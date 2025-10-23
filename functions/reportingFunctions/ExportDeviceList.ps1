@@ -17,61 +17,17 @@ function ExportDeviceList()
     $functionName = $MyInvocation.MyCommand
     $currentDateTime = (Get-Date -Format "yyyyMMdd-HHmmss")
     $outputFile = "$outputPath\$deviceType-DeviceList-$currentDateTime.csv"
-    $autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
-    # $autopilotExtraParameters = "select=serialNumber,groupTag,manufacturer,model,systemFamily,enrollmentState,deploymentProfileAssignmentStatus"
-    $importedAutopilotDeviceURI = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
-    $importedAutopilotExtraParameters = "select=serialNumber,importId,groupTag,state"
-    $unmanagedDeviceUri = "devices"
-    $unmanagedDeviceFilter = "operatingSystem eq 'Windows'"
-    $unmanagedDeviceExtraParameters = "select=id,displayName,manufacturer,model,operatingSystemVersion,profileType,createdDateTime,registrationDateTime,accountEnabled,approximateLastSignInDateTime,enrollmentProfileName,enrollmentType,isCompliant"
-    $managedDeviceUri = "deviceManagement/managedDevices"
-    if ($settings.deviceNamePrefix -isnot [string] -or [string]::IsNullOrWhiteSpace($settings.deviceNamePrefix))
-    {
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device name prefix is not set in settings." -LogLevel "Warning"
-        Write-Verbose "[    $functionName] Device name prefix is not set in settings."
-        $managedDeviceFilter = "operatingSystem eq 'Windows'" 
-    }
-    else 
-    {
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Using device name prefix '$($settings.deviceNamePrefix)' from settings." -LogLevel "Information"
-        Write-Verbose "[    $functionName] Using device name prefix '$($settings.deviceNamePrefix)' from settings."
-        $deviceNamePrefixForOData = $settings.deviceNamePrefix -replace "'", "''"
-        $managedDeviceFilter = "operatingSystem eq 'Windows' and startswith(deviceName,'$deviceNamePrefixForOData')"
-    }
-    $managedDeviceExtraParameters = "select=serialNumber,deviceName,manufacturer,model,osVersion,autopilotEnrolled,enrolledDateTime,lastSyncDateTime,complianceState,userPrincipalName,userDisplayName,usersLoggedOn"
     $CSVObject = [System.Collections.ArrayList]@()
     $success = $false
     #endregion
 
-    #region Prepare export object
-    switch ($deviceType )
-    {
-        'autopilot'
-        {
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "fetching Autopilot devices." -LogLevel "Information"
-            $devices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Fetched $($devices.value.Count) Autopilot devices." -LogLevel "Information"
-        }
-        'imported'
-        {
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "fetching Imported Autopilot devices." -LogLevel "Information"
-            $devices = CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken -extraParameters $importedAutopilotExtraParameters
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Fetched $($devices.value.Count) imported Autopilot devices." -LogLevel "Information"
-        }
-        'unmanaged'
-        {
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "fetching Unmanaged devices." -LogLevel "Information"
-            $devices = CallGraphApi -ResourcePath $unmanagedDeviceUri -accessToken $accessToken -filter $unmanagedDeviceFilter -extraParameters $unmanagedDeviceExtraParameters
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Fetched $($devices.value.Count) unmanaged devices." -LogLevel "Information"
-        }
-        'managed'
-        {
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "fetching Managed devices." -LogLevel "Information"
-            $devices = CallGraphApi -ResourcePath $managedDeviceUri -accessToken $accessToken -filter $managedDeviceFilter -extraParameters $managedDeviceExtraParameters
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Fetched $($devices.value.Count) managed devices." -LogLevel "Information"
-        }
-    }
+    #region Fetch devices using Get-DeviceData
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Fetching $deviceType devices." -LogLevel "Information"
+    $devices = Get-DeviceData -AccessToken $AccessToken -DeviceType $deviceType
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Fetched $($devices.value.Count) $deviceType devices." -LogLevel "Information"
+    #endregion
     
+    #region Process devices for export
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing $($devices.value.Count) $deviceType devices for export." -LogLevel "Verbose"
     for ($i = 0; $i -lt $devices.value.count; $i++)
     {
@@ -185,13 +141,12 @@ function ExportDeviceList()
         $CSVObject.Add($exportObject) | Out-Null
     }
     #endregion    
-
-    if ($CSVObject.Count -gt 0)
+    
+    try
     {
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "exporting $($CSVObject.Count) $deviceType devices to $outputFile." -LogLevel "Information"
-        #Check if the file exists and ask if the user wants to overwrite.
-        if (Test-Path $outputFile)
+        if ($CSVObject.Count -gt 0)
         {
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "exporting $($CSVObject.Count) $deviceType devices to $outputFile." -LogLevel "Information"
             if ($fileMode -eq 'Append')
             {
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Appending to existing file $outputFile." -LogLevel "Information"
@@ -205,24 +160,16 @@ function ExportDeviceList()
         }
         else
         {
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Creating new file $outputFile." -LogLevel "Information"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "No devices found for export." -LogLevel "Verbose"
         }
-        $CSVObject | Export-Csv -Path $outputFile -NoTypeInformation -Force -Encoding UTF8 -Delimiter ','
-    }
-    else
-    {
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No devices found for export." -LogLevel "Verbose"
-    }
-    #check if the csv file exists.
-    if (Test-Path $outputFile)
-    {
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "CSV file $outputFile created successfully." -LogLevel "Information"
+        write-log -logFile $LogFile -Module "$functionName" -Message "Device list export completed successfully." -LogLevel "Information"
         $success = $true
     }
-    else
+    catch
     {
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to create CSV file $outputFile." -LogLevel "Error"
         $success = $false
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error occurred while exporting device list: $_" -LogLevel "Error"
     }
+    
     return $success, $outputFile
 }

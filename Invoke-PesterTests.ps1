@@ -37,6 +37,16 @@
     
     When -Tags "Interactive" is used, an interactive menu will display all available tags
     from test files, allowing multiple selection.
+    
+    Behavior changes with -Exclude switch (see -Exclude parameter).
+.PARAMETER Exclude
+    When specified, inverts the filtering logic for -Tags, -TestFile, and -TestType parameters.
+    Instead of including only matching tests, excludes matching tests and runs everything else.
+    
+    Examples:
+    - `-Tags "Slow" -Exclude` = Run all tests EXCEPT those tagged "Slow"
+    - `-TestType Unit -Exclude` = Run all tests EXCEPT Unit tests
+    - `-TestFile "Auth" -Exclude` = Run all tests EXCEPT files matching "Auth"
 .EXAMPLE
     .\Invoke-PesterTests.ps1 -TestType Unit
     Runs all unit tests
@@ -64,13 +74,22 @@
 .EXAMPLE
     .\Invoke-PesterTests.ps1 -EnableCodeCoverage -ShowMissedCommands
     Runs tests with detailed code coverage information
+.EXAMPLE
+    .\Invoke-PesterTests.ps1 -Tags "Slow" -Exclude
+    Runs all tests EXCEPT those tagged "Slow"
+.EXAMPLE
+    .\Invoke-PesterTests.ps1 -TestType Unit -Exclude
+    Runs all tests EXCEPT Unit tests (Integration and Comprehensive only)
+.EXAMPLE
+    .\Invoke-PesterTests.ps1 -TestFile "Authentication" -Exclude
+    Runs all tests EXCEPT files matching "Authentication"
 #>
 [CmdletBinding(DefaultParameterSetName = 'Default')]
 param(
     [ValidateSet('Unit', 'Integration', 'Comprehensive', 'All')]
     [string]$TestType = 'All',
     [ValidateSet('None', 'Minimal', 'Normal', 'Detailed')]
-    [string]$OutputVerbosity = 'Detailed',
+    [string]$OutputVerbosity = 'Normal',
     [string]$TestFile,
     [Parameter(ParameterSetName = 'Default')]
     [Parameter(ParameterSetName = 'CodeCoverage')]
@@ -89,7 +108,10 @@ param(
     [switch]$CI,
     [Parameter(ParameterSetName = 'Default')]
     [Parameter(ParameterSetName = 'CodeCoverage')]
-    [string[]]$Tags = @()
+    [string[]]$Tags = @(),
+    [Parameter(ParameterSetName = 'Default')]
+    [Parameter(ParameterSetName = 'CodeCoverage')]
+    [switch]$Exclude
 )
 
 $ErrorActionPreference = 'Stop'
@@ -102,7 +124,7 @@ Write-Host "  Autopilot Pester Test Suite" -ForegroundColor Cyan
 Write-Host "=" * 63 -ForegroundColor Cyan
 
 # Get Pester configuration
-$config = Get-AutopilotPesterConfiguration -TestType $TestType -EnableCodeCoverage:$EnableCodeCoverage -CI:$CI -OutputVerbosity $OutputVerbosity
+$config = Get-AutopilotPesterConfiguration -TestType $TestType -EnableCodeCoverage:$EnableCodeCoverage -CI:$CI -OutputVerbosity $OutputVerbosity -Exclude:$Exclude
 
 #region Helper functions
 function Find-FileWithFuzzySearch()
@@ -578,14 +600,38 @@ elseif ($PSBoundParameters.ContainsKey('TestFile') -and -not [string]::IsNullOrW
             {
                 Write-Host ""
                 Write-Host "Using $($foundPath.Count) selected test file(s)" -ForegroundColor Green
-                $config.Run.Path = $foundPath
+                
+                # Handle exclusion mode
+                if ($Exclude)
+                {
+                    # Get all test files and exclude the found ones
+                    $allTestFiles = Get-ChildItem -Path $testsPath -Recurse -Filter "*.Tests.ps1" | Where-Object { $_.FullName -notin $foundPath }
+                    $config.Run.Path = $allTestFiles.FullName
+                    Write-Host "Excluding $($foundPath.Count) file(s), running $($allTestFiles.Count) remaining test(s)" -ForegroundColor Yellow
+                }
+                else
+                {
+                    $config.Run.Path = $foundPath
+                }
             }
             else
             {
                 $resolvedPath = $foundPath
                 Write-Host ""
                 Write-Host "Using selected test file: $resolvedPath" -ForegroundColor Green
-                $config.Run.Path = $resolvedPath
+                
+                # Handle exclusion mode
+                if ($Exclude)
+                {
+                    # Get all test files and exclude the found one
+                    $allTestFiles = Get-ChildItem -Path $testsPath -Recurse -Filter "*.Tests.ps1" | Where-Object { $_.FullName -ne $resolvedPath }
+                    $config.Run.Path = $allTestFiles.FullName
+                    Write-Host "Excluding this file, running $($allTestFiles.Count) remaining test(s)" -ForegroundColor Yellow
+                }
+                else
+                {
+                    $config.Run.Path = $resolvedPath
+                }
             }
         }
         elseif ($foundPath -in $strings)
@@ -612,20 +658,47 @@ elseif ($PSBoundParameters.ContainsKey('TestFile') -and -not [string]::IsNullOrW
     }
     else
     {
-        $config.Run.Path = $resolvedPath
-        Write-Host "`nRunning single test file: $(Split-Path -Leaf $resolvedPath)" -ForegroundColor Yellow
+        # Handle exclusion mode for directly specified file
+        if ($Exclude)
+        {
+            # Get all test files and exclude the specified one
+            $testsPath = Join-Path $PSScriptRoot "tests"
+            $allTestFiles = Get-ChildItem -Path $testsPath -Recurse -Filter "*.Tests.ps1" | Where-Object { $_.FullName -ne $resolvedPath }
+            $config.Run.Path = $allTestFiles.FullName
+            Write-Host "`nExcluding test file: $(Split-Path -Leaf $resolvedPath)" -ForegroundColor Yellow
+            Write-Host "Running $($allTestFiles.Count) remaining test(s)" -ForegroundColor Yellow
+        }
+        else
+        {
+            $config.Run.Path = $resolvedPath
+            Write-Host "`nRunning single test file: $(Split-Path -Leaf $resolvedPath)" -ForegroundColor Yellow
+        }
     }
 }
 
 # Apply tag filter if specified
 if ($Tags.Count -gt 0)
 {
-    $config.Filter.Tag = $Tags
+    if ($Exclude)
+    {
+        $config.Filter.ExcludeTag = $Tags
+    }
+    else
+    {
+        $config.Filter.Tag = $Tags
+    }
 }
 
 # Display configuration
 Write-Host "`nTest Configuration:" -ForegroundColor Cyan
-Write-Host "  Test Type: $TestType" -ForegroundColor White
+if ($Exclude -and $TestType -ne 'All')
+{
+    Write-Host "  Test Type: $TestType (EXCLUDING)" -ForegroundColor White
+}
+else
+{
+    Write-Host "  Test Type: $TestType" -ForegroundColor White
+}
 
 # Handle display of test paths (single or multiple)
 $testPaths = $config.Run.Path.Value
@@ -648,7 +721,14 @@ if ($EnableCodeCoverage -or $OutputVerbosity -eq 'Detailed')
 }
 if ($Tags.Count -gt 0)
 {
-    Write-Host "  Tags: $($Tags -join ', ')" -ForegroundColor White
+    if ($Exclude)
+    {
+        Write-Host "  Excluding Tags: $($Tags -join ', ')" -ForegroundColor White
+    }
+    else
+    {
+        Write-Host "  Tags: $($Tags -join ', ')" -ForegroundColor White
+    }
 }
 Write-Host ""
 

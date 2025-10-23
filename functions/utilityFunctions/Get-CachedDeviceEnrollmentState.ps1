@@ -1,4 +1,4 @@
-function GetCachedDeviceEnrollmentState()
+function Get-CachedDeviceEnrollmentStatus()
 {
     [CmdletBinding()]
     param(
@@ -6,13 +6,14 @@ function GetCachedDeviceEnrollmentState()
         [string]$SerialNumber,
         [Parameter(Mandatory = $true)]
         [string]$AccessToken,
-        $Settings = $settings
+        $Settings = $settings,
+        [switch]$flushCache
     )
     $functionName = $MyInvocation.MyCommand.Name
     if ($script:DeviceEnrollmentCache.ContainsKey($SerialNumber) -eq $false)
     {
         Write-Verbose "[$functionName] Cache miss for serial number: $SerialNumber. Fetching from API."
-        $enrollmentState = GetDeviceEnrollmentStatus -serialNumber $SerialNumber -AccessToken $AccessToken -Settings $Settings
+        $enrollmentState = Get-DeviceEnrollmentStatus -serialNumber $SerialNumber -AccessToken $AccessToken -Settings $Settings
         if ($enrollmentState)
         {
             $script:DeviceEnrollmentCache[$SerialNumber] = $enrollmentState

@@ -413,6 +413,17 @@
         Description           = 'Choose what you would like to export'
         items                 = @(
             @{
+                menuName              = 'deviceReportsMenu'
+                description           = 'Export various device assignment reports'
+                name                  = 'Export Device Assignment Reports'
+                blockType             = 'menu'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin',
+                    'advanced'
+                )
+            },
+            @{
                 description           = 'Export Autopilot devices to a CSV file'
                 name                  = 'Export Autopilot Devices'
                 type                  = 'action'
@@ -490,6 +501,58 @@
             'registration'
         )
     }
+    deviceReportsMenu         = @{
+        Title                 = 'Device Reports Menu'
+        Description           = 'Select the type of device report you would like to export'
+        items                 = @(
+            @{
+                description           = 'Generate a report of assigned Windows devices'
+                name                  = 'Assigned Windows Devices'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin',
+                    'advanced'
+                )
+            },
+            @{
+                description           = 'Generate a report of unassigned Windows devices'
+                name                  = 'Unassigned Windows Devices'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin',
+                    'advanced'
+                )
+            },
+            @{
+                description           = 'Generate a report of Windows devices pre-provisioned with Autopilot'
+                name                  = 'Pre-provisioned Windows Devices'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin',
+                    'advanced'
+                )
+            },
+            @{
+                description           = 'Generate a report of all Windows devices with their assignment'
+                name                  = 'All Windows Devices'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin',
+                    'advanced'
+                )
+            }
+        )
+        type                  = 'static'
+        includeInDisplayModes = @(
+            'full',
+            'admin',
+            'advanced'
+        )
+    }               
     serialNumberMenu          = @{
         Title                 = 'Lookup by Serial Number'
         Description           = 'How would you like to enter the serial number?'
@@ -867,12 +930,24 @@
         )
     }
     reportExportMenu          = @{
-        Title                 = 'Report Export Menu'
-        Description           = 'Select the format to which you would like to export the report'
+        Title                 = 'Device Health Menu'
+        Description           = 'Select whether you want to display or export the device health report'
         items                 = @(
             @{
+                Description           = 'Display the report on screen'
+                name                  = 'Display on Screen'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin',
+                    'advanced',
+                    'helpdesk',
+                    'registration'
+                )
+            },
+            @{
                 Description           = 'Export the report in HTML format'
-                name                  = 'Export in HTML format'
+                name                  = 'Export to HTML'
                 blockType             = 'action'
                 includeInDisplayModes = @(
                     'full',
@@ -884,7 +959,7 @@
             },
             @{
                 Description           = 'Export the report in CSV format'
-                name                  = 'Export in CSV format'
+                name                  = 'Export to CSV'
                 blockType             = 'action'
                 includeInDisplayModes = @(
                     'full',

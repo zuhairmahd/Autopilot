@@ -1,4 +1,4 @@
-function GetDeviceEnrollmentStatus()
+function Get-DeviceEnrollmentStatus()
 {
     [CmdletBinding()]
     param (

@@ -47,7 +47,7 @@ jobs:
       - name: Run Unit Tests
         shell: pwsh
         run: |
-          .\Invoke-PesterTests.ps1 -TestType Unit -CI
+          .\Invoke-PesterTests.ps1 -TestType Unit -CI -OutputVerbosity Detailed
 
       - name: Upload unit test results
         if: always()
@@ -86,7 +86,7 @@ jobs:
       - name: Run Integration Tests
         shell: pwsh
         run: |
-          .\Invoke-PesterTests.ps1 -TestType Integration -CI
+          .\Invoke-PesterTests.ps1 -TestType Integration -CI -OutputVerbosity Detailed
 
       - name: Upload integration test results
         if: always()
