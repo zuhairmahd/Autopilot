@@ -24,6 +24,25 @@
         checkStrongMapping           = $false
         configFile                   = '.\.secrets\config.json'
         deviceContactThresholdInDays = 30
+        cacheSettings                = @{
+            enabled                  = $true
+            defaultExpirationMinutes = 15
+            maxCacheSize             = 1000
+            cacheTypes               = @{
+                Configuration    = @{
+                    enabled           = $true
+                    expirationMinutes = 60
+                }
+                DirectoryObjects = @{
+                    enabled           = $true
+                    expirationMinutes = 15
+                }
+                Devices          = @{
+                    enabled           = $true
+                    expirationMinutes = 15
+                }
+            }
+        }
     }
     description    = 'This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.'
     version        = '1.3.0.0'

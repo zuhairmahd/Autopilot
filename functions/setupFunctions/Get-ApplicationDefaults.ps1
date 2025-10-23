@@ -120,6 +120,25 @@ function Get-ApplicationDefaults()
             maxGroupMatchDisplay         = 10
             maxMenuItemsPerPage          = 15
             release                      = "auto"
+            cacheSettings                = @{
+                enabled                  = $true
+                defaultExpirationMinutes = 15
+                maxCacheSize             = 1000
+                cacheTypes               = @{
+                    Configuration    = @{
+                        enabled           = $true
+                        expirationMinutes = 60
+                    }
+                    DirectoryObjects = @{
+                        enabled           = $true
+                        expirationMinutes = 15
+                    }
+                    Devices          = @{
+                        enabled           = $true
+                        expirationMinutes = 15
+                    }
+                }
+            }
             repoInfo                     = @{
                 repoName      = "Autopilot"
                 baseSourceURL = "https://raw.githubusercontent.com"
