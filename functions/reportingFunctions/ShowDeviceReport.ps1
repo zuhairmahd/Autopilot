@@ -249,7 +249,7 @@ function ShowDeviceReport()
         -PageSize 15 `
         -DisplayScriptBlock { param($item); Write-Host "$($item.Property): $($item.Value)" } `
         -Title $reportTitle `
-        -ShowPageInfo $true
+        -ShowPageInfo $false
     
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Show-PagedContent completed with result: $pagingResult" -LogLevel "Verbose"
     Write-Verbose "[$functionName] Show-PagedContent completed with result: $pagingResult"

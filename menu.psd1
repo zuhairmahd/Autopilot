@@ -935,7 +935,7 @@
         items                 = @(
             @{
                 Description           = 'Export the report in HTML format'
-                name                  = 'Export in HTML format'
+                name                  = 'Export to HTML'
                 blockType             = 'action'
                 includeInDisplayModes = @(
                     'full',
@@ -947,7 +947,7 @@
             },
             @{
                 Description           = 'Export the report in CSV format'
-                name                  = 'Export in CSV format'
+                name                  = 'Export to CSV'
                 blockType             = 'action'
                 includeInDisplayModes = @(
                     'full',

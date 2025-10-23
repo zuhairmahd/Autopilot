@@ -1,4 +1,4 @@
-function Show-PagedContent
+function Show-PagedContent()
 {
     <#
     .SYNOPSIS
@@ -86,22 +86,16 @@ function Show-PagedContent
         [Parameter(Mandatory = $true)]
         [AllowNull()]
         $Content,
-        
         [Parameter(Mandatory = $false)]
         [int]$PageSize = 10,
-        
         [Parameter(Mandatory = $false)]
         [scriptblock]$DisplayScriptBlock,
-        
         [Parameter(Mandatory = $false)]
         [string]$Title = "",
-        
         [Parameter(Mandatory = $false)]
         [bool]$ShowPageInfo = $true,
-        
         [Parameter(Mandatory = $false)]
         [switch]$Silent,
-        
         [Parameter(Mandatory = $false)]
         [switch]$NoPaging
     )
