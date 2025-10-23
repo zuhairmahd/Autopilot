@@ -71,9 +71,9 @@ function ConvertTo-Psd1String()
             }
             elseif ($value.Count -eq 1)
             {
-                # Force single-item arrays to remain arrays using ,@() syntax
-                Write-Verbose "[$functionName] Processing single-item array (forcing array type)"
-                $result += ",@("
+                # Single-item arrays use @() syntax (not ,@() which creates nested arrays)
+                Write-Verbose "[$functionName] Processing single-item array"
+                $result += "@("
                 $item = $value[0]
                 
                 if ($null -eq $item)
