@@ -43,6 +43,8 @@ TestResults/
 *.csv
 *.xls
 *.xlsx
+*.htm
+*.html
 *.xml
 *.backup.*
 config.json
