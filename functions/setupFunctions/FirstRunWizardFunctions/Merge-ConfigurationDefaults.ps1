@@ -111,13 +111,6 @@ function Merge-ConfigurationDefaults()
             elseif (-not $preserveExisting)
             {
                 # Overwrite existing value with default if PreserveExisting is false
-                Write-Verbose "[$functionName] Overwriting existing key: $key"              
-                Write-Log -logFile $logFile -module $functionName -Message "Overwriting existing key: $key"
-                $merged[$key] = $defaults[$key]
-            }
-            elseif (-not $preserveExisting)
-            {
-                # Overwrite existing value with default if PreserveExisting is false
                 Write-Verbose "[$functionName] Overwriting existing key: $key"
                 Write-Log -logFile $logFile -module $functionName -Message "Overwriting existing key: $key"
                 $merged[$key] = $defaults[$key]

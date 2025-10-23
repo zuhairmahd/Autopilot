@@ -347,7 +347,7 @@ $version = if ($null -ne $appMetaData.version)
 }
 else
 {
-    [System.Version]::new(0, 0, 0, 0)
+    New-Object System.Version 0, 0, 0, 0
 }
 if ($ShowVersion)
 {
