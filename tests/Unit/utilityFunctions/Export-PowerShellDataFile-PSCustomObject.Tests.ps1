@@ -217,4 +217,183 @@ Describe "Function: Export-PowerShellDataFile - PSCustomObject Array Handling" -
             $imported.appModes[1] | Should -Be 'registration'
         }
     }
+
+    Context "String Arrays (userPatternsToExclude, autopilotDeviceAllowedVendors)" {
+        It "Should handle single string in array correctly" {
+            $testData = @{
+                userPatternsToExclude = @('-test')
+            }
+            
+            $testFile = Join-Path $script:TestOutputDir "single-string.psd1"
+            Export-PowerShellDataFile -InputObject $testData -Path $testFile -Force | Should -Not -BeNullOrEmpty
+            
+            $imported = Import-PowerShellDataFile -Path $testFile
+            $imported.userPatternsToExclude.Count | Should -Be 1
+            $imported.userPatternsToExclude[0] | Should -Be '-test'
+            $imported.userPatternsToExclude[0] | Should -BeOfType [string]
+        }
+
+        It "Should handle multiple strings in array correctly" {
+            $testData = @{
+                autopilotDeviceAllowedVendors = @('Dell', 'HP', 'Lenovo')
+            }
+            
+            $testFile = Join-Path $script:TestOutputDir "multiple-strings.psd1"
+            Export-PowerShellDataFile -InputObject $testData -Path $testFile -Force | Should -Not -BeNullOrEmpty
+            
+            $imported = Import-PowerShellDataFile -Path $testFile
+            $imported.autopilotDeviceAllowedVendors.Count | Should -Be 3
+            $imported.autopilotDeviceAllowedVendors[0] | Should -Be 'Dell'
+            $imported.autopilotDeviceAllowedVendors[1] | Should -Be 'HP'
+            $imported.autopilotDeviceAllowedVendors[2] | Should -Be 'Lenovo'
+        }
+
+        It "Should handle empty string array correctly" {
+            $testData = @{
+                userPatternsToExclude = @()
+            }
+            
+            $testFile = Join-Path $script:TestOutputDir "empty-string-array.psd1"
+            Export-PowerShellDataFile -InputObject $testData -Path $testFile -Force | Should -Not -BeNullOrEmpty
+            
+            $imported = Import-PowerShellDataFile -Path $testFile
+            $imported.userPatternsToExclude.Count | Should -Be 0
+        }
+    }
+
+    Context "Hashtable Arrays (groupsToInclude, groupsToExclude, autopilotProfilesToInclude)" {
+        It "Should handle single hashtable with id and name correctly" {
+            $testData = @{
+                groupsToInclude = @(
+                    @{ id = 'group-id-1'; name = 'Marketing Team' }
+                )
+            }
+            
+            $testFile = Join-Path $script:TestOutputDir "single-hashtable.psd1"
+            Export-PowerShellDataFile -InputObject $testData -Path $testFile -Force | Should -Not -BeNullOrEmpty
+            
+            $imported = Import-PowerShellDataFile -Path $testFile
+            $imported.groupsToInclude.Count | Should -Be 1
+            $imported.groupsToInclude[0].id | Should -Be 'group-id-1'
+            $imported.groupsToInclude[0].name | Should -Be 'Marketing Team'
+        }
+
+        It "Should handle multiple hashtables with id and name correctly" {
+            $testData = @{
+                autopilotProfilesToInclude = @(
+                    @{ id = 'profile-1'; name = 'Profile One' },
+                    @{ id = 'profile-2'; name = 'Profile Two' }
+                )
+            }
+            
+            $testFile = Join-Path $script:TestOutputDir "multiple-hashtables.psd1"
+            Export-PowerShellDataFile -InputObject $testData -Path $testFile -Force | Should -Not -BeNullOrEmpty
+            
+            $imported = Import-PowerShellDataFile -Path $testFile
+            $imported.autopilotProfilesToInclude.Count | Should -Be 2
+            $imported.autopilotProfilesToInclude[0].id | Should -Be 'profile-1'
+            $imported.autopilotProfilesToInclude[0].name | Should -Be 'Profile One'
+            $imported.autopilotProfilesToInclude[1].id | Should -Be 'profile-2'
+            $imported.autopilotProfilesToInclude[1].name | Should -Be 'Profile Two'
+        }
+
+        It "Should handle empty hashtable array correctly" {
+            $testData = @{
+                groupsToExclude = @()
+            }
+            
+            $testFile = Join-Path $script:TestOutputDir "empty-hashtable-array.psd1"
+            Export-PowerShellDataFile -InputObject $testData -Path $testFile -Force | Should -Not -BeNullOrEmpty
+            
+            $imported = Import-PowerShellDataFile -Path $testFile
+            $imported.groupsToExclude.Count | Should -Be 0
+        }
+    }
+
+    Context "Mixed Array Types in Single Configuration" {
+        It "Should handle realistic domain configuration with mixed array types" {
+            $testData = @{
+                userPatternsToExclude = @('-test', 'onmicrosoft.com')
+                autopilotDeviceAllowedVendors = @('Dell')
+                groupsToInclude = @(
+                    @{ id = 'group1-id'; name = 'Group 1' }
+                )
+                autopilotProfilesToInclude = @(
+                    @{ id = 'profile1-id'; name = 'Profile 1' },
+                    @{ id = 'profile2-id'; name = 'Profile 2' }
+                )
+            }
+            
+            $testFile = Join-Path $script:TestOutputDir "mixed-arrays.psd1"
+            Export-PowerShellDataFile -InputObject $testData -Path $testFile -Force | Should -Not -BeNullOrEmpty
+            
+            $imported = Import-PowerShellDataFile -Path $testFile
+            
+            # Verify string arrays
+            $imported.userPatternsToExclude.Count | Should -Be 2
+            $imported.userPatternsToExclude[0] | Should -Be '-test'
+            $imported.autopilotDeviceAllowedVendors.Count | Should -Be 1
+            $imported.autopilotDeviceAllowedVendors[0] | Should -Be 'Dell'
+            
+            # Verify hashtable arrays
+            $imported.groupsToInclude.Count | Should -Be 1
+            $imported.groupsToInclude[0].name | Should -Be 'Group 1'
+            $imported.autopilotProfilesToInclude.Count | Should -Be 2
+            $imported.autopilotProfilesToInclude[1].id | Should -Be 'profile2-id'
+        }
+    }
+
+    Context "Save-Load-Modify-Save Cycles" {
+        It "Should preserve string array data through save-load-modify-save cycle" {
+            $originalData = @{
+                autopilotDeviceAllowedVendors = @('Dell')
+            }
+            
+            # First save
+            $testFile = Join-Path $script:TestOutputDir "cycle-strings.psd1"
+            Export-PowerShellDataFile -InputObject $originalData -Path $testFile -Force | Should -Not -BeNullOrEmpty
+            
+            # Load
+            $loaded = Import-PowerShellDataFile -Path $testFile
+            
+            # Modify
+            $loaded.autopilotDeviceAllowedVendors = $loaded.autopilotDeviceAllowedVendors + @('HP')
+            
+            # Second save
+            Export-PowerShellDataFile -InputObject $loaded -Path $testFile -Force | Should -Not -BeNullOrEmpty
+            
+            # Final load and verify
+            $finalLoaded = Import-PowerShellDataFile -Path $testFile
+            $finalLoaded.autopilotDeviceAllowedVendors.Count | Should -Be 2
+            $finalLoaded.autopilotDeviceAllowedVendors[0] | Should -Be 'Dell'
+            $finalLoaded.autopilotDeviceAllowedVendors[1] | Should -Be 'HP'
+        }
+
+        It "Should preserve hashtable array data through save-load-modify-save cycle" {
+            $originalData = @{
+                groupsToInclude = @(
+                    @{ id = 'g1'; name = 'Group 1' }
+                )
+            }
+            
+            # First save
+            $testFile = Join-Path $script:TestOutputDir "cycle-hashtables.psd1"
+            Export-PowerShellDataFile -InputObject $originalData -Path $testFile -Force | Should -Not -BeNullOrEmpty
+            
+            # Load
+            $loaded = Import-PowerShellDataFile -Path $testFile
+            
+            # Modify
+            $loaded.groupsToInclude = $loaded.groupsToInclude + @(@{ id = 'g2'; name = 'Group 2' })
+            
+            # Second save
+            Export-PowerShellDataFile -InputObject $loaded -Path $testFile -Force | Should -Not -BeNullOrEmpty
+            
+            # Final load and verify
+            $finalLoaded = Import-PowerShellDataFile -Path $testFile
+            $finalLoaded.groupsToInclude.Count | Should -Be 2
+            $finalLoaded.groupsToInclude[0].id | Should -Be 'g1'
+            $finalLoaded.groupsToInclude[1].name | Should -Be 'Group 2'
+        }
+    }
 }
