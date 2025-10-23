@@ -124,7 +124,7 @@ function Merge-ConfigurationDefaults()
                 $changesMade = $true
             }
             #If the key is 'domain' and it has a string or whitespace, we consider it a change
-            if ($key -eq 'domain' -and $merged[$key] -is [string] -and [string]::IsNullOrWhiteSpace($merged[$key]))
+            if ($key -eq 'domain' -and $merged[$key] -is [string] -and ([string]::IsNullOrWhiteSpace($merged[$key]) -or $merged[$key] -ne $domain))
             {
                 Write-Verbose "[$functionName] Domain key is empty or whitespace"
                 Write-Log -logFile $logFile -module $functionName -Message "Domain key is empty or whitespace"
