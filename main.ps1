@@ -615,6 +615,12 @@ $requiredScopes = $configResult.RequiredScopes
 # Merge global and local settings into a single settings object
 Write-Verbose "[$scriptName] Merging global and local settings"
 $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+if ($settings.domain -ne $domain)
+{
+    Write-Verbose "[$scriptName] Updating settings domain from $($settings.domain) to $domain"
+    write-log -logFile $logFile -module $scriptName -message "Updating settings domain from $($settings.domain) to $domain"     
+    $settings.domain = $domain
+}
 Write-Verbose "[$scriptName] Settings merged successfully. Final settings count: $($settings.Count)"
 Write-Verbose "[$scriptName] Configuration initialization completed successfully"
 Write-Verbose "[$scriptName] Auth settings count: $($auth.Count)"

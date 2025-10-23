@@ -513,7 +513,7 @@ See Progress Tracking section below for detailed results.
 - [x] `tests/Unit/setupFunctions/Show-SettingsViewer.Tests.ps1` ✅ COMPLETE (Day 5)
   - Test value formatting (Format-SettingValueForDisplay) - null/empty, primitives, arrays, hashtables, PSCustomObject ✅
   - Test description retrieval (Get-SettingDescription) - known settings, fallbacks ✅
-  - Test setting display (Display-SettingInfo, Display-SettingInfoForViewer) ✅
+  - Test setting display (Show-SettingInfo, Show-SettingInfoForViewer) ✅
   - Test nested settings handling ✅
   - Test deterministic output (alphabetically sorted keys/properties) ✅
   - **37 test cases, all passing (100% pass rate)**
@@ -882,9 +882,9 @@ See Progress Tracking section below for detailed results.
     * Known settings: configFile, maxWaitTime, deviceNamePrefix, authType, repoPath, scope (6 tests)
     * Unknown fallback: generic "Configuration setting: {name}" (2 tests)
     * Coverage validation: core settings (7 settings), auth settings (6 settings) (2 tests)
-  - **Display-SettingInfo (Legacy)** (4 tests): Legacy function compatibility
+  - **Show-SettingInfo (Legacy)** (4 tests): Legacy function compatibility
     * Basic setting, boolean, array, null value display without throwing (4 tests)
-  - **Display-SettingInfoForViewer** (5 tests): SettingInfo object display
+  - **Show-SettingInfoForViewer** (5 tests): SettingInfo object display
     * Flat vs nested settings (Path display), value changes (default diff), complex types (5 tests)
   - Coverage: ~115 lines of settings viewer utilities
   - **Note**: Show-SettingsViewer main function (interactive paging) deferred to integration tests
@@ -911,7 +911,7 @@ See Progress Tracking section below for detailed results.
   - Hashtables/PSCustomObject → `{ key: value, ... }` with alphabetically sorted keys
 - **Deterministic Display**: Alphabetical sorting ensures consistent output for tests and diffs
 - **Description System**: 40+ predefined descriptions, generic fallback for unknown settings
-- **Legacy Compatibility**: Display-SettingInfo maintained for backward compatibility
+- **Legacy Compatibility**: Show-SettingInfo maintained for backward compatibility
 
 **Key Pattern Established** (Days 3-6):
 - **Test Isolation**: Interactive functions deferred to integration tests (Week 8)

@@ -209,7 +209,7 @@ function Show-SettingsViewer()
         Write-Verbose "[$functionName] Settings template loaded successfully. Found $($settingsTemplate.PSObject.Properties.Count) settings to display"
         
         # Get flattened settings for display (exclude GroupsToInclude/GroupsToExclude as they have dedicated viewers)
-        $excludeSettings = @('groupsToInclude', 'groupsToExclude', 'GroupsToInclude', 'GroupsToExclude')
+        $excludeSettings = @('groupsToInclude', 'groupsToExclude', 'GroupsToInclude', 'GroupsToExclude', 'autopilotProfilesToInclude')
         $flattenedSettings = Get-FlattenedSettingsForProcessing -SettingsTemplate $settingsTemplate -CurrentValues $currentValues -ExcludeSettings $excludeSettings
         $totalSettings = $flattenedSettings.Count
         
@@ -248,7 +248,7 @@ function Show-SettingsViewer()
             {
                 if (-not $Silent)
                 {
-                    Display-SettingInfoForViewer -SettingInfo $settingInfo
+                    Show-SettingInfoForViewer -SettingInfo $settingInfo
                 }
             }
             
@@ -361,7 +361,7 @@ function Show-SettingsViewer()
     }
 }
 
-function Display-SettingInfoForViewer()
+function Show-SettingInfoForViewer()
 {
     <#
     .SYNOPSIS
@@ -407,7 +407,7 @@ function Display-SettingInfoForViewer()
     Write-Host ""  # Empty line for spacing
 }
 
-function Display-SettingInfo()
+function Show-SettingInfo()
 {
     <#
     .SYNOPSIS

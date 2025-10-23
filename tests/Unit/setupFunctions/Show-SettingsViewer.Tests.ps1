@@ -225,7 +225,7 @@ Describe "Function: Get-SettingDescription" -Tags 'Unit', 'SettingsViewer' {
     }
 }
 
-Describe "Function: Display-SettingInfo (Legacy)" -Tags 'Unit', 'SettingsViewer' {
+Describe "Function: Show-SettingInfo (Legacy)" -Tags 'Unit', 'SettingsViewer' {
     BeforeAll {
         $script:RepoRoot = (Get-Item $PSScriptRoot).Parent.Parent.Parent.FullName
         $script:logFile = Join-Path $TestDrive "test.log"
@@ -238,28 +238,28 @@ Describe "Function: Display-SettingInfo (Legacy)" -Tags 'Unit', 'SettingsViewer'
     
     Context "Display output validation" {
         It "Should not throw when displaying basic setting" {
-            { Display-SettingInfo -SettingName "testSetting" -CurrentValue "testValue" -DefaultValue "defaultValue" } | 
+            { Show-SettingInfo -SettingName "testSetting" -CurrentValue "testValue" -DefaultValue "defaultValue" } | 
                 Should -Not -Throw
         }
         
         It "Should not throw when displaying boolean setting" {
-            { Display-SettingInfo -SettingName "boolSetting" -CurrentValue $true -DefaultValue $false } | 
+            { Show-SettingInfo -SettingName "boolSetting" -CurrentValue $true -DefaultValue $false } | 
                 Should -Not -Throw
         }
         
         It "Should not throw when displaying array setting" {
-            { Display-SettingInfo -SettingName "arraySetting" -CurrentValue @("a", "b") -DefaultValue @("x", "y") } | 
+            { Show-SettingInfo -SettingName "arraySetting" -CurrentValue @("a", "b") -DefaultValue @("x", "y") } | 
                 Should -Not -Throw
         }
         
         It "Should not throw when displaying null value" {
-            { Display-SettingInfo -SettingName "nullSetting" -CurrentValue $null -DefaultValue "default" } | 
+            { Show-SettingInfo -SettingName "nullSetting" -CurrentValue $null -DefaultValue "default" } | 
                 Should -Not -Throw
         }
     }
 }
 
-Describe "Function: Display-SettingInfoForViewer" -Tags 'Unit', 'SettingsViewer' {
+Describe "Function: Show-SettingInfoForViewer" -Tags 'Unit', 'SettingsViewer' {
     BeforeAll {
         $script:RepoRoot = (Get-Item $PSScriptRoot).Parent.Parent.Parent.FullName
         $script:logFile = Join-Path $TestDrive "test.log"
@@ -280,7 +280,7 @@ Describe "Function: Display-SettingInfoForViewer" -Tags 'Unit', 'SettingsViewer'
                 IsNested     = $false
             }
             
-            { Display-SettingInfoForViewer -SettingInfo $settingInfo } | Should -Not -Throw
+            { Show-SettingInfoForViewer -SettingInfo $settingInfo } | Should -Not -Throw
         }
         
         It "Should not throw when displaying nested setting" {
@@ -292,7 +292,7 @@ Describe "Function: Display-SettingInfoForViewer" -Tags 'Unit', 'SettingsViewer'
                 IsNested     = $true
             }
             
-            { Display-SettingInfoForViewer -SettingInfo $settingInfo } | Should -Not -Throw
+            { Show-SettingInfoForViewer -SettingInfo $settingInfo } | Should -Not -Throw
         }
         
         It "Should not throw when current value differs from default" {
@@ -304,7 +304,7 @@ Describe "Function: Display-SettingInfoForViewer" -Tags 'Unit', 'SettingsViewer'
                 IsNested     = $false
             }
             
-            { Display-SettingInfoForViewer -SettingInfo $settingInfo } | Should -Not -Throw
+            { Show-SettingInfoForViewer -SettingInfo $settingInfo } | Should -Not -Throw
         }
         
         It "Should not throw when current value equals default" {
@@ -316,7 +316,7 @@ Describe "Function: Display-SettingInfoForViewer" -Tags 'Unit', 'SettingsViewer'
                 IsNested     = $false
             }
             
-            { Display-SettingInfoForViewer -SettingInfo $settingInfo } | Should -Not -Throw
+            { Show-SettingInfoForViewer -SettingInfo $settingInfo } | Should -Not -Throw
         }
         
         It "Should not throw with complex value types" {
@@ -328,7 +328,7 @@ Describe "Function: Display-SettingInfoForViewer" -Tags 'Unit', 'SettingsViewer'
                 IsNested     = $false
             }
             
-            { Display-SettingInfoForViewer -SettingInfo $settingInfo } | Should -Not -Throw
+            { Show-SettingInfoForViewer -SettingInfo $settingInfo } | Should -Not -Throw
         }
     }
 }
