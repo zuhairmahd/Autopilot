@@ -21,7 +21,8 @@ function ConvertTo-Psd1String()
     }
     
     Write-Verbose "[$functionName] Converting $($Configuration.GetType().Name) to PSD1 string at indent level $IndentLevel"
-    
+    Write-Verbose "[$functionName] Configuration object $($Configuration |Out-String) with keys:"
+    $Configuration.Keys | ForEach-Object { Write-Verbose "[$functionName] Key: $_" }
     # Handle empty hashtables
     if ($Configuration.Keys.Count -eq 0)
     {
@@ -81,6 +82,27 @@ function ConvertTo-Psd1String()
                     Write-Verbose "[$functionName] Processing null item in single-item array"
                     $result += '$null'
                 }
+                elseif ($item -is [string])
+                {
+                    Write-Verbose "[$functionName] Processing string in single-item array: $item"
+                    $escapedItem = $item -replace "'", "''" -replace "`n", "``n" -replace "`r", "``r" -replace "`t", "``t"
+                    $result += "'$escapedItem'"
+                }
+                elseif ($item -is [bool])
+                {
+                    $result += if ($item)
+                    {
+                        '$true' 
+                    }
+                    else
+                    {
+                        '$false' 
+                    }
+                }
+                elseif ($item -is [int] -or $item -is [long] -or $item -is [double] -or $item -is [float])
+                {
+                    $result += $item.ToString()
+                }
                 elseif ($item -is [hashtable] -or $item -is [System.Collections.Specialized.OrderedDictionary])
                 {
                     Write-Verbose "[$functionName] Processing nested $($item.GetType().Name) in single-item array"
@@ -91,20 +113,6 @@ function ConvertTo-Psd1String()
                     Write-Verbose "[$functionName] Processing PSCustomObject in single-item array - converting to hashtable first"
                     $itemAsHashtable = ConvertTo-HashtableFromPSCustomObject -InputObject $item
                     $result += (ConvertTo-Psd1String -Configuration $itemAsHashtable -IndentLevel ($IndentLevel + 1))
-                }
-                elseif ($item -is [string])
-                {
-                    Write-Verbose "[$functionName] Processing string in single-item array: $item"
-                    $escapedItem = $item -replace "'", "''" -replace "`n", "``n" -replace "`r", "``r" -replace "`t", "``t"
-                    $result += "'$escapedItem'"
-                }
-                elseif ($item -is [bool])
-                {
-                    $result += if ($item) { '$true' } else { '$false' }
-                }
-                elseif ($item -is [int] -or $item -is [long] -or $item -is [double] -or $item -is [float])
-                {
-                    $result += $item.ToString()
                 }
                 else
                 {
@@ -145,7 +153,14 @@ function ConvertTo-Psd1String()
                     }
                     elseif ($item -is [bool])
                     {
-                        $result += if ($item) { '$true' } else { '$false' }
+                        $result += if ($item)
+                        {
+                            '$true' 
+                        }
+                        else
+                        {
+                            '$false' 
+                        }
                     }
                     elseif ($item -is [int] -or $item -is [long] -or $item -is [double] -or $item -is [float])
                     {
@@ -172,7 +187,14 @@ function ConvertTo-Psd1String()
         elseif ($value -is [bool])
         {
             Write-Verbose "[$functionName] Processing key: $key with value type: Boolean"
-            $result += if ($value) { '$true' } else { '$false' }
+            $result += if ($value)
+            {
+                '$true' 
+            }
+            else
+            {
+                '$false' 
+            }
         }
         elseif ($value -is [int] -or $value -is [long] -or $value -is [double] -or $value -is [float])
         {

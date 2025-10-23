@@ -11,12 +11,14 @@ function ConvertTo-HashtableFromPSCustomObject()
 
     if ($InputObject -is [hashtable] -or $InputObject -is [System.Collections.Specialized.OrderedDictionary])
     {
-        Write-Verbose "[$functionName] Input is already a hashtable, returning as-is"
+        Write-Verbose "[$functionName] Input $InputObject is already a hashtable, returning as-is with the following keys:"
+        $InputObject.Keys | ForEach-Object { Write-Verbose "[$functionName] Hashtable key: $_" }
         return $InputObject
     }
     elseif ($InputObject -is [PSCustomObject])
     {
-        Write-Verbose "[$functionName] Converting PSCustomObject to hashtable"
+        Write-Verbose "[$functionName] Converting PSCustomObject $InputObject to hashtable with the following keys:"
+        $InputObject.PSObject.Properties | ForEach-Object { Write-Verbose "[$functionName] PSCustomObject property: $($_.Name)" }   
         $hashtable = [ordered]@{}
         foreach ($property in $InputObject.PSObject.Properties)
         {
@@ -63,7 +65,7 @@ function ConvertTo-HashtableFromPSCustomObject()
     }
     elseif ($InputObject -is [System.Array])
     {
-        Write-Verbose "[$functionName] Processing array input"
+        Write-Verbose "[$functionName] Processing array input $InputObject"
         $array = @()
         foreach ($item in $InputObject)
         {
