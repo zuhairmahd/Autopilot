@@ -19,7 +19,7 @@ function ConvertTo-HashtableFromPSCustomObject()
     elseif ($InputObject -is [PSCustomObject])
     {
         Write-Verbose "[$functionName] Converting PSCustomObject $InputObject to hashtable with the following keys:"
-        write-log -logFile $logFile -module $functionName -message "Converting PSCustomObject $InputObject to hashtable with        the following keys:"
+        write-log -logFile $logFile -module $functionName -message "Converting PSCustomObject $InputObject to hashtable with the following keys:"
         $InputObject.PSObject.Properties | ForEach-Object { Write-Verbose "[$functionName] PSCustomObject property: $($_.Name)" }   
         $hashtable = [ordered]@{}
         foreach ($property in $InputObject.PSObject.Properties)
