@@ -172,6 +172,7 @@ $stats = Invoke-CacheManagement -Action 'GetStatistics'
 2. **Get-CachedDeviceEnrollmentState.ps1** - Replace `$script:DeviceEnrollmentCache`
 3. **Get-MenuConfiguration.ps1** - Integrate with unified cache instead of `$script:configurationCache`
 4. **Get-ApplicationDefaults.ps1** - Replace `$script:defaultsCache` if still relevant
+5. **Update setting editors and viewers to add settings descriptions and ensure they are displayed and processed properly
 
 ### Phase 3: Pester Test Migration
 1. Fix Pester test execution issues (currently container fails to load)
