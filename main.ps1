@@ -599,7 +599,8 @@ else
 {
     "contoso.com"
 }
-$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -BoundParameters $PSBoundParameters
+
+$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -BoundParameters $PSBoundParameters -verbose 
 if (-not $configResult.Success)
 {
     Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
@@ -619,6 +620,7 @@ if ($settings.domain -ne $domain)
 {
     Write-Verbose "[$scriptName] Updating settings domain from $($settings.domain) to $domain"
     write-log -logFile $logFile -module $scriptName -message "Updating settings domain from $($settings.domain) to $domain"     
+    Write-Warning "[$scriptName] Settings domain updated from $($settings.domain) to $domain"
     $settings.domain = $domain
 }
 Write-Verbose "[$scriptName] Settings merged successfully. Final settings count: $($settings.Count)"

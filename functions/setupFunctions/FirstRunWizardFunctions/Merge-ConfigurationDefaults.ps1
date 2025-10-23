@@ -53,14 +53,8 @@ function Merge-ConfigurationDefaults()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    # Check if Write-Log is available (for standalone test execution)
-    $canLog = (Get-Command Write-Log -ErrorAction SilentlyContinue) -and ($null -ne $logFile)
-    
     Write-Verbose "[$functionName] Starting configuration merge"
-    if ($canLog)
-    {
-        Write-Log -logFile $logFile -module $functionName -Message "Starting configuration merge"
-    }
+    Write-Log -logFile $logFile -module $functionName -Message "Starting configuration merge"
     
     # Helper function to perform recursive merge
     function MergeHashtables()
@@ -71,45 +65,29 @@ function Merge-ConfigurationDefaults()
             [System.Collections.Hashtable]$defaults,
             [bool]$preserveExisting
         )
-
         $functionName = $MyInvocation.MyCommand.Name
         Write-Verbose "[$functionName] Starting hashtable merge"
-        if ($canLog)
-        {
-            Write-Log -logFile $logFile -module $functionName -Message "Starting hashtable merge"
-        }
+        Write-Log -logFile $logFile -module $functionName -Message "Starting hashtable merge"
         $merged = @{}
         $changesMade = $false
         
         # First, copy all existing values
         Write-Verbose "[$functionName] Copying existing values"
-        if ($canLog)
-        {
-            Write-Log -logFile $logFile -module $functionName -Message "Copying existing values"
-        }
+        Write-Log -logFile $logFile -module $functionName -Message "Copying existing values"
         foreach ($key in $existing.Keys)
         {
             $merged[$key] = $existing[$key]
             Write-Verbose "[$functionName] Copied existing key: $key"
-            if ($canLog)
-            {
-                Write-Log -logFile $logFile -module $functionName -Message "Copied existing key: $key"
-            }
+            Write-Log -logFile $logFile -module $functionName -Message "Copied existing key: $key"
         }
         
         # Then, add any missing keys from defaults
         Write-Verbose "[$functionName] Adding missing keys from defaults"
-        if ($canLog)
-        {
-            Write-Log -logFile $logFile -module $functionName -Message "Adding missing keys from defaults"
-        }
+        Write-Log -logFile $logFile -module $functionName -Message "Adding missing keys from defaults"
         foreach ($key in $defaults.Keys)
         {
             Write-Verbose "[$functionName] Checking key: $key"
-            if ($canLog)
-            {
-                Write-Log -logFile $logFile -module $functionName -Message "Checking key: $key"
-            }
+            Write-Log -logFile $logFile -module $functionName -Message "Checking key: $key"
             if (-not $merged.ContainsKey($key))
             {
                 Write-Verbose "[$functionName] Adding missing key: $key"
@@ -120,42 +98,45 @@ function Merge-ConfigurationDefaults()
             {
                 # Recursively merge nested hashtables
                 Write-Verbose "[$functionName] Merging nested hashtable: $key"
-                if ($canLog)
-                {
-                    Write-Log -logFile $logFile -module $functionName -Message "Merging nested hashtable: $key"
-                }
+                Write-Log -logFile $logFile -module $functionName -Message "Merging nested hashtable: $key"
                 $nestedResult = MergeHashtables -existing $merged[$key] -defaults $defaults[$key] -preserveExisting $preserveExisting
                 if ($nestedResult[0])  # Changes were made
                 {
                     $merged[$key] = $nestedResult[1]
                     $changesMade = $true
-                    if ($canLog)
-                    {
-                        Write-Log -logFile $logFile -module $functionName -Message "Merged nested hashtable: $key"
-                    }
+                    Write-Log -logFile $logFile -module $functionName -Message "Merged nested hashtable: $key"
                     Write-Verbose "[$functionName] Merged nested hashtable: $key"
                 }
             }
             elseif (-not $preserveExisting)
             {
                 # Overwrite existing value with default if PreserveExisting is false
+                Write-Verbose "[$functionName] Overwriting existing key: $key"              
+                Write-Log -logFile $logFile -module $functionName -Message "Overwriting existing key: $key"
+                $merged[$key] = $defaults[$key]
+            }
+            elseif (-not $preserveExisting)
+            {
+                # Overwrite existing value with default if PreserveExisting is false
                 Write-Verbose "[$functionName] Overwriting existing key: $key"
-                if ($canLog)
-                {
-                    Write-Log -logFile $logFile -module $functionName -Message "Overwriting existing key: $key"
-                }
+                Write-Log -logFile $logFile -module $functionName -Message "Overwriting existing key: $key"
                 $merged[$key] = $defaults[$key]
                 $changesMade = $true
             }
-            # If PreserveExisting is true, keep the existing value
+            #If the key is 'domain' and it has a string or whitespace, we consider it a change
+            if ($key -eq 'domain' -and $merged[$key] -is [string] -and [string]::IsNullOrWhiteSpace($merged[$key]))
+            {
+                Write-Verbose "[$functionName] Domain key is empty or whitespace"
+                Write-Log -logFile $logFile -module $functionName -Message "Domain key is empty or whitespace"
+                #set the value of the key to $domain
+                $merged[$key] = $domain
+                $changesMade = $true
+            }
         }
         Write-Verbose "[$functionName] Hashtable merge completed"
         Write-Verbose "[$functionName] Changes made: $changesMade"
-        if ($canLog)
-        {
-            Write-Log -logFile $logFile -module $functionName -Message "Hashtable merge completed"
-            Write-Log -logFile $logFile -module $functionName -Message "Changes made: $changesMade"
-        }
+        Write-Log -logFile $logFile -module $functionName -Message "Hashtable merge completed"
+        Write-Log -logFile $logFile -module $functionName -Message "Changes made: $changesMade"
         return $changesMade, $merged
     }
     
@@ -163,51 +144,32 @@ function Merge-ConfigurationDefaults()
     {
         # Perform the merge
         Write-Verbose "[$functionName] Performing hashtable merge"
-        if ($canLog)
-        {
-            Write-Log -logFile $logFile -module $functionName -Message "Performing hashtable merge"
-        }
+        Write-Log -logFile $logFile -module $functionName -Message "Performing hashtable merge"
         $mergeResult = MergeHashtables -existing $ExistingConfig -defaults $DefaultConfig -preserveExisting $PreserveExisting
         $changesMade = $mergeResult[0]
         Write-Verbose "[$functionName] Changes made: $changesMade"
-        if ($canLog)
-        {
-            Write-Log -logFile $logFile -module $functionName -Message "Changes made: $changesMade"
-        }
+        Write-Log -logFile $logFile -module $functionName -Message "Changes made: $changesMade"
         $mergedConfig = $mergeResult[1]
         Write-Verbose "[$functionName] Merged configuration: $($mergeResult[1])"
-        if ($canLog)
-        {
-            Write-Log -logFile $logFile -module $functionName -Message "Merged configuration: $($mergeResult[1])"
-        }
+        Write-Log -logFile $logFile -module $functionName -Message "Merged configuration: $($mergeResult[1])"
         if ($changesMade)
         {
             Write-Verbose "[$functionName] Configuration merge completed with changes"
-            if ($canLog)
-            {
-                Write-Log -logFile $logFile -module $functionName -Message "Configuration merge completed with changes"
-            }
+            Write-Log -logFile $logFile -module $functionName -Message "Configuration merge completed with changes"
             return $mergedConfig
         }
         else
         {
             Write-Verbose "[$functionName] No configuration changes needed"
-            if ($canLog)
-            {
-                Write-Log -logFile $logFile -module $functionName -Message "No configuration changes needed"
-            }
+            Write-Log -logFile $logFile -module $functionName -Message "No configuration changes needed"
             return $null
         }
     }
     catch
     {
         Write-Verbose "[$functionName] Error during configuration merge: $($_.Exception.Message)"
-        if ($canLog)
-        {
-            Write-Log -logFile $logFile -module $functionName -Message "Error during configuration merge: $($_.Exception.Message)"
-        }
+        Write-Log -logFile $logFile -module $functionName -Message "Error during configuration merge: $($_.Exception.Message)"
         throw
     }
 }
-
 
