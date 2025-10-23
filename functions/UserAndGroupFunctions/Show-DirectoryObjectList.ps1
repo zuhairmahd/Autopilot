@@ -1,4 +1,4 @@
-function Show-DirectoryObjectList
+function Show-DirectoryObjectList()
 {
     <#
     .SYNOPSIS
@@ -43,20 +43,16 @@ function Show-DirectoryObjectList
         Version: 1.0.0
         This function replaces DisplayUserList and DisplayGroupList to eliminate code duplication.
     #>
-    
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
         [AllowEmptyCollection()]
         [array]$EntityList,
-        
         [Parameter(Mandatory = $true)]
         [ValidateSet("User", "Group")]
         [string]$EntityType,
-        
         [Parameter(Mandatory = $false)]
         [int]$MaxDisplay = 10,
-        
         [Parameter(Mandatory = $false)]
         [switch]$NoPrompt
     )

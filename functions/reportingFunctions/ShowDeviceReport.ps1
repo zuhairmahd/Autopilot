@@ -22,7 +22,7 @@ function ShowDeviceReport()
     #endregion usage info
     $functionName = $MyInvocation.MyCommand.Name
     #region write verbose log of received parameters
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting device report generation" -LogLevel "Verbose"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting device report generation" -LogLevel "Verbose"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Parameter Set: $($PSCmdlet.ParameterSetName)" -LogLevel "Information"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Export: $Export" -LogLevel "Information"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "ExportFormat: $ExportFormat" -LogLevel "Information"
@@ -50,12 +50,12 @@ Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting device re
         if ($enrollmentState.autopilot.events -and $enrollmentState.autopilot.events.Count -gt 0)
         {
             $latestAutopilotEvent = $enrollmentState.autopilot.events | Select-Object -First 1
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found $($enrollmentState.autopilot.events.Count) autopilot events" -LogLevel "Verbose"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found $($enrollmentState.autopilot.events.Count) autopilot events" -LogLevel "Verbose"
         }
         else
         {
             $latestAutopilotEvent = $null
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "No autopilot events found" -LogLevel "Verbose"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "No autopilot events found" -LogLevel "Verbose"
         }
         
         $output = [ordered] @{
@@ -183,7 +183,7 @@ Write-Log -LogFile $LogFile -Module "$functionName" -Message "No autopilot event
             if ($key -match "^($prefix)(.+)$")
             {
                 $matchedPrefix = $prefix
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found prefix '$prefix' for key '$key'" -LogLevel "Verbose"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found prefix '$prefix' for key '$key'" -LogLevel "Verbose"
                 break
             }
         }
@@ -215,13 +215,37 @@ Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found prefix '$pre
         }
         
         $formattedOutput[$readableKey] = $formattedValue
-        
-        # Display each property and value
-        Write-Host "$readableKey`: $formattedValue"
     }
-    Write-Verbose "[$functionName] Formatted $($formattedOutput.Keys.Count) properties for display"    #endregion Format property names and display report
-    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Formatted $($formattedOutput.Keys.Count) properties for display"    #endregion Format property names and display report" -LogLevel "Information"
-    #endregion Display report
+    
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Formatted $($formattedOutput.Keys.Count) properties for display" -LogLevel "Information"
+    
+    # Use the generic paging function to display the report
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Invoking Show-PagedContent for device report with $($formattedOutput.Count) properties" -LogLevel "Verbose"
+    Write-Verbose "[$functionName] Invoking Show-PagedContent for device report with $($formattedOutput.Count) properties"
+    
+    # Convert ordered dictionary to array of key-value pairs for paging
+    $reportItems = @()
+    foreach ($key in $formattedOutput.Keys)
+    {
+        $reportItems += [PSCustomObject]@{
+            Property = $key
+            Value    = $formattedOutput[$key]
+        }
+    }
+    
+    $pagingResult = Show-PagedContent `
+        -Content $reportItems `
+        -PageSize 15 `
+        -DisplayScriptBlock {
+        param($item)
+        Write-Host "$($item.Property): $($item.Value)"
+    } `
+        -Title "Device Report$(if ($DeviceName) { " - $DeviceName" } elseif ($SerialNumber) { " - $SerialNumber" } else { "" })" `
+        -ShowPageInfo $true
+    
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Show-PagedContent completed with result: $pagingResult" -LogLevel "Verbose"
+    Write-Verbose "[$functionName] Show-PagedContent completed with result: $pagingResult"
+    #endregion Format property names and display report
     
     #region Handle export decision
     $HTMLAction = {
@@ -253,7 +277,8 @@ Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found prefix '$pre
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Prompting user for export decision" -LogLevel "Information"
     # Create report export menu from configuration
     $reportExportMenu = NewMenu -MenuName "reportExportMenu"
-    if (-not $reportExportMenu) {
+    if (-not $reportExportMenu)
+    {
         # Fallback to manual creation if config not found
         $reportExportMenu = NewMenu -Title "Export report" -Description "Select the format to which you would like to export the report"
     }

@@ -215,136 +215,35 @@ function Show-SettingsViewer()
         
         Write-Verbose "[$functionName] Flattened $totalSettings settings for viewing"
         
-        # Implement paging for large setting lists
-        $pageSize = 10  # Settings per page
-        $totalPages = [Math]::Ceiling($totalSettings / $pageSize)
-        $currentPage = 1
+        # Use the generic paging function to display settings
+        Write-Log -LogFile $logFile -Module $functionName -Message "Invoking Show-PagedContent for $totalSettings settings" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Invoking Show-PagedContent for $totalSettings settings"
         
-        if ($totalSettings -gt $pageSize -and -not $Silent)
+        # Build title string
+        $viewerTitle = "$SettingsType Settings Viewer"
+        if ($SettingsType -eq 'Domain')
         {
-            Write-Host "Total settings: $totalSettings (showing $pageSize per page, $totalPages pages total)" -ForegroundColor Gray
-            Write-Host "Use 'n' for next page, 'p' for previous page, 'q' to quit, or page number to jump" -ForegroundColor Yellow
-            Write-Host ""
+            $viewerTitle += " - Domain: $DomainName"
         }
         
-        do
-        {
-            $startIndex = ($currentPage - 1) * $pageSize
-            $endIndex = [Math]::Min($startIndex + $pageSize - 1, $totalSettings - 1)
-            $pageSettings = $flattenedSettings[$startIndex..$endIndex]
-            
-            if (-not $Silent)
-            {
-                if ($totalPages -gt 1)
-                {
-                    Write-Host "═══ Page $currentPage of $totalPages ═══" -ForegroundColor Cyan
-                    Write-Host "Showing settings $($startIndex + 1) - $($endIndex + 1) of $totalSettings" -ForegroundColor Gray
-                    Write-Host ""
-                }
-            }
-            
-            # Display settings on current page
-            foreach ($settingInfo in $pageSettings)
-            {
-                if (-not $Silent)
-                {
-                    Show-SettingInfoForViewer -SettingInfo $settingInfo
-                }
-            }
-            
-            # Handle paging navigation
-            if ($totalPages -gt 1 -and -not $Silent)
-            {
-                Write-Host "════════════════════════════════════════" -ForegroundColor Cyan
-                Write-Host "Page navigation: [n]ext | [p]revious | [1-$totalPages] jump to page | [q]uit" -ForegroundColor Yellow
-                
-                do
-                {
-                    $userInput = Read-Host "Enter command"
-                    $navigationAction = $null
-                    
-                    switch ($userInput.ToLower())
-                    {
-                        'n'
-                        {
-                            if ($currentPage -lt $totalPages)
-                            {
-                                $currentPage++
-                                $navigationAction = 'continue'
-                            }
-                            else
-                            {
-                                Write-Host "Already on last page" -ForegroundColor Yellow
-                            }
-                        }
-                        'p'
-                        {
-                            if ($currentPage -gt 1)
-                            {
-                                $currentPage--
-                                $navigationAction = 'continue'
-                            }
-                            else
-                            {
-                                Write-Host "Already on first page" -ForegroundColor Yellow
-                            }
-                        }
-                        'q'
-                        {
-                            $navigationAction = 'quit'
-                        }
-                        default
-                        {
-                            # Check if it's a page number
-                            if ($userInput -match '^\d+$')
-                            {
-                                $pageNumber = [int]$userInput
-                                if ($pageNumber -ge 1 -and $pageNumber -le $totalPages)
-                                {
-                                    $currentPage = $pageNumber
-                                    $navigationAction = 'continue'
-                                }
-                                else
-                                {
-                                    Write-Host "Invalid page number. Enter 1-$totalPages" -ForegroundColor Red
-                                }
-                            }
-                            else
-                            {
-                                Write-Host "Invalid command. Use n, p, q, or page number" -ForegroundColor Red
-                            }
-                        }
-                    }
-                    
-                    if ($navigationAction)
-                    {
-                        break
-                    }
-                } while ($true)
-                
-                if ($navigationAction -eq 'quit')
-                {
-                    break
-                }
-                
-                # Clear screen for next page
-                Clear-Host
-                Write-Host "══ $($SettingsType) Settings Viewer ══" -ForegroundColor Cyan
-                if ($SettingsType -eq 'Domain')
-                {
-                    Write-Host "Domain: $DomainName" -ForegroundColor Yellow
-                }
-                Write-Host ""
-            }
-            else
-            {
-                break  # No paging needed or silent mode
-            }
-        } while ($true)
+        $pagingResult = Show-PagedContent `
+            -Content $flattenedSettings `
+            -PageSize 10 `
+            -DisplayScriptBlock {
+            param($settingInfo)
+            Show-SettingInfoForViewer -SettingInfo $settingInfo
+        } `
+            -Title $viewerTitle `
+            -ShowPageInfo $true `
+            -Silent:$Silent
         
-        if (-not $Silent -and $totalPages -le 1)
+        Write-Log -LogFile $logFile -Module $functionName -Message "Show-PagedContent completed with result: $pagingResult" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Show-PagedContent completed with result: $pagingResult"
+        
+        if (-not $Silent)
         {
-            Write-Host "`n══════════════════════════════════════" -ForegroundColor Cyan
+            Write-Host ""
+            Write-Host "══════════════════════════════════════" -ForegroundColor Cyan
             Write-Host "Total settings displayed: $totalSettings" -ForegroundColor White
             Write-Host "Use the settings editor to modify these values." -ForegroundColor Gray
         }
