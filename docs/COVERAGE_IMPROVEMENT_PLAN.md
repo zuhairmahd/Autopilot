@@ -404,18 +404,22 @@ See Progress Tracking section below for detailed results.
 5. **Documentation**: Serves as executable documentation for application startup
 
 ##### Deliverables
-- [x] `tests/Integration/main/MainInitialization.Tests.ps1` ✅ OPTIMIZED (Day 1-2)
+- [x] `tests/Integration/main/MainInitialization.Tests.ps1` ✅ COMPLETE & OPTIMIZED (Day 1-2)
   - Test application startup and parameter handling ✅
-  - Mock configuration loading (Initialize-ApplicationConfiguration) ✅
-  - Mock authentication flow (Get-GraphAccessToken) ✅
-  - Test command-line parameter precedence (critical bug we just fixed) ✅
-  - Validate global variable initialization (Settings, MenuHistory, History) ✅
-  - **27 test cases (optimized from 49), all passing (100% pass rate)**
-  - **Optimization**: Reduced from 39 to 27 tests (~31% reduction), log checks as last resort
-  - **Performance**: ~40% faster execution (~3-4 min vs 5-8 min)
-  - **Enhanced Error Reporting**: Log excerpts shown on failure (not full logs)
-  - **Estimated Lines Covered**: ~400-500 lines (exceeds original estimate)
-  - **Status**: ✅ Complete - See `OPTIMIZATION_SUMMARY.md` for details
+  - Test configuration file loading ✅
+  - Test settings migration from old config ✅
+  - Test command-line parameter precedence (regression test for Week 6 bug fix) ✅
+  - Test authentication initialization (with mocked dependencies) ✅
+  - Test temporary file cleanup ✅
+  - Test logging initialization and verbosity levels ✅
+  - Test parameter validation (required parameters, invalid combinations) ✅
+  - **Test Results**: 25/25 tests passing (100% pass rate) ✅
+  - **Execution Time**: ~12 minutes (down from ~15 minutes, 20% improvement)
+  - **Optimization Details**: Consolidated from 26 to 17 main.ps1 executions (35% reduction in process spawns)
+  - **Performance Analysis**: Each main.ps1 execution takes ~42 seconds in test mode (inherent initialization overhead)
+  - **Further Optimization Options**: Mock authentication more aggressively, create "minimal test mode" for faster startup, or accept integration test tradeoff
+  - **Estimated Lines Covered**: ~400-500 lines (startup, config, auth flows)
+  - **Status**: ✅ Complete - Performance optimized, all tests passing, 20% faster execution
 
 - [ ] `tests/Integration/main/MainMenuFlow.Tests.ps1` ⏳ NEXT
   - Test menu creation and structure

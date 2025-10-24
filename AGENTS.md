@@ -4,7 +4,7 @@
 `main.ps1` bootstraps the app by dot-sourcing every module in `functions/`. Each subfolder (device, menu, graph, reporting, etc.) groups scripts by responsibility; keep modules self-contained and suited for PowerShell 5.1. Configuration defaults live in the root `.psd1` files (`settings.psd1`, `menu.psd1`, `strings.psd1`), while runtime secrets are generated under `.secrets/` and log output lands in `Logs/`. Tests, demos, and validation harnesses sit in `TestScripts/`, and deeper references live in `docs/`. Binary drops like `main.exe` are build outputs only.
 
 ## Build, Test, and Development Commands
-Launch the interactive tool with `.\main.ps1 -Verbose -LogLevel "Debug"` to mirror developer telemetry. Use `.\test.ps1` for lightweight module import checks, then run **PowerShell 7** tests with `pwsh.exe -ExecutionPolicy Bypass -File .\Invoke-PesterTests.ps1 -TestType Unit` (or substitute `integration`, or `comprehensive` as needed). Create signed builds with `.\CreateRelease.ps1 -Stage Build` (pair with `-WhatIf` for rehearsal). Tail `Logs\Autopilot.log` to watch Graph and menu activity while iterating.
+Launch the interactive tool with `.\main.ps1 -Verbose -LogLevel "Debug"` to mirror developer telemetry. Use `.\test.ps1` for lightweight module import checks, then run **PowerShell 7** tests with `pwsh.exe -ExecutionPolicy Bypass -File .\Invoke-PesterTests.ps1 -OutputVerbosity Detailed -TestType Unit` (or substitute `integration`, or `comprehensive` as needed). Create signed builds with `.\CreateRelease.ps1 -Stage Build` (pair with `-WhatIf` for rehearsal). Tail `Logs\Autopilot.log` to watch Graph and menu activity while iterating.
 
 **IMPORTANT:** Always use PowerShell 7 (`pwsh.exe`) for running Pester tests. The application code must support PowerShell 5.1, but tests require PowerShell 7+.
 
@@ -18,9 +18,9 @@ Stick to four-space indentation, ~120-character lines, and approved PowerShell v
 The project uses **Pester v5** as the primary testing framework for new tests, while legacy tests are being gradually migrated (82% complete as of October 2025). Both frameworks coexist during the migration period.
 
 ### Quick Reference Commands
-- **Quick validation:** `pwsh.exe -ExecutionPolicy Bypass -File .\Invoke-PesterTests.ps1 -TestType Unit` (runs fast Pester unit tests)
-- **Full Pester suite:** `pwsh.exe -ExecutionPolicy Bypass -File .\Invoke-PesterTests.ps1 -TestType All -EnableCodeCoverage` (all Pester tests with coverage)
-- **Single test file:** `pwsh.exe -ExecutionPolicy Bypass -File .\Invoke-PesterTests.ps1 -TestFile "tests\Unit\MyTest.Tests.ps1"`
+- **Quick validation:** `pwsh.exe -ExecutionPolicy Bypass -File .\Invoke-PesterTests.ps1 -outputVerbosity Detailed -TestType Unit` (runs fast Pester unit tests)
+- **Full Pester suite:** `pwsh.exe -ExecutionPolicy Bypass -File .\Invoke-PesterTests.ps1 -TestType All -outputVerbosity Detailed -EnableCodeCoverage` (all Pester tests with coverage)
+- **Single test file:** `pwsh.exe -ExecutionPolicy Bypass -File .\Invoke-PesterTests.ps1 -outputVerbosity Detailed -TestFile "tests\Unit\MyTest.Tests.ps1"`
 
 **CRITICAL:** All Pester tests MUST be run using PowerShell 7 (`pwsh.exe`). Do not use `powershell.exe` (PowerShell 5.1) for running tests.
 

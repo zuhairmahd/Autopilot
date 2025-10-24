@@ -13,9 +13,9 @@
 
 | Task | Command | Time |
 |------|---------|------|
-| Run all tests | `pwsh.exe -ExecutionPolicy Bypass -File .\Invoke-PesterTests.ps1 -TestType All` | 2-3s |
-| Run single test | `pwsh.exe -ExecutionPolicy Bypass -File .\Invoke-PesterTests.ps1 -TestFile "tests\Unit\MyTest.Tests.ps1"` | <1s |
-| Run with coverage | `pwsh.exe -ExecutionPolicy Bypass -File .\Invoke-PesterTests.ps1 -TestType All -EnableCodeCoverage` | 5-10s |
+| Run all tests | `pwsh.exe -ExecutionPolicy Bypass -File .\Invoke-PesterTests.ps1 -TestType All -outputVerbosity Detailed ` | 2-3s |
+| Run single test | `pwsh.exe -ExecutionPolicy Bypass -File .\Invoke-PesterTests.ps1 -TestFile "tests\Unit\MyTest.Tests.ps1" -outputVerbosity Detailed ` | <1s |
+| Run with coverage | `pwsh.exe -ExecutionPolicy Bypass -File .\Invoke-PesterTests.ps1 -TestType All -EnableCodeCoverage -outputVerbosity Detailed` | 5-10s |
 
 **CRITICAL:** All tests MUST be run using `pwsh.exe` (PowerShell 7+). Do NOT use `powershell.exe` (PowerShell 5.1) for running tests. The application itself must support PowerShell 5.1, but Pester tests require PowerShell 7+.
 
@@ -365,7 +365,7 @@ It "Should return expected value" {
 $legacyExitCode = $LASTEXITCODE
 
 # Run Pester test
-.\Invoke-PesterTests.ps1 -TestFile "tests\Unit\Original.Tests.ps1"
+.\Invoke-PesterTests.ps1 -TestFile "tests\Unit\Original.Tests.ps1" -outputVerbosity Detailed
 # Check: 0 failures expected
 
 # Results should match:
@@ -893,7 +893,7 @@ Before committing a test, verify:
 - [ ] Uses `Should` assertions (not manual Write-Host)
 - [ ] No exit codes in test (Pester manages this)
 - [ ] Tagged appropriately (Unit/Integration/Comprehensive + feature tags)
-- [ ] Runs successfully: `.\Invoke-PesterTests.ps1 -TestFile "tests\...\MyTest.Tests.ps1"`
+- [ ] Runs successfully: `.\Invoke-PesterTests.ps1 -TestFile "tests\...\MyTest.Tests.ps1" -outputVerbosity Detailed`
 - [ ] **100% pass rate** (0 failures)
 - [ ] Tested on PowerShell 7+ (required for tests)
 - [ ] Legacy test archived (if migration)
@@ -1070,13 +1070,8 @@ Describe "Get-UserStrongMapping Function" -Tags 'Unit', 'Authentication' {
 **Step 4: Run and validate**
 ```powershell
 # Run new test
-.\Invoke-PesterTests.ps1 -TestFile "tests\Unit\GetUserStrongMapping.Tests.ps1"
+.\Invoke-PesterTests.ps1 -TestFile "tests\Unit\GetUserStrongMapping.Tests.ps1" -outputVerbosity Detailed
 # Result: 26/26 passing
-
-# Validate on PS 5.1
-powershell.exe -File .\Invoke-PesterTests.ps1 -TestFile "tests\Unit\GetUserStrongMapping.Tests.ps1"
-# Result: 26/26 passing
-```
 
 **Step 5: Archive legacy test**
 ```powershell
