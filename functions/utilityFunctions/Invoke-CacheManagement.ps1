@@ -126,9 +126,6 @@ function Invoke-CacheManagement()
             CacheTypes  = @{
                 Menu     = @{ Hits = 0; Misses = 0; Size = 0 }
                 Strings  = @{ Hits = 0; Misses = 0; Size = 0 }
-                Groups   = @{ Hits = 0; Misses = 0; Size = 0 }
-                Users    = @{ Hits = 0; Misses = 0; Size = 0 }
-                Devices  = @{ Hits = 0; Misses = 0; Size = 0 }
                 Defaults = @{ Hits = 0; Misses = 0; Size = 0 }
             }
         }
@@ -254,34 +251,6 @@ function Invoke-CacheManagement()
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared strings cache ($stringsCacheSize items)" -LogLevel "Debug"
             }
             
-            # Clear Graph API caches
-            if ($global:GroupCache)
-            {
-                $groupCacheSize = $global:GroupCache.Count
-                $global:GroupCache.Clear()
-                $clearedCaches++
-                $cacheDetails += "Groups ($groupCacheSize items)"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared groups cache ($groupCacheSize items)" -LogLevel "Debug"
-            }
-            
-            if ($global:UserCache)
-            {
-                $userCacheSize = $global:UserCache.Count
-                $global:UserCache.Clear()
-                $clearedCaches++
-                $cacheDetails += "Users ($userCacheSize items)"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared users cache ($userCacheSize items)" -LogLevel "Debug"
-            }
-            
-            if ($global:DeviceIdCache)
-            {
-                $deviceCacheSize = $global:DeviceIdCache.Count
-                $global:DeviceIdCache.Clear()
-                $clearedCaches++
-                $cacheDetails += "Devices ($deviceCacheSize items)"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared device ID cache ($deviceCacheSize items)" -LogLevel "Debug"
-            }
-            
             # Clear defaults cache
             if ($script:defaultsCache)
             {
@@ -359,30 +328,6 @@ function Invoke-CacheManagement()
                             $cleared = $true
                         }
                     }
-                    'Groups'
-                    {
-                        if ($global:GroupCache)
-                        {
-                            $global:GroupCache.Clear()
-                            $cleared = $true
-                        }
-                    }
-                    'Users'
-                    {
-                        if ($global:UserCache)
-                        {
-                            $global:UserCache.Clear()
-                            $cleared = $true
-                        }
-                    }
-                    'Devices'
-                    {
-                        if ($global:DeviceIdCache)
-                        {
-                            $global:DeviceIdCache.Clear()
-                            $cleared = $true
-                        }
-                    }
                     'Defaults'
                     {
                         if ($script:defaultsCache)
@@ -436,21 +381,6 @@ function Invoke-CacheManagement()
                 FileTracking = if ($script:stringsFileTimestamp) { $script:stringsFileTimestamp.Count } else { 0 }
             }
             
-            $stats.Caches.Groups = @{
-                Enabled = ($null -ne $global:GroupCache)
-                Size    = if ($global:GroupCache) { $global:GroupCache.Count } else { 0 }
-            }
-            
-            $stats.Caches.Users = @{
-                Enabled = ($null -ne $global:UserCache)
-                Size    = if ($global:UserCache) { $global:UserCache.Count } else { 0 }
-            }
-            
-            $stats.Caches.Devices = @{
-                Enabled = ($null -ne $global:DeviceIdCache)
-                Size    = if ($global:DeviceIdCache) { $global:DeviceIdCache.Count } else { 0 }
-            }
-            
             $stats.Caches.Defaults = @{
                 Enabled = ($null -ne $script:defaultsCache)
                 Size    = if ($script:defaultsCache) { $script:defaultsCache.Count } else { 0 }
@@ -495,19 +425,22 @@ function Invoke-CacheManagement()
             Write-Verbose "[$functionName] Listing available caches"
             
             $cacheList = @(
-                @{ Name = 'Menu'; Description = 'Menu configuration cache (menu.psd1)'; Variable = '$script:menuConfigCache' }
-                @{ Name = 'Strings'; Description = 'String resources cache (strings.psd1)'; Variable = '$script:stringsCache' }
-                @{ Name = 'Groups'; Description = 'Entra ID groups cache'; Variable = '$global:GroupCache' }
-                @{ Name = 'Users'; Description = 'Entra ID users cache'; Variable = '$global:UserCache' }
-                @{ Name = 'Devices'; Description = 'Device ID lookup cache'; Variable = '$global:DeviceIdCache' }
-                @{ Name = 'Defaults'; Description = 'Application defaults cache'; Variable = '$script:defaultsCache' }
+                @{ Name = 'Menu'; Description = 'Menu configuration cache (menu.psd1)'; Variable = '$script:menuConfigCache'; Value = $script:menuConfigCache }
+                @{ Name = 'Strings'; Description = 'String resources cache (strings.psd1)'; Variable = '$script:stringsCache'; Value = $script:stringsCache }
+                @{ Name = 'Defaults'; Description = 'Application defaults cache'; Variable = '$script:defaultsCache'; Value = $script:defaultsCache }
+                @{ Name = 'UnifiedConfiguration'; Description = 'Unified configuration cache'; Variable = '$global:UnifiedCache.Configuration'; Value = if ($global:UnifiedCache) { $global:UnifiedCache.Configuration } else { $null } }
+                @{ Name = 'UnifiedDirectoryObjects'; Description = 'Unified directory objects cache (users/groups)'; Variable = '$global:UnifiedCache.DirectoryObjects'; Value = if ($global:UnifiedCache) { $global:UnifiedCache.DirectoryObjects } else { $null } }
+                @{ Name = 'UnifiedDevices'; Description = 'Unified devices cache'; Variable = '$global:UnifiedCache.Devices'; Value = if ($global:UnifiedCache) { $global:UnifiedCache.Devices } else { $null } }
             )
             
             Write-Host "=== Available Application Caches ===" -ForegroundColor Cyan
             foreach ($cache in $cacheList)
             {
+                $enabled = ($null -ne $cache.Value)
+                $size = if ($enabled -and $cache.Value -is [hashtable]) { $cache.Value.Count } elseif ($enabled -and $cache.Value -is [System.Collections.IDictionary]) { $cache.Value.Count } else { 0 }
                 Write-Host "• $($cache.Name): $($cache.Description)" -ForegroundColor White
                 Write-Host "  Variable: $($cache.Variable)" -ForegroundColor Gray
+                Write-Host "  Enabled: $enabled, Size: $size" -ForegroundColor $(if ($enabled) { "Green" } else { "Yellow" })
             }
             
             return @{ Action = 'ListCaches'; Caches = $cacheList; Timestamp = Get-Date }
@@ -560,21 +493,25 @@ function Invoke-CacheManagement()
                 {
                     Write-Host "  Strings Cache Keys: $($script:stringsCache.Keys -join ', ')" -ForegroundColor Gray
                 }
-                if ($global:GroupCache -and $global:GroupCache.Count -gt 0)
-                {
-                    Write-Host "  Groups Cache: $($global:GroupCache.Count) entries" -ForegroundColor Gray
-                }
-                if ($global:UserCache -and $global:UserCache.Count -gt 0)
-                {
-                    Write-Host "  Users Cache: $($global:UserCache.Count) entries" -ForegroundColor Gray
-                }
-                if ($global:DeviceIdCache -and $global:DeviceIdCache.Count -gt 0)
-                {
-                    Write-Host "  Device Cache: $($global:DeviceIdCache.Count) entries" -ForegroundColor Gray
-                }
                 if ($script:defaultsCache -and $script:defaultsCache.Count -gt 0)
                 {
                     Write-Host "  Defaults Cache: $($script:defaultsCache.Count) entries" -ForegroundColor Gray
+                }
+                # Show unified cache details
+                if ($global:UnifiedCache)
+                {
+                    if ($global:UnifiedCache.Configuration -and $global:UnifiedCache.Configuration.Count -gt 0)
+                    {
+                        Write-Host "  Unified Configuration Cache: $($global:UnifiedCache.Configuration.Count) entries" -ForegroundColor Gray
+                    }
+                    if ($global:UnifiedCache.DirectoryObjects -and $global:UnifiedCache.DirectoryObjects.Count -gt 0)
+                    {
+                        Write-Host "  Unified Directory Objects Cache: $($global:UnifiedCache.DirectoryObjects.Count) entries" -ForegroundColor Gray
+                    }
+                    if ($global:UnifiedCache.Devices -and $global:UnifiedCache.Devices.Count -gt 0)
+                    {
+                        Write-Host "  Unified Devices Cache: $($global:UnifiedCache.Devices.Count) entries" -ForegroundColor Gray
+                    }
                 }
             }
             

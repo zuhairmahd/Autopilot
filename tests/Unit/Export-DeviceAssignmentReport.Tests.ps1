@@ -544,9 +544,6 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
         }
         
         It "Should populate message when no devices found" {
-            # Clear cache first to ensure empty mock is used
-            $script:DeviceDataCache = $null
-            
             Mock CallGraphApi {
                 return @{ value = @() }
             }

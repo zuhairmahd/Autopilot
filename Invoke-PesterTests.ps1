@@ -744,7 +744,7 @@ else
     Write-Host "  Test Path: $testPaths" -ForegroundColor White
 }
 
-if ($TestType -in @('Integration', 'All') -and $OutputVerbosity -ne 'Detailed')
+if ($TestType -in @('Integration') -and $OutputVerbosity -ne 'Detailed')
 {
     Write-Host "Changing output verbosity to 'Detailed' for Integration tests" -ForegroundColor Yellow
     $config.Output.Verbosity = 'Detailed'
