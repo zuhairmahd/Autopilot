@@ -715,6 +715,11 @@ else
     Write-Host "  Test Path: $testPaths" -ForegroundColor White
 }
 
+if ($TestType -in @('Integration', 'All') -and $OutputVerbosity -ne 'Detailed')
+{
+    Write-Host "Changing output verbosity to 'Detailed' for Integration tests" -ForegroundColor Yellow
+    $config.Output.Verbosity = 'Detailed'
+}
 if ($EnableCodeCoverage -or $OutputVerbosity -eq 'Detailed')
 {
     Write-Host "  Code Coverage: $($config.CodeCoverage.Enabled)" -ForegroundColor White
@@ -755,7 +760,14 @@ try
     Write-Host "=" * 63 -ForegroundColor Cyan
     Write-Host "  Total Tests: $($result.TotalCount)" -ForegroundColor White
     Write-Host "  Passed: $($result.PassedCount)" -ForegroundColor Green
-    Write-Host "  Failed: $($result.FailedCount)" -ForegroundColor $(if ($result.FailedCount -gt 0) { 'Red' } else { 'Gray' })
+    Write-Host "  Failed: $($result.FailedCount)" -ForegroundColor $(if ($result.FailedCount -gt 0)
+        {
+            'Red' 
+        }
+        else
+        {
+            'Gray' 
+        })
     Write-Host "  Skipped: $($result.SkippedCount)" -ForegroundColor Gray
     Write-Host "  Duration: $($duration.TotalSeconds.ToString('F2'))s" -ForegroundColor White
     
@@ -828,7 +840,18 @@ try
         Write-Host "  Commands Executed: $($coverage.CommandsExecutedCount)" -ForegroundColor White
         Write-Host "Commands missed: $($coverage.CommandsMissedCount)" -ForegroundColor White
         Write-Host "Files analyzed: $($coverage.FilesAnalyzedCount)" -ForegroundColor White
-        Write-Host "  Coverage: $($coverage.CoveragePercent)" -ForegroundColor $(if ($coverage.CoveragePercent -ge 80) { 'Green' } elseif ($coverage.CoveragePercent -ge 60) { 'Yellow' } else { 'Red' })
+        Write-Host "  Coverage: $($coverage.CoveragePercent)" -ForegroundColor $(if ($coverage.CoveragePercent -ge 80)
+            {
+                'Green' 
+            }
+            elseif ($coverage.CoveragePercent -ge 60)
+            {
+                'Yellow' 
+            }
+            else
+            {
+                'Red' 
+            })
         Write-Host "Coverage target: $($coverage.CoveragePercentTarget)"
         
         # Show detailed list ONLY if requested

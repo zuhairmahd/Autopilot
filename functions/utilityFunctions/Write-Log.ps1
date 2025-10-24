@@ -52,6 +52,7 @@ function Write-Log()
         [ValidateSet('Error', 'Warning', 'Information', 'Verbose', 'Debug')]
         [string]$MinimumLogLevel
     )
+    
     try
     {
         # Use global minimum log level if not provided

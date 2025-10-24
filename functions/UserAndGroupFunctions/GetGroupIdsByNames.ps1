@@ -220,5 +220,6 @@ function GetGroupIdsByNames()
         }
     }
     Write-Log -LogFile $LogFile -Module $functionName -Message "Completed processing" -LogLevel "Verbose"
-    return $result
+    # Ensure we always return an array (even if empty or single element)
+    return , @($result)
 }

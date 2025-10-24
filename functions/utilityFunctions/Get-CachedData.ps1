@@ -37,10 +37,8 @@ function Get-CachedData()
         [Parameter(Mandatory = $true)]
         [ValidateSet('Configuration', 'DirectoryObjects', 'Devices')]
         [string]$CacheType,
-        
         [Parameter(Mandatory = $true)]
         [string]$Key,
-        
         [Parameter(Mandatory = $false)]
         $Settings = $global:settings
     )
@@ -149,16 +147,12 @@ function Set-CachedData()
         [Parameter(Mandatory = $true)]
         [ValidateSet('Configuration', 'DirectoryObjects', 'Devices')]
         [string]$CacheType,
-        
         [Parameter(Mandatory = $true)]
         [string]$Key,
-        
         [Parameter(Mandatory = $true)]
         $Data,
-        
         [Parameter(Mandatory = $false)]
         $Metadata,
-        
         [Parameter(Mandatory = $false)]
         $Settings = $global:settings
     )
