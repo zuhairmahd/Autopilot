@@ -86,7 +86,7 @@ function Show-SettingsEditor()
         # Get default settings structure from Get-ApplicationDefaults
         Write-Log -LogFile $logFile -Module $functionName -Message "Retrieving default settings structure" -LogLevel "Verbose"
         Write-Verbose "[$functionName] Retrieving default settings structure"
-        $defaultSettings = Get-DefaultSettingsStructure
+        $defaultSettings = Get-ApplicationDefaults -DefaultType "Settings"
         if (-not $defaultSettings)
         {
             Write-Log -LogFile $logFile -Module $functionName -Message "Failed to get default settings structure" -LogLevel "Error"
@@ -219,7 +219,7 @@ function Show-SettingsEditor()
         $hasChanges = $false
         
         # Process each setting in the template - with support for nested objects
-        # Exclude GroupsToInclude and GroupsToExclude as they have dedicated editors
+        # Exclude GroupsToInclude, GroupsToExclude, autopilotProfilesToInclude, appMode and appModes as they have dedicated editors
         $excludeSettings = @('groupsToInclude', 'groupsToExclude', 'GroupsToInclude', 'GroupsToExclude', 'autopilotProfilesToInclude', 'appMode', 'appModes')
         $processedSettings = Get-FlattenedSettingsForProcessing -SettingsTemplate $settingsTemplate -CurrentValues $currentValues -ExcludeSettings $excludeSettings
         
@@ -376,59 +376,6 @@ function Show-SettingsEditor()
         Write-Warning "[$functionName] Error in settings editor: $($_.Exception.Message)"
         Write-Verbose "[$functionName] Full error: $($_.Exception | Format-List * | Out-String)"
         return $false
-    }
-}
-
-function Get-DefaultSettingsStructure()
-{
-    <#
-    .SYNOPSIS
-        Retrieves the default settings structure efficiently from centralized defaults.
-    
-    .DESCRIPTION
-        Uses the centralized Get-ApplicationDefaults function to retrieve default settings.
-        This ensures consistency and eliminates duplicate default value definitions.
-    #>
-    [CmdletBinding()]
-    param()
-
-    $functionName = $MyInvocation.MyCommand.Name
-    
-    Write-Log -LogFile $logFile -Module $functionName -Message "Retrieving default settings structure from centralized defaults" -LogLevel "Verbose"
-    Write-Verbose "[$functionName] Retrieving default settings structure from centralized defaults"
-    
-    try
-    {
-        # Use centralized default values - single source of truth
-        Write-Log -LogFile $logFile -Module $functionName -Message "Getting defaults from Get-ApplicationDefaults" -LogLevel "Debug"
-        Write-Verbose "[$functionName] Getting defaults from Get-ApplicationDefaults"
-        
-        $defaultSettings = Get-ApplicationDefaults -DefaultType "Settings"
-        
-        if (-not $defaultSettings)
-        {
-            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to get default settings from centralized function" -LogLevel "Error"
-            Write-Verbose "[$functionName] Failed to get default settings from centralized function"
-            return $null
-        }
-        
-        Write-Log -LogFile $logFile -Module $functionName -Message "Default settings structure retrieved successfully from centralized source" -LogLevel "Information"
-        Write-Verbose "[$functionName] Default settings structure retrieved successfully from centralized source"
-        
-        # Convert to PSCustomObject to match the JSON structure behavior expected by consuming functions
-        $jsonString = $defaultSettings | ConvertTo-Json -Depth $global:maxJSONDepth
-        $defaultStructure = $jsonString | ConvertFrom-Json
-        
-        Write-Log -LogFile $logFile -Module $functionName -Message "Default settings structure converted to PSCustomObject format" -LogLevel "Verbose"
-        Write-Verbose "[$functionName] Default settings structure converted to PSCustomObject format"
-        
-        return $defaultStructure
-    }
-    catch
-    {
-        Write-Log -LogFile $logFile -Module $functionName -Message "Error retrieving default settings structure: $($_.Exception.Message)" -LogLevel "Error"
-        Write-Verbose "[$functionName] Error retrieving default settings structure: $($_.Exception.Message)"
-        return $null
     }
 }
 
