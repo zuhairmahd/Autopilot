@@ -212,14 +212,25 @@ function Find-FileWithFuzzySearch()
     Write-Verbose "[$functionName] Found $($exactMatch.Count) exact matches for '$searchFileName'."
     if ($exactMatch)
     {
-        if ($exactMatch.Count -eq 1 -and -not $AllowMultiple)
+        # Auto-select if there's exactly one match, regardless of -AllowMultiple
+        if ($exactMatch.Count -eq 1)
         {
             Write-Host "Found exact match: $($exactMatch.FullName)" -ForegroundColor Green
-            return $exactMatch.FullName
+            
+            if ($AllowMultiple)
+            {
+                # Return as array for consistency with AllowMultiple mode
+                return @($exactMatch.FullName)
+            }
+            else
+            {
+                return $exactMatch.FullName
+            }
         }
         else
         {
-            Write-Host "Found $($exactMatch.Count) exact match$(if ($exactMatch.Count -ne 1) {'es'}):" -ForegroundColor Yellow
+            # Multiple exact matches - let user choose
+            Write-Host "Found $($exactMatch.Count) exact matches:" -ForegroundColor Yellow
             
             $selectedFiles = Select-TestFiles -Files $exactMatch -TestsPath $TestsPath -AllowMultiple:$AllowMultiple
             
@@ -256,6 +267,24 @@ function Find-FileWithFuzzySearch()
     {
         Write-Host "No similar test files found" -ForegroundColor Red
         return 'No files found'
+    }
+    
+    # Check if the top match is an exact match (score >= 1000)
+    # Auto-select regardless of -AllowMultiple switch when there's an exact match
+    if ($scoredFiles[0].Score -ge 1000)
+    {
+        Write-Host "Found exact fuzzy match: $($scoredFiles[0].File.FullName)" -ForegroundColor Green
+        Write-Verbose "[$functionName] Exact fuzzy match found with score $($scoredFiles[0].Score), proceeding without prompt."
+        
+        if ($AllowMultiple)
+        {
+            # Return as array for consistency with AllowMultiple mode
+            return @($scoredFiles[0].File.FullName)
+        }
+        else
+        {
+            return $scoredFiles[0].File.FullName
+        }
     }
     
     Write-Host ""

@@ -17,12 +17,6 @@ function Get-ConfigurationData()
     A hashtable containing default values to use if the configuration file cannot be loaded
     or contains missing keys.
 
-.PARAMETER ConfigurationType
-    For init.psd1 files, specifies which configuration values to use:
-    - 'dev': Uses devdefault values
-    - 'release': Uses reldefault values  
-    - 'default': Uses default values
-
 .PARAMETER EnableCaching
     Enables timestamp-based caching for improved performance on repeated loads.
 
@@ -33,10 +27,6 @@ function Get-ConfigurationData()
 .EXAMPLE
     $config = Get-ConfigurationData -ConfigurationPath "settings" -DefaultValues @{key='value'}
     # Loads settings.psd1 with fallback to defaults
-
-.EXAMPLE
-    $init = Get-ConfigurationData -ConfigurationPath "init" -ConfigurationType 'release' -DefaultValues @{}
-    # Loads init.psd1 configuration with release defaults
 
 .NOTES
     - PowerShell Data Files only (.psd1) - JSON format no longer supported
@@ -51,7 +41,6 @@ function Get-ConfigurationData()
         [string]$ConfigurationPath,
         [Parameter(Mandatory = $true)]
         [hashtable]$DefaultValues,
-        [string]$ConfigurationType = 'default',
         [switch]$EnableCaching
     )
     

@@ -7,7 +7,6 @@
     - Loading .psd1 configuration files
     - File timestamp-based cache validation
     - Cache invalidation on file modification
-    - ConfigurationType handling (dev, release, default)
     - Error handling and fallback to defaults
     
 .NOTES
@@ -239,81 +238,6 @@ Describe "Get-ConfigurationData Function" -Tags 'Unit', 'Configuration', 'Cache'
             $cacheEntry.Data.FileTimestamp | Should -Not -BeNullOrEmpty
             $cacheEntry.Metadata | Should -Not -BeNullOrEmpty
             $cacheEntry.Metadata.FilePath | Should -Be $testFile
-        }
-    }
-    
-    Context "ConfigurationType Handling" {
-        
-        It "Should handle init.psd1 with default configuration type" -Skip {
-            # NOTE: ConfigurationType parameter is documented but not yet implemented in Get-ConfigurationData
-            # This test is skipped until the feature is implemented
-            # Create init-style configuration
-            $initConfig = @{
-                default    = @{
-                    key1 = "defaultValue"
-                }
-                devdefault = @{
-                    key1 = "devValue"
-                }
-                reldefault = @{
-                    key1 = "releaseValue"
-                }
-            }
-            
-            $testFile = Join-Path $testPath "init-default.psd1"
-            $initConfig | Export-PowerShellDataFile -Path $testFile -Force
-            
-            # Load with default type
-            $result = Get-ConfigurationData -ConfigurationPath $testFile -DefaultValues @{} -ConfigurationType 'default' -EnableCaching
-            
-            $result | Should -Not -BeNullOrEmpty
-            $result.key1 | Should -Be "defaultValue"
-        }
-        
-        It "Should handle init.psd1 with dev configuration type" -Skip {
-            # NOTE: ConfigurationType parameter is documented but not yet implemented in Get-ConfigurationData
-            # This test is skipped until the feature is implemented
-            # Create init-style configuration
-            $initConfig = @{
-                default    = @{
-                    key1 = "defaultValue"
-                }
-                devdefault = @{
-                    key1 = "devValue"
-                }
-            }
-            
-            $testFile = Join-Path $testPath "init-dev.psd1"
-            $initConfig | Export-PowerShellDataFile -Path $testFile -Force
-            
-            # Load with dev type
-            $result = Get-ConfigurationData -ConfigurationPath $testFile -DefaultValues @{} -ConfigurationType 'dev' -EnableCaching
-            
-            $result | Should -Not -BeNullOrEmpty
-            $result.key1 | Should -Be "devValue"
-        }
-        
-        It "Should handle init.psd1 with release configuration type" -Skip {
-            # NOTE: ConfigurationType parameter is documented but not yet implemented in Get-ConfigurationData
-            # This test is skipped until the feature is implemented
-            # Create init-style configuration
-            $initConfig = @{
-                default    = @{
-                    key1 = "defaultValue"
-                }
-                reldefault = @{
-                    key1 = "releaseValue"
-                }
-            }
-            
-            $testFile = Join-Path $testPath "init-release.psd1"
-            $initConfig | Export-PowerShellDataFile -Path $testFile -Force
-            
-            # Load with release type
-            $result = Get-ConfigurationData -ConfigurationPath $testFile -DefaultValues @{} -ConfigurationType 'release' -EnableCaching
-            
-            $result | Should -Not -BeNullOrEmpty
-            $result.key1 | Should -Be "releaseValue"
         }
     }
     
