@@ -95,27 +95,26 @@ BeforeAll {
             $Parameters['LogFilePath'] = $script:TestLogFile
         }
         
-        # Change to repo root for execution
-        Push-Location $script:RepoRoot
+        # Build parameter list
+        $params = @()
+        foreach ($key in $Parameters.Keys)
+        {
+            $value = $Parameters[$key]
+            if ($value -is [bool] -or $value -is [switch])
+            {
+                if ($value) { $params += "-$key" }
+            }
+            else
+            {
+                $params += "-$key"
+                $params += $value
+            }
+        }
+        
         try
         {
-            # Build parameter list
-            $params = @()
-            foreach ($key in $Parameters.Keys)
-            {
-                $value = $Parameters[$key]
-                if ($value -is [bool] -or $value -is [switch])
-                {
-                    if ($value) { $params += "-$key" }
-                }
-                else
-                {
-                    $params += "-$key"
-                    $params += $value
-                }
-            }
-            
             # Execute main.ps1 in a new PowerShell process to capture exit code reliably
+            # No need for Push-Location since we're using absolute path
             $result = & pwsh.exe -NoProfile -ExecutionPolicy Bypass -File $script:MainScriptPath @params 2>&1
             $exitCode = $LASTEXITCODE
             
@@ -141,10 +140,6 @@ BeforeAll {
                 Error    = $_
             }
         }
-        finally
-        {
-            Pop-Location
-        }
     }
     
     # Make it available in script scope
@@ -165,21 +160,67 @@ BeforeAll {
         }
         
         $lines = Get-Content $LogFilePath
+        
+        # Find the current log session boundaries using separator lines from Write-Log.ps1
+        $startSeparator = "=" * 30 + " start of log session " + "=" * 30
+        $endSeparator = "=" * 30 + " end of log session " + "=" * 30
+        
+        # Find the last occurrence of start separator (current session)
+        $sessionStart = -1
+        $sessionEnd = $lines.Count
+        
+        for ($i = $lines.Count - 1; $i -ge 0; $i--)
+        {
+            if ($lines[$i] -match [regex]::Escape($startSeparator))
+            {
+                $sessionStart = $i
+                break
+            }
+        }
+        
+        # If we found a start separator, look for the corresponding end separator
+        if ($sessionStart -ge 0)
+        {
+            for ($i = $sessionStart + 1; $i -lt $lines.Count; $i++)
+            {
+                if ($lines[$i] -match [regex]::Escape($endSeparator))
+                {
+                    $sessionEnd = $i
+                    break
+                }
+            }
+        }
+        else
+        {
+            # No session separator found, use entire log
+            $sessionStart = 0
+        }
+        
+        # Restrict search to current session only
+        $sessionLines = if ($sessionStart -ge 0 -and $sessionEnd -gt $sessionStart)
+        {
+            $lines[$sessionStart..$sessionEnd]
+        }
+        else
+        {
+            $lines
+        }
+        
         $matchingLines = @()
         
-        for ($i = 0; $i -lt $lines.Count; $i++)
+        for ($i = 0; $i -lt $sessionLines.Count; $i++)
         {
-            if ($lines[$i] -match $Pattern)
+            if ($sessionLines[$i] -match $Pattern)
             {
                 $start = [Math]::Max(0, $i - $ContextLines)
-                $end = [Math]::Min($lines.Count - 1, $i + $ContextLines)
+                $end = [Math]::Min($sessionLines.Count - 1, $i + $ContextLines)
                 
                 $excerpt = @()
-                $excerpt += "--- Log excerpt (lines $($start+1)-$($end+1)) ---"
+                $excerpt += "--- Log excerpt (session lines $($start+1)-$($end+1)) ---"
                 for ($j = $start; $j -le $end; $j++)
                 {
                     $marker = if ($j -eq $i) { '>>> ' } else { '    ' }
-                    $excerpt += "$marker$($lines[$j])"
+                    $excerpt += "$marker$($sessionLines[$j])"
                 }
                 $excerpt += "--- End excerpt ---"
                 $matchingLines += $excerpt -join "`n"
@@ -188,10 +229,10 @@ BeforeAll {
         
         if ($matchingLines.Count -eq 0)
         {
-            # Pattern not found - show first and last few lines
-            $headerLines = $lines | Select-Object -First 5
-            $footerLines = $lines | Select-Object -Last 5
-            return "Pattern not found. Log preview:`n--- First 5 lines ---`n$($headerLines -join "`n")`n...`n--- Last 5 lines ---`n$($footerLines -join "`n")"
+            # Pattern not found - show first and last few lines of current session
+            $headerLines = $sessionLines | Select-Object -First 5
+            $footerLines = $sessionLines | Select-Object -Last 5
+            return "Pattern not found in current session. Session preview:`n--- First 5 lines ---`n$($headerLines -join "`n")`n...`n--- Last 5 lines ---`n$($footerLines -join "`n")"
         }
         
         return $matchingLines -join "`n`n"
@@ -214,6 +255,33 @@ AfterAll {
         {
             Remove-Item -Path $script:TestContext.TestFolder -Recurse -Force -ErrorAction SilentlyContinue
         }
+    }
+    
+    # Cleanup any GUID-named folders that may have been created by test artifacts
+    # These can be created by Pester TestDrive or other temp directory mechanisms
+    $guidPattern = '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    
+    # Clean from repo root
+    if ($script:RepoRoot -and (Test-Path $script:RepoRoot))
+    {
+        Get-ChildItem -Path $script:RepoRoot -Directory -ErrorAction SilentlyContinue | 
+            Where-Object { $_.Name -match $guidPattern } | 
+            ForEach-Object {
+                Write-Verbose "Removing GUID folder: $($_.FullName)"
+                Remove-Item -Path $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+            }
+    }
+    
+    # Clean from tests folder
+    $testsFolder = Join-Path $script:RepoRoot "tests"
+    if (Test-Path $testsFolder)
+    {
+        Get-ChildItem -Path $testsFolder -Directory -ErrorAction SilentlyContinue | 
+            Where-Object { $_.Name -match $guidPattern } | 
+            ForEach-Object {
+                Write-Verbose "Removing GUID folder: $($_.FullName)"
+                Remove-Item -Path $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+            }
     }
 }
 

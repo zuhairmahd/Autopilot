@@ -83,6 +83,9 @@ function Get-AutopilotPesterConfiguration
     $config.Run.Exit = $false  # Don't exit PowerShell after tests
     $config.Run.PassThru = $true  # Return test results object
     
+    # TestDrive configuration - ensure cleanup
+    $config.TestDrive.Enabled = $true
+    
     # Code coverage
     if ($EnableCodeCoverage)
     {

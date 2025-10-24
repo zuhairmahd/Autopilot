@@ -42,6 +42,7 @@ Describe "Main: Menu Creation and Structure" -Tags 'Integration', 'Main' {
         . "$script:RepoRoot/functions/setupFunctions/Get-ApplicationDefaults.ps1"
         . "$script:RepoRoot/functions/setupFunctions/Get-ConfigurationData.ps1"
         . "$script:RepoRoot/functions/utilityFunctions/Write-Log.ps1"
+        . "$script:RepoRoot/functions/utilityFunctions/Get-CachedData.ps1"
         
         # Export-PowerShellDataFile is built-in cmdlet in PowerShell 7+ (no file to load)
         
@@ -83,11 +84,11 @@ Describe "Main: Menu Creation and Structure" -Tags 'Integration', 'Main' {
             
             # Test Get-CachedMenuConfiguration directly first
             $directConfig = Get-CachedMenuConfiguration -MenuName "mainMenu" -MenuConfigFile $configPath
-            Write-Host "DEBUG: Direct config result: $($directConfig | ConvertTo-Json -Depth 2)" -ForegroundColor Yellow
+            Write-Host "DEBUG: Direct config result: $($directConfig | ConvertTo-Json -Depth 20)" -ForegroundColor Yellow
             Write-Host "DEBUG: Direct config is null: $($null -eq $directConfig)" -ForegroundColor Yellow
             Write-Host "DEBUG: Direct config type: $($directConfig.GetType().FullName)" -ForegroundColor Yellow
             
-            $mainMenu = NewMenu -MenuName "mainMenu" -MenuConfigFile $configPath -Verbose
+            $mainMenu = NewMenu -MenuName "mainMenu" -MenuConfigFile $configPath
             
             $mainMenu | Should -Not -BeNullOrEmpty
             $mainMenu.Title | Should -Not -BeNullOrEmpty

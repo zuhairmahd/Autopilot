@@ -22,17 +22,21 @@ BeforeAll {
             }
         }
     }
-}
-
-AfterEach {
-    # Clean up global cache after each test
-    if ($global:UnifiedCache)
-    {
-        $global:UnifiedCache = $null
-    }
+    
+    # Set global settings for all tests
+    $global:settings = $script:testSettings
 }
 
 Describe "Unified Cache Management" -Tags 'Unit' {
+    
+    AfterEach {
+        # Clean up global cache after each test
+        if ($global:UnifiedCache)
+        {
+            $global:UnifiedCache = $null
+        }
+    }
+    
     Context "Cache Initialization" {
         It "Initializes global cache structure" {
             Initialize-UnifiedCache
@@ -46,7 +50,20 @@ Describe "Unified Cache Management" -Tags 'Unit' {
     
     Context "Get-CachedData" {
         BeforeEach {
-            $global:settings = $script:testSettings
+            # Create fresh copy of settings for each test
+            $global:settings = @{
+                cacheSettings = @{
+                    enabled                  = $true
+                    defaultExpirationMinutes = 15
+                    maxCacheSize             = 1000
+                    cacheTypes               = @{
+                        Configuration    = @{ enabled = $true; expirationMinutes = 60 }
+                        DirectoryObjects = @{ enabled = $true; expirationMinutes = 15 }
+                        Devices          = @{ enabled = $true; expirationMinutes = 15 }
+                    }
+                }
+            }
+            Initialize-UnifiedCache
         }
         
         It "Returns null for non-existent cache key" {
@@ -93,7 +110,20 @@ Describe "Unified Cache Management" -Tags 'Unit' {
     
     Context "Set-CachedData" {
         BeforeEach {
-            $global:settings = $script:testSettings
+            # Create fresh copy of settings for each test
+            $global:settings = @{
+                cacheSettings = @{
+                    enabled                  = $true
+                    defaultExpirationMinutes = 15
+                    maxCacheSize             = 1000
+                    cacheTypes               = @{
+                        Configuration    = @{ enabled = $true; expirationMinutes = 60 }
+                        DirectoryObjects = @{ enabled = $true; expirationMinutes = 15 }
+                        Devices          = @{ enabled = $true; expirationMinutes = 15 }
+                    }
+                }
+            }
+            Initialize-UnifiedCache
         }
         
         It "Stores data successfully" {
@@ -138,7 +168,20 @@ Describe "Unified Cache Management" -Tags 'Unit' {
     
     Context "Clear-UnifiedCache" {
         BeforeEach {
-            $global:settings = $script:testSettings
+            # Create fresh copy of settings for each test
+            $global:settings = @{
+                cacheSettings = @{
+                    enabled                  = $true
+                    defaultExpirationMinutes = 15
+                    maxCacheSize             = 1000
+                    cacheTypes               = @{
+                        Configuration    = @{ enabled = $true; expirationMinutes = 60 }
+                        DirectoryObjects = @{ enabled = $true; expirationMinutes = 15 }
+                        Devices          = @{ enabled = $true; expirationMinutes = 15 }
+                    }
+                }
+            }
+            Initialize-UnifiedCache
             
             # Populate cache
             Set-CachedData -CacheType 'Configuration' -Key 'test:1' -Data 'Value1'
@@ -165,7 +208,19 @@ Describe "Unified Cache Management" -Tags 'Unit' {
     
     Context "Cache Expiration Helper" {
         BeforeEach {
-            $global:settings = $script:testSettings
+            # Create fresh copy of settings for each test
+            $global:settings = @{
+                cacheSettings = @{
+                    enabled                  = $true
+                    defaultExpirationMinutes = 15
+                    maxCacheSize             = 1000
+                    cacheTypes               = @{
+                        Configuration    = @{ enabled = $true; expirationMinutes = 60 }
+                        DirectoryObjects = @{ enabled = $true; expirationMinutes = 15 }
+                        Devices          = @{ enabled = $true; expirationMinutes = 15 }
+                    }
+                }
+            }
         }
         
         It "Returns configured expiration for cache type" {

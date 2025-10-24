@@ -13,11 +13,11 @@
 
 | Task | Command | Time |
 |------|---------|------|
-| Run all tests | `pwsh -File .\Invoke-PesterTests.ps1 -TestType All` | 2-3s |
-| Run single test | `.\Invoke-PesterTests.ps1 -TestFile "tests\Unit\MyTest.Tests.ps1"` | <1s |
-| Run with coverage | `.\Invoke-PesterTests.ps1 -TestType All -EnableCodeCoverage` | 5-10s |
+| Run all tests | `pwsh.exe -ExecutionPolicy Bypass -File .\Invoke-PesterTests.ps1 -TestType All` | 2-3s |
+| Run single test | `pwsh.exe -ExecutionPolicy Bypass -File .\Invoke-PesterTests.ps1 -TestFile "tests\Unit\MyTest.Tests.ps1"` | <1s |
+| Run with coverage | `pwsh.exe -ExecutionPolicy Bypass -File .\Invoke-PesterTests.ps1 -TestType All -EnableCodeCoverage` | 5-10s |
 
-**Note:** Tests run in PowerShell 7+ only. The application itself must support PowerShell 5.1, but Pester tests do not.
+**CRITICAL:** All tests MUST be run using `pwsh.exe` (PowerShell 7+). Do NOT use `powershell.exe` (PowerShell 5.1) for running tests. The application itself must support PowerShell 5.1, but Pester tests require PowerShell 7+.
 
 ### File Locations
 
@@ -119,10 +119,15 @@ BeforeAll {
 ### 3. Always Clean Up (AfterAll Required)
 
 **✅ Mandatory cleanup pattern:**
+
+**IMPORTANT:** Avoid using Pester's `TestDrive:` as it can leave GUID-named folders behind in the repository root and tests directory. Instead, use `Initialize-AutopilotTestEnvironment` from `AutopilotTestHelpers.psm1` which provides proper cleanup tracking.
+
 ```powershell
+Import-Module "$PSScriptRoot/../Helpers/AutopilotTestHelpers.psm1" -Force
+
 Describe "My Tests" {
     BeforeAll {
-        # Setup
+        # Setup using helper (preferred method)
         $script:TestContext = Initialize-AutopilotTestEnvironment
         Initialize-GraphMockEnvironment -ClearCache
         Initialize-MenuTestEnvironment -AppMode "admin"
@@ -139,7 +144,7 @@ Describe "My Tests" {
 }
 ```
 
-**Why:** Prevents test pollution, disk space issues, and state leakage between test runs.
+**Why:** Prevents test pollution, disk space issues, state leakage between test runs, and GUID-named folder remnants in the repository.
 
 ---
 

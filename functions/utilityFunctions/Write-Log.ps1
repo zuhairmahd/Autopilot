@@ -80,8 +80,15 @@ function Write-Log()
             $Module = $MyInvocation.MyCommand.Name
             $LogLevel = "Information"
             
-            # Create separator line
-            $separatorLine = "=" * 80
+            # Create separator line with appropriate message
+            if ($StartLogging)
+            {
+                $separatorLine = "=" * 30 + " start of log session " + "=" * 30
+            }
+            else
+            {
+                $separatorLine = "=" * 30 + " end of log session " + "=" * 30
+            }
             
             # Ensure log directory exists
             $logDir = Split-Path $LogFile -Parent

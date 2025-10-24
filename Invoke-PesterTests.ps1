@@ -862,6 +862,41 @@ try
     Write-Host "=" * 63 -ForegroundColor Cyan
     Write-Host ""
     
+    # Cleanup any GUID-named folders that may have been left behind by TestDrive
+    # These folders are created in the current working directory when TestDrive cleanup fails
+    $guidPattern = '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    
+    $repoRoot = $PSScriptRoot
+    $guidFoldersInRoot = Get-ChildItem -Path $repoRoot -Directory -ErrorAction SilentlyContinue | 
+        Where-Object { $_.Name -match $guidPattern }
+    
+    if ($guidFoldersInRoot.Count -gt 0)
+    {
+        Write-Host "Cleaning up $($guidFoldersInRoot.Count) GUID-named TestDrive folder(s) from repository root..." -ForegroundColor Yellow
+        foreach ($folder in $guidFoldersInRoot)
+        {
+            Remove-Item -Path $folder.FullName -Recurse -Force -ErrorAction SilentlyContinue
+            Write-Verbose "Removed: $($folder.FullName)"
+        }
+    }
+    
+    $testsFolder = Join-Path $repoRoot "tests"
+    if (Test-Path $testsFolder)
+    {
+        $guidFoldersInTests = Get-ChildItem -Path $testsFolder -Directory -ErrorAction SilentlyContinue | 
+            Where-Object { $_.Name -match $guidPattern }
+        
+        if ($guidFoldersInTests.Count -gt 0)
+        {
+            Write-Host "Cleaning up $($guidFoldersInTests.Count) GUID-named TestDrive folder(s) from tests directory..." -ForegroundColor Yellow
+            foreach ($folder in $guidFoldersInTests)
+            {
+                Remove-Item -Path $folder.FullName -Recurse -Force -ErrorAction SilentlyContinue
+                Write-Verbose "Removed: $($folder.FullName)"
+            }
+        }
+    }
+    
     # Exit with appropriate code
     exit $result.FailedCount
 }

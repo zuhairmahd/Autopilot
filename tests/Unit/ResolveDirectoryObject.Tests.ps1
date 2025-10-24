@@ -2,6 +2,9 @@ BeforeAll {
     # Get repository root
     $script:RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     
+    # Load unified cache functions first
+    . (Join-Path $script:RepoRoot "functions/utilityFunctions/Get-CachedData.ps1")
+    
     # Load the function under test
     . (Join-Path $script:RepoRoot "functions/UserAndGroupFunctions/Resolve-DirectoryObject.ps1")
     . (Join-Path $script:RepoRoot "functions/UserAndGroupFunctions/ConvertFrom-DirectoryObjectSelection.ps1")
@@ -10,6 +13,20 @@ BeforeAll {
     
     # Import the Graph mocking module
     Import-Module (Join-Path $script:RepoRoot "tests/Helpers/AutopilotGraphMocks.psm1") -Force
+    
+    # Initialize cache settings
+    $global:settings = @{
+        cacheSettings = @{
+            enabled                  = $true
+            defaultExpirationMinutes = 15
+            maxCacheSize             = 1000
+            cacheTypes               = @{
+                Configuration    = @{ enabled = $true; expirationMinutes = 60 }
+                DirectoryObjects = @{ enabled = $true; expirationMinutes = 15 }
+                Devices          = @{ enabled = $true; expirationMinutes = 15 }
+            }
+        }
+    }
     
     # Initialize mock environment
     Initialize-GraphMockEnvironment -ClearCache
@@ -87,11 +104,8 @@ Describe "Resolve-DirectoryObject" -Tag 'Unit', 'DirectoryObject' {
         $script:MockMenuResponse = $null
         $script:MenuCallCount = 0
         
-        # Clear cache
-        if (Get-Variable -Name DirectoryObjectCache -Scope Global -ErrorAction SilentlyContinue)
-        {
-            $global:DirectoryObjectCache = @{}
-        }
+        # Clear unified cache
+        Clear-UnifiedCache -CacheType 'DirectoryObjects'
     }
     
     Context "Input Validation" {
@@ -613,7 +627,7 @@ Describe "Resolve-DirectoryObject" -Tag 'Unit', 'DirectoryObject' {
             $result1 | Should -Be $result2
             $result1 | Should -Be "john.doe@contoso.com"
             # Cache should have at least one entry
-            $global:DirectoryObjectCache.Count | Should -BeGreaterThan 0
+            $global:UnifiedCache.DirectoryObjects.Count | Should -BeGreaterThan 0
         }
         
         It "Benefits from caching on repeated fuzzy lookups" {
@@ -636,7 +650,7 @@ Describe "Resolve-DirectoryObject" -Tag 'Unit', 'DirectoryObject' {
             $result1 | Should -Be "john.doe@contoso.com"
             $result2 | Should -Be "john.doe@contoso.com"
             # Cache should have fuzzy search results
-            $global:DirectoryObjectCache.Count | Should -BeGreaterThan 0
+            $global:UnifiedCache.DirectoryObjects.Count | Should -BeGreaterThan 0
         }
     }
     

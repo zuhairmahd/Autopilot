@@ -67,23 +67,16 @@ function Get-EntraDirectoryObject()
     Write-Verbose "[$functionName] Starting function to get $EntityType from Entra ID"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Starting $EntityType search for: $EntityName" -LogLevel "Verbose"
     
-    # Initialize unified cache if it doesn't exist
-    if (-not $global:DirectoryObjectCache)
-    {
-        $global:DirectoryObjectCache = @{}
-        Write-Verbose "[$functionName] Initialized directory object cache"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Initialized directory object cache" -LogLevel "Verbose"
-    }
-    
     # Create cache key including EntityType and FindSimilar flag
     $cacheKey = "$EntityType|$EntityName|$FindSimilar"
     
-    # Check cache first
-    if ($global:DirectoryObjectCache.ContainsKey($cacheKey))
+    # Check unified cache first
+    $cachedResult = Get-CachedData -CacheType 'DirectoryObjects' -Key $cacheKey -Settings $global:settings
+    if ($null -ne $cachedResult)
     {
         Write-Verbose "[$functionName] Found cached result for $EntityType`: $EntityName (FindSimilar: $FindSimilar)"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Found cached result for $EntityType`: $EntityName" -LogLevel "Verbose"
-        return $global:DirectoryObjectCache[$cacheKey]
+        return $cachedResult
     }
     
     # Validate access token
@@ -148,9 +141,17 @@ function Get-EntraDirectoryObject()
         
         # Cache and return
         $result = $exactMatchResponse, $substringSearch
-        $global:DirectoryObjectCache[$cacheKey] = $result
-        Write-Verbose "[$functionName] Cached exact match result for $EntityType`: $EntityName"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Cached exact match for $EntityType`: $EntityName" -LogLevel "Verbose"
+        $metadata = @{
+            EntityType = $EntityType
+            SearchType = 'ExactMatch'
+            EntityName = $EntityName
+        }
+        $cached = Set-CachedData -CacheType 'DirectoryObjects' -Key $cacheKey -Data $result -Metadata $metadata -Settings $global:settings
+        if ($cached)
+        {
+            Write-Verbose "[$functionName] Cached exact match result for $EntityType`: $EntityName"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Cached exact match for $EntityType`: $EntityName" -LogLevel "Verbose"
+        }
         
         return $result
     }
@@ -327,9 +328,18 @@ function Get-EntraDirectoryObject()
             
             # Cache and return
             $result = $filteredResponse, $substringSearch
-            $global:DirectoryObjectCache[$cacheKey] = $result
-            Write-Verbose "[$functionName] Cached fuzzy search result for $EntityType`: $EntityName"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Cached fuzzy search result for $EntityType`: $EntityName" -LogLevel "Verbose"
+            $metadata = @{
+                EntityType  = $EntityType
+                SearchType  = 'FuzzyMatch'
+                EntityName  = $EntityName
+                ResultCount = $filteredResponse.value.Count
+            }
+            $cached = Set-CachedData -CacheType 'DirectoryObjects' -Key $cacheKey -Data $result -Metadata $metadata -Settings $global:settings
+            if ($cached)
+            {
+                Write-Verbose "[$functionName] Cached fuzzy search result for $EntityType`: $EntityName"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Cached fuzzy search result for $EntityType`: $EntityName" -LogLevel "Verbose"
+            }
             
             return $result
         }
