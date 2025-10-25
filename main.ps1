@@ -225,6 +225,7 @@ param(
     [string]$LogLevel = 'Information'
 )
 
+#region Initialize test mode
 # Store test password in script scope if provided (only works with testMode for security)
 if ($testMode -and $TestPassword)
 {
@@ -268,7 +269,9 @@ if ($testMode)
     
     Write-Verbose "[$scriptName] Test mode options initialized: $($script:testModeOptions | ConvertTo-Json -Compress)"
 }
+#endregion Initialize test mode
 
+#region Initialize script variables
 $scriptName = $MyInvocation.MyCommand.Name
 if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
 {
@@ -291,6 +294,8 @@ else
         Write-Verbose "[$scriptName] Full script path: $fullScriptPath"
     }
 }
+#endregion Initialize script variables
+
 
 #region import functions.
 function Find-FolderPath()
@@ -713,7 +718,7 @@ else
 }
 #endregion Process login
 
-#region initialize script
+#region initialize script objects
 Write-Host "Loading configuration..."
 # Use domain if available, otherwise default to contoso.com
 $domainForDefaults = if ($domain)
@@ -781,7 +786,7 @@ if (-not $version.version)
         }
     }
 }
-#endregion Initialize script
+#endregion Initialize script objects
 
 #region Check for password change requirement
 if ($testMode)
