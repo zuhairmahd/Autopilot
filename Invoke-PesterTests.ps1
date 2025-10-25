@@ -212,14 +212,25 @@ function Find-FileWithFuzzySearch()
     Write-Verbose "[$functionName] Found $($exactMatch.Count) exact matches for '$searchFileName'."
     if ($exactMatch)
     {
-        if ($exactMatch.Count -eq 1 -and -not $AllowMultiple)
+        # Auto-select if there's exactly one match, regardless of -AllowMultiple
+        if ($exactMatch.Count -eq 1)
         {
             Write-Host "Found exact match: $($exactMatch.FullName)" -ForegroundColor Green
-            return $exactMatch.FullName
+            
+            if ($AllowMultiple)
+            {
+                # Return as array for consistency with AllowMultiple mode
+                return @($exactMatch.FullName)
+            }
+            else
+            {
+                return $exactMatch.FullName
+            }
         }
         else
         {
-            Write-Host "Found $($exactMatch.Count) exact match$(if ($exactMatch.Count -ne 1) {'es'}):" -ForegroundColor Yellow
+            # Multiple exact matches - let user choose
+            Write-Host "Found $($exactMatch.Count) exact matches:" -ForegroundColor Yellow
             
             $selectedFiles = Select-TestFiles -Files $exactMatch -TestsPath $TestsPath -AllowMultiple:$AllowMultiple
             
@@ -256,6 +267,24 @@ function Find-FileWithFuzzySearch()
     {
         Write-Host "No similar test files found" -ForegroundColor Red
         return 'No files found'
+    }
+    
+    # Check if the top match is an exact match (score >= 1000)
+    # Auto-select regardless of -AllowMultiple switch when there's an exact match
+    if ($scoredFiles[0].Score -ge 1000)
+    {
+        Write-Host "Found exact fuzzy match: $($scoredFiles[0].File.FullName)" -ForegroundColor Green
+        Write-Verbose "[$functionName] Exact fuzzy match found with score $($scoredFiles[0].Score), proceeding without prompt."
+        
+        if ($AllowMultiple)
+        {
+            # Return as array for consistency with AllowMultiple mode
+            return @($scoredFiles[0].File.FullName)
+        }
+        else
+        {
+            return $scoredFiles[0].File.FullName
+        }
     }
     
     Write-Host ""
@@ -527,6 +556,38 @@ function Select-TestFiles()
     
     return @()
 }
+
+# Helper function to clean up GUID-named TestDrive folders
+function Remove-GuidFolders()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path,
+        [Parameter(Mandatory)]
+        [string]$LocationDescription
+    )
+    
+    $guidPattern = '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    
+    if (-not (Test-Path $Path))
+    {
+        return
+    }
+    
+    $guidFolders = Get-ChildItem -Path $Path -Directory -ErrorAction SilentlyContinue | 
+        Where-Object { $_.Name -match $guidPattern }
+    
+    if ($guidFolders.Count -gt 0)
+    {
+        Write-Host "Cleaning up $($guidFolders.Count) GUID-named TestDrive folder(s) from $LocationDescription..." -ForegroundColor Yellow
+        foreach ($folder in $guidFolders)
+        {
+            Remove-Item -Path $folder.FullName -Recurse -Force -ErrorAction SilentlyContinue
+            Write-Verbose "Removed: $($folder.FullName)"
+        }
+    }
+}
 #endregion
 
 # Check if -Tags was passed with "Interactive" value (interactive mode)
@@ -715,6 +776,11 @@ else
     Write-Host "  Test Path: $testPaths" -ForegroundColor White
 }
 
+if ($TestType -in @('Integration') -and $OutputVerbosity -ne 'Detailed')
+{
+    Write-Host "Changing output verbosity to 'Detailed' for Integration tests" -ForegroundColor Yellow
+    $config.Output.Verbosity = 'Detailed'
+}
 if ($EnableCodeCoverage -or $OutputVerbosity -eq 'Detailed')
 {
     Write-Host "  Code Coverage: $($config.CodeCoverage.Enabled)" -ForegroundColor White
@@ -755,7 +821,14 @@ try
     Write-Host "=" * 63 -ForegroundColor Cyan
     Write-Host "  Total Tests: $($result.TotalCount)" -ForegroundColor White
     Write-Host "  Passed: $($result.PassedCount)" -ForegroundColor Green
-    Write-Host "  Failed: $($result.FailedCount)" -ForegroundColor $(if ($result.FailedCount -gt 0) { 'Red' } else { 'Gray' })
+    Write-Host "  Failed: $($result.FailedCount)" -ForegroundColor $(if ($result.FailedCount -gt 0)
+        {
+            'Red' 
+        }
+        else
+        {
+            'Gray' 
+        })
     Write-Host "  Skipped: $($result.SkippedCount)" -ForegroundColor Gray
     Write-Host "  Duration: $($duration.TotalSeconds.ToString('F2'))s" -ForegroundColor White
     
@@ -828,7 +901,18 @@ try
         Write-Host "  Commands Executed: $($coverage.CommandsExecutedCount)" -ForegroundColor White
         Write-Host "Commands missed: $($coverage.CommandsMissedCount)" -ForegroundColor White
         Write-Host "Files analyzed: $($coverage.FilesAnalyzedCount)" -ForegroundColor White
-        Write-Host "  Coverage: $($coverage.CoveragePercent)" -ForegroundColor $(if ($coverage.CoveragePercent -ge 80) { 'Green' } elseif ($coverage.CoveragePercent -ge 60) { 'Yellow' } else { 'Red' })
+        Write-Host "  Coverage: $($coverage.CoveragePercent)" -ForegroundColor $(if ($coverage.CoveragePercent -ge 80)
+            {
+                'Green' 
+            }
+            elseif ($coverage.CoveragePercent -ge 60)
+            {
+                'Yellow' 
+            }
+            else
+            {
+                'Red' 
+            })
         Write-Host "Coverage target: $($coverage.CoveragePercentTarget)"
         
         # Show detailed list ONLY if requested
@@ -861,6 +945,14 @@ try
     
     Write-Host "=" * 63 -ForegroundColor Cyan
     Write-Host ""
+    
+    # Cleanup any GUID-named folders that may have been left behind by TestDrive
+    # These folders are created in the current working directory when TestDrive cleanup fails
+    $repoRoot = $PSScriptRoot
+    Remove-GuidFolders -Path $repoRoot -LocationDescription "repository root"
+    
+    $testsFolder = Join-Path $repoRoot "tests"
+    Remove-GuidFolders -Path $testsFolder -LocationDescription "tests directory"
     
     # Exit with appropriate code
     exit $result.FailedCount

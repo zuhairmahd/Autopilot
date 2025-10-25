@@ -50,108 +50,94 @@ function Get-DeviceData()
     
     $functionName = $MyInvocation.MyCommand.Name
     
-    # Initialize script-scope cache if it doesn't exist
-    if ($null -eq $script:DeviceDataCache)
+    # Build cache key based on device type and filter (for managed devices)
+    $cacheKey = "device:$DeviceType"
+    if ($DeviceType -eq 'managed')
     {
-        $script:DeviceDataCache = @{
-            autopilot = @{ Data = $null; Timestamp = $null; Filter = $null }
-            managed   = @{ Data = $null; Timestamp = $null; Filter = $null }
-            imported  = @{ Data = $null; Timestamp = $null; Filter = $null }
-            unmanaged = @{ Data = $null; Timestamp = $null; Filter = $null }
+        $currentFilter = Get-ManagedDeviceFilter -DeviceNamePrefix $DeviceNamePrefix
+        $cacheKey = "$cacheKey|$currentFilter"
+    }
+    
+    # Try to get cached data (unless RefreshCache is specified)
+    if (-not $RefreshCache)
+    {
+        $cachedData = Get-CachedData -CacheType 'Devices' -Key $cacheKey -Settings $global:settings
+        
+        if ($null -ne $cachedData)
+        {
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Using cached $DeviceType device data" -LogLevel "Information"
+            Write-Verbose "[$functionName] Using cached $DeviceType device data"
+            
+            # Return cached data
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Retrieved $($cachedData.value.Count) $DeviceType devices from cache." -LogLevel "Information"
+            Write-Verbose "[$functionName] Retrieved $($cachedData.value.Count) $DeviceType devices from cache."
+            return $cachedData
         }
     }
     
-    # Determine if we should use cached data
-    $cacheValid = $false
-    $currentCache = $script:DeviceDataCache[$DeviceType]
-    
-    if (-not $RefreshCache -and $null -ne $currentCache.Timestamp)
+    # If we reach here, either RefreshCache was specified or cache was empty/expired
+    # Fetch fresh data based on device type
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Fetching $DeviceType devices from Graph API." -LogLevel "Information"
+    Write-Verbose "[$functionName] Fetching $DeviceType devices from Graph API."
+        
+    switch ($DeviceType)
     {
-        $cacheAge = (Get-Date) - $currentCache.Timestamp
-        
-        # For managed devices, also check if filter has changed
-        if ($DeviceType -eq 'managed')
+        'autopilot'
         {
-            $currentFilter = Get-ManagedDeviceFilter -DeviceNamePrefix $DeviceNamePrefix
-            $filterMatch = $currentCache.Filter -eq $currentFilter
+            $resourcePath = "deviceManagement/windowsAutopilotDeviceIdentities"
+            # Note: No extraParameters for autopilot endpoint - using defaults to get all available properties
+            $devices = CallGraphApi -ResourcePath $resourcePath -accessToken $AccessToken
         }
-        else
+        'imported'
         {
-            $filterMatch = $true
+            $resourcePath = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
+            $extraParameters = "select=serialNumber,importId,groupTag,state"
+            $devices = CallGraphApi -ResourcePath $resourcePath -accessToken $AccessToken -extraParameters $extraParameters
         }
-        
-        if ($cacheAge.TotalMinutes -lt $CacheExpirationMinutes -and $filterMatch)
+        'unmanaged'
         {
-            $cacheValid = $true
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Using cached $DeviceType device data (age: $([math]::Round($cacheAge.TotalMinutes, 1)) minutes)" -LogLevel "Information"
-            Write-Verbose "[$functionName] Using cached $DeviceType device data (age: $([math]::Round($cacheAge.TotalMinutes, 1)) minutes)"
+            $resourcePath = "devices"
+            $filter = "operatingSystem eq 'Windows'"
+            $extraParameters = "select=id,displayName,manufacturer,model,operatingSystemVersion,profileType,createdDateTime,registrationDateTime,accountEnabled,approximateLastSignInDateTime,enrollmentProfileName,enrollmentType,isCompliant"
+            $devices = CallGraphApi -ResourcePath $resourcePath -accessToken $AccessToken -filter $filter -extraParameters $extraParameters
+        }
+        'managed'
+        {
+            $resourcePath = "deviceManagement/managedDevices"
+            $filter = Get-ManagedDeviceFilter -DeviceNamePrefix $DeviceNamePrefix
+            $extraParameters = "select=id,serialNumber,deviceName,manufacturer,model,osVersion,deviceEnrollmentType,enrolledDateTime,lastSyncDateTime,complianceState,userPrincipalName,userDisplayName,userId,managedDeviceOwnerType,azureADRegistered,autopilotEnrolled,usersLoggedOn"
+            $devices = CallGraphApi -ResourcePath $resourcePath -accessToken $AccessToken -filter $filter -extraParameters $extraParameters
         }
     }
-    
-    if ($cacheValid)
+        
+    # Validate response
+    if ($null -eq $devices -or $null -eq $devices.value)
     {
-        # Return cached data
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Retrieved $($currentCache.Data.value.Count) $DeviceType devices from cache." -LogLevel "Information"
-        Write-Verbose "[$functionName] Retrieved $($currentCache.Data.value.Count) $DeviceType devices from cache."
-        return $currentCache.Data
+        Write-Log -LogFile $LogFile -Module $functionName -Message "WARNING: No $DeviceType devices retrieved from API!" -LogLevel "Warning"
+        Write-Verbose "[$functionName] WARNING: No $DeviceType devices retrieved!"
+        $devices = @{ value = @() }
     }
-    else
+        
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Fetched $($devices.value.Count) $DeviceType devices." -LogLevel "Information"
+    Write-Verbose "[$functionName] Fetched $($devices.value.Count) $DeviceType devices."
+        
+    # Store in unified cache
+    $metadata = @{
+        DeviceType = $DeviceType
+        Count      = $devices.value.Count
+    }
+    if ($DeviceType -eq 'managed')
     {
-        # Fetch fresh data based on device type
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Fetching $DeviceType devices from Graph API." -LogLevel "Information"
-        Write-Verbose "[$functionName] Fetching $DeviceType devices from Graph API."
-        
-        switch ($DeviceType)
-        {
-            'autopilot'
-            {
-                $resourcePath = "deviceManagement/windowsAutopilotDeviceIdentities"
-                # Note: No extraParameters for autopilot endpoint - using defaults to get all available properties
-                $devices = CallGraphApi -ResourcePath $resourcePath -accessToken $AccessToken
-            }
-            'imported'
-            {
-                $resourcePath = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
-                $extraParameters = "select=serialNumber,importId,groupTag,state"
-                $devices = CallGraphApi -ResourcePath $resourcePath -accessToken $AccessToken -extraParameters $extraParameters
-            }
-            'unmanaged'
-            {
-                $resourcePath = "devices"
-                $filter = "operatingSystem eq 'Windows'"
-                $extraParameters = "select=id,displayName,manufacturer,model,operatingSystemVersion,profileType,createdDateTime,registrationDateTime,accountEnabled,approximateLastSignInDateTime,enrollmentProfileName,enrollmentType,isCompliant"
-                $devices = CallGraphApi -ResourcePath $resourcePath -accessToken $AccessToken -filter $filter -extraParameters $extraParameters
-            }
-            'managed'
-            {
-                $resourcePath = "deviceManagement/managedDevices"
-                $filter = Get-ManagedDeviceFilter -DeviceNamePrefix $DeviceNamePrefix
-                $extraParameters = "select=id,serialNumber,deviceName,manufacturer,model,osVersion,deviceEnrollmentType,enrolledDateTime,lastSyncDateTime,complianceState,userPrincipalName,userDisplayName,userId,managedDeviceOwnerType,azureADRegistered,autopilotEnrolled,usersLoggedOn"
-                $devices = CallGraphApi -ResourcePath $resourcePath -accessToken $AccessToken -filter $filter -extraParameters $extraParameters
-                
-                # Store filter for cache validation
-                $currentCache.Filter = $filter
-            }
-        }
-        
-        # Validate response
-        if ($null -eq $devices -or $null -eq $devices.value)
-        {
-            Write-Log -LogFile $LogFile -Module $functionName -Message "WARNING: No $DeviceType devices retrieved from API!" -LogLevel "Warning"
-            Write-Verbose "[$functionName] WARNING: No $DeviceType devices retrieved!"
-            $devices = @{ value = @() }
-        }
-        
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Fetched $($devices.value.Count) $DeviceType devices." -LogLevel "Information"
-        Write-Verbose "[$functionName] Fetched $($devices.value.Count) $DeviceType devices."
-        
-        # Update cache
-        $currentCache.Data = $devices
-        $currentCache.Timestamp = Get-Date
-        Write-Log -LogFile $LogFile -Module $functionName -Message "$DeviceType device data cached for $CacheExpirationMinutes minutes." -LogLevel "Verbose"
-        
-        return $devices
+        $metadata.Filter = $currentFilter
     }
+        
+    $cached = Set-CachedData -CacheType 'Devices' -Key $cacheKey -Data $devices -Metadata $metadata -Settings $global:settings
+    if ($cached)
+    {
+        Write-Log -LogFile $LogFile -Module $functionName -Message "$DeviceType device data cached." -LogLevel "Verbose"
+    }
+        
+    return $devices
 }
 
 function Get-ManagedDeviceFilter

@@ -68,6 +68,16 @@ function GetAutopilotProfile()
             return $null, $false
         }
         
+        # Check cache for GetAll (uses empty ProfileName)
+        $getAllCacheKey = "autopilot:|False"
+        $cachedGetAll = Get-CachedData -CacheType 'Configuration' -Key $getAllCacheKey -Settings $global:settings
+        if ($null -ne $cachedGetAll)
+        {
+            Write-Verbose "[$functionName] Found cached GetAll result"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found cached GetAll result" -LogLevel "Verbose"
+            return $cachedGetAll
+        }
+        
         $Uri = "deviceManagement/windowsAutopilotDeploymentProfiles"
         $ExtraParameters = "select=id,displayName,description,createdDateTime,lastModifiedDateTime"
         
@@ -79,7 +89,20 @@ function GetAutopilotProfile()
             {
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Retrieved $($Info.value.Count) total Autopilot profiles" -LogLevel "Information"
                 Write-Verbose "[$functionName] Successfully retrieved $($Info.value.Count) profiles"
-                return $Info, $false
+                
+                # Cache GetAll result
+                $result = $Info, $false
+                $metadata = @{
+                    ProfileName  = ""
+                    SearchType   = 'GetAll'
+                    ProfileCount = $Info.value.Count
+                }
+                $cached = Set-CachedData -CacheType 'Configuration' -Key $getAllCacheKey -Data $result -Metadata $metadata -Settings $global:settings
+                if ($cached)
+                {
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cached GetAll result" -LogLevel "Verbose"
+                }
+                return $result
             }
             else
             {
@@ -96,22 +119,16 @@ function GetAutopilotProfile()
     
     Write-Verbose "[$functionName] Searching for Autopilot profile: $ProfileName"
     
-    # Initialize autopilot profile cache if it doesn't exist
-    if (-not $global:AutopilotProfileCache)
-    {
-        $global:AutopilotProfileCache = @{}
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Initialized Autopilot profile cache" -LogLevel "Verbose"
-    }
-    
     # Create cache key including FindSimilar flag for different search types
-    $cacheKey = "$ProfileName|$FindSimilar"
+    $cacheKey = "autopilot:$ProfileName|$FindSimilar"
     
-    # Check cache first
-    if ($global:AutopilotProfileCache.ContainsKey($cacheKey))
+    # Check unified cache first
+    $cachedResult = Get-CachedData -CacheType 'Configuration' -Key $cacheKey -Settings $global:settings
+    if ($null -ne $cachedResult)
     {
         Write-Verbose "[$functionName] Found cached result for Autopilot profile: $ProfileName (FindSimilar: $FindSimilar)"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found cached result for Autopilot profile: $ProfileName" -LogLevel "Verbose"
-        return $global:AutopilotProfileCache[$cacheKey]
+        return $cachedResult
     }
     
     # Validate access token
@@ -146,8 +163,16 @@ function GetAutopilotProfile()
             
             # Cache the result before returning
             $result = $Info, $substringSearch
-            $global:AutopilotProfileCache[$cacheKey] = $result
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cached result for Autopilot profile: $ProfileName" -LogLevel "Verbose"
+            $metadata = @{
+                ProfileName = $ProfileName
+                SearchType  = 'ExactMatch'
+                ProfileId   = $Info.value[0].id
+            }
+            $cached = Set-CachedData -CacheType 'Configuration' -Key $cacheKey -Data $result -Metadata $metadata -Settings $global:settings
+            if ($cached)
+            {
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cached result for Autopilot profile: $ProfileName" -LogLevel "Verbose"
+            }
             return $result
         }
     }
@@ -294,8 +319,16 @@ function GetAutopilotProfile()
                 
                 # Cache the similarity search result before returning
                 $result = $filteredResponse, $substringSearch
-                $global:AutopilotProfileCache[$cacheKey] = $result
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cached similarity search result for Autopilot profile: $ProfileName" -LogLevel "Verbose"
+                $metadata = @{
+                    ProfileName = $ProfileName
+                    SearchType  = 'FuzzyMatch'
+                    ResultCount = $filteredResponse.value.Count
+                }
+                $cached = Set-CachedData -CacheType 'Configuration' -Key $cacheKey -Data $result -Metadata $metadata -Settings $global:settings
+                if ($cached)
+                {
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cached similarity search result for Autopilot profile: $ProfileName" -LogLevel "Verbose"
+                }
                 return $result
             }
             else        
@@ -345,8 +378,16 @@ function GetAutopilotProfile()
                             
                             $substringSearch = $true
                             $result = $clientFilteredResponse, $substringSearch
-                            $global:AutopilotProfileCache[$cacheKey] = $result
-                            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cached client-side filtered result" -LogLevel "Verbose"
+                            $metadata = @{
+                                ProfileName = $ProfileName
+                                SearchType  = 'ClientSideFilter'
+                                ResultCount = $clientFilteredResponse.value.Count
+                            }
+                            $cached = Set-CachedData -CacheType 'Configuration' -Key $cacheKey -Data $result -Metadata $metadata -Settings $global:settings
+                            if ($cached)
+                            {
+                                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cached client-side filtered result" -LogLevel "Verbose"
+                            }
                             return $result
                         }
                         else

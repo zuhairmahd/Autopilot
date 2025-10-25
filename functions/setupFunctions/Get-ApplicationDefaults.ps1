@@ -120,7 +120,26 @@ function Get-ApplicationDefaults()
             maxGroupMatchDisplay         = 10
             maxMenuItemsPerPage          = 15
             release                      = "auto"
-            repoInfo                     = @{
+            cacheSettings                = [ordered]@{
+                enabled                  = $true
+                defaultExpirationMinutes = 15
+                maxCacheSize             = 1000
+                cacheTypes               = [ordered]@{
+                    Configuration    = [ordered]@{
+                        enabled           = $true
+                        expirationMinutes = 60
+                    }
+                    DirectoryObjects = [ordered]@{
+                        enabled           = $true
+                        expirationMinutes = 15
+                    }
+                    Devices          = [ordered]@{
+                        enabled           = $true
+                        expirationMinutes = 15
+                    }
+                }
+            }
+            repoInfo                     = [ordered]@{
                 repoName      = "Autopilot"
                 baseSourceURL = "https://raw.githubusercontent.com"
                 baseURL       = "https://www.github.com"
@@ -157,7 +176,26 @@ function Get-ApplicationDefaults()
             maxGroupMatchDisplay            = 20
             maxMenuItemsPerPage             = 20
             release                         = "master"
-            repoInfo                        = @{
+            cacheSettings                   = [ordered]@{
+                enabled                  = $true
+                defaultExpirationMinutes = 15
+                maxCacheSize             = 1000
+                cacheTypes               = [ordered]@{
+                    Configuration    = [ordered]@{
+                        enabled           = $true
+                        expirationMinutes = 60
+                    }
+                    DirectoryObjects = [ordered]@{
+                        enabled           = $true
+                        expirationMinutes = 15
+                    }
+                    Devices          = [ordered]@{
+                        enabled           = $true
+                        expirationMinutes = 15
+                    }
+                }
+            }
+            repoInfo                        = [ordered]@{
                 repoName      = "Autopilot"
                 baseSourceURL = "https://raw.githubusercontent.com"
                 baseURL       = "https://www.github.com"

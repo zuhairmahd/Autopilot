@@ -30,6 +30,7 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
         $script:RepoRoot = (Get-Item $PSScriptRoot).Parent.Parent.Parent.FullName
         
         # Load dependencies
+        . "$script:RepoRoot/functions/utilityFunctions/Get-CachedData.ps1"
         . "$script:RepoRoot/functions/utilityFunctions/Export-PowershellDataFile/Export-PowerShellDataFile.ps1"
         . "$script:RepoRoot/functions/utilityFunctions/Export-PowershellDataFile/ConvertTo-Psd1String.ps1"
         . "$script:RepoRoot/functions/utilityFunctions/Export-PowershellDataFile/ConvertTo-HashtableFromPSCustomObject.ps1"
