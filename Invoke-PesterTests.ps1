@@ -556,6 +556,38 @@ function Select-TestFiles()
     
     return @()
 }
+
+# Helper function to clean up GUID-named TestDrive folders
+function Remove-GuidFolders()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path,
+        [Parameter(Mandatory)]
+        [string]$LocationDescription
+    )
+    
+    $guidPattern = '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    
+    if (-not (Test-Path $Path))
+    {
+        return
+    }
+    
+    $guidFolders = Get-ChildItem -Path $Path -Directory -ErrorAction SilentlyContinue | 
+        Where-Object { $_.Name -match $guidPattern }
+    
+    if ($guidFolders.Count -gt 0)
+    {
+        Write-Host "Cleaning up $($guidFolders.Count) GUID-named TestDrive folder(s) from $LocationDescription..." -ForegroundColor Yellow
+        foreach ($folder in $guidFolders)
+        {
+            Remove-Item -Path $folder.FullName -Recurse -Force -ErrorAction SilentlyContinue
+            Write-Verbose "Removed: $($folder.FullName)"
+        }
+    }
+}
 #endregion
 
 # Check if -Tags was passed with "Interactive" value (interactive mode)
@@ -916,38 +948,11 @@ try
     
     # Cleanup any GUID-named folders that may have been left behind by TestDrive
     # These folders are created in the current working directory when TestDrive cleanup fails
-    $guidPattern = '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-    
     $repoRoot = $PSScriptRoot
-    $guidFoldersInRoot = Get-ChildItem -Path $repoRoot -Directory -ErrorAction SilentlyContinue | 
-        Where-Object { $_.Name -match $guidPattern }
-    
-    if ($guidFoldersInRoot.Count -gt 0)
-    {
-        Write-Host "Cleaning up $($guidFoldersInRoot.Count) GUID-named TestDrive folder(s) from repository root..." -ForegroundColor Yellow
-        foreach ($folder in $guidFoldersInRoot)
-        {
-            Remove-Item -Path $folder.FullName -Recurse -Force -ErrorAction SilentlyContinue
-            Write-Verbose "Removed: $($folder.FullName)"
-        }
-    }
+    Remove-GuidFolders -Path $repoRoot -LocationDescription "repository root"
     
     $testsFolder = Join-Path $repoRoot "tests"
-    if (Test-Path $testsFolder)
-    {
-        $guidFoldersInTests = Get-ChildItem -Path $testsFolder -Directory -ErrorAction SilentlyContinue | 
-            Where-Object { $_.Name -match $guidPattern }
-        
-        if ($guidFoldersInTests.Count -gt 0)
-        {
-            Write-Host "Cleaning up $($guidFoldersInTests.Count) GUID-named TestDrive folder(s) from tests directory..." -ForegroundColor Yellow
-            foreach ($folder in $guidFoldersInTests)
-            {
-                Remove-Item -Path $folder.FullName -Recurse -Force -ErrorAction SilentlyContinue
-                Write-Verbose "Removed: $($folder.FullName)"
-            }
-        }
-    }
+    Remove-GuidFolders -Path $testsFolder -LocationDescription "tests directory"
     
     # Exit with appropriate code
     exit $result.FailedCount

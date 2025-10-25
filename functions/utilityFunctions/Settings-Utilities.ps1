@@ -145,7 +145,7 @@ function Get-FlattenedSettingsForProcessing()
                 Write-Verbose "[$functionName] Processing nested settings for: $key"
                 write-log -logFile $logFile -module $functionName -message "Processing nested settings for: $key"
                 # Process nested object recursively
-                $nestedSettings = Get-FlattenedSettingsForProcessing -SettingsTemplate $defaultValue -CurrentValu es $currentValue -ExcludeSettings $ExcludeSettings
+                $nestedSettings = Get-FlattenedSettingsForProcessing -SettingsTemplate $defaultValue -CurrentValues $currentValue -ExcludeSettings $ExcludeSettings
                 Write-Verbose "[$functionName] Retrieved $($nestedSettings.Count) nested settings for: $key"
                 write-log -logFile $logFile -module $functionName -message "Retrieved $($nestedSettings.Count) nested settings for: $key"
                 foreach ($nestedSetting in $nestedSettings)
