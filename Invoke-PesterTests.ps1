@@ -750,7 +750,7 @@ function Select-TestFiles()
         param($file) 
         if ($TestsPath)
         {
-            $file.FullName.Replace($TestsPath, "tests").TrimStart('\\\\')
+            $file.FullName.Replace($TestsPath, "tests").TrimStart([System.IO.Path]::DirectorySeparatorChar)
         }
         else
         {
@@ -1122,7 +1122,7 @@ function Remove-GuidFolders()
         [string]$LocationDescription
     )
     
-    $guidPattern = '^[0-9a-f]{8}-[0-9a-f] {4}-[0-9a-f] {4}-[0-9a-f] {4}-[0-9a-f] {12}$'
+    $guidPattern = '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
     
     if (-not (Test-Path $Path))
     {
