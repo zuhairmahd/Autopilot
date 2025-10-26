@@ -79,15 +79,10 @@ Describe "Main: Menu Creation and Structure" -Tags 'Integration', 'Main' {
     Context "Menu Object Creation (NewMenu)" {
         It "Should create mainMenu object from configuration" {
             $configPath = Join-Path $script:RepoRoot "menu"
-            Write-Host "DEBUG: Using config path: $configPath" -ForegroundColor Cyan
-            Write-Host "DEBUG: Config file exists: $(Test-Path "$configPath.psd1")" -ForegroundColor Cyan
             
             # Test Get-CachedMenuConfiguration directly first
             $directConfig = Get-CachedMenuConfiguration -MenuName "mainMenu" -MenuConfigFile $configPath
-            Write-Host "DEBUG: Direct config result: $($directConfig | ConvertTo-Json -Depth 20)" -ForegroundColor Yellow
-            Write-Host "DEBUG: Direct config is null: $($null -eq $directConfig)" -ForegroundColor Yellow
-            Write-Host "DEBUG: Direct config type: $($directConfig.GetType().FullName)" -ForegroundColor Yellow
-            
+            $directConfig | Should -Not -BeNullOrEmpty
             $mainMenu = NewMenu -MenuName "mainMenu" -MenuConfigFile $configPath
             
             $mainMenu | Should -Not -BeNullOrEmpty
