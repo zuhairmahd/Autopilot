@@ -1097,7 +1097,7 @@ function Select-InteractiveCombined()
                 Start-Sleep -Seconds 1
                 return $result
             }
-            '^[q0Q]$'
+            '^[qQ0]$'
             {
                 $result.Canceled = $true
                 return $result
