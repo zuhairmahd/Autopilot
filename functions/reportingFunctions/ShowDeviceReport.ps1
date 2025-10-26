@@ -308,7 +308,7 @@ function ShowDeviceReport()
     $continueLoop = $true
     do
     {
-        $selection = ShowMenu -Menu $reportExportMenu -CalledBy 'Action'
+        $selection = ShowMenu -Menu $reportExportMenu -StackOperation 'None'
 
         if ($null -ne $selection )
         {
