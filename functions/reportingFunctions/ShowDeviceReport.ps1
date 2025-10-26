@@ -305,6 +305,7 @@ function ShowDeviceReport()
     $reportExportMenu = AddMenuItem -Menu $reportExportMenu -Name "Export to CSV" -Action $CSVAction -ReturnsValue
     
     # Loop to keep showing the menu until user chooses to navigate away
+    $continueLoop = $true
     do
     {
         $selection = ShowMenu -Menu $reportExportMenu -CalledBy 'Action'
@@ -316,6 +317,7 @@ function ShowDeviceReport()
             if ($selection -eq "Back" -or $selection -eq "Main Menu" -or $selection -eq 0 -or $selection -eq "0")
             {
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "ShowMenu returned navigation option: '$selection', treating as navigation" -LogLevel "Information"
+                $continueLoop = $false
                 return $selection
             }
             # If action completed successfully, continue loop to show menu again
@@ -324,10 +326,11 @@ function ShowDeviceReport()
         else
         {
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "No export selected. Exiting." -LogLevel "Information"
+            $continueLoop = $false
             return $null
         }
     }
-    while ($true)
+    while ($continueLoop)
     #endregion Handle menu decision
 }
 

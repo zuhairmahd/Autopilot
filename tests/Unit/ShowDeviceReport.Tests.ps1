@@ -48,12 +48,14 @@ Describe "Function: ShowDeviceReport - Menu Loop Implementation" -Tags 'Unit', '
             # Act - Check for do-while loop pattern
             $hasDoBlock = $content -match 'do\s*\{'
             $hasShowMenuInLoop = $content -match 'do\s*\{[^}]*?\$selection\s*=\s*ShowMenu'
-            $hasWhileTrue = $content -match 'while\s*\(\s*\$true\s*\)'
+            $hasContinueLoopVar = $content -match '\$continueLoop\s*=\s*\$true'
+            $hasWhileCondition = $content -match 'while\s*\(\s*\$continueLoop\s*\)'
             
             # Assert
             $hasDoBlock | Should -Be $true -Because "Function should contain a do block"
             $hasShowMenuInLoop | Should -Be $true -Because "Function should call ShowMenu within do block"
-            $hasWhileTrue | Should -Be $true -Because "Function should have while(true) loop condition"
+            $hasContinueLoopVar | Should -Be $true -Because "Function should initialize continueLoop variable"
+            $hasWhileCondition | Should -Be $true -Because "Function should have while(continueLoop) condition"
         }
         
         It "Should return on Back navigation command" {
