@@ -128,6 +128,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $strings = @('User canceled', 'No files found')
+$pageSize = 12
 # Import configuration
 . "$PSScriptRoot\PesterConfiguration.ps1"
 
@@ -334,7 +335,7 @@ function Select-ItemsFromList()
         [scriptblock]$DisplayFormat,
         [switch]$AllowMultiple,
         [string]$PromptText = "Enter selection",
-        [int]$PageSize = 20
+        [int]$PageSize = 10
     )
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -593,14 +594,25 @@ function Select-ItemsFromList()
 # Helper function to extract all tags from test files
 function Get-AvailableTags()
 {
+    [CmdletBinding()]              
     param(
-        [string]$TestsPath
+        [string]$TestsPath,
+        [string[]]$Files
     )
     
     Write-Host "Scanning test files for available tags..." -ForegroundColor Yellow
     
     $allTags = @{}
-    $testFiles = Get-ChildItem -Path $TestsPath -Filter "*.Tests.ps1" -Recurse -File
+    
+    # If specific files are provided, use them; otherwise scan all test files
+    if ($Files -and $Files.Count -gt 0)
+    {
+        $testFiles = $Files | ForEach-Object { Get-Item $_ }
+    }
+    else
+    {
+        $testFiles = Get-ChildItem -Path $TestsPath -Filter "*.Tests.ps1" -Recurse -File
+    }
     
     foreach ($file in $testFiles)
     {
@@ -639,6 +651,7 @@ function Get-AvailableTags()
 # Helper function to get test files containing specific tags
 function Get-FilesContainingTags()
 {
+    [CmdletBinding()]                   
     param(
         [Parameter(Mandatory)]
         [string[]]$Tags,
@@ -681,6 +694,7 @@ function Get-FilesContainingTags()
 # Helper function for tag selection menu
 function Select-Tags()
 {
+    [CmdletBinding()]                   
     param(
         [string]$TestsPath
     )
@@ -701,7 +715,7 @@ function Select-Tags()
         -DisplayFormat { param($tag) "$($tag.Name) ($($tag.Value) test(s))" } `
         -AllowMultiple `
         -PromptText "Enter tag numbers" `
-        -PageSize 20
+        -PageSize $pageSize
     
     if ($selectedTags.Count -gt 0)
     {
@@ -716,6 +730,7 @@ function Select-Tags()
 # Helper function for test file selection menu
 function Select-TestFiles()
 {
+    [CmdletBinding()]                       
     param(
         [Parameter(Mandatory)]
         [array]$Files,
@@ -744,7 +759,7 @@ function Select-TestFiles()
     } `
         -AllowMultiple:$AllowMultiple `
         -PromptText "Enter file number$(if ($AllowMultiple) {'s'})" `
-        -PageSize 20
+        -PageSize $pageSize
     
     if ($selectedFiles.Count -gt 0)
     {
@@ -757,6 +772,7 @@ function Select-TestFiles()
 # Helper function for combined interactive selection (files + tags)
 function Select-InteractiveCombined()
 {
+    [CmdletBinding()]                                       
     param(
         [string]$TestsPath
     )
@@ -814,7 +830,7 @@ function Select-InteractiveCombined()
         Write-Host "[4] Clear Tags" -ForegroundColor Yellow
         Write-Host "[5] Clear All" -ForegroundColor Yellow
         Write-Host "[r] Run Tests with Current Selections" -ForegroundColor Green
-        Write-Host "[q] Quit" -ForegroundColor Gray
+        Write-Host "[q] or 0 to Quit" -ForegroundColor Gray
         Write-Host ""
         
         $choice = Read-Host "Enter choice"
@@ -863,16 +879,151 @@ function Select-InteractiveCombined()
                 if ($selectedFiles.Count -gt 0)
                 {
                     $result.TestFiles = $selectedFiles
+                    
+                    # Auto-filter tags based on newly selected files
+                    Write-Host ""
+                    Write-Host "Auto-filtering tags to match selected files..." -ForegroundColor Cyan
+                    $availableTags = Get-AvailableTags -TestsPath $TestsPath -Files $result.TestFiles
+                    
+                    if ($availableTags.Count -gt 0)
+                    {
+                        # If tags were previously selected, keep only those that exist in the new file set
+                        if ($result.Tags.Count -gt 0)
+                        {
+                            $validTags = @()
+                            $availableTagNames = $availableTags | ForEach-Object { $_.Name }
+                            foreach ($tag in $result.Tags)
+                            {
+                                if ($availableTagNames -contains $tag)
+                                {
+                                    $validTags += $tag
+                                }
+                            }
+                            $result.Tags = $validTags
+                            
+                            if ($validTags.Count -lt $result.Tags.Count)
+                            {
+                                Write-Host "Some previously selected tags are not in the new file set and were removed." -ForegroundColor Yellow
+                            }
+                        }
+                        Write-Host "Tags filtered: $($availableTags.Count) tag(s) available in selected files" -ForegroundColor Green
+                    }
+                    else
+                    {
+                        if ($result.Tags.Count -gt 0)
+                        {
+                            Write-Host "Warning: Selected files contain no tags. Tag selection cleared." -ForegroundColor Yellow
+                        }
+                        $result.Tags = @()
+                    }
+                    Start-Sleep -Seconds 2
                 }
             }
             '^2$'
             {
                 # Select tags
-                $selectedTags = Select-Tags -TestsPath $TestsPath
+                Write-Host ""
                 
-                if ($selectedTags.Count -gt 0)
+                # If files are selected, filter tags to only those in the selected files
+                if ($result.TestFiles.Count -gt 0)
                 {
-                    $result.Tags = $selectedTags
+                    Write-Host "Finding tags in selected files..." -ForegroundColor Yellow
+                    $availableTags = Get-AvailableTags -TestsPath $TestsPath -Files $result.TestFiles
+                    
+                    if ($availableTags.Count -eq 0)
+                    {
+                        Write-Host ""
+                        Write-Host "No tags found in the selected files" -ForegroundColor Red
+                        Write-Host "Consider clearing files (option 3) to see all tags." -ForegroundColor Yellow
+                        Start-Sleep -Seconds 3
+                        continue
+                    }
+                    
+                    Write-Host "Found $($availableTags.Count) tag(s) in selected files" -ForegroundColor Green
+                    Write-Host "(Filtering to show only tags in: $(($result.TestFiles | ForEach-Object { Split-Path -Leaf $_ }) -join ', '))" -ForegroundColor Cyan
+                    Write-Host ""
+                    
+                    # Use filtered tags for selection
+                    $tagList = @($availableTags)
+                    
+                    $selectedTags = Select-ItemsFromList `
+                        -Items $tagList `
+                        -Title "Available Test Tags (from selected files)" `
+                        -DisplayFormat { param($tag) "$($tag.Name) ($($tag.Value) test(s))" } `
+                        -AllowMultiple `
+                        -PromptText "Enter tag numbers" `
+                        -PageSize $pageSize
+                    
+                    if ($selectedTags.Count -gt 0)
+                    {
+                        $tagNames = $selectedTags | ForEach-Object { $_.Name }
+                        Write-Host "Selected tags: $($tagNames -join ', ')" -ForegroundColor Green
+                        $result.Tags = $tagNames
+                        
+                        # Auto-filter files based on newly selected tags
+                        Write-Host ""
+                        Write-Host "Auto-filtering files to match selected tags..." -ForegroundColor Cyan
+                        $matchingFiles = Get-FilesContainingTags -Tags $result.Tags -TestsPath $TestsPath
+                        
+                        if ($matchingFiles.Count -gt 0)
+                        {
+                            # If files were previously selected, keep only those that match the new tags
+                            if ($result.TestFiles.Count -gt 0)
+                            {
+                                $matchingFileNames = $matchingFiles | ForEach-Object { $_.FullName }
+                                $validFiles = @()
+                                foreach ($file in $result.TestFiles)
+                                {
+                                    if ($matchingFileNames -contains $file)
+                                    {
+                                        $validFiles += $file
+                                    }
+                                }
+                                $result.TestFiles = $validFiles
+                                
+                                if ($validFiles.Count -eq 0)
+                                {
+                                    Write-Host "Warning: None of the previously selected files contain the new tags. File selection cleared." -ForegroundColor Yellow
+                                }
+                                elseif ($validFiles.Count -lt $result.TestFiles.Count)
+                                {
+                                    Write-Host "Some previously selected files don't contain the new tags and were removed." -ForegroundColor Yellow
+                                }
+                            }
+                            Write-Host "Files filtered: $($matchingFiles.Count) file(s) contain selected tags" -ForegroundColor Green
+                        }
+                        else
+                        {
+                            Write-Host "Warning: No files found containing selected tags. File selection cleared." -ForegroundColor Yellow
+                            $result.TestFiles = @()
+                        }
+                        Start-Sleep -Seconds 2
+                    }
+                }
+                else
+                {
+                    # No files selected, show all tags
+                    $selectedTags = Select-Tags -TestsPath $TestsPath
+                    
+                    if ($selectedTags.Count -gt 0)
+                    {
+                        $result.Tags = $selectedTags
+                        
+                        # Auto-filter files based on newly selected tags
+                        Write-Host ""
+                        Write-Host "Auto-filtering files to match selected tags..." -ForegroundColor Cyan
+                        $matchingFiles = Get-FilesContainingTags -Tags $result.Tags -TestsPath $TestsPath
+                        
+                        if ($matchingFiles.Count -gt 0)
+                        {
+                            Write-Host "Files filtered: $($matchingFiles.Count) file(s) contain selected tags" -ForegroundColor Green
+                        }
+                        else
+                        {
+                            Write-Host "Warning: No files found containing selected tags." -ForegroundColor Yellow
+                        }
+                        Start-Sleep -Seconds 2
+                    }
                 }
             }
             '^3$'
@@ -946,7 +1097,7 @@ function Select-InteractiveCombined()
                 Start-Sleep -Seconds 1
                 return $result
             }
-            '^[qQ]$'
+            '^[q0Q]$'
             {
                 $result.Canceled = $true
                 return $result
