@@ -47,6 +47,12 @@
     - `-Tags "Slow" -Exclude` = Run all tests EXCEPT those tagged "Slow"
     - `-TestType Unit -Exclude` = Run all tests EXCEPT Unit tests
     - `-TestFile "Auth" -Exclude` = Run all tests EXCEPT files matching "Auth"
+.PARAMETER Interactive
+    Launch fully interactive mode where you can select both test files AND tags in a combined workflow.
+    This mode presents a menu allowing you to:
+    - Select test files (with paging support for large lists)
+    - Select tags (with paging support)
+    - Review and confirm selections before running tests
 .EXAMPLE
     .\Invoke-PesterTests.ps1 -TestType Unit
     Runs all unit tests
@@ -83,6 +89,9 @@
 .EXAMPLE
     .\Invoke-PesterTests.ps1 -TestFile "Authentication" -Exclude
     Runs all tests EXCEPT files matching "Authentication"
+.EXAMPLE
+    .\Invoke-PesterTests.ps1 -Interactive
+    Launch interactive mode to select both test files and tags with paging support
 #>
 [CmdletBinding(DefaultParameterSetName = 'Default')]
 param(
@@ -111,11 +120,15 @@ param(
     [string[]]$Tags = @(),
     [Parameter(ParameterSetName = 'Default')]
     [Parameter(ParameterSetName = 'CodeCoverage')]
-    [switch]$Exclude
+    [switch]$Exclude,
+    [Parameter(ParameterSetName = 'Default')]
+    [Parameter(ParameterSetName = 'CodeCoverage')]
+    [switch]$Interactive
 )
 
 $ErrorActionPreference = 'Stop'
 $strings = @('User canceled', 'No files found')
+$pageSize = 12
 # Import configuration
 . "$PSScriptRoot\PesterConfiguration.ps1"
 
@@ -309,7 +322,7 @@ function Find-FileWithFuzzySearch()
     }
 }
 
-# Generic helper function for interactive selection from a list
+# Generic helper function for interactive selection from a list with paging support
 function Select-ItemsFromList()
 {
     [CmdletBinding()]
@@ -321,133 +334,285 @@ function Select-ItemsFromList()
         [Parameter(Mandatory)]
         [scriptblock]$DisplayFormat,
         [switch]$AllowMultiple,
-        [string]$PromptText = "Enter selection"
+        [string]$PromptText = "Enter selection",
+        [int]$PageSize = 10
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Starting interactive selection. Title: '$Title', AllowMultiple: $AllowMultiple."
+    Write-Verbose "[$functionName] Starting interactive selection. Title: '$Title', AllowMultiple: $AllowMultiple, PageSize: $PageSize."
     if ($Items.Count -eq 0)
     {
         Write-Host "No items available for selection" -ForegroundColor Yellow
         return @()
     }
     
-    Write-Host ""
-    Write-Host "===============================================================" -ForegroundColor Cyan
-    Write-Host " $Title" -ForegroundColor Cyan
-    Write-Host "===============================================================" -ForegroundColor Cyan
-    Write-Host ""
+    # Paging state
+    $currentPage = 0
+    $totalPages = [Math]::Ceiling($Items.Count / $PageSize)
+    $usePaging = $Items.Count -gt $PageSize
     
-    for ($i = 0; $i -lt $Items.Count; $i++)
-    {
-        $displayText = & $DisplayFormat $Items[$i]
-        Write-Host " [$($i + 1)] $displayText" -ForegroundColor White
-    }
+    # Track selections across pages (store indices, not items)
+    $selectedIndices = @{}
+    $done = $false
     
-    Write-Host ""
-    if ($AllowMultiple)
+    while (-not $done)
     {
-        Write-Host "[a] Select All" -ForegroundColor Green
-    }
-    Write-Host "[q] or [0] to Quit" -ForegroundColor Gray
-    Write-Host ""
-    
-    if ($AllowMultiple)
-    {
-        Write-Host "$PromptText (comma-separated, e.g., 1, 3, 5) or 'a' for all:" -ForegroundColor Cyan
-    }
-    else
-    {
-        Write-Host "${PromptText}:" -ForegroundColor Cyan
-    }
-    
-    $validSelection = $false
-    $selectedItems = @()
-    
-    while (-not $validSelection)
-    {
-        $choice = Read-Host "Selection"
+        # Calculate page boundaries
+        $startIndex = $currentPage * $PageSize
+        $endIndex = [Math]::Min($startIndex + $PageSize - 1, $Items.Count - 1)
+        $pageItems = $Items[$startIndex..$endIndex]
         
-        # Handle quit
-        if ($choice -eq 'q' -or $choice -eq 'Q' -or $choice -eq '0')
+        # Display header
+        Clear-Host
+        Write-Host ""
+        Write-Host "===============================================================" -ForegroundColor Cyan
+        Write-Host " $Title" -ForegroundColor Cyan
+        if ($usePaging)
         {
-            Write-Host "Selection canceled" -ForegroundColor Yellow
-            return @()
+            Write-Host " Page $($currentPage + 1) of $totalPages (Items $($startIndex + 1)-$($endIndex + 1) of $($Items.Count))" -ForegroundColor Cyan
+        }
+        Write-Host "===============================================================" -ForegroundColor Cyan
+        Write-Host ""
+        
+        # Display items for current page
+        for ($i = 0; $i -lt $pageItems.Count; $i++)
+        {
+            $globalIndex = $startIndex + $i
+            $itemNumber = $globalIndex + 1
+            $displayText = & $DisplayFormat $pageItems[$i]
+            
+            # Show [X] marker if already selected
+            $marker = if ($selectedIndices.ContainsKey($globalIndex)) { "[X]" } else { "[ ]" }
+            
+            if ($AllowMultiple)
+            {
+                Write-Host " $marker [$itemNumber] $displayText" -ForegroundColor $(if ($selectedIndices.ContainsKey($globalIndex)) { 'Green' } else { 'White' })
+            }
+            else
+            {
+                Write-Host " [$itemNumber] $displayText" -ForegroundColor White
+            }
         }
         
-        # Handle select all (only if allowed)
-        if ($AllowMultiple -and ($choice -eq 'a' -or $choice -eq 'A'))
+        # Display navigation and selection options
+        Write-Host ""
+        if ($AllowMultiple)
+        {
+            Write-Host "[a] Select All on Current Page" -ForegroundColor Green
+            Write-Host "[c] Clear All Selections" -ForegroundColor Yellow
+            if ($selectedIndices.Count -gt 0)
+            {
+                Write-Host "[d] Done - Use $($selectedIndices.Count) Selected Item(s)" -ForegroundColor Green
+            }
+        }
+        
+        if ($usePaging)
         {
             Write-Host ""
-            Write-Host "Selected all $($Items.Count) items" -ForegroundColor Green
-            return $Items
+            Write-Host "Navigation:" -ForegroundColor Cyan
+            if ($currentPage -gt 0)
+            {
+                Write-Host "[p] Previous Page" -ForegroundColor Yellow
+                Write-Host "[f] First Page" -ForegroundColor Yellow
+            }
+            if ($currentPage -lt $totalPages - 1)
+            {
+                Write-Host "[n] Next Page" -ForegroundColor Yellow
+                Write-Host "[l] Last Page" -ForegroundColor Yellow
+            }
         }
         
-        # Check for empty input
-        if ([string]::IsNullOrWhiteSpace($choice))
-        {
-            Write-Host "No selection entered. Please enter a number or 'q' to quit. (Invalid attempts: $invalidAttemptCount/$maxInvalidAttempts)" -ForegroundColor Yellow
-            continue
-        }
+        Write-Host ""
+        Write-Host "[q] or [0] to Quit" -ForegroundColor Gray
+        Write-Host ""
         
-        # Parse selection(s)
-        $selectedItems = @()
-        $hasErrors = $false
-        
-        $numbers = if ($AllowMultiple)
+        if ($AllowMultiple)
         {
-            $choice -split ',' | ForEach-Object { $_.Trim() }
+            Write-Host "$PromptText (comma-separated, e.g., 1, 3, 5):" -ForegroundColor Cyan
         }
         else
         {
-            @($choice.Trim())
+            Write-Host "${PromptText}:" -ForegroundColor Cyan
         }
         
-        foreach ($num in $numbers)
+        $choice = Read-Host "Selection"
+        
+        # Handle navigation commands
+        switch -Regex ($choice)
         {
-            try
+            '^[qQ]$|^0$'
             {
-                $index = [int]$num - 1
-                if ($index -ge 0 -and $index -lt $Items.Count)
+                Write-Host "Selection canceled" -ForegroundColor Yellow
+                return @()
+            }
+            '^[dD]$'
+            {
+                if ($AllowMultiple -and $selectedIndices.Count -gt 0)
                 {
-                    $selectedItems += $Items[$index]
+                    $done = $true
                 }
                 else
                 {
-                    Write-Host "Invalid selection: $num (out of range 1-$($Items.Count))" -ForegroundColor Red
-                    $hasErrors = $true
+                    Write-Host "No items selected. Use numbers to select items." -ForegroundColor Yellow
+                    Start-Sleep -Seconds 2
                 }
             }
-            catch
+            '^[aA]$'
             {
-                Write-Host "Invalid input: '$num' (not a number)" -ForegroundColor Red
-                $hasErrors = $true
+                if ($AllowMultiple)
+                {
+                    # Select all items on current page
+                    for ($i = $startIndex; $i -le $endIndex; $i++)
+                    {
+                        $selectedIndices[$i] = $true
+                    }
+                    Write-Host "Selected all items on current page" -ForegroundColor Green
+                    Start-Sleep -Seconds 1
+                }
             }
-        }
-        
-        # Check if we got valid selections
-        if ($selectedItems.Count -gt 0)
-        {
-            Write-Host ""
-            Write-Host "Selected $($selectedItems.Count) item(s)" -ForegroundColor Green
-            $validSelection = $true
+            '^[cC]$'
+            {
+                if ($AllowMultiple)
+                {
+                    $selectedIndices.Clear()
+                    Write-Host "Cleared all selections" -ForegroundColor Yellow
+                    Start-Sleep -Seconds 1
+                }
+            }
+            '^[pP]$'
+            {
+                if ($usePaging -and $currentPage -gt 0)
+                {
+                    $currentPage--
+                }
+            }
+            '^[nN]$'
+            {
+                if ($usePaging -and $currentPage -lt $totalPages - 1)
+                {
+                    $currentPage++
+                }
+            }
+            '^[fF]$'
+            {
+                if ($usePaging -and $currentPage -gt 0)
+                {
+                    $currentPage = 0
+                }
+            }
+            '^[lL]$'
+            {
+                if ($usePaging -and $currentPage -lt $totalPages - 1)
+                {
+                    $currentPage = $totalPages - 1
+                }
+            }
+            default
+            {
+                # Handle numeric selections
+                if (-not [string]::IsNullOrWhiteSpace($choice))
+                {
+                    $numbers = $choice -split ',' | ForEach-Object { $_.Trim() }
+                    $hasErrors = $false
+                    
+                    foreach ($num in $numbers)
+                    {
+                        try
+                        {
+                            $itemNumber = [int]$num
+                            $index = $itemNumber - 1
+                            
+                            if ($index -ge 0 -and $index -lt $Items.Count)
+                            {
+                                if ($AllowMultiple)
+                                {
+                                    # Toggle selection
+                                    if ($selectedIndices.ContainsKey($index))
+                                    {
+                                        $selectedIndices.Remove($index)
+                                        Write-Host "Deselected item $itemNumber" -ForegroundColor Yellow
+                                    }
+                                    else
+                                    {
+                                        $selectedIndices[$index] = $true
+                                        Write-Host "Selected item $itemNumber" -ForegroundColor Green
+                                    }
+                                }
+                                else
+                                {
+                                    # Single selection mode - return immediately
+                                    Write-Host ""
+                                    Write-Host "Selected: $(& $DisplayFormat $Items[$index])" -ForegroundColor Green
+                                    return @($Items[$index])
+                                }
+                            }
+                            else
+                            {
+                                Write-Host "Invalid selection: $num (out of range 1-$($Items.Count))" -ForegroundColor Red
+                                $hasErrors = $true
+                            }
+                        }
+                        catch
+                        {
+                            Write-Host "Invalid input: '$num' (not a number)" -ForegroundColor Red
+                            $hasErrors = $true
+                        }
+                    }
+                    
+                    if ($hasErrors)
+                    {
+                        Start-Sleep -Seconds 2
+                    }
+                    elseif ($AllowMultiple)
+                    {
+                        Start-Sleep -Seconds 1
+                    }
+                }
+            }
         }
     }
     
-    return $selectedItems
+    # Return selected items
+    if ($selectedIndices.Count -gt 0)
+    {
+        $result = @()
+        $sortedIndices = $selectedIndices.Keys | Sort-Object
+        foreach ($index in $sortedIndices)
+        {
+            $result += $Items[$index]
+        }
+        
+        Write-Host ""
+        Write-Host "Returning $($result.Count) selected item(s)" -ForegroundColor Green
+        Start-Sleep -Seconds 1
+        return $result
+    }
+    
+    return @()
 }
 
 # Helper function to extract all tags from test files
 function Get-AvailableTags()
 {
+    [CmdletBinding()]              
     param(
-        [string]$TestsPath
+        [string]$TestsPath,
+        [string[]]$Files
     )
     
     Write-Host "Scanning test files for available tags..." -ForegroundColor Yellow
     
     $allTags = @{}
-    $testFiles = Get-ChildItem -Path $TestsPath -Filter "*.Tests.ps1" -Recurse -File
+    
+    # If specific files are provided, use them; otherwise scan all test files
+    if ($Files -and $Files.Count -gt 0)
+    {
+        $testFiles = $Files | ForEach-Object { Get-Item $_ }
+    }
+    else
+    {
+        $testFiles = Get-ChildItem -Path $TestsPath -Filter "*.Tests.ps1" -Recurse -File
+    }
     
     foreach ($file in $testFiles)
     {
@@ -459,7 +624,7 @@ function Get-AvailableTags()
         {
             $tagsString = $match.Groups[1].Value
             # Extract individual tags (handle both 'tag' and "tag" format)
-            $individualTags = [regex]::Matches($tagsString, "['`"]([^'`"]+)['`"]")
+            $individualTags = [regex]::Matches($tagsString, '[''`"]([^''`"]+)[''`"]')
             
             foreach ($tagMatch in $individualTags)
             {
@@ -483,9 +648,53 @@ function Get-AvailableTags()
     return $allTags.GetEnumerator() | Sort-Object -Property Name
 }
 
+# Helper function to get test files containing specific tags
+function Get-FilesContainingTags()
+{
+    [CmdletBinding()]                   
+    param(
+        [Parameter(Mandatory)]
+        [string[]]$Tags,
+        [Parameter(Mandatory)]
+        [string]$TestsPath
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Finding files containing tags: $($Tags -join ', ')"
+    
+    $testFiles = Get-ChildItem -Path $TestsPath -Filter "*.Tests.ps1" -Recurse -File
+    $matchingFiles = @()
+    
+    foreach ($file in $testFiles)
+    {
+        $content = Get-Content -Path $file.FullName -Raw
+        $fileHasTag = $false
+        
+        # Check if file contains any of the specified tags
+        foreach ($tag in $Tags)
+        {
+            # Match Describe blocks with this tag
+            if ($content -match "Describe\s+[^-]+-Tags\s+[^{]*['""`]$tag['""`]")
+            {
+                $fileHasTag = $true
+                break
+            }
+        }
+            
+        if ($fileHasTag)
+        {
+            $matchingFiles += $file
+        }
+    }
+        
+    Write-Verbose "[$functionName] Found $($matchingFiles.Count) file(s) containing the specified tags"
+    return $matchingFiles
+}
+
 # Helper function for tag selection menu
 function Select-Tags()
 {
+    [CmdletBinding()]                   
     param(
         [string]$TestsPath
     )
@@ -505,7 +714,8 @@ function Select-Tags()
         -Title "Available Test Tags" `
         -DisplayFormat { param($tag) "$($tag.Name) ($($tag.Value) test(s))" } `
         -AllowMultiple `
-        -PromptText "Enter tag numbers"
+        -PromptText "Enter tag numbers" `
+        -PageSize $pageSize
     
     if ($selectedTags.Count -gt 0)
     {
@@ -520,6 +730,7 @@ function Select-Tags()
 # Helper function for test file selection menu
 function Select-TestFiles()
 {
+    [CmdletBinding()]                       
     param(
         [Parameter(Mandatory)]
         [array]$Files,
@@ -539,7 +750,7 @@ function Select-TestFiles()
         param($file) 
         if ($TestsPath)
         {
-            $file.FullName.Replace($TestsPath, "tests").TrimStart('\')
+            $file.FullName.Replace($TestsPath, "tests").TrimStart([System.IO.Path]::DirectorySeparatorChar)
         }
         else
         {
@@ -547,7 +758,8 @@ function Select-TestFiles()
         }
     } `
         -AllowMultiple:$AllowMultiple `
-        -PromptText "Enter file number$(if ($AllowMultiple) {'s'})"
+        -PromptText "Enter file number$(if ($AllowMultiple) {'s'})" `
+        -PageSize $pageSize
     
     if ($selectedFiles.Count -gt 0)
     {
@@ -555,6 +767,348 @@ function Select-TestFiles()
     }
     
     return @()
+}
+
+# Helper function for combined interactive selection (files + tags)
+function Select-InteractiveCombined()
+{
+    [CmdletBinding()]                                       
+    param(
+        [string]$TestsPath
+    )
+    
+    $result = @{
+        TestFiles = @()
+        Tags      = @()
+        Canceled  = $false
+    }
+    
+    while ($true)
+    {
+        Clear-Host
+        Write-Host ""
+        Write-Host "===============================================================" -ForegroundColor Cyan
+        Write-Host " Interactive Test Selection" -ForegroundColor Cyan
+        Write-Host "===============================================================" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "Current Selections:" -ForegroundColor Yellow
+        Write-Host "  Test Files: $($result.TestFiles.Count) selected" -ForegroundColor White
+        if ($result.TestFiles.Count -gt 0)
+        {
+            foreach ($file in $result.TestFiles)
+            {
+                Write-Host "    - $(Split-Path -Leaf $file)" -ForegroundColor Gray
+            }
+        }
+        Write-Host "  Tags: $($result.Tags.Count) selected" -ForegroundColor White
+        if ($result.Tags.Count -gt 0)
+        {
+            Write-Host "    - $($result.Tags -join ', ')" -ForegroundColor Gray
+        }
+        
+        # Show informational message based on selections
+        if ($result.Tags.Count -gt 0 -and $result.TestFiles.Count -eq 0)
+        {
+            Write-Host ""
+            Write-Host "  Mode: Run all tests with selected tags (across all files)" -ForegroundColor Cyan
+        }
+        elseif ($result.TestFiles.Count -gt 0 -and $result.Tags.Count -eq 0)
+        {
+            Write-Host ""
+            Write-Host "  Mode: Run all tests in selected files" -ForegroundColor Cyan
+        }
+        elseif ($result.TestFiles.Count -gt 0 -and $result.Tags.Count -gt 0)
+        {
+            Write-Host ""
+            Write-Host "  Mode: Run tests matching BOTH selected files AND tags" -ForegroundColor Cyan
+        }
+        Write-Host ""
+        Write-Host "Options:" -ForegroundColor Cyan
+        Write-Host "[1] Select Test Files" -ForegroundColor White
+        Write-Host "[2] Select Tags" -ForegroundColor White
+        Write-Host "[3] Clear Test Files" -ForegroundColor Yellow
+        Write-Host "[4] Clear Tags" -ForegroundColor Yellow
+        Write-Host "[5] Clear All" -ForegroundColor Yellow
+        Write-Host "[r] Run Tests with Current Selections" -ForegroundColor Green
+        Write-Host "[q] or 0 to Quit" -ForegroundColor Gray
+        Write-Host ""
+        
+        $choice = Read-Host "Enter choice"
+        
+        switch -Regex ($choice)
+        {
+            '^1$'
+            {
+                # Select test files
+                Write-Host ""
+                
+                # If tags are selected, filter files to only those containing the tags
+                if ($result.Tags.Count -gt 0)
+                {
+                    Write-Host "Finding files containing selected tags..." -ForegroundColor Yellow
+                    $allTestFiles = Get-FilesContainingTags -Tags $result.Tags -TestsPath $TestsPath
+                    
+                    if ($allTestFiles.Count -eq 0)
+                    {
+                        Write-Host ""
+                        Write-Host "No test files found containing the selected tags: $($result.Tags -join ', ')" -ForegroundColor Red
+                        Write-Host "Consider clearing tags (option 4) to see all files." -ForegroundColor Yellow
+                        Start-Sleep -Seconds 3
+                        continue
+                    }
+                    
+                    Write-Host "Found $($allTestFiles.Count) file(s) containing selected tags" -ForegroundColor Green
+                    Write-Host "(Filtering to show only files with tags: $($result.Tags -join ', '))" -ForegroundColor Cyan
+                    Write-Host ""
+                }
+                else
+                {
+                    Write-Host "Loading test files..." -ForegroundColor Yellow
+                    $allTestFiles = Get-ChildItem -Path $TestsPath -Filter "*.Tests.ps1" -Recurse -File
+                    
+                    if ($allTestFiles.Count -eq 0)
+                    {
+                        Write-Host "No test files found" -ForegroundColor Red
+                        Start-Sleep -Seconds 2
+                        continue
+                    }
+                }
+                
+                $selectedFiles = Select-TestFiles -Files $allTestFiles -TestsPath $TestsPath -AllowMultiple
+                
+                if ($selectedFiles.Count -gt 0)
+                {
+                    $result.TestFiles = $selectedFiles
+                    
+                    # Auto-filter tags based on newly selected files
+                    Write-Host ""
+                    Write-Host "Auto-filtering tags to match selected files..." -ForegroundColor Cyan
+                    $availableTags = Get-AvailableTags -TestsPath $TestsPath -Files $result.TestFiles
+                    
+                    if ($availableTags.Count -gt 0)
+                    {
+                        # If tags were previously selected, keep only those that exist in the new file set
+                        if ($result.Tags.Count -gt 0)
+                        {
+                            $validTags = @()
+                            $availableTagNames = $availableTags | ForEach-Object { $_.Name }
+                            foreach ($tag in $result.Tags)
+                            {
+                                if ($availableTagNames -contains $tag)
+                                {
+                                    $validTags += $tag
+                                }
+                            }
+                            $result.Tags = $validTags
+                            
+                            if ($validTags.Count -lt $result.Tags.Count)
+                            {
+                                Write-Host "Some previously selected tags are not in the new file set and were removed." -ForegroundColor Yellow
+                            }
+                        }
+                        Write-Host "Tags filtered: $($availableTags.Count) tag(s) available in selected files" -ForegroundColor Green
+                    }
+                    else
+                    {
+                        if ($result.Tags.Count -gt 0)
+                        {
+                            Write-Host "Warning: Selected files contain no tags. Tag selection cleared." -ForegroundColor Yellow
+                        }
+                        $result.Tags = @()
+                    }
+                    Start-Sleep -Seconds 2
+                }
+            }
+            '^2$'
+            {
+                # Select tags
+                Write-Host ""
+                
+                # If files are selected, filter tags to only those in the selected files
+                if ($result.TestFiles.Count -gt 0)
+                {
+                    Write-Host "Finding tags in selected files..." -ForegroundColor Yellow
+                    $availableTags = Get-AvailableTags -TestsPath $TestsPath -Files $result.TestFiles
+                    
+                    if ($availableTags.Count -eq 0)
+                    {
+                        Write-Host ""
+                        Write-Host "No tags found in the selected files" -ForegroundColor Red
+                        Write-Host "Consider clearing files (option 3) to see all tags." -ForegroundColor Yellow
+                        Start-Sleep -Seconds 3
+                        continue
+                    }
+                    
+                    Write-Host "Found $($availableTags.Count) tag(s) in selected files" -ForegroundColor Green
+                    Write-Host "(Filtering to show only tags in: $(($result.TestFiles | ForEach-Object { Split-Path -Leaf $_ }) -join ', '))" -ForegroundColor Cyan
+                    Write-Host ""
+                    
+                    # Use filtered tags for selection
+                    $tagList = @($availableTags)
+                    
+                    $selectedTags = Select-ItemsFromList `
+                        -Items $tagList `
+                        -Title "Available Test Tags (from selected files)" `
+                        -DisplayFormat { param($tag) "$($tag.Name) ($($tag.Value) test(s))" } `
+                        -AllowMultiple `
+                        -PromptText "Enter tag numbers" `
+                        -PageSize $pageSize
+                    
+                    if ($selectedTags.Count -gt 0)
+                    {
+                        $tagNames = $selectedTags | ForEach-Object { $_.Name }
+                        Write-Host "Selected tags: $($tagNames -join ', ')" -ForegroundColor Green
+                        $result.Tags = $tagNames
+                        
+                        # Auto-filter files based on newly selected tags
+                        Write-Host ""
+                        Write-Host "Auto-filtering files to match selected tags..." -ForegroundColor Cyan
+                        $matchingFiles = Get-FilesContainingTags -Tags $result.Tags -TestsPath $TestsPath
+                        
+                        if ($matchingFiles.Count -gt 0)
+                        {
+                            # If files were previously selected, keep only those that match the new tags
+                            if ($result.TestFiles.Count -gt 0)
+                            {
+                                $matchingFileNames = $matchingFiles | ForEach-Object { $_.FullName }
+                                $validFiles = @()
+                                foreach ($file in $result.TestFiles)
+                                {
+                                    if ($matchingFileNames -contains $file)
+                                    {
+                                        $validFiles += $file
+                                    }
+                                }
+                                $result.TestFiles = $validFiles
+                                
+                                if ($validFiles.Count -eq 0)
+                                {
+                                    Write-Host "Warning: None of the previously selected files contain the new tags. File selection cleared." -ForegroundColor Yellow
+                                }
+                                elseif ($validFiles.Count -lt $result.TestFiles.Count)
+                                {
+                                    Write-Host "Some previously selected files don't contain the new tags and were removed." -ForegroundColor Yellow
+                                }
+                            }
+                            Write-Host "Files filtered: $($matchingFiles.Count) file(s) contain selected tags" -ForegroundColor Green
+                        }
+                        else
+                        {
+                            Write-Host "Warning: No files found containing selected tags. File selection cleared." -ForegroundColor Yellow
+                            $result.TestFiles = @()
+                        }
+                        Start-Sleep -Seconds 2
+                    }
+                }
+                else
+                {
+                    # No files selected, show all tags
+                    $selectedTags = Select-Tags -TestsPath $TestsPath
+                    
+                    if ($selectedTags.Count -gt 0)
+                    {
+                        $result.Tags = $selectedTags
+                        
+                        # Auto-filter files based on newly selected tags
+                        Write-Host ""
+                        Write-Host "Auto-filtering files to match selected tags..." -ForegroundColor Cyan
+                        $matchingFiles = Get-FilesContainingTags -Tags $result.Tags -TestsPath $TestsPath
+                        
+                        if ($matchingFiles.Count -gt 0)
+                        {
+                            Write-Host "Files filtered: $($matchingFiles.Count) file(s) contain selected tags" -ForegroundColor Green
+                        }
+                        else
+                        {
+                            Write-Host "Warning: No files found containing selected tags." -ForegroundColor Yellow
+                        }
+                        Start-Sleep -Seconds 2
+                    }
+                }
+            }
+            '^3$'
+            {
+                # Check if clearing files would affect tag-based filtering
+                if ($result.TestFiles.Count -gt 0 -and $result.Tags.Count -gt 0)
+                {
+                    Write-Host ""
+                    Write-Host "WARNING: Clearing test files will run ALL files containing the selected tags." -ForegroundColor Yellow
+                    Write-Host "Tags: $($result.Tags -join ', ')" -ForegroundColor Cyan
+                    Write-Host ""
+                    Write-Host "Continue? [y/n]:" -ForegroundColor Yellow -NoNewline
+                    $confirm = Read-Host " "
+                    if ($confirm -notmatch '^[yY]')
+                    {
+                        Write-Host "Cancelled" -ForegroundColor Gray
+                        Start-Sleep -Seconds 1
+                        continue
+                    }
+                }
+                
+                $result.TestFiles = @()
+                Write-Host ""
+                Write-Host "Test files cleared" -ForegroundColor Yellow
+                Start-Sleep -Seconds 1
+            }
+            '^4$'
+            {
+                # Check if clearing tags would affect the file selection
+                if ($result.Tags.Count -gt 0 -and $result.TestFiles.Count -gt 0)
+                {
+                    Write-Host ""
+                    Write-Host "WARNING: Clearing tags will run ALL tests in the selected files." -ForegroundColor Yellow
+                    Write-Host "Currently selected files: $($result.TestFiles.Count)" -ForegroundColor Cyan
+                    Write-Host ""
+                    Write-Host "Continue? [y/n]:" -ForegroundColor Yellow -NoNewline
+                    $confirm = Read-Host " "
+                    if ($confirm -notmatch '^[yY]')
+                    {
+                        Write-Host "Cancelled" -ForegroundColor Gray
+                        Start-Sleep -Seconds 1
+                        continue
+                    }
+                }
+                
+                $result.Tags = @()
+                Write-Host ""
+                Write-Host "Tags cleared" -ForegroundColor Yellow
+                Start-Sleep -Seconds 1
+            }
+            '^5$'
+            {
+                $result.TestFiles = @()
+                $result.Tags = @()
+                Write-Host "All selections cleared" -ForegroundColor Yellow
+                Start-Sleep -Seconds 1
+            }
+            '^[rR]$'
+            {
+                # Validate at least one selection
+                if ($result.TestFiles.Count -eq 0 -and $result.Tags.Count -eq 0)
+                {
+                    Write-Host ""
+                    Write-Host "No selections made. Please select test files or tags." -ForegroundColor Red
+                    Start-Sleep -Seconds 2
+                    continue
+                }
+                
+                Write-Host ""
+                Write-Host "Proceeding with test execution..." -ForegroundColor Green
+                Start-Sleep -Seconds 1
+                return $result
+            }
+            '^[qQ0]$'
+            {
+                $result.Canceled = $true
+                return $result
+            }
+            default
+            {
+                Write-Host "Invalid choice. Please try again." -ForegroundColor Red
+                Start-Sleep -Seconds 1
+            }
+        }
+    }
 }
 
 # Helper function to clean up GUID-named TestDrive folders
@@ -589,6 +1143,31 @@ function Remove-GuidFolders()
     }
 }
 #endregion
+
+# Check if -Interactive mode was requested (combined files + tags selection)
+if ($Interactive)
+{
+    $testsPath = Join-Path $PSScriptRoot "tests"
+    $interactiveResult = Select-InteractiveCombined -TestsPath $testsPath
+    
+    if ($interactiveResult.Canceled)
+    {
+        Write-Host ""
+        Write-Host "Interactive mode canceled. Exiting." -ForegroundColor Yellow
+        exit 0
+    }
+    
+    # Apply selections from interactive mode
+    if ($interactiveResult.TestFiles.Count -gt 0)
+    {
+        $config.Run.Path = $interactiveResult.TestFiles
+    }
+    
+    if ($interactiveResult.Tags.Count -gt 0)
+    {
+        $Tags = $interactiveResult.Tags
+    }
+}
 
 # Check if -Tags was passed with "Interactive" value (interactive mode)
 if ($PSBoundParameters.ContainsKey('Tags') -and $Tags.Count -eq 1 -and $Tags[0] -eq "Interactive")

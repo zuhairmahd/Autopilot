@@ -296,7 +296,6 @@ else
 }
 #endregion Initialize script variables
 
-
 #region import functions.
 function Find-FolderPath()
 {
