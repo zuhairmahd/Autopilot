@@ -303,25 +303,31 @@ function ShowDeviceReport()
     $reportExportMenu = AddMenuItem -Menu $reportExportMenu -Name "Display on Screen" -Action $displayAction -ReturnsValue
     $reportExportMenu = AddMenuItem -Menu $reportExportMenu -Name "Export to HTML" -Action $HTMLAction -ReturnsValue
     $reportExportMenu = AddMenuItem -Menu $reportExportMenu -Name "Export to CSV" -Action $CSVAction -ReturnsValue
-    $selection = ShowMenu -Menu $reportExportMenu -CalledBy 'Action'
-
-    if ($null -ne $selection )
+    
+    # Loop to keep showing the menu until user chooses to navigate away
+    do
     {
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "ShowMenu returned: '$selection' (Type: $($selection.GetType().Name))" -LogLevel "Information"
-        # Validate that we got a proper selection, not a navigation option
-        if ($selection -eq "Back" -or $selection -eq "Main Menu" -or $selection -eq 0 -or $selection -eq "0")
+        $selection = ShowMenu -Menu $reportExportMenu -CalledBy 'Action'
+
+        if ($null -ne $selection )
         {
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "ShowMenu returned navigation option: '$selection', treating as navigation" -LogLevel "Information"
-            return $selection
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "ShowMenu returned: '$selection' (Type: $($selection.GetType().Name))" -LogLevel "Information"
+            # Validate that we got a proper selection, not a navigation option
+            if ($selection -eq "Back" -or $selection -eq "Main Menu" -or $selection -eq 0 -or $selection -eq "0")
+            {
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "ShowMenu returned navigation option: '$selection', treating as navigation" -LogLevel "Information"
+                return $selection
+            }
+            # If action completed successfully, continue loop to show menu again
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action completed, returning to Device Health Menu" -LogLevel "Information"
+        }
+        else
+        {
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "No export selected. Exiting." -LogLevel "Information"
+            return $null
         }
     }
-    else
-    {
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No export selected. Exiting." -LogLevel "Information"
-        return $null
-    }
+    while ($true)
     #endregion Handle menu decision
-    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device report generation completed" -LogLevel "Information"
-    return $true
 }
 
