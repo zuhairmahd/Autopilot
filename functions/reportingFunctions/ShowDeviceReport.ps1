@@ -304,49 +304,37 @@ function ShowDeviceReport()
     $reportExportMenu = AddMenuItem -Menu $reportExportMenu -Name "Export to HTML" -Action $HTMLAction -ReturnsValue
     $reportExportMenu = AddMenuItem -Menu $reportExportMenu -Name "Export to CSV" -Action $CSVAction -ReturnsValue
     
-    # Push the menu to the stack once before entering the loop
-    # This ensures "Back" navigation works correctly
-    Push-MenuToStack -Menu $reportExportMenu
-    
     # Loop to keep showing the menu until user chooses to navigate away
-    $continueLoop = $true
-    do
+    # Similar approach to ShowGroupAssignments function
+    while ($true)
     {
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "=== LOOP ITERATION START ===" -LogLevel "Debug"
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "About to call ShowMenu with StackOperation 'None'" -LogLevel "Debug"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "About to call ShowMenu with CalledBy 'Custom_DeviceHealthSubmenu' and StackOperation 'Push'" -LogLevel "Debug"
         
-        $selection = ShowMenu -Menu $reportExportMenu -StackOperation 'None'
+        # Use custom CalledBy context with explicit Push to enable auto-pop after action
+        # This ensures the menu stays on the stack during loop but pops after each action completes
+        $selection = ShowMenu -Menu $reportExportMenu -CalledBy 'Custom_DeviceHealthSubmenu' -StackOperation 'Push'
         
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "ShowMenu returned. Selection value: '$selection', Type: $(if ($null -eq $selection) { 'null' } else { $selection.GetType().Name })" -LogLevel "Debug"
 
-        if ($null -ne $selection )
+        # Validate that we got a proper selection, not a navigation option
+        if ($selection -eq "Back" -or $selection -eq "Main Menu" -or $selection -eq 0 -or $selection -eq "0")
         {
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "ShowMenu returned: '$selection' (Type: $($selection.GetType().Name))" -LogLevel "Information"
-            # Validate that we got a proper selection, not a navigation option
-            if ($selection -eq "Back" -or $selection -eq "Main Menu" -or $selection -eq 0 -or $selection -eq "0")
-            {
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "ShowMenu returned navigation option: '$selection', treating as navigation" -LogLevel "Information"
-                $continueLoop = $false
-                # Pop the menu from the stack before returning
-                $poppedMenu = Pop-MenuFromStack
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Popped menu from stack: $(if ($poppedMenu) { $poppedMenu.Title } else { 'null' })" -LogLevel "Debug"
-                return $selection
-            }
-            # If action completed successfully, continue loop to show menu again
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action completed, returning to Device Health Menu" -LogLevel "Information"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "ShowMenu returned navigation option: '$selection', treating as navigation" -LogLevel "Information"
+            return $selection
         }
-        else
+        
+        # If selection is null, user may have navigated away
+        if ($null -eq $selection)
         {
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "No export selected (selection is null). Exiting loop." -LogLevel "Information"
-            $continueLoop = $false
-            # Pop the menu from the stack before returning
-            $poppedMenu = Pop-MenuFromStack
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Popped menu from stack: $(if ($poppedMenu) { $poppedMenu.Title } else { 'null' })" -LogLevel "Debug"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "ShowMenu returned null, user may have navigated away" -LogLevel "Information"
             return $null
         }
+        
+        # If action completed successfully, continue loop to show menu again
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action completed, returning to Device Health Menu" -LogLevel "Information"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "=== LOOP ITERATION END - continuing ===" -LogLevel "Debug"
     }
-    while ($continueLoop)
     #endregion Handle menu decision
 }
 

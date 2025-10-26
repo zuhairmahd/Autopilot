@@ -41,21 +41,21 @@ Describe "Function: ShowDeviceReport - Menu Loop Implementation" -Tags 'Unit', '
             $parseErrors | Should -BeNullOrEmpty -Because "ShowDeviceReport.ps1 must have valid PowerShell syntax"
         }
         
-        It "Should contain a do-while loop for menu display" {
+        It "Should contain a while loop for menu display" {
             # Arrange
             $content = Get-Content $script:FilePath -Raw
             
-            # Act - Check for do-while loop pattern
-            $hasDoBlock = $content -match 'do\s*\{'
-            $hasShowMenuInLoop = $content -match 'do\s*\{[^}]*?\$selection\s*=\s*ShowMenu'
-            $hasContinueLoopVar = $content -match '\$continueLoop\s*=\s*\$true'
-            $hasWhileCondition = $content -match 'while\s*\(\s*\$continueLoop\s*\)'
+            # Act - Check for while loop pattern (similar to ShowGroupAssignments)
+            $hasWhileTrue = $content -match 'while\s*\(\s*\$true\s*\)'
+            $hasShowMenuInLoop = $content -match 'while\s*\(\s*\$true\s*\)[^}]*?\$selection\s*=\s*ShowMenu'
+            $hasCustomCalledBy = $content -match 'Custom_DeviceHealthSubmenu'
+            $hasStackOperationPush = $content -match 'StackOperation\s+[''"]Push[''"]'
             
             # Assert
-            $hasDoBlock | Should -Be $true -Because "Function should contain a do block"
-            $hasShowMenuInLoop | Should -Be $true -Because "Function should call ShowMenu within do block"
-            $hasContinueLoopVar | Should -Be $true -Because "Function should initialize continueLoop variable"
-            $hasWhileCondition | Should -Be $true -Because "Function should have while(continueLoop) condition"
+            $hasWhileTrue | Should -Be $true -Because "Function should contain a while(true) loop"
+            $hasShowMenuInLoop | Should -Be $true -Because "Function should call ShowMenu within while loop"
+            $hasCustomCalledBy | Should -Be $true -Because "Function should use Custom_DeviceHealthSubmenu CalledBy context"
+            $hasStackOperationPush | Should -Be $true -Because "Function should use StackOperation 'Push'"
         }
         
         It "Should return on Back navigation command" {
