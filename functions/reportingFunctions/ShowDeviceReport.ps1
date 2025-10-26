@@ -304,11 +304,20 @@ function ShowDeviceReport()
     $reportExportMenu = AddMenuItem -Menu $reportExportMenu -Name "Export to HTML" -Action $HTMLAction -ReturnsValue
     $reportExportMenu = AddMenuItem -Menu $reportExportMenu -Name "Export to CSV" -Action $CSVAction -ReturnsValue
     
+    # Push the menu to the stack once before entering the loop
+    # This ensures "Back" navigation works correctly
+    Push-MenuToStack -Menu $reportExportMenu
+    
     # Loop to keep showing the menu until user chooses to navigate away
     $continueLoop = $true
     do
     {
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "=== LOOP ITERATION START ===" -LogLevel "Debug"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "About to call ShowMenu with StackOperation 'None'" -LogLevel "Debug"
+        
         $selection = ShowMenu -Menu $reportExportMenu -StackOperation 'None'
+        
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "ShowMenu returned. Selection value: '$selection', Type: $(if ($null -eq $selection) { 'null' } else { $selection.GetType().Name })" -LogLevel "Debug"
 
         if ($null -ne $selection )
         {
@@ -318,6 +327,9 @@ function ShowDeviceReport()
             {
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "ShowMenu returned navigation option: '$selection', treating as navigation" -LogLevel "Information"
                 $continueLoop = $false
+                # Pop the menu from the stack before returning
+                $poppedMenu = Pop-MenuFromStack
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Popped menu from stack: $(if ($poppedMenu) { $poppedMenu.Title } else { 'null' })" -LogLevel "Debug"
                 return $selection
             }
             # If action completed successfully, continue loop to show menu again
@@ -325,10 +337,14 @@ function ShowDeviceReport()
         }
         else
         {
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "No export selected. Exiting." -LogLevel "Information"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "No export selected (selection is null). Exiting loop." -LogLevel "Information"
             $continueLoop = $false
+            # Pop the menu from the stack before returning
+            $poppedMenu = Pop-MenuFromStack
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Popped menu from stack: $(if ($poppedMenu) { $poppedMenu.Title } else { 'null' })" -LogLevel "Debug"
             return $null
         }
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "=== LOOP ITERATION END - continuing ===" -LogLevel "Debug"
     }
     while ($continueLoop)
     #endregion Handle menu decision
