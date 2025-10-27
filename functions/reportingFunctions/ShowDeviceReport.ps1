@@ -258,18 +258,18 @@ function ShowDeviceReport()
         Write-Verbose "[$functionName] Show-PagedContent completed with result: $pagingResult"
         if ($pagingResult -in @('completed', 'quit'))
         {
-            return $true
+            return $pagingResult
         }
         else
         {
-            return $false
+            return $pagingResult
         }
         return $pagingResult                
     } 
     $HTMLAction = {
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "User selected HTML export" -LogLevel "Information"
         $exportResult = ExportDeviceReport -formattedOutput $formattedOutput -ExportFormat "HTML"
-        if ($exportResult)
+        if ($exportResult.success)
         {
             Write-Host "Report exported to HTML successfully."
         }
@@ -282,7 +282,7 @@ function ShowDeviceReport()
     $CSVAction = {
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "User selected CSV export" -LogLevel "Information"
         $exportResult = ExportDeviceReport -formattedOutput $formattedOutput -ExportFormat "CSV"
-        if ($exportResult)
+        if ($exportResult.success)
         {
             Write-Host "Report exported to CSV successfully."
         }
