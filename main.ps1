@@ -1337,47 +1337,47 @@ $deviceReportsMenu = NewMenu -MenuName "deviceReportsMenu"
 #region export menu
 $exportMenu = addMenuItem -menu $exportMenu -name 'Export Device Assignment Reports' -SubMenu $deviceReportsMenu
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Autopilot Devices" -Action {
-    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'autopilot'
-    if ($exported)
+    $exported = Export-DeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'autopilot'
+    if ($exported.success)
     {
-        Write-Host "Exported Autopilot devices to $($outputFile)." -ForegroundColor Green
+        Write-Host $exported.message -ForegroundColor Green             
     }
     else
     {
-        Write-Host "Failed to export Autopilot devices." -ForegroundColor Red
+        Write-Host $exported.message -ForegroundColor Red
     }
 }
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Imported Autopilot Devices" -Action {
-    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'imported'
-    if ($exported)
+    $exported = Export-DeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'imported'
+    if ($exported.success)
     {
-        Write-Host "Exported Imported Autopilot devices to $($outputFile)." -ForegroundColor Green
+        Write-Host $exported.message -ForegroundColor Green
     }
     else
     {
-        Write-Host "Failed to export Imported Autopilot devices." -ForegroundColor Red
+        Write-Host $exported.message -ForegroundColor Red
     }
 }
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Managed Windows Devices" -Action {
-    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'managed'
-    if ($exported)
+    $exported = Export-DeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'managed'
+    if ($exported.success)
     {
-        Write-Host "Exported Managed devices to $($outputFile)." -ForegroundColor Green
+        Write-Host $exported.message -ForegroundColor Green
     }
     else
     {
-        Write-Host "Failed to export Managed devices." -ForegroundColor Red
+        Write-Host $exported.message -ForegroundColor Red
     }
 }
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Unmanaged Windows Devices" -Action {
-    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'unmanaged'
-    if ($exported)
+    $exported = Export-DeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'unmanaged'
+    if ($exported.success)
     {
-        Write-Host "Exported Unmanaged devices to $($outputFile)." -ForegroundColor Green
+        Write-Host $exported.message -ForegroundColor Green
     }
     else
     {
-        Write-Host "Failed to export Unmanaged devices." -ForegroundColor Red
+        Write-Host $exported.message -ForegroundColor Red
     }
 }
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export device storage report" -Action {

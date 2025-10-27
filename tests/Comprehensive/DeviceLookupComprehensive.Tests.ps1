@@ -109,27 +109,27 @@ Describe "Comprehensive Device Lookup and Reporting Tests" -Tags 'Comprehensive'
             }
         }
         
-        It "Should have ExportDeviceList function available" {
-            $cmd = Get-Command -Name ExportDeviceList -ErrorAction SilentlyContinue
+        It "Should have Export-DeviceList function available" {
+            $cmd = Get-Command -Name Export-DeviceList -ErrorAction SilentlyContinue
             if ($cmd)
             {
                 $cmd | Should -Not -BeNullOrEmpty
             }
             else
             {
-                Set-ItResult -Skipped -Because "ExportDeviceList function not found"
+                Set-ItResult -Skipped -Because "Export-DeviceList function not found"
             }
         }
         
-        It "Should have ExportDeviceReport function available" {
-            $cmd = Get-Command -Name ExportDeviceReport -ErrorAction SilentlyContinue
+        It "Should have Export-DeviceReport function available" {
+            $cmd = Get-Command -Name Export-DeviceReport -ErrorAction SilentlyContinue
             if ($cmd)
             {
                 $cmd | Should -Not -BeNullOrEmpty
             }
             else
             {
-                Set-ItResult -Skipped -Because "ExportDeviceReport function not found"
+                Set-ItResult -Skipped -Because "Export-DeviceReport function not found"
             }
         }
     }

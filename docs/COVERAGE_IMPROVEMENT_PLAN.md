@@ -607,7 +607,7 @@ See Progress Tracking section below for detailed results.
   - Test error scenarios
   - **Estimated Lines Covered**: ~200 lines
 
-- [ ] `tests/Unit/reportingFunctions/ExportDeviceList.Tests.ps1`
+- [ ] `tests/Unit/reportingFunctions/Export-DeviceList.Tests.ps1`
   - Test CSV export
   - Test data formatting
   - Test file operations
@@ -1006,7 +1006,7 @@ See Progress Tracking section below for detailed results.
 **Target Completion**: November 9, 2025  
 **Planned Tests**:
 - [ ] AssessDeviceState.Tests.ps1 (~200 lines target)
-- [ ] ExportDeviceList.Tests.ps1 (~150 lines target)
+- [ ] Export-DeviceList.Tests.ps1 (~150 lines target)
 - [ ] ShowDeviceReport.Tests.ps1 (~180 lines target)
 
 **Lines to Cover This Week**: ~530 lines (reportingFunctions to ~35% coverage)  

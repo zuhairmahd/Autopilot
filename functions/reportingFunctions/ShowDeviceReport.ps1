@@ -258,37 +258,37 @@ function ShowDeviceReport()
         Write-Verbose "[$functionName] Show-PagedContent completed with result: $pagingResult"
         if ($pagingResult -in @('completed', 'quit'))
         {
-            return $true
+            Write-Host "Returning to Device Health Menu: $pagingResult" -ForegroundColor Yellow
         }
         else
         {
-            return $false
+            Write-Host "Returning to Device Health Menu due to an error: $pagingResult" -ForegroundColor Yellow
         }
         return $pagingResult                
-    }
+    } 
     $HTMLAction = {
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "User selected HTML export" -LogLevel "Information"
-        $exportResult = ExportDeviceReport -formattedOutput $formattedOutput -ExportFormat "HTML"
-        if ($exportResult)
+        $exportResult = Export-DeviceReport -formattedOutput $formattedOutput -ExportFormat "HTML"
+        if ($exportResult.success)
         {
-            Write-Host "Report exported to HTML successfully."
+            Write-Host $exportResult.message -ForegroundColor Green
         }
         else
         {
-            Write-Host "Failed to export report to HTML."
+            Write-Host $exportResult.message -ForegroundColor Red
         }
         return $exportResult 
     } 
     $CSVAction = {
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "User selected CSV export" -LogLevel "Information"
-        $exportResult = ExportDeviceReport -formattedOutput $formattedOutput -ExportFormat "CSV"
-        if ($exportResult)
+        $exportResult = Export-DeviceReport -formattedOutput $formattedOutput -ExportFormat "CSV"
+        if ($exportResult.success)
         {
-            Write-Host "Report exported to CSV successfully."
+            Write-Host $exportResult.message -ForegroundColor Green                 
         }
         else
         {
-            Write-Host "Failed to export report to CSV."
+            Write-Host $exportResult.message -ForegroundColor Red
         }
         return $exportResult 
     } 
@@ -303,25 +303,38 @@ function ShowDeviceReport()
     $reportExportMenu = AddMenuItem -Menu $reportExportMenu -Name "Display on Screen" -Action $displayAction -ReturnsValue
     $reportExportMenu = AddMenuItem -Menu $reportExportMenu -Name "Export to HTML" -Action $HTMLAction -ReturnsValue
     $reportExportMenu = AddMenuItem -Menu $reportExportMenu -Name "Export to CSV" -Action $CSVAction -ReturnsValue
-    $selection = ShowMenu -Menu $reportExportMenu -CalledBy 'Action'
-
-    if ($null -ne $selection )
+    
+    # Loop to keep showing the menu until user chooses to navigate away
+    # Similar approach to ShowGroupAssignments function
+    while ($true)
     {
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "ShowMenu returned: '$selection' (Type: $($selection.GetType().Name))" -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "=== LOOP ITERATION START ===" -LogLevel "Debug"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "About to call ShowMenu with CalledBy 'Custom_DeviceHealthSubmenu' and StackOperation 'Push'" -LogLevel "Debug"
+        
+        # Use custom CalledBy context with explicit Push to enable auto-pop after action
+        # This ensures the menu stays on the stack during loop but pops after each action completes
+        $selection = ShowMenu -Menu $reportExportMenu -CalledBy 'Custom_DeviceHealthSubmenu' -StackOperation 'Push'
+        
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "ShowMenu returned. Selection value: '$selection', Type: $(if ($null -eq $selection) { 'null' } else { $selection.GetType().Name })" -LogLevel "Debug"
+
         # Validate that we got a proper selection, not a navigation option
         if ($selection -eq "Back" -or $selection -eq "Main Menu" -or $selection -eq 0 -or $selection -eq "0")
         {
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "ShowMenu returned navigation option: '$selection', treating as navigation" -LogLevel "Information"
             return $selection
         }
-    }
-    else
-    {
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No export selected. Exiting." -LogLevel "Information"
-        return $null
+        
+        # If selection is null, user may have navigated away
+        if ($null -eq $selection)
+        {
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "ShowMenu returned null, user may have navigated away" -LogLevel "Information"
+            return $null
+        }
+        
+        # If action completed successfully, continue loop to show menu again
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action completed, returning to Device Health Menu" -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "=== LOOP ITERATION END - continuing ===" -LogLevel "Debug"
     }
     #endregion Handle menu decision
-    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device report generation completed" -LogLevel "Information"
-    return $true
 }
 

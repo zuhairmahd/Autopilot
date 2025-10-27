@@ -35,15 +35,12 @@ function Show-PagedContent()
     
     .PARAMETER ShowPageInfo
         If specified, displays page information (current page, total pages, item range).
-        Default: $true
     
     .PARAMETER Silent
         If specified, suppresses all output and navigation (useful for testing/automation).
-        Default: $false
     
     .PARAMETER NoPaging
         If specified, displays all content without paging (useful when content is small).
-        Default: $false
     
     .OUTPUTS
         System.String
