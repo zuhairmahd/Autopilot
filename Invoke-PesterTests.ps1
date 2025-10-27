@@ -171,10 +171,11 @@ if (-not $skipModuleCheck)
 else
 {
     Write-Verbose "Module dependency check is skipped as per user request."
-    #endregion Module Dependencies
+}
+#endregion Module Dependencies
 
-    # Import configuration
-    . "$PSScriptRoot\PesterConfiguration.ps1"
+# Import configuration
+. "$PSScriptRoot\PesterConfiguration.ps1"
 
     Write-Host "=" * 63 -ForegroundColor Cyan
     Write-Host "  Autopilot Pester Test Suite" -ForegroundColor Cyan

@@ -1763,7 +1763,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Download and install la
         return $null
     }
     Write-Host 'Downloading and installing the latest Windows updates...'
-    $updateResult = ApplyWindowsUpdates
+    $updateResult = Apply-WindowsUpdates
     Write-Host $returnValues.$updateResult
 }
 $autopilotMenu = AddMenuItem -Menu $autopilotMenu -Name "Check device Autopilot status" -Submenu $SerialNumberMenu
