@@ -46,7 +46,7 @@ Describe "Report Generation Integration" -Tags 'Integration', 'Reporting' {
             $result = Export-DeviceReport -formattedOutput $reportData -ExportFormat "CSV" -outputFile $outputPath
 
             # Assert
-            $result | Should -Be $true
+            $result.success | Should -Be $true
             (Test-Path $outputPath) | Should -Be $true
 
             $csvContent = Import-Csv -Path $outputPath
