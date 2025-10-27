@@ -171,6 +171,19 @@
                 )
             },
             @{
+                description           = 'Shutdown the device'
+                name                  = 'Shutdown the device'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin',
+                    'helpdesk',
+                    'registration',
+                    'advancedRegistration',
+                    'advanced'
+                )
+            },
+            @{
                 description           = 'Show the group assignments for the device'
                 name                  = 'Show Group Assignments'
                 blockType             = 'action'

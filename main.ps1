@@ -2182,6 +2182,14 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
         return $returnValues.backoutText
     }
 }
+$mainMenu = AddMenuItem -menu $mainMenu -name "Shutdown the device" -action {
+    Write-Host 'Shutting down the device...'
+    if (-not (RestartDevice -Question 'Do you want to shut down the device now? (Y/N)' -action 'shutdown' -bootMessage 'Shutting down the device...'))
+    {
+        Write-Verbose "[$scriptName] RestartDevice function failed."
+        return $returnValues.backoutText
+    }
+}
 $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
     $groupName = GetUserInput -Message "Enter the name of the group whose assignments you want to view." -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
     if ($null -eq $groupName)
