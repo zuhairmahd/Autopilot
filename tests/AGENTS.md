@@ -19,6 +19,8 @@
 
 **Note:** Tests run in PowerShell 7+ only. The application itself must support PowerShell 5.1, but Pester tests do not.
 
+**Whenever possible, run only related tests for the changes you are making as the complete test suite takes a long time to complete (over 20 minutes)
+
 ### File Locations
 
 ```
