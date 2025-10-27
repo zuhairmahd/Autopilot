@@ -118,8 +118,28 @@ function Get-ApplicationDefaults()
             checkStrongMapping           = $false
             strongMappingOptional        = $true
             maxGroupMatchDisplay         = 10
+            maxMenuItemsPerPage          = 15
             release                      = "auto"
-            repoInfo                     = @{
+            cacheSettings                = [ordered]@{
+                enabled                  = $true
+                defaultExpirationMinutes = 15
+                maxCacheSize             = 1000
+                cacheTypes               = [ordered]@{
+                    Configuration    = [ordered]@{
+                        enabled           = $true
+                        expirationMinutes = 60
+                    }
+                    DirectoryObjects = [ordered]@{
+                        enabled           = $true
+                        expirationMinutes = 15
+                    }
+                    Devices          = [ordered]@{
+                        enabled           = $true
+                        expirationMinutes = 15
+                    }
+                }
+            }
+            repoInfo                     = [ordered]@{
                 repoName      = "Autopilot"
                 baseSourceURL = "https://raw.githubusercontent.com"
                 baseURL       = "https://www.github.com"
@@ -154,8 +174,28 @@ function Get-ApplicationDefaults()
             timeInSeconds                   = 60
             maxUserMatchDisplay             = 20
             maxGroupMatchDisplay            = 20
+            maxMenuItemsPerPage             = 20
             release                         = "master"
-            repoInfo                        = @{
+            cacheSettings                   = [ordered]@{
+                enabled                  = $true
+                defaultExpirationMinutes = 15
+                maxCacheSize             = 1000
+                cacheTypes               = [ordered]@{
+                    Configuration    = [ordered]@{
+                        enabled           = $true
+                        expirationMinutes = 60
+                    }
+                    DirectoryObjects = [ordered]@{
+                        enabled           = $true
+                        expirationMinutes = 15
+                    }
+                    Devices          = [ordered]@{
+                        enabled           = $true
+                        expirationMinutes = 15
+                    }
+                }
+            }
+            repoInfo                        = [ordered]@{
                 repoName      = "Autopilot"
                 baseSourceURL = "https://raw.githubusercontent.com"
                 baseURL       = "https://www.github.com"
@@ -511,7 +551,22 @@ function Get-ApplicationDefaults()
                             'full',
                             'admin',
                             'advanced',
+                            'registration',
+                            'advancedRegistration',
                             'helpdesk'
+                        )
+                    },
+                    @{
+                        description           = 'Shutdown the device'
+                        name                  = 'Shutdown the device'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'helpdesk',
+                            'registration',
+                            'advancedRegistration',
+                            'advanced'
                         )
                     },
                     @{
@@ -1274,12 +1329,24 @@ function Get-ApplicationDefaults()
                 )
             }
             reportExportMenu          = @{
-                Title                 = 'Report Export Menu'
-                Description           = 'Select the format to which you would like to export the report'
+                Title                 = 'Device Health Menu'
+                Description           = 'Select whether you want to display or export the device health report'
                 items                 = @(
                     @{
+                        Description           = 'Display the report on screen'
+                        name                  = 'Display on Screen'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced',
+                            'helpdesk',
+                            'registration'
+                        )
+                    },
+                    @{
                         Description           = 'Export the report in HTML format'
-                        name                  = 'Export in HTML format'
+                        name                  = 'Export to HTML'
                         blockType             = 'action'
                         includeInDisplayModes = @(
                             'full',
@@ -1291,7 +1358,7 @@ function Get-ApplicationDefaults()
                     },
                     @{
                         Description           = 'Export the report in CSV format'
-                        name                  = 'Export in CSV format'
+                        name                  = 'Export to CSV'
                         blockType             = 'action'
                         includeInDisplayModes = @(
                             'full',

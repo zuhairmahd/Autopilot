@@ -6,6 +6,7 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
     BeforeAll {
         # Load the function and its dependencies
         $script:RepoRoot = (Get-Item $PSScriptRoot).Parent.Parent.FullName
+        . "$script:RepoRoot/functions/utilityFunctions/Get-CachedData.ps1"
         . "$script:RepoRoot/functions/reportingFunctions/Export-DeviceAssignmentReport.ps1"
         . "$script:RepoRoot/functions/deviceFunctions/Get-DeviceData.ps1"
         . "$script:RepoRoot/functions/utilityFunctions/FormatDateWithTimeZone.ps1"
@@ -20,9 +21,19 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
         # Mock Write-Log globally (no -ModuleName needed for dot-sourced functions)
         Mock Write-Log {}
         
-        # Mock settings global variable
+        # Mock settings global variable with cache configuration
         $global:settings = @{
             deviceNamePrefix = 'TEST-'
+            cacheSettings    = @{
+                enabled                  = $true
+                defaultExpirationMinutes = 15
+                maxCacheSize             = 1000
+                cacheTypes               = @{
+                    Configuration    = @{ enabled = $true; expirationMinutes = 60 }
+                    DirectoryObjects = @{ enabled = $true; expirationMinutes = 15 }
+                    Devices          = @{ enabled = $true; expirationMinutes = 15 }
+                }
+            }
         }
         
         # Mock LogFile global variable
@@ -184,8 +195,8 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
             Remove-Item -Path $script:TestOutputPath.FullName -Recurse -Force
         }
         
-        # Clear cache (now using DeviceDataCache instead of DeviceReportCache)
-        $script:DeviceDataCache = $null
+        # Clear unified cache
+        Clear-UnifiedCache -CacheType 'Devices'
     }
     
     Context "Report Type: Assigned" {
@@ -348,24 +359,27 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
     Context "Caching Functionality" {
         
         BeforeEach {
-            # Clear cache before each test (now using DeviceDataCache)
-            $script:DeviceDataCache = $null
+            # Clear unified cache before each test
+            Clear-UnifiedCache -CacheType 'Devices'
         }
         
         It "Should cache data on first call" {
             $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'All'
             
-            $script:DeviceDataCache | Should -Not -BeNullOrEmpty
-            $script:DeviceDataCache.autopilot.Data | Should -Not -BeNullOrEmpty
-            $script:DeviceDataCache.managed.Data | Should -Not -BeNullOrEmpty
-            $script:DeviceDataCache.autopilot.Timestamp | Should -Not -BeNullOrEmpty
+            $global:UnifiedCache | Should -Not -BeNullOrEmpty
+            $global:UnifiedCache.Devices | Should -Not -BeNullOrEmpty
+            $global:UnifiedCache.Devices.Keys | Should -Contain 'device:autopilot'
+            $autopilotKey = 'device:autopilot'
+            $managedKey = $global:UnifiedCache.Devices.Keys | Where-Object { $_ -like 'device:managed*' }
+            $managedKey | Should -Not -BeNullOrEmpty
+            $global:UnifiedCache.Devices[$autopilotKey].Timestamp | Should -Not -BeNullOrEmpty
         }
         
         It "Should use cached data on subsequent calls" {
             # First call
             Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'All'
             
-            $firstTimestamp = $script:DeviceDataCache.autopilot.Timestamp
+            $firstTimestamp = $global:UnifiedCache.Devices['device:autopilot'].Timestamp
             
             Start-Sleep -Milliseconds 100
             
@@ -373,30 +387,30 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
             Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'Assigned'
             
             # Timestamp should be the same (using cache)
-            $script:DeviceDataCache.autopilot.Timestamp | Should -Be $firstTimestamp
+            $global:UnifiedCache.Devices['device:autopilot'].Timestamp | Should -Be $firstTimestamp
         }
         
         It "Should refresh cache when -RefreshCache is specified" {
             # First call
             Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'All'
             
-            $firstTimestamp = $script:DeviceDataCache.autopilot.Timestamp
+            $firstTimestamp = $global:UnifiedCache.Devices['device:autopilot'].Timestamp
             
             Start-Sleep -Milliseconds 100
             
             # Second call with -RefreshCache
-            Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'Assigned' -RefreshCache
+            Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'All' -RefreshCache
             
             # Timestamp should be different (cache refreshed)
-            $script:DeviceDataCache.autopilot.Timestamp | Should -Not -Be $firstTimestamp
+            $global:UnifiedCache.Devices['device:autopilot'].Timestamp | Should -Not -Be $firstTimestamp
         }
     }
     
     Context "Error Handling and Robustness" {
         
         BeforeEach {
-            # Clear cache before each test to ensure clean state
-            $script:DeviceDataCache = $null
+            # Clear unified cache before each test to ensure clean state
+            Clear-UnifiedCache -CacheType 'Devices'
         }
         
         It "Should handle empty result set gracefully" {
@@ -484,8 +498,8 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
     Context "Return Object Structure and Properties" {
         
         BeforeEach {
-            # Clear cache before each test to ensure clean state
-            $script:DeviceDataCache = $null
+            # Clear unified cache before each test to ensure clean state
+            Clear-UnifiedCache -CacheType 'Devices'
         }
         
         It "Should return a hashtable with all required properties" {
@@ -530,9 +544,6 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
         }
         
         It "Should populate message when no devices found" {
-            # Clear cache first to ensure empty mock is used
-            $script:DeviceDataCache = $null
-            
             Mock CallGraphApi {
                 return @{ value = @() }
             }

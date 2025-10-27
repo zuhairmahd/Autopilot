@@ -24,6 +24,7 @@ BeforeAll {
     . (Join-Path $script:RepoRoot "functions/UserAndGroupFunctions/Show-DirectoryObjectList.ps1")
     . (Join-Path $script:RepoRoot "functions/UserAndGroupFunctions/Resolve-DirectoryObject.ps1")
     . (Join-Path $script:RepoRoot "functions/UserAndGroupFunctions/ConvertFrom-DirectoryObjectSelection.ps1")
+    . (Join-Path $script:RepoRoot "functions/utilityFunctions/Get-CachedData.ps1")
     
     # Import mocking infrastructure
     Import-Module (Join-Path $script:RepoRoot "tests/Helpers/AutopilotGraphMocks.psm1") -Force
@@ -100,10 +101,18 @@ Describe "Directory Object Workflow Integration" -Tag 'Integration', 'DirectoryO
         Reset-MockData -IncludeUsers -IncludeGroups
         $script:MockMenuResponse = $null
         
-        # Clear cache
-        if (Get-Variable -Name DirectoryObjectCache -Scope Global -ErrorAction SilentlyContinue)
+        # Clear cache ONLY for non-cache tests
+        # Cache integration tests need the cache to persist to verify caching behavior
+        $testName = $global:PesterBoundParameters.CurrentTest.Name
+        if ($testName -notmatch 'cache')
         {
-            $global:DirectoryObjectCache = @{}
+            if (Get-Variable -Name UnifiedCache -Scope Global -ErrorAction SilentlyContinue)
+            {
+                if ($global:UnifiedCache.ContainsKey('DirectoryObjects'))
+                {
+                    $global:UnifiedCache['DirectoryObjects'] = @{}
+                }
+            }
         }
     }
     
@@ -302,8 +311,19 @@ Describe "Directory Object Workflow Integration" -Tag 'Integration', 'DirectoryO
     
     Context "Cache Integration Across Workflow" {
         
+        BeforeEach {
+            # Ensure cache starts fresh for each cache test
+            if (Get-Variable -Name UnifiedCache -Scope Global -ErrorAction SilentlyContinue)
+            {
+                if ($global:UnifiedCache.ContainsKey('DirectoryObjects'))
+                {
+                    $global:UnifiedCache['DirectoryObjects'] = @{}
+                }
+            }
+        }
+        
         It "Should cache user results across workflow steps" {
-            $settings = @{ maxUserMatchDisplay = 10 }
+            $settings = @{ maxUserMatchDisplay = 10; cacheSettings = @{ enabled = $true } }
             $returnValues = @{}
             
             # First lookup
@@ -311,7 +331,7 @@ Describe "Directory Object Workflow Integration" -Tag 'Integration', 'DirectoryO
                 -Settings $settings -ReturnValues $returnValues -EntityType "User"
             
             # Cache should be populated
-            $global:DirectoryObjectCache.Count | Should -BeGreaterThan 0
+            $global:UnifiedCache['DirectoryObjects'].Count | Should -BeGreaterThan 0
             
             # Second lookup should use cache
             $result2 = Resolve-DirectoryObject -EntityName "john.doe@contoso.com" -AccessToken "test-token" `
@@ -321,7 +341,7 @@ Describe "Directory Object Workflow Integration" -Tag 'Integration', 'DirectoryO
         }
         
         It "Should cache group results across workflow steps" {
-            $settings = @{ maxGroupMatchDisplay = 10 }
+            $settings = @{ maxGroupMatchDisplay = 10; cacheSettings = @{ enabled = $true } }
             $returnValues = @{}
             
             # First lookup
@@ -329,7 +349,7 @@ Describe "Directory Object Workflow Integration" -Tag 'Integration', 'DirectoryO
                 -Settings $settings -ReturnValues $returnValues -EntityType "Group"
             
             # Cache should be populated
-            $global:DirectoryObjectCache.Count | Should -BeGreaterThan 0
+            $global:UnifiedCache['DirectoryObjects'].Count | Should -BeGreaterThan 0
             
             # Second lookup should use cache
             $result2 = Resolve-DirectoryObject -EntityName "Marketing Team" -AccessToken "test-token" `
@@ -339,7 +359,7 @@ Describe "Directory Object Workflow Integration" -Tag 'Integration', 'DirectoryO
         }
         
         It "Should maintain separate cache entries for users and groups" {
-            $settings = @{ maxUserMatchDisplay = 10; maxGroupMatchDisplay = 10 }
+            $settings = @{ maxUserMatchDisplay = 10; maxGroupMatchDisplay = 10; cacheSettings = @{ enabled = $true } }
             $returnValues = @{}
             
             # Lookup user
@@ -351,7 +371,7 @@ Describe "Directory Object Workflow Integration" -Tag 'Integration', 'DirectoryO
                 -Settings $settings -ReturnValues $returnValues -EntityType "Group"
             
             # Cache should have entries for both
-            $global:DirectoryObjectCache.Count | Should -BeGreaterOrEqual 2
+            $global:UnifiedCache['DirectoryObjects'].Count | Should -BeGreaterOrEqual 2
         }
     }
     

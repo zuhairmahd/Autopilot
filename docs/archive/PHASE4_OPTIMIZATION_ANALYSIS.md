@@ -22,7 +22,7 @@ After successful implementation of Phases 1-3 optimizations, this analysis ident
 **Target Files**: 172 string concatenation operations identified across functions
 - `functions/menuFunctions/Create-MenuBanner.ps1` - Multiple banner string concatenations
 - `functions/setupFunctions/Show-SettingsViewer.ps1` - Display string building
-- `functions/reportingFunctions/ExportDeviceList.ps1` - CSV generation with += operations
+- `functions/reportingFunctions/Export-DeviceList.ps1` - CSV generation with += operations
 
 **Optimization Strategy**: Implement StringBuilder-style operations using .NET System.Text.StringBuilder
 

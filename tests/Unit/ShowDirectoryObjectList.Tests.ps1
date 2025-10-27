@@ -5,6 +5,9 @@ BeforeAll {
     # Get repository root
     $script:RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     
+    # Load unified cache functions first
+    . "$script:RepoRoot/functions/utilityFunctions/Get-CachedData.ps1"
+    
     # Initialize helpers
     Initialize-MockGlobalVariables -LogFile "test-show-directory-object-list.log" -IncludeReturnValues
     

@@ -1,4 +1,4 @@
-function ExportDeviceList()
+function Export-DeviceList()
 {
     [CmdletBinding()]
     param(
@@ -18,7 +18,14 @@ function ExportDeviceList()
     $currentDateTime = (Get-Date -Format "yyyyMMdd-HHmmss")
     $outputFile = "$outputPath\$deviceType-DeviceList-$currentDateTime.csv"
     $CSVObject = [System.Collections.ArrayList]@()
-    $success = $false
+    $returnObject = @{
+        success     = $false
+        outputFile  = $outputFile
+        message     = ""
+        deviceCount = 0
+        deviceType  = $deviceType
+        fileMode    = $fileMode
+    }
     #endregion
 
     #region Fetch devices using Get-DeviceData
@@ -141,44 +148,38 @@ function ExportDeviceList()
         $CSVObject.Add($exportObject) | Out-Null
     }
     #endregion    
-
-    if ($CSVObject.Count -gt 0)
+    
+    try
     {
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "exporting $($CSVObject.Count) $deviceType devices to $outputFile." -LogLevel "Information"
-        #Check if the file exists and ask if the user wants to overwrite.
-        if (Test-Path $outputFile)
+        if ($CSVObject.Count -gt 0)
         {
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "exporting $($CSVObject.Count) $deviceType devices to $outputFile." -LogLevel "Information"
             if ($fileMode -eq 'Append')
             {
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Appending to existing file $outputFile." -LogLevel "Information"
                 $CSVObject | Export-Csv -Path $outputFile -NoTypeInformation -Append -Encoding UTF8 -Delimiter ','
+                $returnObject.message = "Appended $($CSVObject.Count) $deviceType devices to $outputFile."          
             }
             else
             {
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Overwriting existing file $outputFile." -LogLevel "Verbose"
                 $CSVObject | Export-Csv -Path $outputFile -NoTypeInformation -Force -Encoding UTF8 -Delimiter ','
+                $returnObject.message = "Exported $($CSVObject.Count) $deviceType devices to $outputFile."  
             }
         }
         else
         {
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Creating new file $outputFile." -LogLevel "Information"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "No devices found for export." -LogLevel "Verbose"
+            $returnObject.message = "No $deviceType devices found for export."              
         }
-        $CSVObject | Export-Csv -Path $outputFile -NoTypeInformation -Force -Encoding UTF8 -Delimiter ','
+        $returnObject.success = $true
     }
-    else
+    catch
     {
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No devices found for export." -LogLevel "Verbose"
+        $returnObject.          success = $false
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error occurred while exporting device list: $_" -LogLevel "Error"
+        $returnObject.message = "Error occurred while exporting device list: $_"                    
     }
-    #check if the csv file exists.
-    if (Test-Path $outputFile)
-    {
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "CSV file $outputFile created successfully." -LogLevel "Information"
-        $success = $true
-    }
-    else
-    {
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to create CSV file $outputFile." -LogLevel "Error"
-        $success = $false
-    }
-    return $success, $outputFile
+
+    return $returnObject                
 }

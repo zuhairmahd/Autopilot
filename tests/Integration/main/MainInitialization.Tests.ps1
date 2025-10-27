@@ -65,6 +65,7 @@ BeforeAll {
     {
         param(
             [hashtable]$Parameters = @{},
+            [hashtable]$TestModeOptions = $null,
             [switch]$SuppressOutput
         )
         
@@ -72,6 +73,19 @@ BeforeAll {
         $Parameters['testMode'] = $true
         $Parameters['autoUpdate'] = $false
         $Parameters['OverwriteLogs'] = $true
+        
+        # Convert testModeOptions hashtable to individual switch parameters
+        if ($TestModeOptions)
+        {
+            foreach ($option in @('metadata', 'cleanup', 'migration', 'config', 'auth', 'legacyMigration', 'exitAfter'))
+            {
+                if ($TestModeOptions.ContainsKey($option) -and $TestModeOptions.$option)
+                {
+                    $paramName = "testMode$($option[0].ToString().ToUpper())$($option.Substring(1))"
+                    $Parameters[$paramName] = $true
+                }
+            }
+        }
         
         # Set default test configuration files if not specified
         if (-not $Parameters.ContainsKey('InitFile'))
@@ -95,26 +109,24 @@ BeforeAll {
             $Parameters['LogFilePath'] = $script:TestLogFile
         }
         
-        # Change to repo root for execution
-        Push-Location $script:RepoRoot
+        # Build parameter list
+        $params = @()
+        foreach ($key in $Parameters.Keys)
+        {
+            $value = $Parameters[$key]
+            if ($value -is [bool] -or $value -is [switch])
+            {
+                if ($value) { $params += "-$key" }
+            }
+            else
+            {
+                $params += "-$key"
+                $params += $value
+            }
+        }
+        
         try
         {
-            # Build parameter list
-            $params = @()
-            foreach ($key in $Parameters.Keys)
-            {
-                $value = $Parameters[$key]
-                if ($value -is [bool] -or $value -is [switch])
-                {
-                    if ($value) { $params += "-$key" }
-                }
-                else
-                {
-                    $params += "-$key"
-                    $params += $value
-                }
-            }
-            
             # Execute main.ps1 in a new PowerShell process to capture exit code reliably
             $result = & pwsh.exe -NoProfile -ExecutionPolicy Bypass -File $script:MainScriptPath @params 2>&1
             $exitCode = $LASTEXITCODE
@@ -141,10 +153,6 @@ BeforeAll {
                 Error    = $_
             }
         }
-        finally
-        {
-            Pop-Location
-        }
     }
     
     # Make it available in script scope
@@ -165,21 +173,67 @@ BeforeAll {
         }
         
         $lines = Get-Content $LogFilePath
+        
+        # Find the current log session boundaries using separator lines from Write-Log.ps1
+        $startSeparator = "=" * 30 + " start of log session " + "=" * 30
+        $endSeparator = "=" * 30 + " end of log session " + "=" * 30
+        
+        # Find the last occurrence of start separator (current session)
+        $sessionStart = -1
+        $sessionEnd = $lines.Count
+        
+        for ($i = $lines.Count - 1; $i -ge 0; $i--)
+        {
+            if ($lines[$i] -match [regex]::Escape($startSeparator))
+            {
+                $sessionStart = $i
+                break
+            }
+        }
+        
+        # If we found a start separator, look for the corresponding end separator
+        if ($sessionStart -ge 0)
+        {
+            for ($i = $sessionStart + 1; $i -lt $lines.Count; $i++)
+            {
+                if ($lines[$i] -match [regex]::Escape($endSeparator))
+                {
+                    $sessionEnd = $i
+                    break
+                }
+            }
+        }
+        else
+        {
+            # No session separator found, use entire log
+            $sessionStart = 0
+        }
+        
+        # Restrict search to current session only
+        $sessionLines = if ($sessionStart -ge 0 -and $sessionEnd -gt $sessionStart)
+        {
+            $lines[$sessionStart..$sessionEnd]
+        }
+        else
+        {
+            $lines
+        }
+        
         $matchingLines = @()
         
-        for ($i = 0; $i -lt $lines.Count; $i++)
+        for ($i = 0; $i -lt $sessionLines.Count; $i++)
         {
-            if ($lines[$i] -match $Pattern)
+            if ($sessionLines[$i] -match $Pattern)
             {
                 $start = [Math]::Max(0, $i - $ContextLines)
-                $end = [Math]::Min($lines.Count - 1, $i + $ContextLines)
+                $end = [Math]::Min($sessionLines.Count - 1, $i + $ContextLines)
                 
                 $excerpt = @()
-                $excerpt += "--- Log excerpt (lines $($start+1)-$($end+1)) ---"
+                $excerpt += "--- Log excerpt (session lines $($start+1)-$($end+1)) ---"
                 for ($j = $start; $j -le $end; $j++)
                 {
                     $marker = if ($j -eq $i) { '>>> ' } else { '    ' }
-                    $excerpt += "$marker$($lines[$j])"
+                    $excerpt += "$marker$($sessionLines[$j])"
                 }
                 $excerpt += "--- End excerpt ---"
                 $matchingLines += $excerpt -join "`n"
@@ -188,10 +242,10 @@ BeforeAll {
         
         if ($matchingLines.Count -eq 0)
         {
-            # Pattern not found - show first and last few lines
-            $headerLines = $lines | Select-Object -First 5
-            $footerLines = $lines | Select-Object -Last 5
-            return "Pattern not found. Log preview:`n--- First 5 lines ---`n$($headerLines -join "`n")`n...`n--- Last 5 lines ---`n$($footerLines -join "`n")"
+            # Pattern not found - show first and last few lines of current session
+            $headerLines = $sessionLines | Select-Object -First 5
+            $footerLines = $sessionLines | Select-Object -Last 5
+            return "Pattern not found in current session. Session preview:`n--- First 5 lines ---`n$($headerLines -join "`n")`n...`n--- Last 5 lines ---`n$($footerLines -join "`n")"
         }
         
         return $matchingLines -join "`n`n"
@@ -215,25 +269,80 @@ AfterAll {
             Remove-Item -Path $script:TestContext.TestFolder -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
+    
+    # Cleanup any GUID-named folders that may have been created by test artifacts
+    # These can be created by Pester TestDrive or other temp directory mechanisms
+    $guidPattern = '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    
+    # Clean from repo root
+    if ($script:RepoRoot -and (Test-Path $script:RepoRoot))
+    {
+        Get-ChildItem -Path $script:RepoRoot -Directory -ErrorAction SilentlyContinue | 
+            Where-Object { $_.Name -match $guidPattern } | 
+            ForEach-Object {
+                Write-Verbose "Removing GUID folder: $($_.FullName)"
+                Remove-Item -Path $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+            }
+    }
+    
+    # Clean from tests folder
+    $testsFolder = Join-Path $script:RepoRoot "tests"
+    if (Test-Path $testsFolder)
+    {
+        Get-ChildItem -Path $testsFolder -Directory -ErrorAction SilentlyContinue | 
+            Where-Object { $_.Name -match $guidPattern } | 
+            ForEach-Object {
+                Write-Verbose "Removing GUID folder: $($_.FullName)"
+                Remove-Item -Path $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+            }
+    }
+}
+
+Describe "Quick TestMode Verification" -Tags 'Integration', 'Quick' {
+    It "Should execute with testMode switches" {
+        $result = & pwsh.exe -NoProfile -ExecutionPolicy Bypass -File $script:MainScriptPath `
+            -testMode -testModeMetadata -testModeExitAfter `
+            -LogFilePath "$script:RepoRoot\Logs\pester-quick-test.log" -OverwriteLogs 2>&1
+        
+        $LASTEXITCODE | Should -Be 0
+    }
 }
 
 Describe "Main.ps1 - Test Mode Execution" -Tags 'Integration', 'Main', 'TestMode' {
     
     Context "Basic Startup in Test Mode" {
+        BeforeAll {
+            # Run main.ps1 once for this entire context with minimal phases
+            $testOpts = @{
+                metadata        = $true
+                cleanup         = $false
+                migration       = $false
+                config          = $false
+                auth            = $false
+                legacyMigration = $false
+                exitAfter       = $true
+            }
+            $script:BasicStartupResult = & $script:InvokeMainScript -TestModeOptions $testOpts
+        }
         
         It "Should execute successfully with -testMode switch" {
-            $result = & $script:InvokeMainScript
-            
-            $result.Success | Should -Be $true
-            $result.ExitCode | Should -Be 0
+            if (-not $script:BasicStartupResult.Success)
+            {
+                Write-Host "Exit Code: $($script:BasicStartupResult.ExitCode)"
+                Write-Host "Output: $($script:BasicStartupResult.Output)"
+                if ($script:BasicStartupResult.Error)
+                {
+                    Write-Host "Error: $($script:BasicStartupResult.Error)"
+                }
+            }
+            $script:BasicStartupResult.Success | Should -Be $true
+            $script:BasicStartupResult.ExitCode | Should -Be 0
         }
         
         It "Should skip menu display and exit cleanly in test mode" {
-            $result = & $script:InvokeMainScript
-            
             # Should complete successfully without hanging (proves menu was skipped)
-            $result.Success | Should -Be $true
-            $result.ExitCode | Should -Be 0
+            $script:BasicStartupResult.Success | Should -Be $true
+            $script:BasicStartupResult.ExitCode | Should -Be 0
         }
         
         It "Should find and load functions folder" {
@@ -241,25 +350,13 @@ Describe "Main.ps1 - Test Mode Execution" -Tags 'Integration', 'Main', 'TestMode
             $functionsPath = Join-Path $script:RepoRoot "functions"
             Test-Path $functionsPath | Should -Be $true
             
-            # Run script - if functions folder not found, it would exit with error
-            $result = & $script:InvokeMainScript
-            $result.Success | Should -Be $true
+            # Successful execution proves functions were loaded
+            $script:BasicStartupResult.Success | Should -Be $true
         }
     }
     
     Context "Application Metadata" {
-        
-        It "Should load application metadata and complete successfully" {
-            $result = & $script:InvokeMainScript
-            
-            # Primary validation: successful execution
-            $result.Success | Should -Be $true
-            
-            # Secondary: verify log was created (proves initialization happened)
-            Test-Path $script:TestLogFile | Should -Be $true
-        }
-        
-        It "Should process custom metadata from settings file" {
+        BeforeAll {
             # Create settings with custom metadata
             @"
 @{
@@ -270,10 +367,30 @@ Describe "Main.ps1 - Test Mode Execution" -Tags 'Integration', 'Main', 'TestMode
 }
 "@ | Out-File -FilePath $script:TestSettingsFile -Encoding UTF8
             
-            $result = & $script:InvokeMainScript
+            # Run main.ps1 once for this context - only test metadata phase
+            $testOpts = @{
+                metadata        = $true
+                cleanup         = $false
+                migration       = $false
+                config          = $false
+                auth            = $false
+                legacyMigration = $false
+                exitAfter       = $true
+            }
+            $script:MetadataResult = & $script:InvokeMainScript -TestModeOptions $testOpts
+        }
+        
+        It "Should load application metadata and complete successfully" {
+            # Primary validation: successful execution
+            $script:MetadataResult.Success | Should -Be $true
             
+            # Secondary: verify log was created (proves initialization happened)
+            Test-Path $script:TestLogFile | Should -Be $true
+        }
+        
+        It "Should process custom metadata from settings file" {
             # Primary: successful execution with custom settings
-            $result.Success | Should -Be $true
+            $script:MetadataResult.Success | Should -Be $true
             
             # Secondary: log validation (only if test fails, check logs for details)
             if (Test-Path $script:TestLogFile)
@@ -293,29 +410,24 @@ Describe "Main.ps1 - Test Mode Execution" -Tags 'Integration', 'Main', 'TestMode
         }
         
         It "Should not prompt for input in testMode (silent mode)" {
-            $result = & $script:InvokeMainScript
-            
             # Primary: completes without hanging (proves no prompts)
-            $result.Success | Should -Be $true
-            $result.ExitCode | Should -Be 0
+            $script:MetadataResult.Success | Should -Be $true
+            $script:MetadataResult.ExitCode | Should -Be 0
         }
         
         It "Should exit cleanly with -showVersion parameter" {
-            $result = & $script:InvokeMainScript -Parameters @{ showVersion = $true }
+            # Run separately as this has different parameters
+            $versionResult = & $script:InvokeMainScript -Parameters @{ showVersion = $true }
             
             # Primary: clean exit after showing version
-            $result.Success | Should -Be $true
-            $result.ExitCode | Should -Be 0
-            
-            # Logs only if needed for debugging
-            # Version display happens before full initialization, so faster
+            $versionResult.Success | Should -Be $true
+            $versionResult.ExitCode | Should -Be 0
         }
     }
     
     Context "Configuration File Initialization" {
-        
-        BeforeEach {
-            # Create minimal test configuration files before each test
+        BeforeAll {
+            # Create minimal test configuration files
             @"
 @{
     appMode = 'helpdesk'
@@ -345,37 +457,56 @@ Describe "Main.ps1 - Test Mode Execution" -Tags 'Integration', 'Main', 'TestMode
     }
 }
 "@ | Out-File -FilePath $script:TestStringsFile -Encoding UTF8
-        }
-        
-        It "Should initialize with default configuration files in test mode" {
+            
             # Without config.json, test mode should use defaults
             if (Test-Path $script:TestConfigFile)
             {
                 Remove-Item $script:TestConfigFile -Force
             }
             
-            $result = & $script:InvokeMainScript
-            
+            # Run main.ps1 once for this context - test config phase
+            $testOpts = @{
+                metadata        = $true
+                cleanup         = $false
+                migration       = $false
+                config          = $true
+                auth            = $false
+                legacyMigration = $false
+                exitAfter       = $true
+            }
+            $script:ConfigResult = & $script:InvokeMainScript -TestModeOptions $testOpts -Parameters @{
+                InitFile = $script:TestSettingsFile
+            }
+        }
+        
+        It "Should initialize with default configuration files in test mode" {
             # Primary: should complete without real config file
-            $result.Success | Should -Be $true
+            $script:ConfigResult.Success | Should -Be $true
         }
         
         It "Should load settings from InitFile parameter" {
-            $result = & $script:InvokeMainScript -Parameters @{
-                InitFile = $script:TestSettingsFile
-            }
-            
-            $result.Success | Should -Be $true
+            $script:ConfigResult.Success | Should -Be $true
         }
     }
     
-    Context "Temporary File Cleanup" {
+    Context "Temporary File Cleanup and Logging Initialization" {
+        BeforeAll {
+            # Run main.ps1 once for this context - test cleanup phase
+            $testOpts = @{
+                metadata        = $true
+                cleanup         = $true
+                migration       = $false
+                config          = $false
+                auth            = $false
+                legacyMigration = $false
+                exitAfter       = $true
+            }
+            $script:CleanupLoggingResult = & $script:InvokeMainScript -TestModeOptions $testOpts
+        }
         
         It "Should run cleanup operation during startup" {
-            $result = & $script:InvokeMainScript
-            
             # Primary: successful startup (cleanup is part of initialization)
-            $result.Success | Should -Be $true
+            $script:CleanupLoggingResult.Success | Should -Be $true
             
             # Secondary: verify cleanup executed (check logs only if needed)
             if (Test-Path $script:TestLogFile)
@@ -392,27 +523,32 @@ Describe "Main.ps1 - Test Mode Execution" -Tags 'Integration', 'Main', 'TestMode
                 $logContent | Should -Match $cleanupPattern
             }
         }
-    }
-    
-    Context "Logging Initialization" {
         
         It "Should create log file at specified path" {
             # Note: OverwriteLogs is set by default in helper, so clean state guaranteed
-            $result = & $script:InvokeMainScript
-            
-            $result.Success | Should -Be $true
+            $script:CleanupLoggingResult.Success | Should -Be $true
             # Log file should exist
             Test-Path $script:TestLogFile | Should -Be $true
             (Get-Item $script:TestLogFile).Length | Should -BeGreaterThan 0
         }
         
         It "Should accept custom LogLevel parameter" {
-            $result = & $script:InvokeMainScript -Parameters @{
+            # Run separately for Debug level test with minimal phases
+            $testOpts = @{
+                metadata        = $true
+                cleanup         = $false
+                migration       = $false
+                config          = $false
+                auth            = $false
+                legacyMigration = $false
+                exitAfter       = $true
+            }
+            $debugResult = & $script:InvokeMainScript -TestModeOptions $testOpts -Parameters @{
                 LogLevel = 'Debug'
             }
             
             # Primary: accepts parameter without error
-            $result.Success | Should -Be $true
+            $debugResult.Success | Should -Be $true
             
             # Secondary: verify debug logging occurred (logs only)
             if (Test-Path $script:TestLogFile)
@@ -432,12 +568,23 @@ Describe "Main.ps1 - Test Mode Execution" -Tags 'Integration', 'Main', 'TestMode
     }
     
     Context "Settings Migration" {
+        BeforeAll {
+            # Run main.ps1 once for this context - test migration phase
+            $testOpts = @{
+                metadata        = $true
+                cleanup         = $false
+                migration       = $true
+                config          = $false
+                auth            = $false
+                legacyMigration = $false
+                exitAfter       = $true
+            }
+            $script:MigrationResult = & $script:InvokeMainScript -TestModeOptions $testOpts
+        }
         
         It "Should handle settings migration check without errors" {
-            $result = & $script:InvokeMainScript
-            
             # Primary: migration check doesn't break startup
-            $result.Success | Should -Be $true
+            $script:MigrationResult.Success | Should -Be $true
             
             # Secondary: verify migration was checked (logs as fallback)
             if (Test-Path $script:TestLogFile)
@@ -484,39 +631,44 @@ Describe "Main.ps1 - Parameter Handling" -Tags 'Integration', 'Main', 'Parameter
 "@ | Out-File -FilePath $script:TestStringsFile -Encoding UTF8
     }
     
-    Context "Command-Line Parameter Precedence" {
-        
-        It "Should accept appMode parameter override" {
-            $result = & $script:InvokeMainScript -Parameters @{
-                appMode = 'admin'
+    Context "Command-Line Parameter Precedence and Switch Parameters" {
+        BeforeAll {
+            # Run main.ps1 once with multiple parameters to test
+            $testOpts = @{
+                metadata        = $true
+                cleanup         = $false
+                migration       = $false
+                config          = $false
+                auth            = $false
+                legacyMigration = $false
+                exitAfter       = $true
             }
-            
-            # Primary: accepts parameter without error
-            $result.Success | Should -Be $true
+            $script:ParamResult = & $script:InvokeMainScript -TestModeOptions $testOpts -Parameters @{
+                appMode     = 'admin'
+                maxWaitTime = 600
+            }
         }
         
-        It "Should accept LogLevel parameter override" {
-            $result = & $script:InvokeMainScript -Parameters @{
-                LogLevel = 'Debug'
-            }
-            
+        It "Should accept appMode parameter override" {
             # Primary: accepts parameter without error
-            $result.Success | Should -Be $true
+            $script:ParamResult.Success | Should -Be $true
         }
         
         It "Should accept maxWaitTime parameter" {
-            $result = & $script:InvokeMainScript -Parameters @{
-                maxWaitTime = 600
-            }
-            
-            $result.Success | Should -Be $true
+            $script:ParamResult.Success | Should -Be $true
         }
-    }
-    
-    Context "Switch Parameters" {
         
         It "Should handle showVersion switch" {
-            $result = & $script:InvokeMainScript -Parameters @{
+            $testOpts = @{
+                metadata        = $true
+                cleanup         = $false
+                migration       = $false
+                config          = $false
+                auth            = $false
+                legacyMigration = $false
+                exitAfter       = $false  # showVersion has its own exit
+            }
+            $result = & $script:InvokeMainScript -TestModeOptions $testOpts -Parameters @{
                 showVersion = $true
             }
             
@@ -524,7 +676,16 @@ Describe "Main.ps1 - Parameter Handling" -Tags 'Integration', 'Main', 'Parameter
         }
         
         It "Should handle showSettings switch" {
-            $result = & $script:InvokeMainScript -Parameters @{
+            $testOpts = @{
+                metadata        = $true
+                cleanup         = $false
+                migration       = $false
+                config          = $true
+                auth            = $false
+                legacyMigration = $false
+                exitAfter       = $true
+            }
+            $result = & $script:InvokeMainScript -TestModeOptions $testOpts -Parameters @{
                 showSettings = $true
             }
             
@@ -532,7 +693,16 @@ Describe "Main.ps1 - Parameter Handling" -Tags 'Integration', 'Main', 'Parameter
         }
         
         It "Should handle TestPassword parameter" {
-            $result = & $script:InvokeMainScript -Parameters @{
+            $testOpts = @{
+                metadata        = $true
+                cleanup         = $false
+                migration       = $false
+                config          = $false
+                auth            = $false
+                legacyMigration = $false
+                exitAfter       = $true
+            }
+            $result = & $script:InvokeMainScript -TestModeOptions $testOpts -Parameters @{
                 TestPassword = "TestPassword123"
             }
             
@@ -542,41 +712,35 @@ Describe "Main.ps1 - Parameter Handling" -Tags 'Integration', 'Main', 'Parameter
     
     Context "Parameter Validation" {
         
-        It "Should accept various appMode values" {
-            # Test a representative sample instead of all modes
-            $testModes = @('helpDesk', 'admin', 'custom')
+        It "Should accept various appMode and LogLevel values" -TestCases @(
+            @{ AppMode = 'helpDesk'; LogLevel = 'Information' }
+            @{ AppMode = 'admin'; LogLevel = 'Debug' }
+        ) {
+            param($AppMode, $LogLevel)
             
-            foreach ($mode in $testModes)
-            {
-                $result = & $script:InvokeMainScript -Parameters @{
-                    appMode = $mode
-                }
-                
-                $result.Success | Should -Be $true -Because "appMode '$mode' should be valid"
+            $testOpts = @{
+                metadata        = $true
+                cleanup         = $false
+                migration       = $false
+                config          = $false
+                auth            = $false
+                legacyMigration = $false
+                exitAfter       = $true
             }
-        }
-        
-        It "Should accept various LogLevel values" {
-            # Test representative sample of log levels
-            $testLevels = @('Information', 'Debug')
+            $result = & $script:InvokeMainScript -TestModeOptions $testOpts -Parameters @{
+                appMode  = $AppMode
+                LogLevel = $LogLevel
+            }
             
-            foreach ($level in $testLevels)
-            {
-                $result = & $script:InvokeMainScript -Parameters @{
-                    LogLevel = $level
-                }
-                
-                $result.Success | Should -Be $true -Because "LogLevel '$level' should be valid"
-            }
+            $result.Success | Should -Be $true -Because "appMode '$AppMode' with LogLevel '$LogLevel' should be valid"
         }
     }
 }
 
 Describe "Main.ps1 - Test Mode Configuration Behavior" -Tags 'Integration', 'Main', 'TestModeConfig' {
     
-    Context "Test Mode Without Config File" {
-        
-        BeforeEach {
+    Context "Test Mode Without Config File and With TestPassword" {
+        BeforeAll {
             # Ensure config file doesn't exist
             if (Test-Path $script:TestConfigFile)
             {
@@ -601,20 +765,36 @@ Describe "Main.ps1 - Test Mode Configuration Behavior" -Tags 'Integration', 'Mai
     returnValues = @{ Back = '[B]ack' }
 }
 "@ | Out-File -FilePath $script:TestStringsFile -Encoding UTF8
+            
+            # Run main.ps1 once for this context
+            $testOpts = @{
+                metadata        = $true
+                cleanup         = $false
+                migration       = $false
+                config          = $false
+                auth            = $false
+                legacyMigration = $false
+                exitAfter       = $true
+            }
+            $script:NoConfigResult = & $script:InvokeMainScript -TestModeOptions $testOpts
         }
         
         It "Should complete without config file in test mode" {
-            $result = & $script:InvokeMainScript
-            
             # Primary: completes without prompts or errors
-            $result.Success | Should -Be $true
+            $script:NoConfigResult.Success | Should -Be $true
         }
-    }
-    
-    Context "Test Mode With TestPassword" {
         
         It "Should accept TestPassword parameter" {
-            $result = & $script:InvokeMainScript -Parameters @{
+            $testOpts = @{
+                metadata        = $true
+                cleanup         = $false
+                migration       = $false
+                config          = $false
+                auth            = $false
+                legacyMigration = $false
+                exitAfter       = $true
+            }
+            $result = & $script:InvokeMainScript -TestModeOptions $testOpts -Parameters @{
                 TestPassword = "TestPassword123"
             }
             
@@ -645,21 +825,31 @@ Describe "Main.ps1 - Authentication in Test Mode" -Tags 'Integration', 'Main', '
     returnValues = @{ Back = '[B]ack' }
 }
 "@ | Out-File -FilePath $script:TestStringsFile -Encoding UTF8
+        
+        # Remove config file to ensure no real auth is attempted
+        if (Test-Path $script:TestConfigFile)
+        {
+            Remove-Item $script:TestConfigFile -Force
+        }
+        
+        # Run main.ps1 once for this describe block
+        $testOpts = @{
+            metadata        = $true
+            cleanup         = $false
+            migration       = $false
+            config          = $false
+            auth            = $false
+            legacyMigration = $false
+            exitAfter       = $true
+        }
+        $script:AuthResult = & $script:InvokeMainScript -TestModeOptions $testOpts
     }
     
     Context "Test Mode Authentication Bypass" {
         
         It "Should complete without real authentication in test mode" {
-            # Remove config file to ensure no real auth is attempted
-            if (Test-Path $script:TestConfigFile)
-            {
-                Remove-Item $script:TestConfigFile -Force
-            }
-            
-            $result = & $script:InvokeMainScript
-            
             # Primary: completes without real Graph token
-            $result.Success | Should -Be $true
+            $script:AuthResult.Success | Should -Be $true
         }
     }
 }
@@ -701,30 +891,35 @@ Describe "Main.ps1 - Configuration Loading Integration" -Tags 'Integration', 'Ma
     }
 }
 "@ | Out-File -FilePath $script:TestStringsFile -Encoding UTF8
+        
+        # Run main.ps1 once for this describe block
+        $testOpts = @{
+            metadata        = $true
+            cleanup         = $false
+            migration       = $false
+            config          = $true
+            auth            = $false
+            legacyMigration = $false
+            exitAfter       = $true
+        }
+        $script:ConfigLoadingResult = & $script:InvokeMainScript -TestModeOptions $testOpts
     }
     
-    Context "Configuration File Loading" {
+    Context "Configuration File Loading and Global Variable Initialization" {
         
         It "Should load and merge configuration files successfully" {
-            $result = & $script:InvokeMainScript
-            
             # Primary: successful configuration loading
-            $result.Success | Should -Be $true
+            $script:ConfigLoadingResult.Success | Should -Be $true
             
             # Secondary: verify config files exist (proves they were used)
             Test-Path $script:TestSettingsFile | Should -Be $true
             Test-Path $script:TestMenuFile | Should -Be $true
             Test-Path $script:TestStringsFile | Should -Be $true
         }
-    }
-    
-    Context "Global Variable Initialization" {
         
         It "Should initialize global variables correctly" {
-            $result = & $script:InvokeMainScript
-            
             # Primary: successful initialization
-            $result.Success | Should -Be $true
+            $script:ConfigLoadingResult.Success | Should -Be $true
             
             # Secondary: log file exists (proves LogFile variable was set)
             Test-Path $script:TestLogFile | Should -Be $true

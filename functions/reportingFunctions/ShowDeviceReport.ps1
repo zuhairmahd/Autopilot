@@ -22,7 +22,7 @@ function ShowDeviceReport()
     #endregion usage info
     $functionName = $MyInvocation.MyCommand.Name
     #region write verbose log of received parameters
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting device report generation" -LogLevel "Verbose"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting device report generation" -LogLevel "Verbose"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Parameter Set: $($PSCmdlet.ParameterSetName)" -LogLevel "Information"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Export: $Export" -LogLevel "Information"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "ExportFormat: $ExportFormat" -LogLevel "Information"
@@ -50,12 +50,12 @@ Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting device re
         if ($enrollmentState.autopilot.events -and $enrollmentState.autopilot.events.Count -gt 0)
         {
             $latestAutopilotEvent = $enrollmentState.autopilot.events | Select-Object -First 1
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found $($enrollmentState.autopilot.events.Count) autopilot events" -LogLevel "Verbose"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found $($enrollmentState.autopilot.events.Count) autopilot events" -LogLevel "Verbose"
         }
         else
         {
             $latestAutopilotEvent = $null
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "No autopilot events found" -LogLevel "Verbose"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "No autopilot events found" -LogLevel "Verbose"
         }
         
         $output = [ordered] @{
@@ -183,7 +183,7 @@ Write-Log -LogFile $LogFile -Module "$functionName" -Message "No autopilot event
             if ($key -match "^($prefix)(.+)$")
             {
                 $matchedPrefix = $prefix
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found prefix '$prefix' for key '$key'" -LogLevel "Verbose"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found prefix '$prefix' for key '$key'" -LogLevel "Verbose"
                 break
             }
         }
@@ -215,69 +215,126 @@ Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found prefix '$pre
         }
         
         $formattedOutput[$readableKey] = $formattedValue
-        
-        # Display each property and value
-        Write-Host "$readableKey`: $formattedValue"
     }
-    Write-Verbose "[$functionName] Formatted $($formattedOutput.Keys.Count) properties for display"    #endregion Format property names and display report
-    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Formatted $($formattedOutput.Keys.Count) properties for display"    #endregion Format property names and display report" -LogLevel "Information"
-    #endregion Display report
     
-    #region Handle export decision
-    $HTMLAction = {
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "User selected HTML export" -LogLevel "Information"
-        $exportResult = ExportDeviceReport -formattedOutput $formattedOutput -ExportFormat "HTML"
-        if ($exportResult)
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Formatted $($formattedOutput.Keys.Count) properties for display" -LogLevel "Information"
+    
+    # Use the generic paging function to display the report
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Invoking Show-PagedContent for device report with $($formattedOutput.Count) properties" -LogLevel "Verbose"
+    Write-Verbose "[$functionName] Invoking Show-PagedContent for device report with $($formattedOutput.Count) properties"
+    
+    # Convert ordered dictionary to array of key-value pairs for paging
+    $reportItems = @()
+    foreach ($key in $formattedOutput.Keys)
+    {
+        $reportItems += [PSCustomObject]@{
+            Property = $key
+            Value    = $formattedOutput[$key]
+        }
+    }
+    
+    # Build title string to avoid nested quote issues
+    $reportTitle = "Device Report"
+    if ($DeviceName)
+    {
+        $reportTitle += " - $DeviceName"
+    }
+    elseif ($SerialNumber)
+    {
+        $reportTitle += " - $SerialNumber"
+    }
+    #endregion Format property names and display report
+    
+    #region Handle menu decision
+    $displayAction = {
+        write-log -logFile $LogFile -Module "$functionName" -Message "User selected to display report on screen" -LogLevel "Information"
+        $pagingResult = Show-PagedContent `
+            -Content $reportItems `
+            -PageSize 15 `
+            -DisplayScriptBlock { param($item); Write-Host "$($item.Property): $($item.Value)" } `
+            -Title $reportTitle `
+            -ShowPageInfo $false
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Show-PagedContent completed with result: $pagingResult" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Show-PagedContent completed with result: $pagingResult"
+        if ($pagingResult -in @('completed', 'quit'))
         {
-            Write-Host "Report exported to HTML successfully."
+            Write-Host "Returning to Device Health Menu: $pagingResult" -ForegroundColor Yellow
         }
         else
         {
-            Write-Host "Failed to export report to HTML."
+            Write-Host "Returning to Device Health Menu due to an error: $pagingResult" -ForegroundColor Yellow
+        }
+        return $pagingResult                
+    } 
+    $HTMLAction = {
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "User selected HTML export" -LogLevel "Information"
+        $exportResult = Export-DeviceReport -formattedOutput $formattedOutput -ExportFormat "HTML"
+        if ($exportResult.success)
+        {
+            Write-Host $exportResult.message -ForegroundColor Green
+        }
+        else
+        {
+            Write-Host $exportResult.message -ForegroundColor Red
         }
         return $exportResult 
     } 
     $CSVAction = {
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "User selected CSV export" -LogLevel "Information"
-        $exportResult = ExportDeviceReport -formattedOutput $formattedOutput -ExportFormat "CSV"
-        if ($exportResult)
+        $exportResult = Export-DeviceReport -formattedOutput $formattedOutput -ExportFormat "CSV"
+        if ($exportResult.success)
         {
-            Write-Host "Report exported to CSV successfully."
+            Write-Host $exportResult.message -ForegroundColor Green                 
         }
         else
         {
-            Write-Host "Failed to export report to CSV."
+            Write-Host $exportResult.message -ForegroundColor Red
         }
         return $exportResult 
     } 
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Prompting user for export decision" -LogLevel "Information"
-    # Create report export menu from configuration
+    # Create report menu from configuration
     $reportExportMenu = NewMenu -MenuName "reportExportMenu"
-    if (-not $reportExportMenu) {
+    if (-not $reportExportMenu)
+    {
         # Fallback to manual creation if config not found
         $reportExportMenu = NewMenu -Title "Export report" -Description "Select the format to which you would like to export the report"
     }
+    $reportExportMenu = AddMenuItem -Menu $reportExportMenu -Name "Display on Screen" -Action $displayAction -ReturnsValue
     $reportExportMenu = AddMenuItem -Menu $reportExportMenu -Name "Export to HTML" -Action $HTMLAction -ReturnsValue
     $reportExportMenu = AddMenuItem -Menu $reportExportMenu -Name "Export to CSV" -Action $CSVAction -ReturnsValue
-    $selection = ShowMenu -Menu $reportExportMenu -CalledBy 'Action'
-
-    if ($null -ne $selection )
+    
+    # Loop to keep showing the menu until user chooses to navigate away
+    # Similar approach to ShowGroupAssignments function
+    while ($true)
     {
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "ShowMenu returned: '$selection' (Type: $($selection.GetType().Name))" -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "=== LOOP ITERATION START ===" -LogLevel "Debug"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "About to call ShowMenu with CalledBy 'Custom_DeviceHealthSubmenu' and StackOperation 'Push'" -LogLevel "Debug"
+        
+        # Use custom CalledBy context with explicit Push to enable auto-pop after action
+        # This ensures the menu stays on the stack during loop but pops after each action completes
+        $selection = ShowMenu -Menu $reportExportMenu -CalledBy 'Custom_DeviceHealthSubmenu' -StackOperation 'Push'
+        
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "ShowMenu returned. Selection value: '$selection', Type: $(if ($null -eq $selection) { 'null' } else { $selection.GetType().Name })" -LogLevel "Debug"
+
         # Validate that we got a proper selection, not a navigation option
         if ($selection -eq "Back" -or $selection -eq "Main Menu" -or $selection -eq 0 -or $selection -eq "0")
         {
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "ShowMenu returned navigation option: '$selection', treating as navigation" -LogLevel "Information"
             return $selection
         }
+        
+        # If selection is null, user may have navigated away
+        if ($null -eq $selection)
+        {
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "ShowMenu returned null, user may have navigated away" -LogLevel "Information"
+            return $null
+        }
+        
+        # If action completed successfully, continue loop to show menu again
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action completed, returning to Device Health Menu" -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "=== LOOP ITERATION END - continuing ===" -LogLevel "Debug"
     }
-    else
-    {
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No export selected. Exiting." -LogLevel "Information"
-        return $null
-    }
-    #endregion Handle export decision
-    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device report generation completed" -LogLevel "Information"
-    return $true
+    #endregion Handle menu decision
 }
 

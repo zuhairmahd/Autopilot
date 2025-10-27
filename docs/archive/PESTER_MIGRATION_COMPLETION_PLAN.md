@@ -35,7 +35,7 @@ We have successfully completed **Phases 0-3** of the Pester migration and are re
 **UPDATE (2025-10-10):** Phase 3 integration testing is COMPLETE with excellent results:
 - **Pass Rate:** 100% (36 of 36 tests) ✅
 - **Files Complete:** 6 of 6 test files at 100%
-- **Production Fixes:** 1 (ExportDeviceReport outputFile parameter)
+- **Production Fixes:** 1 (Export-DeviceReport outputFile parameter)
 - **Mock Enhancements:** 1 critical (Batch API JSON parsing - enables all batch operations system-wide)
 - **Legacy Tests Archived:** 2 (test-settings-integration.ps1, test-menu-inclusions-integration.ps1)
 - **Architecture Improvements:** 1 (MenuNavigation rewritten to test real menu architecture)

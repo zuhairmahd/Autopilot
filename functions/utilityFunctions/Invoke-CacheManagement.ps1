@@ -11,22 +11,38 @@ function Invoke-CacheManagement()
     
     .PARAMETER Action
         The cache management action to perform:
-        - 'Clear': Clear all caches
+        - 'Clear': Clear all caches (legacy and unified)
         - 'ClearSpecific': Clear specific cache type
+        - 'Get': Get data from unified cache
+        - 'Set': Set data in unified cache
         - 'GetStatistics': Get cache usage statistics
         - 'ListCaches': List all available caches
         - 'Monitor': Display cache monitoring information
-        - 'GetMenuConfiguration': Get cached menu configuration
-        - 'SetMenuConfiguration': Cache menu configuration
+        - 'GetMenuConfiguration': Get cached menu configuration (legacy)
+        - 'SetMenuConfiguration': Cache menu configuration (legacy)
     
     .PARAMETER CacheType
-        Specific cache type for ClearSpecific action:
-        - 'Menu': Menu configuration cache
-        - 'Strings': String resources cache
-        - 'Groups': Entra ID groups cache
-        - 'Users': Entra ID users cache
-        - 'Devices': Device ID cache
-        - 'Defaults': Application defaults cache
+        Specific cache type for ClearSpecific, Get, or Set actions:
+        - Legacy types (for ClearSpecific):
+          - 'Menu': Menu configuration cache
+          - 'Strings': String resources cache
+          - 'Groups': Entra ID groups cache
+          - 'Users': Entra ID users cache
+          - 'Devices': Device ID cache
+          - 'Defaults': Application defaults cache
+        - Unified types (for Get/Set):
+          - 'Configuration': Configuration data cache
+          - 'DirectoryObjects': User and group cache
+          - 'Devices': Device data cache
+        
+    .PARAMETER Key
+        Cache key for Get or Set actions
+        
+    .PARAMETER Data
+        Data to cache for Set action
+        
+    .PARAMETER Metadata
+        Optional metadata to store with cached data for Set action
         
     .PARAMETER MenuName
         Specific menu name for GetMenuConfiguration action
@@ -72,11 +88,16 @@ function Invoke-CacheManagement()
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [ValidateSet('Clear', 'ClearSpecific', 'GetStatistics', 'ListCaches', 'Monitor', 'GetMenuConfiguration', 'SetMenuConfiguration')]
+        [ValidateSet('Clear', 'ClearSpecific', 'Get', 'Set', 'GetStatistics', 'ListCaches', 'Monitor', 'GetMenuConfiguration', 'SetMenuConfiguration')]
         [string]$Action,
         
-        [ValidateSet('Menu', 'Strings', 'Groups', 'Users', 'Devices', 'Defaults')]
         [string]$CacheType,
+        
+        [string]$Key,
+        
+        $Data,
+        
+        $Metadata,
         
         [switch]$ShowDetails,
         
@@ -93,34 +114,124 @@ function Invoke-CacheManagement()
     Write-Log -LogFile $LogFile -Module $functionName -Message "Cache management action: $Action" -LogLevel "Debug"
     
     # Initialize cache tracking if not exists
-    if (-not $global:CacheStats) {
+    if (-not $global:CacheStats)
+    {
         $global:CacheStats = @{
             Initialized = Get-Date
-            Operations = @{
-                Hits = 0
+            Operations  = @{
+                Hits   = 0
                 Misses = 0
                 Clears = 0
             }
-            CacheTypes = @{
-                Menu = @{ Hits = 0; Misses = 0; Size = 0 }
-                Strings = @{ Hits = 0; Misses = 0; Size = 0 }
-                Groups = @{ Hits = 0; Misses = 0; Size = 0 }
-                Users = @{ Hits = 0; Misses = 0; Size = 0 }
-                Devices = @{ Hits = 0; Misses = 0; Size = 0 }
+            CacheTypes  = @{
+                Menu     = @{ Hits = 0; Misses = 0; Size = 0 }
+                Strings  = @{ Hits = 0; Misses = 0; Size = 0 }
                 Defaults = @{ Hits = 0; Misses = 0; Size = 0 }
             }
         }
         Write-Verbose "[$functionName] Initialized cache statistics tracking"
     }
     
-    switch ($Action) {
-        'Clear' {
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Starting comprehensive cache clearing operation" -LogLevel "Verbose"
+    switch ($Action)
+    {
+        'Get'
+        {
+            if (-not $CacheType)
+            {
+                Write-Warning "[$functionName] CacheType parameter required for Get action"
+                return $null
+            }
+            if (-not $Key)
+            {
+                Write-Warning "[$functionName] Key parameter required for Get action"
+                return $null
+            }
+            
+            # Validate unified cache type
+            if ($CacheType -notin @('Configuration', 'DirectoryObjects', 'Devices'))
+            {
+                Write-Warning "[$functionName] Invalid CacheType for unified cache: $CacheType. Use Configuration, DirectoryObjects, or Devices."
+                return $null
+            }
+            
+            Write-Verbose "[$functionName] Getting cached data: Type=$CacheType, Key=$Key"
+            $result = Get-CachedData -CacheType $CacheType -Key $Key
+            
+            if ($null -ne $result)
+            {
+                if ($global:CacheStats)
+                {
+                    $global:CacheStats.Operations.Hits++
+                }
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Cache hit for $CacheType`: $Key" -LogLevel "Debug"
+            }
+            else
+            {
+                if ($global:CacheStats)
+                {
+                    $global:CacheStats.Operations.Misses++
+                }
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Cache miss for $CacheType`: $Key" -LogLevel "Debug"
+            }
+            
+            return $result
+        }
+        
+        'Set'
+        {
+            if (-not $CacheType)
+            {
+                Write-Warning "[$functionName] CacheType parameter required for Set action"
+                return $null
+            }
+            if (-not $Key)
+            {
+                Write-Warning "[$functionName] Key parameter required for Set action"
+                return $null
+            }
+            if ($null -eq $Data)
+            {
+                Write-Warning "[$functionName] Data parameter required for Set action"
+                return $null
+            }
+            
+            # Validate unified cache type
+            if ($CacheType -notin @('Configuration', 'DirectoryObjects', 'Devices'))
+            {
+                Write-Warning "[$functionName] Invalid CacheType for unified cache: $CacheType. Use Configuration, DirectoryObjects, or Devices."
+                return $null
+            }
+            
+            Write-Verbose "[$functionName] Setting cached data: Type=$CacheType, Key=$Key"
+            $success = Set-CachedData -CacheType $CacheType -Key $Key -Data $Data -Metadata $Metadata
+            
+            if ($success)
+            {
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully cached data for $CacheType`: $Key" -LogLevel "Debug"
+            }
+            else
+            {
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to cache data for $CacheType`: $Key (caching may be disabled)" -LogLevel "Debug"
+            }
+            
+            return @{
+                Action    = 'Set'
+                CacheType = $CacheType
+                Key       = $Key
+                Success   = $success
+                Timestamp = Get-Date
+            }
+        }
+        
+        'Clear'
+        {
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Starting comprehensive cache clearing operation (legacy + unified)" -LogLevel "Verbose"
             $clearedCaches = 0
             $cacheDetails = @()
             
             # Clear menu configuration cache
-            if ($script:menuConfigCache) {
+            if ($script:menuConfigCache)
+            {
                 $menuCacheSize = $script:menuConfigCache.Count
                 $script:menuConfigCache.Clear()
                 $script:menuFileTimestamp.Clear()
@@ -130,7 +241,8 @@ function Invoke-CacheManagement()
             }
             
             # Clear strings cache
-            if ($script:stringsCache) {
+            if ($script:stringsCache)
+            {
                 $stringsCacheSize = $script:stringsCache.Count
                 $script:stringsCache.Clear()
                 $script:stringsFileTimestamp.Clear()
@@ -139,38 +251,32 @@ function Invoke-CacheManagement()
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared strings cache ($stringsCacheSize items)" -LogLevel "Debug"
             }
             
-            # Clear Graph API caches
-            if ($global:GroupCache) {
-                $groupCacheSize = $global:GroupCache.Count
-                $global:GroupCache.Clear()
-                $clearedCaches++
-                $cacheDetails += "Groups ($groupCacheSize items)"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared groups cache ($groupCacheSize items)" -LogLevel "Debug"
-            }
-            
-            if ($global:UserCache) {
-                $userCacheSize = $global:UserCache.Count
-                $global:UserCache.Clear()
-                $clearedCaches++
-                $cacheDetails += "Users ($userCacheSize items)"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared users cache ($userCacheSize items)" -LogLevel "Debug"
-            }
-            
-            if ($global:DeviceIdCache) {
-                $deviceCacheSize = $global:DeviceIdCache.Count
-                $global:DeviceIdCache.Clear()
-                $clearedCaches++
-                $cacheDetails += "Devices ($deviceCacheSize items)"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared device ID cache ($deviceCacheSize items)" -LogLevel "Debug"
-            }
-            
             # Clear defaults cache
-            if ($script:defaultsCache) {
+            if ($script:defaultsCache)
+            {
                 $defaultsCacheSize = $script:defaultsCache.Count
                 $script:defaultsCache.Clear()
                 $clearedCaches++
                 $cacheDetails += "Defaults ($defaultsCacheSize items)"
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared application defaults cache ($defaultsCacheSize items)" -LogLevel "Debug"
+            }
+            
+            # Clear unified cache
+            if ($global:UnifiedCache)
+            {
+                $unifiedCount = 0
+                foreach ($type in $global:UnifiedCache.Keys)
+                {
+                    $unifiedCount += $global:UnifiedCache[$type].Count
+                }
+                
+                if ($unifiedCount -gt 0)
+                {
+                    Clear-UnifiedCache
+                    $clearedCaches++
+                    $cacheDetails += "Unified ($unifiedCount items)"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared unified cache ($unifiedCount items)" -LogLevel "Debug"
+                }
             }
             
             $global:CacheStats.Operations.Clears++
@@ -180,8 +286,10 @@ function Invoke-CacheManagement()
             return @{ Action = 'Clear'; CachesCleared = $clearedCaches; Details = $cacheDetails; Timestamp = Get-Date }
         }
         
-        'ClearSpecific' {
-            if (-not $CacheType) {
+        'ClearSpecific'
+        {
+            if (-not $CacheType)
+            {
                 Write-Warning "[$functionName] CacheType parameter required for ClearSpecific action"
                 return $null
             }
@@ -189,107 +297,120 @@ function Invoke-CacheManagement()
             Write-Verbose "[$functionName] Clearing specific cache: $CacheType"
             $cleared = $false
             
-            switch ($CacheType) {
-                'Menu' {
-                    if ($script:menuConfigCache) {
-                        $script:menuConfigCache.Clear()
-                        $script:menuFileTimestamp.Clear()
-                        $cleared = $true
+            # Check if this is a unified cache type
+            if ($CacheType -in @('Configuration', 'DirectoryObjects', 'Devices'))
+            {
+                Clear-UnifiedCache -CacheType $CacheType
+                $cleared = $true
+                Write-Host "Cleared unified $CacheType cache" -ForegroundColor Green
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared unified $CacheType cache" -LogLevel "Information"
+            }
+            else
+            {
+                # Legacy cache types
+                switch ($CacheType)
+                {
+                    'Menu'
+                    {
+                        if ($script:menuConfigCache)
+                        {
+                            $script:menuConfigCache.Clear()
+                            $script:menuFileTimestamp.Clear()
+                            $cleared = $true
+                        }
+                    }
+                    'Strings'
+                    {
+                        if ($script:stringsCache)
+                        {
+                            $script:stringsCache.Clear()
+                            $script:stringsFileTimestamp.Clear()
+                            $cleared = $true
+                        }
+                    }
+                    'Defaults'
+                    {
+                        if ($script:defaultsCache)
+                        {
+                            $script:defaultsCache.Clear()
+                            $cleared = $true
+                        }
                     }
                 }
-                'Strings' {
-                    if ($script:stringsCache) {
-                        $script:stringsCache.Clear()
-                        $script:stringsFileTimestamp.Clear()
-                        $cleared = $true
-                    }
-                }
-                'Groups' {
-                    if ($global:GroupCache) {
-                        $global:GroupCache.Clear()
-                        $cleared = $true
-                    }
-                }
-                'Users' {
-                    if ($global:UserCache) {
-                        $global:UserCache.Clear()
-                        $cleared = $true
-                    }
-                }
-                'Devices' {
-                    if ($global:DeviceIdCache) {
-                        $global:DeviceIdCache.Clear()
-                        $cleared = $true
-                    }
-                }
-                'Defaults' {
-                    if ($script:defaultsCache) {
-                        $script:defaultsCache.Clear()
-                        $cleared = $true
-                    }
+                
+                if ($cleared)
+                {
+                    Write-Host "Cleared $CacheType cache" -ForegroundColor Green
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared $CacheType cache" -LogLevel "Information"
                 }
             }
             
-            if ($cleared) {
-                Write-Host "Cleared $CacheType cache" -ForegroundColor Green
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared $CacheType cache" -LogLevel "Information"
+            if ($cleared)
+            {
                 return @{ Action = 'ClearSpecific'; CacheType = $CacheType; Cleared = $true; Timestamp = Get-Date }
-            } else {
+            }
+            else
+            {
                 Write-Host "$CacheType cache not found or already empty" -ForegroundColor Yellow
                 return @{ Action = 'ClearSpecific'; CacheType = $CacheType; Cleared = $false; Timestamp = Get-Date }
             }
         }
         
-        'GetStatistics' {
+        'GetStatistics'
+        {
             Write-Verbose "[$functionName] Gathering cache statistics"
             
             $stats = @{
-                Action = 'GetStatistics'
-                Timestamp = Get-Date
-                Initialized = $global:CacheStats.Initialized
+                Action          = 'GetStatistics'
+                Timestamp       = Get-Date
+                Initialized     = $global:CacheStats.Initialized
                 TotalOperations = $global:CacheStats.Operations
-                Caches = @{}
+                Caches          = @{}
             }
             
             # Get current cache sizes
             $stats.Caches.Menu = @{
-                Enabled = ($script:menuConfigCache -ne $null)
-                Size = if ($script:menuConfigCache) { $script:menuConfigCache.Count } else { 0 }
+                Enabled      = ($null -ne $script:menuConfigCache)
+                Size         = if ($script:menuConfigCache) { $script:menuConfigCache.Count } else { 0 }
                 FileTracking = if ($script:menuFileTimestamp) { $script:menuFileTimestamp.Count } else { 0 }
             }
             
             $stats.Caches.Strings = @{
-                Enabled = ($script:stringsCache -ne $null)
-                Size = if ($script:stringsCache) { $script:stringsCache.Count } else { 0 }
+                Enabled      = ($null -ne $script:stringsCache)
+                Size         = if ($script:stringsCache) { $script:stringsCache.Count } else { 0 }
                 FileTracking = if ($script:stringsFileTimestamp) { $script:stringsFileTimestamp.Count } else { 0 }
             }
             
-            $stats.Caches.Groups = @{
-                Enabled = ($global:GroupCache -ne $null)
-                Size = if ($global:GroupCache) { $global:GroupCache.Count } else { 0 }
-            }
-            
-            $stats.Caches.Users = @{
-                Enabled = ($global:UserCache -ne $null)
-                Size = if ($global:UserCache) { $global:UserCache.Count } else { 0 }
-            }
-            
-            $stats.Caches.Devices = @{
-                Enabled = ($global:DeviceIdCache -ne $null)
-                Size = if ($global:DeviceIdCache) { $global:DeviceIdCache.Count } else { 0 }
-            }
-            
             $stats.Caches.Defaults = @{
-                Enabled = ($script:defaultsCache -ne $null)
-                Size = if ($script:defaultsCache) { $script:defaultsCache.Count } else { 0 }
+                Enabled = ($null -ne $script:defaultsCache)
+                Size    = if ($script:defaultsCache) { $script:defaultsCache.Count } else { 0 }
             }
             
-            if ($ShowDetails) {
+            # Add unified cache statistics
+            if ($global:UnifiedCache)
+            {
+                $stats.Caches.UnifiedConfiguration = @{
+                    Enabled = $true
+                    Size    = if ($global:UnifiedCache.Configuration) { $global:UnifiedCache.Configuration.Count } else { 0 }
+                }
+                $stats.Caches.UnifiedDirectoryObjects = @{
+                    Enabled = $true
+                    Size    = if ($global:UnifiedCache.DirectoryObjects) { $global:UnifiedCache.DirectoryObjects.Count } else { 0 }
+                }
+                $stats.Caches.UnifiedDevices = @{
+                    Enabled = $true
+                    Size    = if ($global:UnifiedCache.Devices) { $global:UnifiedCache.Devices.Count } else { 0 }
+                }
+            }
+            
+            if ($ShowDetails)
+            {
                 Write-Host "=== Cache Statistics ===" -ForegroundColor Cyan
                 Write-Host "Initialized: $($stats.Initialized)" -ForegroundColor Gray
                 Write-Host "Total Operations - Hits: $($stats.TotalOperations.Hits), Misses: $($stats.TotalOperations.Misses), Clears: $($stats.TotalOperations.Clears)" -ForegroundColor Gray
                 Write-Host ""
-                foreach ($cacheType in $stats.Caches.Keys) {
+                foreach ($cacheType in $stats.Caches.Keys)
+                {
                     $cache = $stats.Caches[$cacheType]
                     $status = if ($cache.Enabled) { "Enabled" } else { "Disabled" }
                     Write-Host "$cacheType Cache: $status (Size: $($cache.Size))" -ForegroundColor $(if ($cache.Enabled) { "Green" } else { "Yellow" })
@@ -299,28 +420,34 @@ function Invoke-CacheManagement()
             return $stats
         }
         
-        'ListCaches' {
+        'ListCaches'
+        {
             Write-Verbose "[$functionName] Listing available caches"
             
             $cacheList = @(
-                @{ Name = 'Menu'; Description = 'Menu configuration cache (menu.psd1)'; Variable = '$script:menuConfigCache' }
-                @{ Name = 'Strings'; Description = 'String resources cache (strings.psd1)'; Variable = '$script:stringsCache' }
-                @{ Name = 'Groups'; Description = 'Entra ID groups cache'; Variable = '$global:GroupCache' }
-                @{ Name = 'Users'; Description = 'Entra ID users cache'; Variable = '$global:UserCache' }
-                @{ Name = 'Devices'; Description = 'Device ID lookup cache'; Variable = '$global:DeviceIdCache' }
-                @{ Name = 'Defaults'; Description = 'Application defaults cache'; Variable = '$script:defaultsCache' }
+                @{ Name = 'Menu'; Description = 'Menu configuration cache (menu.psd1)'; Variable = '$script:menuConfigCache'; Value = $script:menuConfigCache }
+                @{ Name = 'Strings'; Description = 'String resources cache (strings.psd1)'; Variable = '$script:stringsCache'; Value = $script:stringsCache }
+                @{ Name = 'Defaults'; Description = 'Application defaults cache'; Variable = '$script:defaultsCache'; Value = $script:defaultsCache }
+                @{ Name = 'UnifiedConfiguration'; Description = 'Unified configuration cache'; Variable = '$global:UnifiedCache.Configuration'; Value = if ($global:UnifiedCache) { $global:UnifiedCache.Configuration } else { $null } }
+                @{ Name = 'UnifiedDirectoryObjects'; Description = 'Unified directory objects cache (users/groups)'; Variable = '$global:UnifiedCache.DirectoryObjects'; Value = if ($global:UnifiedCache) { $global:UnifiedCache.DirectoryObjects } else { $null } }
+                @{ Name = 'UnifiedDevices'; Description = 'Unified devices cache'; Variable = '$global:UnifiedCache.Devices'; Value = if ($global:UnifiedCache) { $global:UnifiedCache.Devices } else { $null } }
             )
             
             Write-Host "=== Available Application Caches ===" -ForegroundColor Cyan
-            foreach ($cache in $cacheList) {
+            foreach ($cache in $cacheList)
+            {
+                $enabled = ($null -ne $cache.Value)
+                $size = if ($enabled -and $cache.Value -is [hashtable]) { $cache.Value.Count } elseif ($enabled -and $cache.Value -is [System.Collections.IDictionary]) { $cache.Value.Count } else { 0 }
                 Write-Host "• $($cache.Name): $($cache.Description)" -ForegroundColor White
                 Write-Host "  Variable: $($cache.Variable)" -ForegroundColor Gray
+                Write-Host "  Enabled: $enabled, Size: $size" -ForegroundColor $(if ($enabled) { "Green" } else { "Yellow" })
             }
             
             return @{ Action = 'ListCaches'; Caches = $cacheList; Timestamp = Get-Date }
         }
         
-        'Monitor' {
+        'Monitor'
+        {
             Write-Verbose "[$functionName] Displaying cache monitoring information"
             
             $stats = Invoke-CacheManagement -Action GetStatistics
@@ -344,90 +471,112 @@ function Invoke-CacheManagement()
             
             # Show individual cache status
             Write-Host "Cache Status by Type:" -ForegroundColor White
-            foreach ($cacheType in $stats.Caches.Keys) {
+            foreach ($cacheType in $stats.Caches.Keys)
+            {
                 $cache = $stats.Caches[$cacheType]
                 $statusColor = if ($cache.Enabled -and $cache.Size -gt 0) { "Green" } elseif ($cache.Enabled) { "Yellow" } else { "Red" }
                 $status = if ($cache.Enabled) { "Active ($($cache.Size) items)" } else { "Inactive" }
                 Write-Host "  $cacheType`: $status" -ForegroundColor $statusColor
             }
             
-            if ($ShowDetails) {
+            if ($ShowDetails)
+            {
                 Write-Host ""
                 Write-Host "Detailed Cache Information:" -ForegroundColor White
                 
                 # Show cache keys if available
-                if ($script:menuConfigCache -and $script:menuConfigCache.Count -gt 0) {
+                if ($script:menuConfigCache -and $script:menuConfigCache.Count -gt 0)
+                {
                     Write-Host "  Menu Cache Keys: $($script:menuConfigCache.Keys -join ', ')" -ForegroundColor Gray
                 }
-                if ($script:stringsCache -and $script:stringsCache.Count -gt 0) {
+                if ($script:stringsCache -and $script:stringsCache.Count -gt 0)
+                {
                     Write-Host "  Strings Cache Keys: $($script:stringsCache.Keys -join ', ')" -ForegroundColor Gray
                 }
-                if ($global:GroupCache -and $global:GroupCache.Count -gt 0) {
-                    Write-Host "  Groups Cache: $($global:GroupCache.Count) entries" -ForegroundColor Gray
-                }
-                if ($global:UserCache -and $global:UserCache.Count -gt 0) {
-                    Write-Host "  Users Cache: $($global:UserCache.Count) entries" -ForegroundColor Gray
-                }
-                if ($global:DeviceIdCache -and $global:DeviceIdCache.Count -gt 0) {
-                    Write-Host "  Device Cache: $($global:DeviceIdCache.Count) entries" -ForegroundColor Gray
-                }
-                if ($script:defaultsCache -and $script:defaultsCache.Count -gt 0) {
+                if ($script:defaultsCache -and $script:defaultsCache.Count -gt 0)
+                {
                     Write-Host "  Defaults Cache: $($script:defaultsCache.Count) entries" -ForegroundColor Gray
+                }
+                # Show unified cache details
+                if ($global:UnifiedCache)
+                {
+                    if ($global:UnifiedCache.Configuration -and $global:UnifiedCache.Configuration.Count -gt 0)
+                    {
+                        Write-Host "  Unified Configuration Cache: $($global:UnifiedCache.Configuration.Count) entries" -ForegroundColor Gray
+                    }
+                    if ($global:UnifiedCache.DirectoryObjects -and $global:UnifiedCache.DirectoryObjects.Count -gt 0)
+                    {
+                        Write-Host "  Unified Directory Objects Cache: $($global:UnifiedCache.DirectoryObjects.Count) entries" -ForegroundColor Gray
+                    }
+                    if ($global:UnifiedCache.Devices -and $global:UnifiedCache.Devices.Count -gt 0)
+                    {
+                        Write-Host "  Unified Devices Cache: $($global:UnifiedCache.Devices.Count) entries" -ForegroundColor Gray
+                    }
                 }
             }
             
             return $stats
         }
         
-        'GetMenuConfiguration' {
+        'GetMenuConfiguration'
+        {
             Write-Log -LogFile $LogFile -Module $functionName -Message "Getting cached menu configuration for file: $MenuConfigFile" -LogLevel "Debug"
             
             # Check if we need to cache or reload the configuration
             $cacheKey = "MenuConfig_$MenuConfigFile"
             
-            if (-not $script:menuConfigCache) {
+            if (-not $script:menuConfigCache)
+            {
                 $script:menuConfigCache = @{}
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Initialized menu configuration cache" -LogLevel "Debug"
             }
             
             $needsReload = $ForceReload -or 
-                          (-not $script:menuConfigCache.ContainsKey($cacheKey)) -or
-                          (-not $script:menuConfigCache[$cacheKey])
+            (-not $script:menuConfigCache.ContainsKey($cacheKey)) -or
+            (-not $script:menuConfigCache[$cacheKey])
             
-            if ($needsReload) {
+            if ($needsReload)
+            {
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Loading/reloading menu configuration from: $MenuConfigFile" -LogLevel "Verbose"
                 
-                try {
+                try
+                {
                     # Load the configuration from file
                     $menuConfig = Get-MenuConfiguration -MenuConfigFile $MenuConfigFile
                     
-                    if ($menuConfig) {
+                    if ($menuConfig)
+                    {
                         # Cache the configuration
                         $script:menuConfigCache[$cacheKey] = $menuConfig
                         Write-Log -LogFile $LogFile -Module $functionName -Message "Menu configuration cached successfully for key: $cacheKey" -LogLevel "Verbose"
                         
                         # Update cache statistics
-                        if ($global:CacheStats) {
+                        if ($global:CacheStats)
+                        {
                             $global:CacheStats.Operations.Misses++
                             $global:CacheStats.CacheTypes.Menu.Misses++
                             $global:CacheStats.CacheTypes.Menu.Size = $script:menuConfigCache.Count
                         }
                     }
-                    else {
+                    else
+                    {
                         Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to load menu configuration from file: $MenuConfigFile" -LogLevel "Warning"
                         return $null
                     }
                 }
-                catch {
+                catch
+                {
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Error loading menu configuration: $_" -LogLevel "Error"
                     return $null
                 }
             }
-            else {
+            else
+            {
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Using cached menu configuration for key: $cacheKey" -LogLevel "Debug"
                 
                 # Update cache statistics
-                if ($global:CacheStats) {
+                if ($global:CacheStats)
+                {
                     $global:CacheStats.Operations.Hits++
                     $global:CacheStats.CacheTypes.Menu.Hits++
                 }
@@ -437,61 +586,70 @@ function Invoke-CacheManagement()
             $cachedConfig = $script:menuConfigCache[$cacheKey]
             
             # If no specific menu name requested, return all configurations
-            if (-not $MenuName) {
+            if (-not $MenuName)
+            {
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Returning full cached configuration with $($cachedConfig.PSObject.Properties.Count) properties" -LogLevel "Debug"
                 return $cachedConfig
             }
             
             # Return specific menu configuration
-            if ($cachedConfig -and $cachedConfig.PSObject.Properties -and ($cachedConfig.PSObject.Properties.Name -contains $MenuName)) {
+            if ($cachedConfig -and $cachedConfig.PSObject.Properties -and ($cachedConfig.PSObject.Properties.Name -contains $MenuName))
+            {
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Found cached configuration for menu: $MenuName" -LogLevel "Debug"
                 return $cachedConfig.$MenuName
             }
-            else {
+            else
+            {
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Menu configuration not found for: $MenuName" -LogLevel "Warning"
                 return $null
             }
         }
         
-        'SetMenuConfiguration' {
+        'SetMenuConfiguration'
+        {
             Write-Log -LogFile $LogFile -Module $functionName -Message "Setting menu configuration in cache for file: $MenuConfigFile" -LogLevel "Debug"
             
-            if (-not $MenuConfiguration) {
+            if (-not $MenuConfiguration)
+            {
                 Write-Log -LogFile $LogFile -Module $functionName -Message "No menu configuration provided for caching" -LogLevel "Warning"
                 return $null
             }
             
             $cacheKey = "MenuConfig_$MenuConfigFile"
             
-            if (-not $script:menuConfigCache) {
+            if (-not $script:menuConfigCache)
+            {
                 $script:menuConfigCache = @{}
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Initialized menu configuration cache" -LogLevel "Debug"
             }
             
-            try {
+            try
+            {
                 # Cache the configuration
                 $script:menuConfigCache[$cacheKey] = $MenuConfiguration
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Menu configuration cached successfully for key: $cacheKey" -LogLevel "Verbose"
                 
                 # Update cache statistics
-                if ($global:CacheStats) {
+                if ($global:CacheStats)
+                {
                     $global:CacheStats.CacheTypes.Menu.Size = $script:menuConfigCache.Count
                 }
                 
                 return @{ 
-                    Action = 'SetMenuConfiguration'
-                    CacheKey = $cacheKey
-                    Success = $true
+                    Action    = 'SetMenuConfiguration'
+                    CacheKey  = $cacheKey
+                    Success   = $true
                     Timestamp = Get-Date
                 }
             }
-            catch {
+            catch
+            {
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Error caching menu configuration: $_" -LogLevel "Error"
                 return @{ 
-                    Action = 'SetMenuConfiguration'
-                    CacheKey = $cacheKey
-                    Success = $false
-                    Error = $_.ToString()
+                    Action    = 'SetMenuConfiguration'
+                    CacheKey  = $cacheKey
+                    Success   = $false
+                    Error     = $_.ToString()
                     Timestamp = Get-Date
                 }
             }

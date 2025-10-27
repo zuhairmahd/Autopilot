@@ -171,6 +171,19 @@
                 )
             },
             @{
+                description           = 'Shutdown the device'
+                name                  = 'Shutdown the device'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin',
+                    'helpdesk',
+                    'registration',
+                    'advancedRegistration',
+                    'advanced'
+                )
+            },
+            @{
                 description           = 'Show the group assignments for the device'
                 name                  = 'Show Group Assignments'
                 blockType             = 'action'
@@ -930,12 +943,24 @@
         )
     }
     reportExportMenu          = @{
-        Title                 = 'Report Export Menu'
-        Description           = 'Select the format to which you would like to export the report'
+        Title                 = 'Device Health Menu'
+        Description           = 'Select whether you want to display or export the device health report'
         items                 = @(
             @{
+                Description           = 'Display the report on screen'
+                name                  = 'Display on Screen'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin',
+                    'advanced',
+                    'helpdesk',
+                    'registration'
+                )
+            },
+            @{
                 Description           = 'Export the report in HTML format'
-                name                  = 'Export in HTML format'
+                name                  = 'Export to HTML'
                 blockType             = 'action'
                 includeInDisplayModes = @(
                     'full',
@@ -947,7 +972,7 @@
             },
             @{
                 Description           = 'Export the report in CSV format'
-                name                  = 'Export in CSV format'
+                name                  = 'Export to CSV'
                 blockType             = 'action'
                 includeInDisplayModes = @(
                     'full',

@@ -87,7 +87,7 @@ The application organizes its **137 functions** across 9 logical categories:
 | **deviceFunctions** | 12 | Device queries, operations, and lifecycle | `GetDeviceByUser`, `RestartDevice`, `GetBitLockerRecoveryKey` | `deviceFunctions/` |
 | **autopilotFunctions** | 14 | Autopilot device enrollment and management | `ImportAutopilotDevice`, `GetDeviceHash`, `AddCorporateDeviceIdentifier` | `autopilotFunctions/v1/`, `autopilotFunctions/v2/` |
 | **graphFunctions** | 22 | Microsoft Graph API integration and authentication | `GetGraphAccessToken`, `CallGraphAPI`, `Get-DelegatedToken` | `graphFunctions/` |
-| **reportingFunctions** | 11 | Device assessment and readiness analysis | `GetNextUserReadinessReport`, `ExportDeviceList`, `ShowDeviceReport` | `reportingFunctions/` |
+| **reportingFunctions** | 11 | Device assessment and readiness analysis | `GetNextUserReadinessReport`, `Export-DeviceList`, `ShowDeviceReport` | `reportingFunctions/` |
 | **encryptionFunctions** | 14 | Security, encryption, and credential management | `Load-EncryptedConfigFile`, `Get-SecurePassword`, `Invoke-JsonFileEncryption` | `encryptionFunctions/` |
 | **updateFunctions** | 6 | Application update and version management | `CheckForUpdates`, `GetLatestGithubRelease`, `Invoke-FileCertVerification` | `updateFunctions/` |
 
