@@ -258,37 +258,37 @@ function ShowDeviceReport()
         Write-Verbose "[$functionName] Show-PagedContent completed with result: $pagingResult"
         if ($pagingResult -in @('completed', 'quit'))
         {
-            return $pagingResult
+            Write-Host "Returning to Device Health Menu: $pagingResult" -ForegroundColor Yellow
         }
         else
         {
-            return $pagingResult
+            Write-Host "Returning to Device Health Menu due to an error: $pagingResult" -ForegroundColor Yellow
         }
         return $pagingResult                
     } 
     $HTMLAction = {
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "User selected HTML export" -LogLevel "Information"
-        $exportResult = ExportDeviceReport -formattedOutput $formattedOutput -ExportFormat "HTML"
+        $exportResult = Export-DeviceReport -formattedOutput $formattedOutput -ExportFormat "HTML"
         if ($exportResult.success)
         {
-            Write-Host "Report exported to HTML successfully."
+            Write-Host $exportResult.message -ForegroundColor Green
         }
         else
         {
-            Write-Host "Failed to export report to HTML."
+            Write-Host $exportResult.message -ForegroundColor Red
         }
         return $exportResult 
     } 
     $CSVAction = {
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "User selected CSV export" -LogLevel "Information"
-        $exportResult = ExportDeviceReport -formattedOutput $formattedOutput -ExportFormat "CSV"
+        $exportResult = Export-DeviceReport -formattedOutput $formattedOutput -ExportFormat "CSV"
         if ($exportResult.success)
         {
-            Write-Host "Report exported to CSV successfully."
+            Write-Host $exportResult.message -ForegroundColor Green                 
         }
         else
         {
-            Write-Host "Failed to export report to CSV."
+            Write-Host $exportResult.message -ForegroundColor Red
         }
         return $exportResult 
     } 

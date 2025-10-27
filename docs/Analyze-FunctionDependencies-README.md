@@ -69,7 +69,7 @@ The generated CSV report contains the following columns:
 
 ```csv
 "FunctionName","IsUsed","Status","FilePath","CallCount","CalledBy","CallsOthers","FoundInTests","TestCount","TestDetails"
-"GetDeviceInfo","True","USED","./functions/deviceFunctions/GetDeviceInfo.ps1","15","ProcessDevice; ExportDeviceList","CallGraphAPI; Write-Log","Yes","1",".\tests\Unit\GetDeviceInfo.Tests.ps1 | Function: GetDeviceInfo | Multiple contexts"
+"GetDeviceInfo","True","USED","./functions/deviceFunctions/GetDeviceInfo.ps1","15","ProcessDevice; Export-DeviceList","CallGraphAPI; Write-Log","Yes","1",".\tests\Unit\GetDeviceInfo.Tests.ps1 | Function: GetDeviceInfo | Multiple contexts"
 "OldUnusedFunction","False","UNUSED","./functions/utilityFunctions/OldFunction.ps1","0","","","No","0",""
 ```
 

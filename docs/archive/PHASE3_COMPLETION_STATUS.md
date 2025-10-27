@@ -11,7 +11,7 @@ Phase 3 integration test migration has achieved **81.8% pass rate** (27/33 tests
 
 ### Key Achievements
 - ✅ Fixed ProfileAssignment batch API JSON parsing issue
-- ✅ Fixed ExportDeviceReport outputFile parameter handling
+- ✅ Fixed Export-DeviceReport outputFile parameter handling
 - ✅ Enhanced AutopilotGraphMocks with batch API support
 - ✅ 5 of 6 test files fully passing (83% of test files)
 - ✅ 27 of 33 test cases passing (82% of tests)
@@ -106,9 +106,9 @@ Debug script (`tools/Debug-ProfileAssignment.ps1`) confirmed:
 - profile-test-01 correctly returns 1 assignment
 - Final result shows 1 Autopilot Assignment as expected
 
-### 2. ExportDeviceReport Function (ReportGeneration fix)
+### 2. Export-DeviceReport Function (ReportGeneration fix)
 
-**File:** `functions/reportingFunctions/ExportDeviceReport.ps1`
+**File:** `functions/reportingFunctions/Export-DeviceReport.ps1`
 
 **Issue:** Function ignored the `outputFile` parameter and always saved to current directory
 
@@ -302,7 +302,7 @@ Rationale:
 ## Files Modified This Session
 
 ### Production Code
-1. `functions/reportingFunctions/ExportDeviceReport.ps1` - Fixed outputFile parameter handling
+1. `functions/reportingFunctions/Export-DeviceReport.ps1` - Fixed outputFile parameter handling
 
 ### Test Code
 2. `tests/Integration/MenuNavigation.Tests.ps1` - Added ArrayList initialization
@@ -319,7 +319,7 @@ Rationale:
 
 - **Tests Passing:** 26/33 (78.8%) ⬆️ from 23/33 (69.7%)
 - **Test Files Complete:** 4/6 (66.7%) ⬆️ from 3/6 (50%)
-- **Production Bugs Fixed:** 1 (ExportDeviceReport)
+- **Production Bugs Fixed:** 1 (Export-DeviceReport)
 - **Mock Enhancements:** 3 (ArrayList, odata.type, variable names)
 
 ## Conclusion
@@ -328,7 +328,7 @@ Phase 3 has made significant progress with 78.8% of tests passing. The remaining
 - **MenuNavigation:** Requires architectural redesign (medium priority, can defer)
 - **ProfileAssignment:** Requires debugging batch API flow (high priority)
 
-The ExportDeviceReport bug fix is a valuable production improvement that benefits the entire application beyond just tests.
+The Export-DeviceReport bug fix is a valuable production improvement that benefits the entire application beyond just tests.
 
 **Recommended Decision Point:** 
 - Option A: Invest 2-3 hours to fix ProfileAssignment, defer MenuNavigation to Phase 4

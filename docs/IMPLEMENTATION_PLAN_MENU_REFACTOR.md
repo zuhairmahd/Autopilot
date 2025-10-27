@@ -40,7 +40,7 @@ Example item (recommended extension):
   name = 'Export Autopilot Devices'
   description = 'Export Autopilot devices'
   type = 'action'
-  action = 'ExportDeviceList'
+  action = 'Export-DeviceList'
   actionParameters = @{ deviceType = 'autopilot' }
   includeInDisplayModes = @('full','admin')
 }
@@ -67,7 +67,7 @@ Example item (recommended extension):
 
 - `Register-MenuAction` (utility)
   - A simple API to populate `$ActionRegistry` during startup after dot-sourcing functions:
-    - `Register-MenuAction -Key 'ExportDeviceList' -ScriptBlock { param($ctx) ExportDeviceList -AccessToken $ctx.AccessToken -outputPath $ctx.Out -deviceType $ctx.deviceType }`
+    - `Register-MenuAction -Key 'Export-DeviceList' -ScriptBlock { param($ctx) Export-DeviceList -AccessToken $ctx.AccessToken -outputPath $ctx.Out -deviceType $ctx.deviceType }`
 
 3) Action context pattern
 
@@ -154,7 +154,7 @@ function Resolve-ActionScriptBlock {
 }
 
 Action registry population (example):
-Register-MenuAction -Key 'ExportDeviceList' -ScriptBlock { param($ctx) ExportDeviceList -AccessToken $ctx.AccessToken -outputPath $ctx.Out -deviceType $ctx.deviceType }
+Register-MenuAction -Key 'Export-DeviceList' -ScriptBlock { param($ctx) Export-DeviceList -AccessToken $ctx.AccessToken -outputPath $ctx.Out -deviceType $ctx.deviceType }
 Register-MenuAction -Key 'ExportDeviceAssignmentReport' -ScriptBlock { param($ctx) Export-DeviceAssignmentReport -AccessToken $ctx.AccessToken -outputPath $ctx.Out -reportType $ctx.reportType }
 
 Testing and Rollout
@@ -187,8 +187,8 @@ exportMenu = @{
   Description = 'Choose what you would like to export'
   items = @(
     @{ menuName='deviceReportsMenu'; description='Export various device assignment reports'; name='Export Device Assignment Reports'; blockType='menu' },
-    @{ name='Export Autopilot Devices'; description='Export Autopilot devices to CSV'; type='action'; action='ExportDeviceList'; actionParameters = @{ deviceType='autopilot' } },
-    @{ name='Export Imported Autopilot Devices'; type='action'; action='ExportDeviceList'; actionParameters = @{ deviceType='imported' } }
+    @{ name='Export Autopilot Devices'; description='Export Autopilot devices to CSV'; type='action'; action='Export-DeviceList'; actionParameters = @{ deviceType='autopilot' } },
+    @{ name='Export Imported Autopilot Devices'; type='action'; action='Export-DeviceList'; actionParameters = @{ deviceType='imported' } }
   )
 }
 ```

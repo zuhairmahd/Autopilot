@@ -229,7 +229,7 @@ For current status and Phase 4 progress, see **PESTER_MIGRATION_STATUS.md**
 - **Tests Migrated:** 6 test files
 - **Test Cases:** 36 (all passing)
 - **Pass Rate:** **100%** ✅
-- **Production Bugs Fixed:** 1 (ExportDeviceReport)
+- **Production Bugs Fixed:** 1 (Export-DeviceReport)
 - **Mock Enhancements:** 1 critical (Batch API JSON parsing)
 - **Legacy Tests Archived:** 2 (test-settings-integration.ps1, test-menu-inclusions-integration.ps1)
 
@@ -267,10 +267,10 @@ For current status and Phase 4 progress, see **PESTER_MIGRATION_STATUS.md**
 #### 4. tests/Integration/ReportGeneration.Tests.ps1 ✅
 - **Test Count:** 1 (all passing)
 - **Coverage:**
-  - CSV export functionality via ExportDeviceReport
+  - CSV export functionality via Export-DeviceReport
 - **Status:** All passing after function fix (100%)
 - **Execution Time:** ~0.5 seconds
-- **Production Fix:** ExportDeviceReport now respects outputFile parameter
+- **Production Fix:** Export-DeviceReport now respects outputFile parameter
 
 #### 5. tests/Integration/ProfileAssignment.Tests.ps1 ✅
 - **Test Count:** 3 (all passing)
@@ -306,8 +306,8 @@ For current status and Phase 4 progress, see **PESTER_MIGRATION_STATUS.md**
 
 ### Production Code Improvements
 
-#### ExportDeviceReport Function Enhancement
-**File:** `functions/reportingFunctions/ExportDeviceReport.ps1`
+#### Export-DeviceReport Function Enhancement
+**File:** `functions/reportingFunctions/Export-DeviceReport.ps1`
 
 **Issue Found:** Function ignored the `outputFile` parameter and always saved files to current directory
 
@@ -404,7 +404,7 @@ From PESTER_MIGRATION_COMPLETION_PLAN.md:
 - **Pass Rate:** **100%** ✅
 - **Fully Complete:** 6 files (DeviceUserAssignment, MenuInclusions, SettingsFunctions, ReportGeneration, ProfileAssignment, MenuNavigation)
 - **Duration:** ~42 seconds (combined)
-- **Production Improvements:** 1 bug fix (ExportDeviceReport)
+- **Production Improvements:** 1 bug fix (Export-DeviceReport)
 - **Mock Enhancements:** 1 critical fix (Batch API JSON parsing)
 - **Architecture Improvements:** 1 (MenuNavigation rewritten to test real menu architecture)
 
@@ -609,7 +609,7 @@ From PESTER_MIGRATION_COMPLETION_PLAN.md:
 - **Weeks 7-8 (Phase 4):** ⏳ Not started (Comprehensive tests)
 - **Week 9 (Phase 5):** ⏳ Not started (Finalization)
 
-**Current Status:** Phase 3 in progress. 26 of 33 integration tests passing (78.8%). 7 tests failing: MenuNavigation (6, architectural issue) + ProfileAssignment (1, batch API bug). Production improvement: ExportDeviceReport bug fix.
+**Current Status:** Phase 3 in progress. 26 of 33 integration tests passing (78.8%). 7 tests failing: MenuNavigation (6, architectural issue) + ProfileAssignment (1, batch API bug). Production improvement: Export-DeviceReport bug fix.
 
 ---
 
@@ -636,7 +636,7 @@ From PESTER_MIGRATION_COMPLETION_PLAN.md:
 5. **Documentation:** Update completion plan
    - Adjust Phase 3 expected test counts (45 → 34)
    - Document MenuNavigation architectural issue
-   - Record ExportDeviceReport production fix
+   - Record Export-DeviceReport production fix
 
 ---
 

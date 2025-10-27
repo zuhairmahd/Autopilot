@@ -350,7 +350,7 @@ Microsoft Graph API integration and authentication.
 Device assessment, reporting, and data export.
 
 **Key Functions**:
-- `ExportDeviceList`: Device data export
+- `Export-DeviceList`: Device data export
 - `GetNextUserReadinessReport`: Readiness assessment
 - `ShowDeviceReport`: Device information display
 - `GetAppAssignmentTypes`: Application assignment analysis
@@ -533,8 +533,8 @@ Security, encryption, and credential management.
 | Function | Purpose | Usage |
 |----------|---------|-------|
 | `AssessDeviceState` | Assess overall device state | Device analysis |
-| `ExportDeviceList` | Export device lists to CSV | Data export |
-| `ExportDeviceReport` | Export device reports | Report generation |
+| `Export-DeviceList` | Export device lists to CSV | Data export |
+| `Export-DeviceReport` | Export device reports | Report generation |
 | `ExportDeviceStorage` | Export device storage information | Storage analysis |
 | `GetAppAssignmentTypes` | Get application assignment types | Assignment analysis |
 | `GetAutopilotDeviceRelevantProperties` | Get Autopilot device properties | Device information |

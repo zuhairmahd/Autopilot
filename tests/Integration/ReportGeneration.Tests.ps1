@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     Tests the application's ability to export a report to a CSV file.
-    This test focuses on the ExportDeviceReport function.
+    This test focuses on the Export-DeviceReport function.
     Addresses Phase 3 of the Pester Migration Plan.
 
 .NOTES
@@ -22,7 +22,7 @@ Describe "Report Generation Integration" -Tags 'Integration', 'Reporting' {
         $script:RepoRoot = $TestContext.RootPath
 
         # Load the function to be tested
-        . (Join-Path $script:RepoRoot "functions/reportingFunctions/ExportDeviceReport.ps1")
+        . (Join-Path $script:RepoRoot "functions/reportingFunctions/Export-DeviceReport.ps1")
         
         # Mock Write-Log as it is called by the function
         function global:Write-Log { param($LogFile, $Module, $Message, $LogLevel) }
@@ -43,7 +43,7 @@ Describe "Report Generation Integration" -Tags 'Integration', 'Reporting' {
             $outputPath = Join-Path $script:TestContext.TestFolder "test-report.csv"
 
             # Act
-            $result = ExportDeviceReport -formattedOutput $reportData -ExportFormat "CSV" -outputFile $outputPath
+            $result = Export-DeviceReport -formattedOutput $reportData -ExportFormat "CSV" -outputFile $outputPath
 
             # Assert
             $result | Should -Be $true

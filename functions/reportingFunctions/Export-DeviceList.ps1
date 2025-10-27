@@ -1,4 +1,4 @@
-function ExportDeviceList()
+function Export-DeviceList()
 {
     [CmdletBinding()]
     param(
@@ -18,7 +18,14 @@ function ExportDeviceList()
     $currentDateTime = (Get-Date -Format "yyyyMMdd-HHmmss")
     $outputFile = "$outputPath\$deviceType-DeviceList-$currentDateTime.csv"
     $CSVObject = [System.Collections.ArrayList]@()
-    $success = $false
+    $returnObject = @{
+        success     = $false
+        outputFile  = $outputFile
+        message     = ""
+        deviceCount = 0
+        deviceType  = $deviceType
+        fileMode    = $fileMode
+    }
     #endregion
 
     #region Fetch devices using Get-DeviceData
@@ -151,25 +158,28 @@ function ExportDeviceList()
             {
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Appending to existing file $outputFile." -LogLevel "Information"
                 $CSVObject | Export-Csv -Path $outputFile -NoTypeInformation -Append -Encoding UTF8 -Delimiter ','
+                $returnObject.message = "Appended $($CSVObject.Count) $deviceType devices to $outputFile."          
             }
             else
             {
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Overwriting existing file $outputFile." -LogLevel "Verbose"
                 $CSVObject | Export-Csv -Path $outputFile -NoTypeInformation -Force -Encoding UTF8 -Delimiter ','
+                $returnObject.message = "Exported $($CSVObject.Count) $deviceType devices to $outputFile."  
             }
         }
         else
         {
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "No devices found for export." -LogLevel "Verbose"
+            $returnObject.message = "No $deviceType devices found for export."              
         }
-        write-log -logFile $LogFile -Module "$functionName" -Message "Device list export completed successfully." -LogLevel "Information"
-        $success = $true
+        $returnObject.success = $true
     }
     catch
     {
-        $success = $false
+        $returnObject.          success = $false
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error occurred while exporting device list: $_" -LogLevel "Error"
+        $returnObject.message = "Error occurred while exporting device list: $_"                    
     }
-    
-    return $success, $outputFile
+
+    return $returnObject                
 }
