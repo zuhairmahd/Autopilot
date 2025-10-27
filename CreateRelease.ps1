@@ -70,6 +70,7 @@ param(
     [switch]$CreateModule,
     [switch]$noCleanup,
     [switch]$SkipSigning,
+    [switch]$skipModuleCheck,
     [switch]$updateHash,
     [switch]$Overwrite,
     [switch]$NoVersionUpdate,
@@ -82,6 +83,62 @@ param(
 
 $scriptName = $MyInvocation.MyCommand.Name
 $logFile = $Log
+
+#region Module Dependencies
+# Check for required modules and install if missing
+if (-not $skipModuleCheck)
+{
+    $requiredModules = @(
+        @{ Name = 'ps2exe'; MinimumVersion = '1.0.0' },
+        @{ Name = 'TrustedSigning'; MinimumVersion = '0.0.1' }
+    )
+    Write-Host "Checking required modules..." -ForegroundColor Cyan
+    foreach ($module in $requiredModules)
+    {
+        $installed = Get-Module -ListAvailable -Name $module.Name | Where-Object {
+            $_.Version -ge [Version]$module.MinimumVersion
+        }
+    
+        if (-not $installed)
+        {
+            Write-Host "Module '$($module.Name)' (version $($module.MinimumVersion) or higher) is not installed." -ForegroundColor Yellow
+            Write-Host "Attempting to install $($module.Name)..." -ForegroundColor Cyan
+        
+            try
+            {
+                # Try installing from PSGallery first
+                Install-Module -Name $module.Name -MinimumVersion $module.MinimumVersion -Scope CurrentUser -Force -AllowClobber -SkipPublisherCheck -ErrorAction Stop
+                Write-Host "Successfully installed $($module.Name)" -ForegroundColor Green
+            }
+            catch
+            {
+                Write-Host "Failed to install $($module.Name): $($_.Exception.Message)" -ForegroundColor Red
+            
+                # Special handling for modules that might not be in PSGallery
+                if ($module.Name -eq 'TrustedSigning')
+                {
+                    Write-Host "Note: TrustedSigning may require Azure Trusted Signing setup." -ForegroundColor Yellow
+                    Write-Host "For testing/development, you can use -SkipSigning parameter to bypass code signing." -ForegroundColor Yellow
+                }
+            
+                Write-Host "Please install manually: Install-Module -Name $($module.Name) -MinimumVersion $($module.MinimumVersion) -Scope CurrentUser" -ForegroundColor Yellow
+                Write-Host "Or use -SkipSigning if you don't need code signing functionality." -ForegroundColor Yellow
+                exit 1
+            }
+        }
+        else
+        {
+            Write-Verbose "[$scriptName] Module '$($module.Name)' is already installed (version $($installed[0].Version))"
+        }
+    }
+    Write-Host "All required modules are available." -ForegroundColor Green
+    Write-Host ""
+}
+else
+{
+    Write-Verbose "[$scriptName] Module check is skipped as per user request."
+}       
+#endregion Module Dependencies
 
 $targetConfig = $null
 if ($PSCmdlet.ParameterSetName -eq 'TargetBuild')
