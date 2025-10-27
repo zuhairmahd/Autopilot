@@ -37,6 +37,12 @@ function ExportDeviceReport()
         $fileName = [System.IO.Path]::GetFileNameWithoutExtension($outputFile)
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Using provided output file name: $fileName" -LogLevel "Information"
     }
+
+    $returnObject = @{
+        success      = $false
+        ExportFormat = $ExportFormat
+        FileName     = $fileName                   
+    }
     
     # Determine final export format
     $finalExportFormat = $ExportFormat.ToUpper()
@@ -51,6 +57,7 @@ function ExportDeviceReport()
             $htmlPath = "$pwd\$fileName.html"
         }
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Exporting to HTML: $htmlPath" -LogLevel "Information"
+        $returnObject.outputFile = $htmlPath    
         $htmlHeader = @"
 <!DOCTYPE html>
 <html>
@@ -97,12 +104,13 @@ function ExportDeviceReport()
             $htmlContent | Out-File -FilePath $htmlPath -Encoding UTF8
             Write-Host "HTML report exported to: $htmlPath" -ForegroundColor Green
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully exported HTML report to $htmlPath" -LogLevel "Information"
+            $returnObject.success = $true
         }
         catch
         {
             Write-Error "[$functionName] Failed to export HTML report: $($_.Exception.Message)"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "HTML export error details: $($_.Exception)" -LogLevel "Error"
-            return $false
+            $returnObject.success = $false
         }
     }
     elseif ($finalExportFormat -eq "CSV")
@@ -116,6 +124,7 @@ function ExportDeviceReport()
             $csvPath = "$pwd\$fileName.csv"
         }
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Exporting to CSV: $csvPath" -LogLevel "Information"
+        $returnObject.outputFile = $csvPath
         try
         {
             $csvData = foreach ($key in $formattedOutput.Keys)
@@ -128,21 +137,22 @@ function ExportDeviceReport()
             $csvData | Export-Csv -Path $csvPath -NoTypeInformation -Encoding UTF8
             Write-Host "CSV report exported to: $csvPath" -ForegroundColor Green
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully exported CSV report to $csvPath" -LogLevel "Information"
+            $returnObject.success = $true
         }
         catch
         {
             Write-Error "[$functionName] Failed to export CSV report: $($_.Exception.Message)"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "CSV export error details: $($_.Exception)" -LogLevel "Error"
-            return $false
+            $returnObject.success = $false
         }
     }
     else
     {
         Write-Error "[$functionName] Unsupported export format: $finalExportFormat"
-        return $false
+        $returnObject.success = $false
     }
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Export completed successfully." -LogLevel "Information"
-    return $true
+    return $returnObject
 }
 
 

@@ -265,7 +265,7 @@ function ShowDeviceReport()
             return $false
         }
         return $pagingResult                
-    }
+    } 
     $HTMLAction = {
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "User selected HTML export" -LogLevel "Information"
         $exportResult = ExportDeviceReport -formattedOutput $formattedOutput -ExportFormat "HTML"
