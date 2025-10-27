@@ -551,7 +551,22 @@ function Get-ApplicationDefaults()
                             'full',
                             'admin',
                             'advanced',
+                            'registration',
+                            'advancedRegistration',
                             'helpdesk'
+                        )
+                    },
+                    @{
+                        description           = 'Shutdown the device'
+                        name                  = 'Shutdown the device'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'helpdesk',
+                            'registration',
+                            'advancedRegistration',
+                            'advanced'
                         )
                     },
                     @{
