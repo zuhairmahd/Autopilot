@@ -223,14 +223,16 @@ function Get-Updates()
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Renamed $executableFileName to $executableFileName.old" -LogLevel "Information"
                 Write-Verbose "[$functionName] Copying the update file from $tempUpdateFile to $executableFileName"
                 Copy-Item -Path $tempUpdateFile -Destination $executableFileName -Force
+                write-log -LogFile $LogFile -Module "$functionName" -Message "Updating $($filesToUpdate.count) additional files..." -LogLevel "Information"
                 if ($filesToUpdate.count -gt 0)
                 {
+                    Write-Host "Updating $($filesToUpdate.count) additional files..."
                     foreach ($file in $filesToUpdate)
                     {
                         if (Test-Path $file)
                         {
                             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Removing $file" -LogLevel "Information"
-                            Remove-Item -Path $file -Force | Out-Null                   
+                            Remove-Item -Path $file -Force -ErrorAction SilentlyContinue | Out-Null
                         }
                     }
                 }
