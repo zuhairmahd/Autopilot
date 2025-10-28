@@ -1,4 +1,4 @@
-function GetUpdates()
+function Get-Updates()
 {
     [CmdletBinding()]
     param (
@@ -7,6 +7,7 @@ function GetUpdates()
         [Parameter(Mandatory = $true)]
         [string]$updateURL,
         [string]$metaDataURL = "$updateURL/lastrun.json",
+        [string[]]$filesToUpdate = @(),
         [switch]$noConfirmation
     )
 
@@ -105,7 +106,7 @@ function GetUpdates()
     {
         Write-Error "[$functionName] Failed to retrieve metadata from $metaDataURL. Please check the URL and try again."
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to retrieve metadata from $metaDataURL. Please check the URL and try again." -LogLevel "Error"
-        $returnValues.UpdateFailedMessage
+        return $returnValues.UpdateFailedMessage
     }
     Write-Verbose "[$functionName] remoteVersion = $remoteVersion"
     #endregion
@@ -145,7 +146,7 @@ function GetUpdates()
         }
         Write-Host "Proceeding with the update..." -ForegroundColor Green
         Write-Verbose "[$functionName] Proceeding with the update."
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Proceeding with the update..."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Proceeding with the update..." -LogLevel "Information"
         Write-Verbose "[$functionName] Checking whether the temp update file $tempUpdateFile exists."
         if (Test-Path $tempUpdateFile)
         {
@@ -222,6 +223,17 @@ function GetUpdates()
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Renamed $executableFileName to $executableFileName.old" -LogLevel "Information"
                 Write-Verbose "[$functionName] Copying the update file from $tempUpdateFile to $executableFileName"
                 Copy-Item -Path $tempUpdateFile -Destination $executableFileName -Force
+                if ($filesToUpdate.count -gt 0)
+                {
+                    foreach ($file in $filesToUpdate)
+                    {
+                        if (Test-Path $file)
+                        {
+                            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Removing $file" -LogLevel "Information"
+                            Remove-Item -Path $file -Force | Out-Null                   
+                        }
+                    }
+                }
                 Write-Verbose "[$functionName] Update completed successfully. New version: $remoteVersion"
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Update completed successfully. New version: $remoteVersion" -LogLevel "Information"
             }
@@ -234,18 +246,18 @@ function GetUpdates()
                 if ($localVersion -ne (getFileVersion -executableFileName $executableFileName))
                 {
                     $backupFileName = Split-Path -Path $backupFile -Leaf
-                    $executableFileParrentFolder = Split-Path -Path $executableFileName -Parent
+                    $executableFileParentFolder = Split-Path -Path $executableFileName -Parent
                     Write-Host "Restoring backup from $backupFile to $executableFileName" -ForegroundColor Yellow
                     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Restoring backup from $backupFile to $executableFileName" -LogLevel "Error"
-                    Copy-Item -Path $backupFile -Destination $executableFileParrentFolder -Force
-                    Write-Verbose "[$functionName] copied backup file $backupFile to $executableFileParrentFolder directory."
-                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Copied backup file $backupFile to $executableFileParrentFolder directory." -LogLevel "Error"
+                    Copy-Item -Path $backupFile -Destination $executableFileParentFolder -Force
+                    Write-Verbose "[$functionName] copied backup file $backupFile to $executableFileParentFolder directory."
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Copied backup file $backupFile to $executableFileParentFolder directory." -LogLevel "Error"
                     Write-Verbose "[$functionName] Extracted backup file name: $backupFileName"
                     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Extracted backup file name: $backupFileName" -LogLevel "Error"
                     Rename-Item -Path $executableFileName -NewName "$executableFileName.tmp" -Force
                     Write-Verbose "[$functionName] Renamed $executableFileName to $executableFileName.tmp"
                     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Renamed $executableFileName to $executableFileName.tmp" -LogLevel "Error"
-                    Rename-Item -Path $backupFileName -NewName $executableFileName -Force
+                    Rename-Item -Path (Join-Path $executableFileParrentFolder $backupFileName) -NewName $executableFileName -Force
                     Write-Verbose "[$functionName] Renamed $backupFileName to $executableFileName"
                     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Renamed $backupFileName to $executableFileName" -LogLevel "Error"
                     Write-Host "The update has been rolled back to the previous version." -ForegroundColor Green

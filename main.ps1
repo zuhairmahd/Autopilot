@@ -961,7 +961,7 @@ if ($updateAvailable.success -eq $true -and $updateAvailable.version -gt $versio
         Write-Host "Automatic updates are enabled." -ForegroundColor Green
         Write-Host "The script will now attempt to update itself." -ForegroundColor Yellow
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Automatic updates are enabled. The script will now attempt to update itself." -LogLevel "Information"
-        $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -noConfirmation
+        $updateResult = Get-Updates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -filesToUpdate @($stringsFile, $menuFile) -noConfirmation
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Update result: $updateResult" -LogLevel "Information"
         switch ($updateResult)
         {
@@ -2148,7 +2148,8 @@ $mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopil
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
     Write-Host "Checking for script updates..."
-    $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL 
+    # Intentionally omitting -noConfirmation here to allow user confirmation before updating
+    $updateResult = Get-Updates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -filesToUpdate @($stringsFile, $menuFile)
     Write-Verbose "[$scriptName] Update result: $updateResult"
     switch ($updateResult)
     {
