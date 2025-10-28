@@ -87,7 +87,7 @@ function Get-Updates()
     }
     #endregion
     
-    $localVersion = (getFileVersion -executableFileName $executableFileName).version
+    $localVersion = (Get-FileVersion -executableFileName $executableFileName).version
     
     #region get the remote version.
     Write-Verbose "[$functionName] Getting metadata from $metaDataURL"
@@ -243,7 +243,7 @@ function Get-Updates()
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error during update: $($_.Exception.Message)" -LogLevel "Error"
                 Write-Error "Failed to update $executableFileName. Please check the error message above."
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Extended error message: $_" -LogLevel "Error"
-                if ($localVersion -ne (getFileVersion -executableFileName $executableFileName))
+                if ($localVersion -ne (Get-FileVersion -executableFileName $executableFileName))
                 {
                     $backupFileName = Split-Path -Path $backupFile -Leaf
                     $executableFileParentFolder = Split-Path -Path $executableFileName -Parent

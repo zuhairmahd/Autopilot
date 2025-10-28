@@ -7,7 +7,7 @@ Describe "Function: Get-ApplicationMetaData" -Tags 'Unit', 'UtilityFunctions' {
     BeforeAll {
         $script:RepoRoot = (Get-Item $PSScriptRoot).Parent.Parent.Parent.FullName
         . "$script:RepoRoot/functions/utilityFunctions/Write-Log.ps1"
-        . "$script:RepoRoot/functions/updateFunctions/getFileVersion.ps1"
+        . "$script:RepoRoot/functions/updateFunctions/Get-FileVersion.ps1"
         . "$script:RepoRoot/functions/menuFunctions/DisplayNumericMenu.ps1"
         . "$script:RepoRoot/functions/utilityFunctions/Get-ApplicationMetaData.ps1"
         Mock Write-Log {}

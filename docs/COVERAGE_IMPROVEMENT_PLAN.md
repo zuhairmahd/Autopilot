@@ -97,7 +97,7 @@ See Progress Tracking section below for detailed results.
   - **18 test cases, all passing**
   - **Estimated Lines Covered**: ~80 lines
 
-- [x] `tests/Unit/updateFunctions/getFileVersion.Tests.ps1`
+- [x] `tests/Unit/updateFunctions/Get-FileVersion.Tests.ps1`
   - Test version extraction from files ✅
   - Test missing file handling ✅
   - Test invalid format handling ✅
@@ -130,7 +130,7 @@ See Progress Tracking section below for detailed results.
 **Notes**:
 - updateFunctions tests completed successfully with comprehensive mocking
 - GetLatestGithubRelease: Full GitHub API mocking with error scenarios  
-- getFileVersion: File system mocking with version parsing validation
+- Get-FileVersion: File system mocking with version parsing validation
 - Invoke-FileCertVerification: Certificate chain and trust validation mocking
 - GetDeviceInfo tests completed after resolving binary cmdlet mocking challenges
 - Binary cmdlet lesson learned: Use exact parameter names (Get-CimInstance uses -ClassName not -Class) and return simple types for mock objects
@@ -659,7 +659,7 @@ See Progress Tracking section below for detailed results.
 **Completed**: October 15, 2025  
 **Completed Tests**:
 - [x] GetLatestGithubRelease.Tests.ps1 - 18 test cases ✅
-- [x] getFileVersion.Tests.ps1 - 18 test cases ✅
+- [x] Get-FileVersion.Tests.ps1 - 18 test cases ✅
 - [x] Invoke-FileCertVerification.Tests.ps1 - 14 test cases ✅
 - [x] GetDeviceInfo.Tests.ps1 - 25 test cases ✅
 

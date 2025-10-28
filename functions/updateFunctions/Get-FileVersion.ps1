@@ -1,4 +1,4 @@
-function getFileVersion()
+function Get-FileVersion()
 {
     [CmdletBinding()]    
     param(

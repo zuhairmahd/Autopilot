@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Unit tests for getFileVersion function
+    Unit tests for Get-FileVersion function
 .DESCRIPTION
     Tests file version extraction, error handling, and version parsing
     Compatible with PowerShell 5.1 and Pester 5.x
@@ -11,7 +11,7 @@
 
 Import-Module "$PSScriptRoot/../../Helpers/AutopilotTestHelpers.psm1" -Force
 
-Describe "Function: getFileVersion" -Tags 'Unit', 'UpdateFunctions' {
+Describe "Function: Get-FileVersion" -Tags 'Unit', 'UpdateFunctions' {
     BeforeAll {
         # Direct dot-sourcing for PS 5.1 compatibility
         $script:RepoRoot = (Get-Item $PSScriptRoot).Parent.Parent.Parent.FullName
@@ -20,7 +20,7 @@ Describe "Function: getFileVersion" -Tags 'Unit', 'UpdateFunctions' {
         . "$script:RepoRoot/functions/utilityFunctions/Write-Log.ps1"
         
         # Load function under test
-        . "$script:RepoRoot/functions/updateFunctions/getFileVersion.ps1"
+        . "$script:RepoRoot/functions/updateFunctions/Get-FileVersion.ps1"
         
         # Mock Write-Log for all tests
         Mock Write-Log {}
@@ -32,7 +32,7 @@ Describe "Function: getFileVersion" -Tags 'Unit', 'UpdateFunctions' {
     
     Context "When file does not exist" {
         It "Should return null for non-existent file" {
-            $result = getFileVersion -executableFileName "C:\NonExistent\file.exe"
+            $result = Get-FileVersion -executableFileName "C:\NonExistent\file.exe"
             
             $result | Should -BeNullOrEmpty
             Should -Invoke Write-Log -Times 2 -Exactly
@@ -41,7 +41,7 @@ Describe "Function: getFileVersion" -Tags 'Unit', 'UpdateFunctions' {
         It "Should log error message for missing file" {
             Mock Write-Log {} -ParameterFilter { $LogLevel -eq "Error" }
             
-            $result = getFileVersion -executableFileName "C:\Missing\app.exe"
+            $result = Get-FileVersion -executableFileName "C:\Missing\app.exe"
             
             Should -Invoke Write-Log -ParameterFilter { $LogLevel -eq "Error" } -Times 1
         }
@@ -49,19 +49,19 @@ Describe "Function: getFileVersion" -Tags 'Unit', 'UpdateFunctions' {
     
     Context "When executable file name is invalid" {
         It "Should return null for empty string" {
-            $result = getFileVersion -executableFileName ""
+            $result = Get-FileVersion -executableFileName ""
             
             $result | Should -BeNullOrEmpty
         }
         
         It "Should return null for null parameter" {
-            $result = getFileVersion -executableFileName $null
+            $result = Get-FileVersion -executableFileName $null
             
             $result | Should -BeNullOrEmpty
         }
         
         It "Should return null for PowerShell script file (.ps1)" {
-            $result = getFileVersion -executableFileName "script.ps1"
+            $result = Get-FileVersion -executableFileName "script.ps1"
             
             $result | Should -BeNullOrEmpty
         }
@@ -69,7 +69,7 @@ Describe "Function: getFileVersion" -Tags 'Unit', 'UpdateFunctions' {
         It "Should log error for .ps1 file" {
             Mock Write-Log {} -ParameterFilter { $LogLevel -eq "Error" }
             
-            $result = getFileVersion -executableFileName "test.ps1"
+            $result = Get-FileVersion -executableFileName "test.ps1"
             
             Should -Invoke Write-Log -ParameterFilter { $LogLevel -eq "Error" } -Times 1
         }
@@ -82,14 +82,14 @@ Describe "Function: getFileVersion" -Tags 'Unit', 'UpdateFunctions' {
         }
         
         It "Should extract version info from PowerShell executable" {
-            $result = getFileVersion -executableFileName $script:TestExe
+            $result = Get-FileVersion -executableFileName $script:TestExe
             
             $result | Should -Not -BeNullOrEmpty
             $result.version | Should -Not -BeNullOrEmpty
         }
         
         It "Should return hashtable with expected properties" {
-            $result = getFileVersion -executableFileName $script:TestExe
+            $result = Get-FileVersion -executableFileName $script:TestExe
             
             $result.major | Should -Not -BeNullOrEmpty
             $result.minor | Should -Not -BeNullOrEmpty
@@ -101,21 +101,21 @@ Describe "Function: getFileVersion" -Tags 'Unit', 'UpdateFunctions' {
         }
         
         It "Should extract company name" {
-            $result = getFileVersion -executableFileName $script:TestExe
+            $result = Get-FileVersion -executableFileName $script:TestExe
             
             $result.companyName | Should -Not -BeNullOrEmpty
             $result.companyName | Should -Be "Microsoft Corporation"
         }
         
         It "Should calculate SHA256 hash" {
-            $result = getFileVersion -executableFileName $script:TestExe
+            $result = Get-FileVersion -executableFileName $script:TestExe
             
             $result.hash | Should -Not -BeNullOrEmpty
             $result.hash.Length | Should -Be 64  # SHA256 is 64 hex characters
         }
         
         It "Should parse version to System.Version object" {
-            $result = getFileVersion -executableFileName $script:TestExe
+            $result = Get-FileVersion -executableFileName $script:TestExe
             
             $result.version | Should -BeOfType [System.Version]
             $result.version.Major | Should -Be $result.major
@@ -138,7 +138,7 @@ Describe "Function: getFileVersion" -Tags 'Unit', 'UpdateFunctions' {
                 return @{ Hash = "ABC123" * 10 + "ABCD" }  # 64 chars
             }
             
-            $result = getFileVersion -executableFileName "test.exe"
+            $result = Get-FileVersion -executableFileName "test.exe"
             
             $result.major | Should -Be 1
             $result.minor | Should -Be 2
@@ -160,7 +160,7 @@ Describe "Function: getFileVersion" -Tags 'Unit', 'UpdateFunctions' {
                 return @{ Hash = "DEF456" * 10 + "DEFG" }
             }
             
-            $result = getFileVersion -executableFileName "app.exe"
+            $result = Get-FileVersion -executableFileName "app.exe"
             
             $result.major | Should -Be 5
             $result.minor | Should -Be 6
@@ -184,7 +184,7 @@ Describe "Function: getFileVersion" -Tags 'Unit', 'UpdateFunctions' {
             }
             Mock Write-Log {} -ParameterFilter { $LogLevel -eq "Verbose" }
             
-            $result = getFileVersion -executableFileName "test.exe"
+            $result = Get-FileVersion -executableFileName "test.exe"
             
             # Should log multiple verbose messages throughout execution
             Should -Invoke Write-Log -ParameterFilter { $LogLevel -eq "Verbose" } -Times 9 -Exactly
@@ -205,7 +205,7 @@ Describe "Function: getFileVersion" -Tags 'Unit', 'UpdateFunctions' {
             }
             Mock Write-Log {} -ParameterFilter { $LogLevel -eq "Information" }
             
-            $result = getFileVersion -executableFileName "app.exe"
+            $result = Get-FileVersion -executableFileName "app.exe"
             
             Should -Invoke Write-Log -ParameterFilter { $LogLevel -eq "Information" } -Times 1
         }
@@ -215,7 +215,7 @@ Describe "Function: getFileVersion" -Tags 'Unit', 'UpdateFunctions' {
         It "Should handle absolute Windows path" {
             Mock Test-Path { $false }
             
-            $result = getFileVersion -executableFileName "C:\Program Files\App\program.exe"
+            $result = Get-FileVersion -executableFileName "C:\Program Files\App\program.exe"
             
             $result | Should -BeNullOrEmpty
         }
@@ -223,7 +223,7 @@ Describe "Function: getFileVersion" -Tags 'Unit', 'UpdateFunctions' {
         It "Should handle relative path" {
             Mock Test-Path { $false }
             
-            $result = getFileVersion -executableFileName ".\bin\app.exe"
+            $result = Get-FileVersion -executableFileName ".\bin\app.exe"
             
             $result | Should -BeNullOrEmpty
         }
@@ -231,7 +231,7 @@ Describe "Function: getFileVersion" -Tags 'Unit', 'UpdateFunctions' {
         It "Should handle UNC path" {
             Mock Test-Path { $false }
             
-            $result = getFileVersion -executableFileName "\\server\share\program.exe"
+            $result = Get-FileVersion -executableFileName "\\server\share\program.exe"
             
             $result | Should -BeNullOrEmpty
         }

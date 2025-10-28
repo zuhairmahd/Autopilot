@@ -120,7 +120,7 @@ function Get-ApplicationMetaData()
     {
         Write-Verbose "[$functionName] Executable file exists: $scriptName. Getting version."
         Write-Log -logFile $logFile -module $functionName -Message "Script file exists: $scriptName. Getting version."
-        $fileVersionInfo = getFileVersion -executableFileName $scriptName
+        $fileVersionInfo = Get-FileVersion -executableFileName $scriptName
     }    
     if ($null -eq $fileVersionInfo)
     {

@@ -466,10 +466,10 @@ Security, encryption, and credential management.
 | Function | Purpose | Usage |
 |----------|---------|-------|
 | `CheckForUpdates` | Check for application updates | Update management |
-| `getFileVersion` | Get file version information | Version checking |
+| `Get-FileVersion` | Get file version information | Version checking |
 | `GetLatestGithubRelease` | Get latest GitHub release info | Update checking |
 | `GetLatestGitlabRelease` | Get latest GitLab release info | Update checking |
-| `GetUpdates` | Download and apply updates | Update management |
+| `Get-Updates` | Download and apply updates | Update management |
 | `Invoke-FileCertVerification` | Verify file digital signatures | Security verification |
 
 ### Autopilot Functions (14 functions)
