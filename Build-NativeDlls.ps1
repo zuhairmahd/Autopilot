@@ -2,10 +2,11 @@
 .SYNOPSIS
     Builds and publishes all C# performance DLLs for Autopilot with multi-target support
 .DESCRIPTION
-    Publishes Autopilot.GraphCore, Autopilot.DeviceCore, Autopilot.CacheCore, and Autopilot.LogCore
-    projects into optimized DLLs for PowerShell integration with all dependencies.
-    Outputs to specified BinFolder/Configuration (e.g., bin/Release or bin/Debug).
-    Provides 5-50x performance improvement for critical operations.
+    Publishes Autopilot.GraphCore, Autopilot.DeviceCore, Autopilot.CacheCore, Autopilot.LogCore,
+    Autopilot.ConfigCore, Autopilot.StringCore, Autopilot.CsvCore, and Autopilot.CollectionCore 
+    projects into optimized DLLs for PowerShell integration with all dependencies. Outputs to 
+    specified BinFolder/Configuration (e.g., bin/Release or bin/Debug). Provides 5-50x performance 
+    improvement for critical operations.
 .PARAMETER Configuration
     Build configuration: Debug or Release (default: Release)
 .PARAMETER Framework

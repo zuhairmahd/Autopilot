@@ -10,6 +10,14 @@ function ConvertTo-Psd1String()
         [int]$IndentLevel = 0
     )
     $functionName = $MyInvocation.MyCommand.Name
+    
+    # Check if StringCore DLL available for 3-5x faster string escaping
+    $useStringCore = $global:AutopilotDllStatus -and $global:AutopilotDllStatus.StringCoreLoaded
+    if ($useStringCore)
+    {
+        Write-Verbose "[$functionName] Using StringCore for optimized string escaping (3-5x faster)"
+    }
+    
     $indent = "    " * $IndentLevel
     $childIndent = "    " * ($IndentLevel + 1)
     $result = "@{`n"
@@ -89,7 +97,14 @@ function ConvertTo-Psd1String()
                 elseif ($item -is [string])
                 {
                     Write-Verbose "[$functionName] Processing string in single-item array: $item"
-                    $escapedItem = $item -replace "'", "''" -replace "`n", "``n" -replace "`r", "``r" -replace "`t", "``t"
+                    if ($useStringCore)
+                    {
+                        $escapedItem = [Autopilot.StringCore.StringHelper]::EscapeForPsd1($item)
+                    }
+                    else
+                    {
+                        $escapedItem = $item -replace "'", "''" -replace "`n", "``n" -replace "`r", "``r" -replace "`t", "``t"
+                    }
                     $result += "'$escapedItem'"
                 }
                 elseif ($item -is [bool])
@@ -128,7 +143,14 @@ function ConvertTo-Psd1String()
                     {
                         Write-Verbose "[$functionName] Processing string in array: $item"
                         # Enhanced string escaping for PowerShell compatibility
-                        $escapedItem = $item -replace "'", "''" -replace "`n", "``n" -replace "`r", "``r" -replace "`t", "``t"
+                        if ($useStringCore)
+                        {
+                            $escapedItem = [Autopilot.StringCore.StringHelper]::EscapeForPsd1($item)
+                        }
+                        else
+                        {
+                            $escapedItem = $item -replace "'", "''" -replace "`n", "``n" -replace "`r", "``r" -replace "`t", "``t"
+                        }
                         $result += "'$escapedItem'"
                     }
                     elseif ($item -is [bool])
@@ -154,7 +176,14 @@ function ConvertTo-Psd1String()
         {
             Write-Verbose "[$functionName] Processing key: $key with value type: String"
             # Enhanced string escaping for PowerShell compatibility
-            $escapedValue = $value -replace "'", "''" -replace "`n", "``n" -replace "`r", "``r" -replace "`t", "``t"
+            if ($useStringCore)
+            {
+                $escapedValue = [Autopilot.StringCore.StringHelper]::EscapeForPsd1($value)
+            }
+            else
+            {
+                $escapedValue = $value -replace "'", "''" -replace "`n", "``n" -replace "`r", "``r" -replace "`t", "``t"
+            }
             $result += "'$escapedValue'"
         }
         elseif ($value -is [bool])
@@ -176,7 +205,14 @@ function ConvertTo-Psd1String()
         {
             Write-Verbose "[$functionName] Processing key: $key with other type: $($value.GetType().Name)"
             # Convert to string and escape
-            $stringValue = $value.ToString() -replace "'", "''" -replace "`n", "``n" -replace "`r", "``r" -replace "`t", "``t"
+            if ($useStringCore)
+            {
+                $stringValue = [Autopilot.StringCore.StringHelper]::EscapeForPsd1($value.ToString())
+            }
+            else
+            {
+                $stringValue = $value.ToString() -replace "'", "''" -replace "`n", "``n" -replace "`r", "``r" -replace "`t", "``t"
+            }
             $result += "'$stringValue'"
         }
         

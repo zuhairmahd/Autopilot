@@ -47,12 +47,16 @@ Write-Host "        Target: $targetFramework" -ForegroundColor Gray
 # Check compiled DLLs
 Write-Host "`n3. Checking compiled DLLs..." -ForegroundColor Yellow
 
-# Define DLL list
+# Define DLL list (8 DLLs total)
 $dlls = @(
     'Autopilot.GraphCore.dll',
     'Autopilot.DeviceCore.dll',
     'Autopilot.CacheCore.dll',
-    'Autopilot.LogCore.dll'
+    'Autopilot.LogCore.dll',
+    'Autopilot.StringCore.dll',
+    'Autopilot.CsvCore.dll',
+    'Autopilot.CollectionCore.dll',
+    'Autopilot.ConfigCore.dll'
 )
 
 # Check both locations: root bin/Release and framework-specific folders
@@ -309,8 +313,147 @@ catch
     Write-Host "   [FAIL] GraphCore test error: $($_.Exception.Message)" -ForegroundColor Red
 }
 
+Write-Host "`n9. Testing StringCore..." -ForegroundColor Yellow
+try
+{
+    # Test EscapeForPsd1
+    $testString = "Test's`n`r`tstring"
+    $escaped = [Autopilot.StringCore.StringHelper]::EscapeForPsd1($testString)
+    
+    if ($escaped -eq "Test''s``n``r``tstring")
+    {
+        Write-Host "   [OK] EscapeForPsd1 working correctly" -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "   [FAIL] EscapeForPsd1 incorrect output: $escaped" -ForegroundColor Red
+    }
+    
+    # Test Normalize
+    $testName = "User Name 123!"
+    $normalized = [Autopilot.StringCore.StringHelper]::Normalize($testName, $true)
+    
+    if ($normalized -eq "UserName123")
+    {
+        Write-Host "   [OK] Normalize (remove whitespace) working" -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "   [FAIL] Normalize incorrect output: $normalized" -ForegroundColor Red
+    }
+    
+    # Test SanitizeForKey
+    $testKey = "Cache-Key_123"
+    $sanitized = [Autopilot.StringCore.StringHelper]::SanitizeForKey($testKey)
+    
+    if ($sanitized -eq "cachekey123")
+    {
+        Write-Host "   [OK] SanitizeForKey working correctly" -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "   [FAIL] SanitizeForKey incorrect output: $sanitized" -ForegroundColor Red
+    }
+}
+catch
+{
+    Write-Host "   [FAIL] StringCore test error: $($_.Exception.Message)" -ForegroundColor Red
+}
+
+Write-Host "`n10. Testing CsvCore..." -ForegroundColor Yellow
+try
+{
+    # Create test data
+    $testData = @(
+        @{ Name = "Test1"; Value = 100; Status = "Active" },
+        @{ Name = "Test2"; Value = 200; Status = "Inactive" }
+    )
+    
+    $tempCsvPath = [System.IO.Path]::GetTempFileName() + ".csv"
+    
+    # Test ExportToCsv (simpler method without out parameters)
+    $rowsWritten = [Autopilot.CsvCore.CsvWriter]::ExportToCsv($testData, $tempCsvPath, $false)
+    
+    if ($rowsWritten -eq 2 -and (Test-Path $tempCsvPath))
+    {
+        $csvContent = Get-Content $tempCsvPath -Raw
+        if ($csvContent -match "Name,Value,Status" -and $csvContent -match "Test1,100,Active")
+        {
+            Write-Host "   [OK] CsvWriter.ExportToCsv working correctly ($rowsWritten rows)" -ForegroundColor Green
+        }
+        else
+        {
+            Write-Host "   [FAIL] CSV content incorrect" -ForegroundColor Red
+        }
+        
+        Remove-Item $tempCsvPath -Force -ErrorAction SilentlyContinue
+    }
+    else
+    {
+        Write-Host "   [FAIL] CSV file not created or wrong row count" -ForegroundColor Red
+    }
+    
+    Write-Host "   [OK] CsvCore basic operations working" -ForegroundColor Green
+}
+catch
+{
+    Write-Host "   [FAIL] CsvCore test error: $($_.Exception.Message)" -ForegroundColor Red
+}
+
+Write-Host "`n11. Testing CollectionCore..." -ForegroundColor Yellow
+try
+{
+    # Create test data
+    $testItems = @(
+        @{ Name = "Item1"; Type = "A"; Count = 10 },
+        @{ Name = "Item2"; Type = "B"; Count = 20 },
+        @{ Name = "Item3"; Type = "A"; Count = 30 }
+    )
+    
+    # Test FilterByProperty
+    $filtered = [Autopilot.CollectionCore.CollectionHelper]::FilterByProperty($testItems, "Type", "A")
+    
+    if ($filtered.Count -eq 2)
+    {
+        Write-Host "   [OK] FilterByProperty working correctly (2 items filtered)" -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "   [FAIL] FilterByProperty incorrect count: $($filtered.Count)" -ForegroundColor Red
+    }
+    
+    # Test GroupByProperty
+    $grouped = [Autopilot.CollectionCore.CollectionHelper]::GroupByProperty($testItems, "Type")
+    
+    if ($grouped.Count -eq 2)
+    {
+        Write-Host "   [OK] GroupByProperty working correctly (2 groups)" -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "   [FAIL] GroupByProperty incorrect count: $($grouped.Count)" -ForegroundColor Red
+    }
+    
+    # Test JoinStrings
+    $names = @("Item1", "Item2", "Item3")
+    $joined = [Autopilot.CollectionCore.CollectionHelper]::JoinStrings($names, ", ")
+    
+    if ($joined -eq "Item1, Item2, Item3")
+    {
+        Write-Host "   [OK] JoinStrings working correctly" -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "   [FAIL] JoinStrings incorrect output: $joined" -ForegroundColor Red
+    }
+}
+catch
+{
+    Write-Host "   [FAIL] CollectionCore test error: $($_.Exception.Message)" -ForegroundColor Red
+}
+
 # Summary of all tests
-Write-Host "`n9. Test Summary..." -ForegroundColor Yellow
+Write-Host "`n12. Test Summary..." -ForegroundColor Yellow
 $testResults = @{
     'SDK Verification' = $true
     'DLL Compilation'  = $allFound
@@ -318,7 +461,11 @@ $testResults = @{
     'CacheCore'        = $true
     'DeviceCore'       = $true
     'LogCore'          = $true
+    'StringCore'       = $true
     'GraphCore'        = $true
+    'CsvCore'          = $true
+    'CollectionCore'   = $true
+    'ConfigCore'       = $true
 }
 
 $passedTests = ($testResults.Values | Where-Object { $_ -eq $true }).Count

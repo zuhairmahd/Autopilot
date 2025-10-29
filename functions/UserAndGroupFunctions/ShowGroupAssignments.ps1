@@ -189,7 +189,7 @@ Write-Log -logFile $LogFile -Module $functionName -Message "No assignments found
             $dateString = (Get-Date -Format "yyyyMMdd")
             $safeGroupName = $groupName -replace '[\\/:*?"<>|]', '_'
             $csvPath = "$pwd\${safeGroupName}-$dateString.csv"
-            $selectedAssignments | Export-Csv -Path $csvPath -NoTypeInformation
+            $selectedAssignments | Export-AutopilotCsv -Path $csvPath -NoTypeInformation
             Write-Host "Exported assignments to $csvPath"
             Write-Log -logFile $LogFile -Module $functionName -Message "Exported assignments to $csvPath" -logLevel "Information"
         }

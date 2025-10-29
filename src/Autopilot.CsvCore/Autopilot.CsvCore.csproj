@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;net9.0</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>Autopilot.CsvCore</RootNamespace>
+    <AssemblyName>Autopilot.CsvCore</AssemblyName>
+    <Description>High-performance CSV export operations for Autopilot (5-10x faster than Export-Csv)</Description>
+  </PropertyGroup>
+
+  <!-- System.Collections.Concurrent is part of netstandard2.0, no package reference needed -->
+
+</Project>

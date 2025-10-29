@@ -26,7 +26,7 @@ function ExportDeviceStorage()
     {
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "- No filter provided, using default filter: $managedDeviceFilter" -LogLevel "Information"
     }
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Starting device memory export process" -LogLevel "Verbose"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Starting device memory export process" -LogLevel "Verbose"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Using batch size of $BatchSize for API requests" -LogLevel "Information"
     
     # Store all devices in an array
@@ -76,7 +76,7 @@ Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Starting device 
                 }
             }
             
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Sending batch request for devices $batchIndex to $($batchIndex + $batch.Count)" -LogLevel "Debug"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Sending batch request for devices $batchIndex to $($batchIndex + $batch.Count)" -LogLevel "Debug"
             $batchResponse = CallGraphApi -ResourcePath "`$batch" -accessToken $AccessToken -Method "POST" -Body ($batchRequestBody | ConvertTo-Json -Depth $maxJSONDepth)
             
             # Process batch responses
@@ -186,7 +186,34 @@ Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Sending batch re
         if ($CSVObject.Count -gt 0)
         {
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Exporting data for $($CSVObject.Count) devices to file $OutputFile" -LogLevel "Information"
-            $CSVObject | Export-Csv -Path $OutputFile -NoTypeInformation -Force
+            
+            # Try CsvCore for 5-10x faster export
+            $useCsvCore = $global:AutopilotDllStatus -and $global:AutopilotDllStatus.CsvCoreLoaded
+            
+            if ($useCsvCore)
+            {
+                try
+                {
+                    Write-Verbose "[$functionName] Using CsvCore for high-performance export (5-10x faster)"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Using CsvCore for optimized CSV export" -LogLevel "Verbose"
+                    $rowsWritten = [Autopilot.CsvCore.CsvWriter]::ExportToCsv($CSVObject, $OutputFile, $false, $false)
+                    Write-Verbose "[$functionName] CsvCore exported $rowsWritten rows"
+                }
+                catch
+                {
+                    Write-Warning "[$functionName] CsvCore export failed, falling back to PowerShell: $_"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "CsvCore failed, using PowerShell fallback: $($_.Exception.Message)" -LogLevel "Warning"
+                    $useCsvCore = $false
+                }
+            }
+            
+            # PowerShell fallback
+            if (-not $useCsvCore)
+            {
+                Write-Verbose "[$functionName] Using PowerShell Export-Csv"
+                $CSVObject | Export-Csv -Path $OutputFile -NoTypeInformation -Force
+            }
+            
             Write-Host "Successfully exported device information to $OutputFile" -ForegroundColor Green
             Write-Host "Exported $($CSVObject.Count) devices with memory and storage information" -ForegroundColor Green
             $success = $true

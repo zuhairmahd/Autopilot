@@ -195,19 +195,19 @@ function ExportDeviceList()
             if ($fileMode -eq 'Append')
             {
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Appending to existing file $outputFile." -LogLevel "Information"
-                $CSVObject | Export-Csv -Path $outputFile -NoTypeInformation -Append -Encoding UTF8 -Delimiter ','
+                $CSVObject | Export-AutopilotCsv -Path $outputFile -NoTypeInformation -Append -Encoding UTF8 -Delimiter ','
             }
             else
             {
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Overwriting existing file $outputFile." -LogLevel "Verbose"
-                $CSVObject | Export-Csv -Path $outputFile -NoTypeInformation -Force -Encoding UTF8 -Delimiter ','
+                $CSVObject | Export-AutopilotCsv -Path $outputFile -NoTypeInformation -Force -Encoding UTF8 -Delimiter ','
             }
         }
         else
         {
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Creating new file $outputFile." -LogLevel "Information"
         }
-        $CSVObject | Export-Csv -Path $outputFile -NoTypeInformation -Force -Encoding UTF8 -Delimiter ','
+        $CSVObject | Export-AutopilotCsv -Path $outputFile -NoTypeInformation -Force -Encoding UTF8 -Delimiter ','
     }
     else
     {

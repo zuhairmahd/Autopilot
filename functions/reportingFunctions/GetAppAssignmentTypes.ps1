@@ -16,7 +16,7 @@ function GetAppAssignmentTypes()
     $functionName = $MyInvocation.MyCommand.Name    
     #write a verbose log of received parameters
     Write-Verbose "[$functionName] Starting function with parameters: AccessToken, Export: $Export, outputPath: $outputPath, fileMode: $fileMode"
-Write-Log -logFile $logFile -Module $functionName -Message "Starting function with parameters: AccessToken, Export: $Export, outputPath: $outputPath, fileMode: $fileMode." -LogLevel "Verbose"
+    Write-Log -logFile $logFile -Module $functionName -Message "Starting function with parameters: AccessToken, Export: $Export, outputPath: $outputPath, fileMode: $fileMode." -LogLevel "Verbose"
     # Create a cache for group information to avoid repeated API calls
     $groupCache = @{}
     Write-Log -logFile $logFile -Module $functionName -Message "Initialized group cache." -LogLevel "Debug"
@@ -53,7 +53,7 @@ Write-Log -logFile $logFile -Module $functionName -Message "Starting function wi
         }
         else
         {
-Write-Log -logFile $logFile -Module $functionName -Message "No displayName found for groupId: $groupId, returning 'unassigned'" -LogLevel "Verbose"
+            Write-Log -logFile $logFile -Module $functionName -Message "No displayName found for groupId: $groupId, returning 'unassigned'" -LogLevel "Verbose"
             return 'unassigned'
         }
     }
@@ -66,7 +66,7 @@ Write-Log -logFile $logFile -Module $functionName -Message "No displayName found
     
     # Get all apps with their assignments in a single API call
     $apps = CallGraphApi -ResourcePath $managedAppUri -accessToken $AccessToken -apiVersion 'v1.0' -extraParameters $extraParameters
-Write-Log -logFile $logFile -Module $functionName -Message "Found $($apps.value.count) apps in Intune." -LogLevel "Verbose"
+    Write-Log -logFile $logFile -Module $functionName -Message "Found $($apps.value.count) apps in Intune." -LogLevel "Verbose"
     
     # Track results
     $assignmentResults = @()
@@ -87,7 +87,7 @@ Write-Log -logFile $logFile -Module $functionName -Message "Found $($apps.value.
             {
                 if ($assignment.target.groupId)
                 {
-Write-Log -logFile $logFile -Module $functionName -Message "Found groupId: $($assignment.target.groupId) for app: $($app.displayName)" -LogLevel "Verbose"
+                    Write-Log -logFile $logFile -Module $functionName -Message "Found groupId: $($assignment.target.groupId) for app: $($app.displayName)" -LogLevel "Verbose"
                     $allGroupIds[$assignment.target.groupId] = $true
                 }
             }
@@ -107,7 +107,7 @@ Write-Log -logFile $logFile -Module $functionName -Message "Found groupId: $($as
     # Step 4: Process each app
     foreach ($app in $apps.value)
     {
-Write-Log -logFile $logFile -Module $functionName -Message "Processing app: $($app.displayName) (id: $($app.id))" -LogLevel "Verbose"
+        Write-Log -logFile $logFile -Module $functionName -Message "Processing app: $($app.displayName) (id: $($app.id))" -LogLevel "Verbose"
         $assignedGroups = @()
         
         # Process app assignments (if any)
@@ -138,13 +138,13 @@ Write-Log -logFile $logFile -Module $functionName -Message "Processing app: $($a
         }
         # Create app object
         $appObject = [PSCustomObject]@{
-            id                     = $app.id
-            type                   = ($app."@odata.type" -replace '#Microsoft.Graph.', '')
-            displayName            = $app.displayName
-            AssignedGroups         = $assignedGroups -join '; '
-            assignedGroupCount     = $assignedGroups.Count
+            id                   = $app.id
+            type                 = ($app."@odata.type" -replace '#Microsoft.Graph.', '')
+            displayName          = $app.displayName
+            AssignedGroups       = $assignedGroups -join '; '
+            assignedGroupCount   = $assignedGroups.Count
             # assignmentResultObject property removed as it is unused
-            applicableDeviceType   = if ($app.applicableDeviceType.iPhoneAndIPod -and $app.applicableDeviceType.iPad) { 'iPad and iPhone' } elseif ($app.applicableDeviceType.iPad) { 'iPad' } elseif ($app.applicableDeviceType.iPhoneAndIPod) { 'iPhone' } else { "" }
+            applicableDeviceType = if ($app.applicableDeviceType.iPhoneAndIPod -and $app.applicableDeviceType.iPad) { 'iPad and iPhone' } elseif ($app.applicableDeviceType.iPad) { 'iPad' } elseif ($app.applicableDeviceType.iPhoneAndIPod) { 'iPhone' } else { "" }
         }
         Write-Log -logFile $logFile -Module $functionName -Message "App object created: $($appObject | Out-String)" -LogLevel "Debug"
         
@@ -255,12 +255,12 @@ Write-Log -logFile $logFile -Module $functionName -Message "Processing app: $($a
             if ($fileMode -eq 'Append' -and (Test-Path $csvPath))
             {
                 Write-Log -logFile $logFile -Module $functionName -Message "Appending to existing CSV file." -LogLevel "Debug"
-                $allAppsForExport | Export-Csv -Path $csvPath -NoTypeInformation -Append
+                $allAppsForExport | Export-AutopilotCsv -Path $csvPath -NoTypeInformation -Append
             }
             else
             {
-Write-Log -logFile $logFile -Module $functionName -Message "Overwriting existing CSV file." -LogLevel "Verbose"
-                $allAppsForExport | Export-Csv -Path $csvPath -NoTypeInformation
+                Write-Log -logFile $logFile -Module $functionName -Message "Overwriting existing CSV file." -LogLevel "Verbose"
+                $allAppsForExport | Export-AutopilotCsv -Path $csvPath -NoTypeInformation
             }
             Write-Host "Exported $($allAppsForExport.Count) apps to $csvPath" -ForegroundColor Green
             if (Test-Path $csvPath)
@@ -286,6 +286,6 @@ Write-Log -logFile $logFile -Module $functionName -Message "Overwriting existing
     }
     
     Write-Verbose "[$functionName] Returning result object."
-Write-Log -logFile $logFile -Module $functionName -Message "Returning result object from GetAppAssignmentTypes." -LogLevel "Information"
+    Write-Log -logFile $logFile -Module $functionName -Message "Returning result object from GetAppAssignmentTypes." -LogLevel "Information"
     return $exportSuccessful, $returnedApps
 }
