@@ -10,7 +10,6 @@ Desktop.ini
 
 .mcp.json
 .secrets/
-release/
 test/
 build/
 TestReports/
