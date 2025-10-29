@@ -1,5 +1,13 @@
 function Export-DeviceAssignmentReport()
 {
+    <#
+    .NOTES
+        Dependencies:
+        - Get-DeviceData (implicit, called for device retrieval)
+        - FormatDateWithTimeZone (implicit, called for date formatting)
+        - Write-Log (implicit, called for logging)
+        - Invoke-DeviceFilter (implicit, used for high-performance serial number lookups)
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -61,10 +69,8 @@ function Export-DeviceAssignmentReport()
             {
                 $processedCount++
                 
-                # Find matching managed device for user assignment information
-                $matchingManagedDevice = $managedDevices.value | Where-Object { 
-                    $_.serialNumber -eq $autopilotDevice.serialNumber
-                }
+                # Find matching managed device for user assignment information (using high-performance filter)
+                $matchingManagedDevice = Invoke-DeviceFilter -Devices $managedDevices.value -FilterType BySerial -FilterValue $autopilotDevice.serialNumber
                 
                 if ($matchingManagedDevice)
                 {
@@ -115,10 +121,8 @@ function Export-DeviceAssignmentReport()
             {
                 $processedCount++
                 
-                # Find matching managed device for user assignment information
-                $matchingManagedDevice = $managedDevices.value | Where-Object { 
-                    $_.serialNumber -eq $autopilotDevice.serialNumber
-                }
+                # Find matching managed device for user assignment information (using high-performance filter)
+                $matchingManagedDevice = Invoke-DeviceFilter -Devices $managedDevices.value -FilterType BySerial -FilterValue $autopilotDevice.serialNumber
                 
                 if ($matchingManagedDevice)
                 {
@@ -194,10 +198,8 @@ function Export-DeviceAssignmentReport()
             {
                 $processedCount++
                 
-                # Find matching managed device for user assignment information
-                $matchingManagedDevice = $managedDevices.value | Where-Object { 
-                    $_.serialNumber -eq $autopilotDevice.serialNumber
-                }
+                # Find matching managed device for user assignment information (using high-performance filter)
+                $matchingManagedDevice = Invoke-DeviceFilter -Devices $managedDevices.value -FilterType BySerial -FilterValue $autopilotDevice.serialNumber
                 
                 if ($matchingManagedDevice)
                 {
@@ -246,10 +248,8 @@ function Export-DeviceAssignmentReport()
             
             $CSVObject = foreach ($autopilotDevice in $autopilotDevices.value)
             {
-                # Find matching managed device for user assignment and additional information
-                $matchingManagedDevice = $managedDevices.value | Where-Object { 
-                    $_.serialNumber -eq $autopilotDevice.serialNumber
-                }
+                # Find matching managed device for user assignment and additional information (using high-performance filter)
+                $matchingManagedDevice = Invoke-DeviceFilter -Devices $managedDevices.value -FilterType BySerial -FilterValue $autopilotDevice.serialNumber
                 
                 if ($matchingManagedDevice)
                 {
