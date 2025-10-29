@@ -67,6 +67,10 @@ function Get-EntraDirectoryObject()
     Write-Verbose "[$functionName] Starting function to get $EntityType from Entra ID"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Starting $EntityType search for: $EntityName" -LogLevel "Verbose"
     
+    # Generate cache key based on entity type, name, and search type (pipe-separated for consistency with tests)
+    $cacheKey = "{0}|{1}|{2}" -f $EntityType, $EntityName, $FindSimilar.ToString()
+    Write-Verbose "[$functionName] Cache key: $cacheKey"
+    
     # Initialize cache (use C# if available, otherwise PowerShell hashtable)
     $useCSharpCache = $global:AutopilotDllStatus -and $global:AutopilotDllStatus.CacheCoreLoaded
     
@@ -375,27 +379,27 @@ function Get-EntraDirectoryObject()
                     Write-Verbose "[$functionName] Cached fuzzy search result for $EntityType`: $EntityName"
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Cached fuzzy search result for $EntityType`: $EntityName" -LogLevel "Verbose"
                 }
-                return $result
             }
-            else
-            {
-                Write-Verbose "[$functionName] Fuzzy search failed (Error code: $fallbackResults)"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Fuzzy search failed for $EntityType`: $EntityName" -LogLevel "Warning"
-            }
-        }
-    
-        # No matches found
-        Write-Verbose "[$functionName] No matches found for $EntityType`: $EntityName"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "No matches found for $EntityType`: $EntityName" -LogLevel "Warning"
-    
-        $noEntityMessage = if ($EntityType -eq "User")
-        {
-            $returnValues.noUserFoundInDirectoryMessage 
+            return $result
         }
         else
         {
-            $returnValues.noGroupFoundMessage 
+            Write-Verbose "[$functionName] Fuzzy search failed (Error code: $fallbackResults)"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Fuzzy search failed for $EntityType`: $EntityName" -LogLevel "Warning"
         }
-        return $noEntityMessage
     }
+    
+    # No matches found
+    Write-Verbose "[$functionName] No matches found for $EntityType`: $EntityName"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "No matches found for $EntityType`: $EntityName" -LogLevel "Warning"
+    
+    $noEntityMessage = if ($EntityType -eq "User")
+    {
+        $returnValues.noUserFoundInDirectoryMessage 
+    }
+    else
+    {
+        $returnValues.noGroupFoundMessage 
+    }
+    return $noEntityMessage
 }

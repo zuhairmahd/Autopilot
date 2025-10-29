@@ -180,8 +180,8 @@ function Initialize-ApplicationConfiguration()
                 $cacheKey = "appconfig:full:$InitFile"
                 $useCache = $false
                 $cachedResult = $null
-                
-                if ($global:AutopilotDllStatus.ConfigCoreLoaded -and $global:AutopilotDllStatus.CacheCoreLoaded)
+
+                if ($global:AutopilotDllStatus -and $global:AutopilotDllStatus.ConfigCoreLoaded -and $global:AutopilotDllStatus.CacheCoreLoaded)
                 {
                     Write-Verbose "[$functionName] ConfigCore and CacheCore available - checking for cached configuration"
                     Write-Log -logFile $logFile -module $functionName -Message "Checking cache availability for configuration" -logLevel "Verbose"
@@ -495,7 +495,7 @@ function Initialize-ApplicationConfiguration()
         Write-Verbose "[$functionName] Configuration initialization completed successfully"
         
         # Phase 2 Optimization: Cache the result if ConfigCore and CacheCore are available
-        if ($global:AutopilotDllStatus.ConfigCoreLoaded -and $global:AutopilotDllStatus.CacheCoreLoaded)
+        if ($global:AutopilotDllStatus -and $global:AutopilotDllStatus.ConfigCoreLoaded -and $global:AutopilotDllStatus.CacheCoreLoaded)
         {
             try
             {

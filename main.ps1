@@ -402,7 +402,6 @@ if ($PSVersionTable.PSVersion.Major -lt 7)
     Write-Host "For best performance and stability, please upgrade to PowerShell 7 or later." -ForegroundColor Yellow
     Write-Host "Download: https://aka.ms/powershell" -ForegroundColor Cyan
     Write-Host ""
-    exit 1
 }
 
 #initialize global variables

@@ -11,6 +11,7 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
         . "$script:RepoRoot/functions/deviceFunctions/Get-DeviceData.ps1"
         . "$script:RepoRoot/functions/utilityFunctions/FormatDateWithTimeZone.ps1"
         . "$script:RepoRoot/functions/utilityFunctions/GetTimeZoneAbbreviation.ps1"
+        . "$script:RepoRoot/functions/utilityFunctions/Invoke-DeviceFilter.ps1"
         . "$script:RepoRoot/functions/utilityFunctions/Write-Log.ps1"
         . "$script:RepoRoot/functions/graphFunctions/CallGraphApi.ps1"
         

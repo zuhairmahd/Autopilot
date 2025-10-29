@@ -125,7 +125,7 @@ function ExportDeviceReport()
                     Value    = $formattedOutput[$key]
                 }
             }
-            $csvData | Export-AutopilotCsv -Path $csvPath -NoTypeInformation -Encoding UTF8
+            $null = $csvData | Export-AutopilotCsv -Path $csvPath -NoTypeInformation
             Write-Host "CSV report exported to: $csvPath" -ForegroundColor Green
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully exported CSV report to $csvPath" -LogLevel "Information"
         }

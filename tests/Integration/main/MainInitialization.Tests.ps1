@@ -116,7 +116,15 @@ BeforeAll {
             $value = $Parameters[$key]
             if ($value -is [bool] -or $value -is [switch])
             {
-                if ($value) { $params += "-$key" }
+                # For boolean/switch parameters, always include them with explicit true/false syntax
+                if ($value)
+                { 
+                    $params += "-$key" 
+                }
+                else
+                {
+                    $params += "-$key`:$false"
+                }
             }
             else
             {

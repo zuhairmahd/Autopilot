@@ -23,6 +23,7 @@ Describe "Report Generation Integration" -Tags 'Integration', 'Reporting' {
 
         # Load the function to be tested
         . (Join-Path $script:RepoRoot "functions/reportingFunctions/ExportDeviceReport.ps1")
+        . (Join-Path $script:RepoRoot "functions/utilityFunctions/Export-AutopilotCsv.ps1")
         
         # Mock Write-Log as it is called by the function
         function global:Write-Log { param($LogFile, $Module, $Message, $LogLevel) }
