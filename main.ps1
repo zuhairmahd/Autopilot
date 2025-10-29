@@ -186,6 +186,7 @@ param(
     [String] $GroupTag,
     [switch]$showLicenseBanner,
     [switch]$showAuth,
+    [switch]$showOptimizations,
     [switch]$showVersion,
     [switch]$showSettings,
     [switch]$OverwriteLogs,
@@ -422,34 +423,36 @@ else
 
 # Initialize C# DLLs for enhanced performance (optional, falls back to PowerShell if not available)
 Write-Verbose "[$scriptName] Initializing C# DLLs for performance optimization"
-$global:AutopilotDllStatus = Initialize-AutopilotDlls -DLLPath "$scriptPath\bin\Release"
+$AutopilotDllStatus = Initialize-AutopilotDlls -DLLPath "$scriptPath\bin\Release"
 
 # Display DLL load status with performance benefits
-if ($global:AutopilotDllStatus.Success)
+if ($AutopilotDllStatus.Success)
 {
     Write-Verbose "[$scriptName] All performance DLLs loaded successfully"
-    Write-Host "Performance DLLs loaded (20-30% faster): $($global:AutopilotDllStatus.LoadedAssemblies -join ', ')" -ForegroundColor Green
+    Write-Host "Performance DLLs loaded: $($AutopilotDllStatus.LoadedAssemblies -join ', ')" -ForegroundColor Green
     
-    # Show specific optimizations enabled
-    $optimizations = @()
-    if ($global:AutopilotDllStatus.LogCoreLoaded) { $optimizations += "Logging (10-20x)" }
-    if ($global:AutopilotDllStatus.CacheCoreLoaded) { $optimizations += "Caching" }
-    if ($global:AutopilotDllStatus.ConfigCoreLoaded) { $optimizations += "Config (10-48x)" }
-    if ($global:AutopilotDllStatus.StringCoreLoaded) { $optimizations += "String ops (3-5x)" }
-    if ($global:AutopilotDllStatus.GraphCoreLoaded) { $optimizations += "Graph API (5-10x)" }
-    if ($global:AutopilotDllStatus.DeviceCoreLoaded) { $optimizations += "Device filtering (3-6x)" }
-    if ($global:AutopilotDllStatus.CsvCoreLoaded) { $optimizations += "CSV export (5-10x)" }
-    if ($global:AutopilotDllStatus.CollectionCoreLoaded) { $optimizations += "Collections (3-8x)" }
-    
-    if ($optimizations.Count -gt 0)
+    if ($showOptimizations)
     {
-        Write-Host "  Optimizations: $($optimizations -join ', ')" -ForegroundColor Cyan
+        # Show specific optimizations enabled
+        $optimizations = @()
+        if ($AutopilotDllStatus.LogCoreLoaded) { $optimizations += "Logging (10-20x)" }
+        if ($AutopilotDllStatus.CacheCoreLoaded) { $optimizations += "Caching" }
+        if ($AutopilotDllStatus.ConfigCoreLoaded) { $optimizations += "Config (10-48x)" }
+        if ($AutopilotDllStatus.StringCoreLoaded) { $optimizations += "String ops (3-5x)" }
+        if ($AutopilotDllStatus.GraphCoreLoaded) { $optimizations += "Graph API (5-10x)" }
+        if ($AutopilotDllStatus.DeviceCoreLoaded) { $optimizations += "Device filtering (3-6x)" }
+        if ($AutopilotDllStatus.CsvCoreLoaded) { $optimizations += "CSV export (5-10x)" }
+        if ($AutopilotDllStatus.CollectionCoreLoaded) { $optimizations += "Collections (3-8x)" }
+        if ($optimizations.Count -gt 0)
+        {
+            Write-Host "  Optimizations: $($optimizations -join ', ')" -ForegroundColor Cyan
+        }
     }
 }
-elseif ($global:AutopilotDllStatus.LoadedCount -gt 0)
+elseif ($AutopilotDllStatus.LoadedCount -gt 0)
 {
-    Write-Verbose "[$scriptName] Partial DLL load: $($global:AutopilotDllStatus.LoadedCount) of 8"
-    Write-Host "Performance DLLs partially loaded ($($global:AutopilotDllStatus.LoadedCount)/8): $($global:AutopilotDllStatus.LoadedAssemblies -join ', ')" -ForegroundColor Yellow
+    Write-Verbose "[$scriptName] Partial DLL load: $($AutopilotDllStatus.LoadedCount) of 8"
+    Write-Host "Performance DLLs partially loaded ($($AutopilotDllStatus.LoadedCount)/8): $($AutopilotDllStatus.LoadedAssemblies -join ', ')" -ForegroundColor Yellow
     Write-Host "  Some operations will use PowerShell fallback" -ForegroundColor Yellow
 }
 else
