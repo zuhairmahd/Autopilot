@@ -856,7 +856,7 @@ function SignScripts()
     $filesToSign = @()
     foreach ($folder in $Path)
     {
-        $files = Get-ChildItem -Path $folder -Filter *.exe
+        $files = Get-ChildItem -Path $folder -Filter *.exe, *.dll
         Write-Verbose "[$functionName] Signing $($files.count) files in $folder and excluding $($exclusions.Count) files."
         if ($files.Count -gt 0)
         {
@@ -1951,7 +1951,7 @@ else
 if (-not $SkipSigning)
 {
     Write-Host "Signing executable at $OutputFile"
-    if (SignScripts -path $outputFile)
+    if (SignScripts -path $outputPath)
     {
         Write-Host "Executable signed successfully: $OutputFile"
     }
