@@ -13,6 +13,7 @@ param(
     [switch]$showSettings,
     [switch]$OverwriteLogs,
     [switch]$SecureString,
+    [bool]$autoUpdate,
     [switch]$testMode,
     [string]$TestPassword,
     [switch]$ResetAuth,
@@ -230,6 +231,38 @@ else
 }
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Version: $($version | Out-String)" -LogLevel "Information"
 Write-Verbose "[$scriptName] Initializing application configuration"
+if ($testMode)
+{
+    Write-Verbose "[$scriptName] Test mode enabled: Initializing application metadata in silent mode"   
+    write-log -logFile $logFile -module $scriptName -message "Test mode enabled: Initializing application metadata in silent mode"
+    $appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile -scriptName $scriptName -scriptPath $ScriptPath -Silent
+}
+else
+{
+    Write-Verbose "[$scriptName] Initializing application metadata"
+    write-log -logFile $logFile -module $scriptName -message "Initializing application metadata"
+    $appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile -scriptName $scriptName -scriptPath $ScriptPath
+}
+$version = if ($null -ne $appMetaData.version)
+{
+    $appMetaData.version
+}
+else
+{
+    New-Object System.Version 0, 0, 0, 0
+}
+if ($ShowVersion)
+{
+    Write-Verbose "[$scriptName] Version: $version"
+    Write-Host "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -ForegroundColor Green
+    Write-Host "Copyright (c) $((Get-Date).Year) $($appMetaData.companyName)" -ForegroundColor Cyan
+    Write-Host "Update branch: $($appMetaData.release)" -ForegroundColor Cyan
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -finishLogging
+    exit 0
+}
+
+#run cleanup of temp files from previous runs
 $filesCleaned = cleanupTempFiles
 if ($filesCleaned.AllRemoved)
 {
@@ -237,10 +270,11 @@ if ($filesCleaned.AllRemoved)
 }
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
-
+#Check for settings migration
 write-log -logFile $logFile -module $scriptName -message "Checking for settings migration need." -LogLevel "Information"
 Write-Verbose "[$scriptName] Checking for settings migration need."
 $migrationCheck = Invoke-SettingsMigration -RemoveJsonFiles -Force
+# $migrationCheck = Invoke-SettingsMigration -Force
 write-log -logFile $logFile -module $scriptName -message "Migration needed: $($migrationCheck.migrationNeeded), Success: $($migrationCheck.success)" -LogLevel "Information"
 if ($migrationCheck.success -and $migrationCheck.migrationNeeded)
 {
@@ -261,25 +295,6 @@ else
 {
     Write-Verbose "[$scriptName] No migration needed."
     Write-Log -LogFile $LogFile -Module $scriptName -Message "No migration needed." -LogLevel "Information" 
-}
-
-$appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile
-# Prioritize version from the domain settings file obtained via the Get-AppMetaData function
-if (-not ([string]::IsNullOrWhiteSpace($appMetaData.companyName)) -and $appMetaData.companyName -ne $version.companyName)
-{
-    Write-Log -LogFile $LogFile -Module $scriptName -Message "Company name mismatch: $($appMetaData.companyName) vs $($version.companyName)" -LogLevel "Warning"
-    $version.companyName = $appMetaData.companyName
-    Write-Verbose "[$scriptName] Updated company name: $($version.companyName)"
-}
-if ($ShowVersion)
-{
-    Write-Verbose "[$scriptName] Version: $version"
-    Write-Host "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -ForegroundColor Green
-    Write-Host "Copyright (c) $((Get-Date).Year) $($version.companyName)" -ForegroundColor Cyan
-    Write-Host "Update branch: $($appMetaData.release)" -ForegroundColor Cyan
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -LogLevel "Information"
-    Write-Log -LogFile $LogFile -finishLogging
-    exit 0
 }
 #endregion  Initialize script parameters
 
@@ -619,7 +634,6 @@ $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $sc
 # "unmanaged" = $unmanagedDevices
 # }
 #endregion Define variables
-
 
 exit 0
 #region Usage examples for GetGraphObjectMetadata

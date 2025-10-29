@@ -23,7 +23,9 @@ The repository includes **5 C# DLLs** that provide performance-critical function
 **Current Status:** Phase 1 (Infrastructure) 100%, Phase 2 (Initial Integrations) 100%, **20-30% overall speedup achieved**. See `docs/DOTNET_MIGRATION_PLAN.md` for comprehensive implementation plan and roadmap.
 
 ## Build, Test, and Development Commands
-Launch the interactive tool with `.\main.ps1 -Verbose -LogLevel "Debug"` to mirror developer telemetry. Use `.\test.ps1` for lightweight module import checks, then run `pwsh -executionPolicy bypass -File .\Invoke-PesterTests.ps1 -TestType Unit` (or substitute `syntax`, `integration`, or `comprehensive` as needed). Create signed builds with `.\CreateRelease.ps1 -Stage Build` (pair with `-WhatIf` for rehearsal). Tail `Logs\Autopilot.log` to watch Graph and menu activity while iterating.
+Launch the interactive tool with `.\main.ps1 -Verbose -LogLevel "Debug"` to mirror developer telemetry. Use `.\test.ps1` for lightweight module import checks, then run **PowerShell 7** tests with `pwsh.exe -ExecutionPolicy Bypass -File .\Invoke-PesterTests.ps1 -OutputVerbosity Detailed -TestType Unit` (or substitute `integration`, or `comprehensive` as needed). Create signed builds with `.\CreateRelease.ps1 -Stage Build` (pair with `-WhatIf` for rehearsal). Tail `Logs\Autopilot.log` to watch Graph and menu activity while iterating.
+
+**IMPORTANT:** Always use PowerShell 7 (`pwsh.exe`) for running Pester tests. The application code must support PowerShell 5.1, but tests require PowerShell 7+.
 
 ## Coding Style & Naming Conventions
 Stick to four-space indentation, ~120-character lines, and approved PowerShell verb-noun PascalCase (`Get-DeviceProfileStatus`). Variables use camelCase, constants use ALL_CAPS, and every public function needs comment-based help plus `$functionName = $MyInvocation.MyCommand.Name` for logging context. Favor `try/catch`, `Write-Verbose`, and the shared `Write-Log` helper; avoid 5.1-incompatible constructs such as ordered hashtables or string interpolation. **Do not use Unicode characters** (checkmarks, arrows, emoji, etc.) as PowerShell 5.1 console output may not render them correctly—stick to ASCII characters only. For newlines in `Write-Host` statements, use separate `Write-Host` calls instead of `\n` escape sequences. No automated formatter runs here—the style guidance and reviewers are the guardrails.
@@ -35,15 +37,19 @@ Stick to four-space indentation, ~120-character lines, and approved PowerShell v
 The project uses **Pester v5** as the primary testing framework for new tests, while legacy tests are being gradually migrated (82% complete as of October 2025). Both frameworks coexist during the migration period.
 
 ### Quick Reference Commands
-- **Quick validation:** `pwsh -executionPolicy bypass -File .\Invoke-PesterTests.ps1 -TestType Unit` (runs fast Pester unit tests)
-- **Full Pester suite:** `.\Invoke-PesterTests.ps1 -TestType All -EnableCodeCoverage` (all Pester tests with coverage)
+- **Quick validation:** `pwsh.exe -ExecutionPolicy Bypass -File .\Invoke-PesterTests.ps1 -outputVerbosity Detailed -TestType Unit` (runs fast Pester unit tests)
+- **Full Pester suite:** `pwsh.exe -ExecutionPolicy Bypass -File .\Invoke-PesterTests.ps1 -TestType All -outputVerbosity Detailed -EnableCodeCoverage` (all Pester tests with coverage)
+- **Single test file:** `pwsh.exe -ExecutionPolicy Bypass -File .\Invoke-PesterTests.ps1 -outputVerbosity Detailed -TestFile "tests\Unit\MyTest.Tests.ps1"`
+
+**CRITICAL:** All Pester tests MUST be run using PowerShell 7 (`pwsh.exe`). Do not use `powershell.exe` (PowerShell 5.1) for running tests.
 
 ### Core Testing Principles
 - ✅ **Improve helpers first** - Enhance helper modules rather than creating workarounds in individual tests
 - ✅ **Direct dot-sourcing** - Load functions directly in BeforeAll blocks (most reliable pattern)
 - ✅ **100% pass rate** - All tests must pass before committing (non-negotiable)
-- ✅ **PowerShell 7+ for tests** - Tests run in PowerShell 7+ only; application code must support PS 5.1
+- ✅ **PowerShell 7+ for tests** - Tests MUST run using `pwsh.exe` (PowerShell 7+); application code must support PS 5.1
 - ✅ **Use Sort-Object** - Apply to collections for deterministic ordering
+- ✅ **Proper cleanup** - Always use `AfterAll` blocks to remove test artifacts; avoid TestDrive if possible, use `Initialize-AutopilotTestEnvironment` from helpers instead
 - ⚠️ **Binary cmdlet mocking** - When mocking binary cmdlets like `Get-CimInstance`, use exact parameter names (e.g., `-ClassName` not `-Class`) and return appropriate types or simple strings to bypass strict type validation
 
 ### Helper Modules (Three-Tiered Architecture)

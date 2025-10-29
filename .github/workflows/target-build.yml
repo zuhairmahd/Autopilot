@@ -87,7 +87,7 @@ jobs:
         run: |
           Write-Host "Running all test suites..."
           $coverageFlag = if ('${{ github.event.inputs.enable_code_coverage }}' -eq 'true') { '-EnableCodeCoverage' } else { '' }
-          $cmd = ".\Invoke-PesterTests.ps1 -TestType All -CI $coverageFlag"
+          $cmd = ".\Invoke-PesterTests.ps1 -TestType All -CI $coverageFlag -OutputVerbosity Detailed"
           Write-Host "Executing: $cmd"
           Invoke-Expression $cmd
 
@@ -99,7 +99,7 @@ jobs:
         run: |
           Write-Host "Running unit tests..."
           $coverageFlag = if ('${{ github.event.inputs.enable_code_coverage }}' -eq 'true') { '-EnableCodeCoverage' } else { '' }
-          $cmd = ".\Invoke-PesterTests.ps1 -TestType Unit -CI $coverageFlag"
+          $cmd = ".\Invoke-PesterTests.ps1 -TestType Unit -CI $coverageFlag -OutputVerbosity Detailed"
           Write-Host "Executing: $cmd"
           Invoke-Expression $cmd
 
@@ -111,7 +111,7 @@ jobs:
         run: |
           Write-Host "Running integration tests..."
           $coverageFlag = if ('${{ github.event.inputs.enable_code_coverage }}' -eq 'true') { '-EnableCodeCoverage' } else { '' }
-          $cmd = ".\Invoke-PesterTests.ps1 -TestType Integration -CI $coverageFlag"
+          $cmd = ".\Invoke-PesterTests.ps1 -TestType Integration -CI $coverageFlag -OutputVerbosity Detailed"
           Write-Host "Executing: $cmd"
           Invoke-Expression $cmd
 
@@ -123,7 +123,7 @@ jobs:
         run: |
           Write-Host "Running comprehensive tests..."
           $coverageFlag = if ('${{ github.event.inputs.enable_code_coverage }}' -eq 'true') { '-EnableCodeCoverage' } else { '' }
-          $cmd = ".\Invoke-PesterTests.ps1 -TestType Comprehensive -CI $coverageFlag"
+          $cmd = ".\Invoke-PesterTests.ps1 -TestType Comprehensive -CI $coverageFlag -OutputVerbosity Detailed"
           Write-Host "Executing: $cmd"
           Invoke-Expression $cmd
 

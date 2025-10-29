@@ -196,8 +196,11 @@ function Show-AutopilotProfilesEditor()
                     {
                         # Detect format and display accordingly
                         $firstElement = $currentAutopilotProfiles[0]
-                        Write-Verbose "[$functionName] First element type: $($firstElement.GetType().FullName)"
-                        write-log -LogFile $logFile -Module $functionName -Message "First element type: $($firstElement.GetType().FullName)" -LogLevel "Information"
+                        if ($null -ne $firstElement)
+                        {
+                            Write-Verbose "[$functionName] First element type: $($firstElement.GetType().FullName)"
+                            write-log -LogFile $logFile -Module $functionName -Message "First element type: $($firstElement.GetType().FullName)" -LogLevel "Information"
+                        }                       
                         if ($firstElement -is [string])
                         {
                             # Old string format

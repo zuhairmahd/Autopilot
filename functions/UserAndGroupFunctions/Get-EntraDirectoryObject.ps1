@@ -79,39 +79,27 @@ function Get-EntraDirectoryObject()
             Write-Verbose "[$functionName] Initialized C# DirectoryObjectCache (LRU with TTL)"
             Write-Log -LogFile $LogFile -Module $functionName -Message "Initialized C# DirectoryObjectCache for enhanced performance" -LogLevel "Information"
         }
-    }
-    else
-    {
-        # Fallback to PowerShell hashtable
-        if (-not $global:DirectoryObjectCache)
+        else
         {
-            $global:DirectoryObjectCache = @{}
-            Write-Verbose "[$functionName] Initialized PowerShell directory object cache (hashtable)"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Initialized PowerShell directory object cache" -LogLevel "Verbose"
-        }
+            # Check cache first
+            $cachedResult = $global:DirectoryObjectCacheInstance.Get($cacheKey)
+            if ($null -ne $cachedResult)
+            {
+                Write-Verbose "[$functionName] Found cached result in C# cache for $EntityType`: $EntityName (FindSimilar: $FindSimilar)"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "C# cache hit for $EntityType`: $EntityName" -LogLevel "Verbose"
+                return $cachedResult
+            }
+        }            
     }
-    
-    # Create cache key including EntityType and FindSimilar flag
-    $cacheKey = "$EntityType|$EntityName|$FindSimilar"
-    
-    # Check cache first
-    if ($useCSharpCache)
+    else 
     {
-        $cachedResult = $global:DirectoryObjectCacheInstance.Get($cacheKey)
+        # Check unified cache first
+        $cachedResult = Get-CachedData -CacheType 'DirectoryObjects' -Key $cacheKey -Settings $global:settings
         if ($null -ne $cachedResult)
         {
-            Write-Verbose "[$functionName] Found cached result in C# cache for $EntityType`: $EntityName (FindSimilar: $FindSimilar)"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "C# cache hit for $EntityType`: $EntityName" -LogLevel "Verbose"
+            Write-Verbose "[$functionName] Found cached result for $EntityType`: $EntityName (FindSimilar: $FindSimilar)"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Found cached result for $EntityType`: $EntityName" -LogLevel "Verbose"
             return $cachedResult
-        }
-    }
-    else
-    {
-        if ($global:DirectoryObjectCache.ContainsKey($cacheKey))
-        {
-            Write-Verbose "[$functionName] Found cached result in PowerShell cache for $EntityType`: $EntityName (FindSimilar: $FindSimilar)"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "PowerShell cache hit for $EntityType`: $EntityName" -LogLevel "Verbose"
-            return $global:DirectoryObjectCache[$cacheKey]
         }
     }
     
@@ -122,10 +110,8 @@ function Get-EntraDirectoryObject()
         Write-Log -LogFile $LogFile -Module $functionName -Message "AccessToken is required but was not provided" -LogLevel "Error"
         return $returnValues.noAccessTokenMessage
     }
-    
     # Step 1: Attempt exact match
     Write-Verbose "[$functionName] Attempting exact match for $EntityType`: $EntityName"
-    
     if ($EntityType -eq "User")
     {
         # User exact match by userPrincipalName
@@ -140,9 +126,7 @@ function Get-EntraDirectoryObject()
         $extraParameters = "select=displayName,id"
         $entityInfo = CallGraphAPI -AccessToken $AccessToken -ResourcePath $resourcePath -Filter $filter -ExtraParameters $extraParameters
     }
-    
     Write-Verbose "[$functionName] Exact match API response: $($entityInfo | Out-String)"
-    
     # Check if exact match succeeded
     $exactMatchFound = $false
     if ($EntityType -eq "User")
@@ -174,10 +158,8 @@ function Get-EntraDirectoryObject()
             $exactMatchResponse = $entityInfo  # Already in correct format
             Write-Verbose "[$functionName] Group found: $($entityInfo.value[0].displayName)"
         }
-        
         # Cache and return
         $result = $exactMatchResponse, $substringSearch
-        
         if ($useCSharpCache)
         {
             $global:DirectoryObjectCacheInstance.Set($cacheKey, $result)
@@ -186,20 +168,26 @@ function Get-EntraDirectoryObject()
         }
         else
         {
-            $global:DirectoryObjectCache[$cacheKey] = $result
-            Write-Verbose "[$functionName] Cached exact match result in PowerShell cache for $EntityType`: $EntityName"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "PowerShell cache: stored exact match for $EntityType`: $EntityName" -LogLevel "Verbose"
-        }
-        
+            $metadata = @{
+                EntityType = $EntityType
+                SearchType = 'ExactMatch'
+                EntityName = $EntityName
+            }
+            $cached = Set-CachedData -CacheType 'DirectoryObjects' -Key $cacheKey -Data $result -Metadata $metadata -Settings $global:settings
+            if ($cached)
+            {
+                Write-Verbose "[$functionName] Cached exact match result for $EntityType`: $EntityName"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Cached exact match for $EntityType`: $EntityName" -LogLevel "Verbose"
+            }
+        }     
         return $result
-    }
+    }    
     
     # Handle error cases - show error message only if FindSimilar is not enabled
     if ($entityInfo -in 400, 401, 403, 404 -and -not $FindSimilar)
     {
         Write-Verbose "[$functionName] Exact match failed with error code: $entityInfo"
         Write-Log -LogFile $LogFile -Module $functionName -Message "$EntityType lookup failed with error code: $entityInfo" -LogLevel "Error"
-        
         # Display appropriate error message
         switch ($entityInfo)
         {
@@ -375,31 +363,39 @@ function Get-EntraDirectoryObject()
             }
             else
             {
-                $global:DirectoryObjectCache[$cacheKey] = $result
-                Write-Verbose "[$functionName] Cached fuzzy search result in PowerShell cache for $EntityType`: $EntityName"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "PowerShell cache: stored fuzzy search for $EntityType`: $EntityName" -LogLevel "Verbose"
+                $metadata = @{
+                    EntityType  = $EntityType
+                    SearchType  = 'FuzzyMatch'
+                    EntityName  = $EntityName
+                    ResultCount = $filteredResponse.value.Count
+                }
+                $cached = Set-CachedData -CacheType 'DirectoryObjects' -Key $cacheKey -Data $result -Metadata $metadata -Settings $global:settings
+                if ($cached)
+                {
+                    Write-Verbose "[$functionName] Cached fuzzy search result for $EntityType`: $EntityName"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Cached fuzzy search result for $EntityType`: $EntityName" -LogLevel "Verbose"
+                }
+                return $result
             }
-            
-            return $result
+            else
+            {
+                Write-Verbose "[$functionName] Fuzzy search failed (Error code: $fallbackResults)"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Fuzzy search failed for $EntityType`: $EntityName" -LogLevel "Warning"
+            }
+        }
+    
+        # No matches found
+        Write-Verbose "[$functionName] No matches found for $EntityType`: $EntityName"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "No matches found for $EntityType`: $EntityName" -LogLevel "Warning"
+    
+        $noEntityMessage = if ($EntityType -eq "User")
+        {
+            $returnValues.noUserFoundInDirectoryMessage 
         }
         else
         {
-            Write-Verbose "[$functionName] Fuzzy search failed (Error code: $fallbackResults)"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Fuzzy search failed for $EntityType`: $EntityName" -LogLevel "Warning"
+            $returnValues.noGroupFoundMessage 
         }
+        return $noEntityMessage
     }
-    
-    # No matches found
-    Write-Verbose "[$functionName] No matches found for $EntityType`: $EntityName"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "No matches found for $EntityType`: $EntityName" -LogLevel "Warning"
-    
-    $noEntityMessage = if ($EntityType -eq "User")
-    {
-        $returnValues.noUserFoundInDirectoryMessage 
-    }
-    else
-    {
-        $returnValues.noGroupFoundMessage 
-    }
-    return $noEntityMessage
 }

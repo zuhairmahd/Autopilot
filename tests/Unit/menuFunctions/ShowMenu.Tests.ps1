@@ -30,6 +30,7 @@ Describe "Function: ShowMenu" -Tags 'Unit', 'menuFunctions' {
         $script:RepoRoot = (Get-Item $PSScriptRoot).Parent.Parent.Parent.FullName
         
         # Load dependencies
+        . "$script:RepoRoot/functions/utilityFunctions/Get-CachedData.ps1"
         . "$script:RepoRoot/functions/menuFunctions/Get-BaseCallingContext.ps1"
         . "$script:RepoRoot/functions/menuFunctions/Get-UniqueCallerContext.ps1"
         . "$script:RepoRoot/functions/menuFunctions/Get-NavigationPathContext.ps1"

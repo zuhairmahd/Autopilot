@@ -27,12 +27,29 @@ Describe "Get-EntraDirectoryObject Function" -Tags 'Unit', 'DirectoryObject', 'G
         # Import mocking infrastructure
         Import-Module (Join-Path $PSScriptRoot "../Helpers/AutopilotGraphMocks.psm1") -Force
         
+        # Load unified cache functions
+        . (Join-Path $script:RepoRoot "functions/utilityFunctions/Get-CachedData.ps1")
+        
         # Load the function being tested
         . (Join-Path $script:RepoRoot "functions/UserAndGroupFunctions/Get-EntraDirectoryObject.ps1")
         
         # Setup test log file
         $tempPath = if ($env:TEMP) { $env:TEMP } else { "/tmp" }
         $global:LogFile = Join-Path $tempPath "test-get-entra-directory-object.log"
+        
+        # Initialize cache settings
+        $global:settings = @{
+            cacheSettings = @{
+                enabled                  = $true
+                defaultExpirationMinutes = 15
+                maxCacheSize             = 1000
+                cacheTypes               = @{
+                    Configuration    = @{ enabled = $true; expirationMinutes = 60 }
+                    DirectoryObjects = @{ enabled = $true; expirationMinutes = 15 }
+                    Devices          = @{ enabled = $true; expirationMinutes = 15 }
+                }
+            }
+        }
         
         # Initialize mock environment
         Initialize-GraphMockEnvironment -ClearCache
@@ -64,8 +81,8 @@ Describe "Get-EntraDirectoryObject Function" -Tags 'Unit', 'DirectoryObject', 'G
     }
     
     BeforeEach {
-        # Clear cache before each test
-        $global:DirectoryObjectCache = @{}
+        # Clear unified cache before each test
+        Clear-UnifiedCache
         
         # Reset mock data to defaults
         Reset-MockData -IncludeUsers -IncludeGroups
@@ -224,11 +241,11 @@ Describe "Get-EntraDirectoryObject Function" -Tags 'Unit', 'DirectoryObject', 'G
         It "Should cache exact match results for users" {
             # First call
             $result1 = Get-EntraDirectoryObject -EntityType User -EntityName "john.doe@contoso.com" -AccessToken "test-token"
-            $cacheSize1 = $global:DirectoryObjectCache.Count
+            $cacheSize1 = $global:UnifiedCache.DirectoryObjects.Count
             
             # Second call - should use cache
             $result2 = Get-EntraDirectoryObject -EntityType User -EntityName "john.doe@contoso.com" -AccessToken "test-token"
-            $cacheSize2 = $global:DirectoryObjectCache.Count
+            $cacheSize2 = $global:UnifiedCache.DirectoryObjects.Count
             
             $cacheSize1 | Should -Be 1
             $cacheSize2 | Should -Be 1
@@ -238,11 +255,11 @@ Describe "Get-EntraDirectoryObject Function" -Tags 'Unit', 'DirectoryObject', 'G
         It "Should cache exact match results for groups" {
             # First call
             $result1 = Get-EntraDirectoryObject -EntityType Group -EntityName "Marketing Team" -AccessToken "test-token"
-            $cacheSize1 = $global:DirectoryObjectCache.Count
+            $cacheSize1 = $global:UnifiedCache.DirectoryObjects.Count
             
             # Second call - should use cache
             $result2 = Get-EntraDirectoryObject -EntityType Group -EntityName "Marketing Team" -AccessToken "test-token"
-            $cacheSize2 = $global:DirectoryObjectCache.Count
+            $cacheSize2 = $global:UnifiedCache.DirectoryObjects.Count
             
             $cacheSize1 | Should -Be 1
             $cacheSize2 | Should -Be 1
@@ -252,11 +269,11 @@ Describe "Get-EntraDirectoryObject Function" -Tags 'Unit', 'DirectoryObject', 'G
         It "Should create separate cache entries for different entity types" {
             # User search
             $result1 = Get-EntraDirectoryObject -EntityType User -EntityName "john.doe@contoso.com" -AccessToken "test-token"
-            $cacheSize1 = $global:DirectoryObjectCache.Count
+            $cacheSize1 = $global:UnifiedCache.DirectoryObjects.Count
             
             # Group search
             $result2 = Get-EntraDirectoryObject -EntityType Group -EntityName "Marketing Team" -AccessToken "test-token"
-            $cacheSize2 = $global:DirectoryObjectCache.Count
+            $cacheSize2 = $global:UnifiedCache.DirectoryObjects.Count
             
             $cacheSize1 | Should -Be 1
             $cacheSize2 | Should -Be 2
@@ -265,11 +282,11 @@ Describe "Get-EntraDirectoryObject Function" -Tags 'Unit', 'DirectoryObject', 'G
         It "Should create separate cache entries for different entity names" {
             # First user
             Get-EntraDirectoryObject -EntityType User -EntityName "john.doe@contoso.com" -AccessToken "test-token"
-            $cacheSize1 = $global:DirectoryObjectCache.Count
+            $cacheSize1 = $global:UnifiedCache.DirectoryObjects.Count
             
             # Different user
             Get-EntraDirectoryObject -EntityType User -EntityName "jane.smith@contoso.com" -AccessToken "test-token"
-            $cacheSize2 = $global:DirectoryObjectCache.Count
+            $cacheSize2 = $global:UnifiedCache.DirectoryObjects.Count
             
             $cacheSize1 | Should -Be 1
             $cacheSize2 | Should -Be 2
@@ -437,14 +454,14 @@ Describe "Get-EntraDirectoryObject Function" -Tags 'Unit', 'DirectoryObject', 'G
         It "Should create new cache entry after cache clear" {
             # First call
             Get-EntraDirectoryObject -EntityType User -EntityName "john.doe@contoso.com" -AccessToken "test-token"
-            $firstCacheCount = $global:DirectoryObjectCache.Count
+            $firstCacheCount = $global:UnifiedCache.DirectoryObjects.Count
             
             # Clear cache
-            $global:DirectoryObjectCache = @{}
+            Clear-UnifiedCache -CacheType 'DirectoryObjects'
             
             # Second call should create new cache entry
             Get-EntraDirectoryObject -EntityType User -EntityName "john.doe@contoso.com" -AccessToken "test-token"
-            $secondCacheCount = $global:DirectoryObjectCache.Count
+            $secondCacheCount = $global:UnifiedCache.DirectoryObjects.Count
             
             $firstCacheCount | Should -BeGreaterThan 0
             $secondCacheCount | Should -Be 1
@@ -457,12 +474,12 @@ Describe "Get-EntraDirectoryObject Function" -Tags 'Unit', 'DirectoryObject', 'G
             Get-EntraDirectoryObject -EntityType User -EntityName "john" -AccessToken "test-token" -FindSimilar
             
             # Cache should have at least 3 entries (non-existent searches may not be cached)
-            $global:DirectoryObjectCache.Count | Should -BeGreaterOrEqual 3
+            $global:UnifiedCache.DirectoryObjects.Count | Should -BeGreaterOrEqual 3
             
             # Existing entities should be cached
-            $global:DirectoryObjectCache.Keys | Should -Contain "User|john.doe@contoso.com|False"
-            $global:DirectoryObjectCache.Keys | Should -Contain "Group|Marketing Team|False"
-            $global:DirectoryObjectCache.Keys | Should -Contain "User|john|True"
+            $global:UnifiedCache.DirectoryObjects.Keys | Should -Contain "User|john.doe@contoso.com|False"
+            $global:UnifiedCache.DirectoryObjects.Keys | Should -Contain "Group|Marketing Team|False"
+            $global:UnifiedCache.DirectoryObjects.Keys | Should -Contain "User|john|True"
         }
     }
     
@@ -541,7 +558,7 @@ Describe "Get-EntraDirectoryObject Function" -Tags 'Unit', 'DirectoryObject', 'G
         
         It "Should benefit from caching during high-volume operations" {
             # Clear cache
-            $global:DirectoryObjectCache = @{}
+            Clear-UnifiedCache -CacheType 'DirectoryObjects'
             
             # First 5 calls to same user
             for ($i = 1; $i -le 5; $i++)
@@ -550,7 +567,7 @@ Describe "Get-EntraDirectoryObject Function" -Tags 'Unit', 'DirectoryObject', 'G
             }
             
             # Should only have 1 cache entry (all reused)
-            $global:DirectoryObjectCache.Count | Should -Be 1
+            $global:UnifiedCache.DirectoryObjects.Count | Should -Be 1
             
             # 5 calls to different existing users (need to add them first)
             Add-MockUser -UserPrincipalName "alice@contoso.com" -DisplayName "Alice" -GivenName "Alice" -Surname "Smith"
@@ -561,7 +578,7 @@ Describe "Get-EntraDirectoryObject Function" -Tags 'Unit', 'DirectoryObject', 'G
             Get-EntraDirectoryObject -EntityType User -EntityName "jane.smith@contoso.com" -AccessToken "test-token"
             
             # Should now have 4 cache entries (john + alice + bob + jane)
-            $global:DirectoryObjectCache.Count | Should -Be 4
+            $global:UnifiedCache.DirectoryObjects.Count | Should -Be 4
         }
     }
     

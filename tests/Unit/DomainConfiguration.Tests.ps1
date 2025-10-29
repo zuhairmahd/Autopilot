@@ -33,6 +33,7 @@ Describe "Domain Configuration" -Tags 'Unit', 'Configuration', 'Domain' {
         Initialize-MockGlobalVariables -LogFile $logPath
         
         # Load essential functions
+        . (Join-Path $script:RepoRoot "functions/utilityFunctions/Get-CachedData.ps1")
         . (Join-Path $script:RepoRoot "functions/setupFunctions/Get-DomainConfigurationFromFiles.ps1")
         . (Join-Path $script:RepoRoot "functions/setupFunctions/Save-DomainConfiguration.ps1")
         . (Join-Path $script:RepoRoot "functions/setupFunctions/Get-ApplicationDefaults.ps1")

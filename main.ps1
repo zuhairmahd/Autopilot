@@ -85,6 +85,33 @@
 .PARAMETER LogLevel
     Logging level for the application. Valid values: 'Error', 'Warning', 'Information', 'Verbose', 'Debug'
 
+.PARAMETER testMode
+    Enable test mode to skip interactive prompts and menu display. Used primarily for automated testing.
+
+.PARAMETER testModeMetadata
+    Test mode: Enable metadata initialization phase (default: true). Only effective with -testMode.
+
+.PARAMETER testModeCleanup
+    Test mode: Enable temporary file cleanup phase (default: true). Only effective with -testMode.
+
+.PARAMETER testModeMigration
+    Test mode: Enable settings migration check phase (default: true). Only effective with -testMode.
+
+.PARAMETER testModeConfig
+    Test mode: Enable configuration loading phase (default: true). Only effective with -testMode.
+
+.PARAMETER testModeAuth
+    Test mode: Enable authentication phase (default: false). Only effective with -testMode.
+
+.PARAMETER testModeLegacyMigration
+    Test mode: Enable legacy migration phase (default: false). Only effective with -testMode.
+
+.PARAMETER testModeExitAfter
+    Test mode: Exit after initialization phases complete (default: true). Only effective with -testMode.
+
+.PARAMETER TestPassword
+    Test password for encryption operations during test mode. Only works with -testMode.
+
 .EXAMPLE
     .\main.ps1
     Run the application with default settings and display the main menu.
@@ -116,6 +143,10 @@
 .EXAMPLE
     .\main.ps1 -ForceNewToken -CacheType memory
     Force a new access token and store it in memory only (not on disk).
+
+.EXAMPLE
+    .\main.ps1 -testMode -testModeMetadata -testModeExitAfter
+    Run in test mode, only testing metadata initialization phase then exit.
 
 .LINK
     Project Repository: https://github.com/zuhairmahd/autopilot
@@ -161,6 +192,13 @@ param(
     [switch]$SecureString,
     [bool]$autoUpdate,
     [switch]$testMode,
+    [switch]$testModeMetadata,
+    [switch]$testModeCleanup,
+    [switch]$testModeMigration,
+    [switch]$testModeConfig,
+    [switch]$testModeAuth,
+    [switch]$testModeLegacyMigration,
+    [switch]$testModeExitAfter,
     [string]$TestPassword,
     [switch]$ResetAuth,
     [switch]$ForceNewToken,
@@ -187,12 +225,53 @@ param(
     [string]$LogLevel = 'Information'
 )
 
+#region Initialize test mode
 # Store test password in script scope if provided (only works with testMode for security)
 if ($testMode -and $TestPassword)
 {
     $script:UserEncryptionPassword = $TestPassword
     $global:UserEncryptionPassword = $TestPassword
 }
+
+# Initialize testModeOptions with defaults if testMode is enabled
+function Get-TestModeOption()
+{
+    param(
+        [string]$ParameterName,
+        $DefaultValue
+    )
+    if ($PSBoundParameters.ContainsKey($ParameterName))
+    {
+        return (Get-Variable -Name $ParameterName -Scope 1).Value.IsPresent
+    }
+    else
+    {
+        return $DefaultValue
+    }
+}
+
+if ($testMode)
+{
+    # Default test mode options - only execute essential phases unless specified
+    $defaultTestModeOptions = @{
+        metadata        = Get-TestModeOption -ParameterName 'testModeMetadata' -DefaultValue $true
+        cleanup         = Get-TestModeOption -ParameterName 'testModeCleanup' -DefaultValue $true
+        migration       = Get-TestModeOption -ParameterName 'testModeMigration' -DefaultValue $true
+        config          = Get-TestModeOption -ParameterName 'testModeConfig' -DefaultValue $true
+        auth            = Get-TestModeOption -ParameterName 'testModeAuth' -DefaultValue $false
+        legacyMigration = Get-TestModeOption -ParameterName 'testModeLegacyMigration' -DefaultValue $false
+        menu            = $false  # Never show menu in test mode
+        exitAfter       = Get-TestModeOption -ParameterName 'testModeExitAfter' -DefaultValue $true
+    }
+    
+    # Store in script scope
+    $script:testModeOptions = $defaultTestModeOptions
+    
+    Write-Verbose "[$scriptName] Test mode options initialized: $($script:testModeOptions | ConvertTo-Json -Compress)"
+}
+#endregion Initialize test mode
+
+#region Initialize script variables
 $scriptName = $MyInvocation.MyCommand.Name
 if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
 {
@@ -215,6 +294,7 @@ else
         Write-Verbose "[$scriptName] Full script path: $fullScriptPath"
     }
 }
+#endregion Initialize script variables
 
 #region import functions.
 function Find-FolderPath()
@@ -383,7 +463,23 @@ if ($testMode)
 {
     Write-Verbose "[$scriptName] Test mode enabled: Initializing application metadata in silent mode"   
     write-log -logFile $logFile -module $scriptName -message "Test mode enabled: Initializing application metadata in silent mode"
-    $appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile -scriptName $scriptName -scriptPath $ScriptPath -Silent
+    
+    # Check if metadata phase should be executed
+    if ($script:testModeOptions.metadata)
+    {
+        $appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile -scriptName $scriptName -scriptPath $ScriptPath -Silent
+    }
+    else
+    {
+        Write-Verbose "[$scriptName] Test mode: Skipping metadata initialization (testModeOptions.metadata = false)"
+        write-log -logFile $logFile -module $scriptName -message "Test mode: Skipping metadata initialization"
+        # Set minimal metadata for scripts that need it
+        $appMetaData = @{
+            version     = New-Object System.Version 0, 0, 0, 0
+            companyName = "Test"
+            release     = "test"
+        }
+    }
 }
 else
 {
@@ -397,7 +493,7 @@ $version = if ($null -ne $appMetaData.version)
 }
 else
 {
-    [System.Version]::new(0, 0, 0, 0)
+    New-Object System.Version 0, 0, 0, 0
 }
 if ($ShowVersion)
 {
@@ -411,20 +507,41 @@ if ($ShowVersion)
 }
 
 #run cleanup of temp files from previous runs
-$filesCleaned = cleanupTempFiles
-if ($filesCleaned.AllRemoved)
+if ($testMode -and -not $script:testModeOptions.cleanup)
 {
-    Write-Verbose "[$scriptName] All temporary files were cleaned."
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
+    Write-Verbose "[$scriptName] Test mode: Skipping temporary file cleanup (testModeOptions.cleanup = false)"
+    write-log -logFile $logFile -module $scriptName -message "Test mode: Skipping temporary file cleanup"
+    # Create minimal cleanup result
+    $filesCleaned = @{
+        AllRemoved        = $true
+        RemovedFilesCount = 0
+        FailedFilesCount  = 0
+    }
 }
-Write-Verbose "[$scriptName] Total temporary files found: $($filesCleaned.RemovedFilesCount)"
-Write-Verbose "[$scriptName] Total temporary files removed: $($filesCleaned.RemovedFilesCount)"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
+else
+{
+    $filesCleaned = cleanupTempFiles
+    if ($filesCleaned.AllRemoved)
+    {
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
+    }
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
+}
 
 #Check for settings migration
-write-log -logFile $logFile -module $scriptName -message "Checking for settings migration need." -LogLevel "Information"
-$migrationCheck = Invoke-SettingsMigration -RemoveJsonFiles -Force
+if ($testMode -and -not $script:testModeOptions.migration)
+{
+    Write-Verbose "[$scriptName] Test mode: Skipping settings migration check (testModeOptions.migration = false)"
+    write-log -logFile $logFile -module $scriptName -message "Test mode: Skipping settings migration check"
+    $migrationCheck = @{ MigrationNeeded = $false }
+}
+else
+{
+    write-log -logFile $logFile -module $scriptName -message "Checking for settings migration need." -LogLevel "Information"
+    Write-Verbose "[$scriptName] Checking for settings migration need."
+    $migrationCheck = Invoke-SettingsMigration -RemoveJsonFiles -Force
+}
 write-log -logFile $logFile -module $scriptName -message "Migration needed: $($migrationCheck.migrationNeeded), Success: $($migrationCheck.success)" -LogLevel "Information"
 if ($migrationCheck.success -and $migrationCheck.migrationNeeded)
 {
@@ -462,8 +579,19 @@ if (-not (Test-Path $secretsDir))
 $configContent = $null
 $script:maxRetries = 6
 
+# Skip config loading entirely if testMode and config flag is false
+if ($testMode -and -not $script:testModeOptions.config)
+{
+    Write-Verbose "[$scriptName] Test mode: Skipping configuration loading (testModeOptions.config = false)"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode: Skipping configuration loading" -LogLevel "Information"
+    # Set minimal test values
+    $domain = "test.contoso.com"
+    $appId = "00000000-0000-0000-0000-000000000000"
+    $tenantId = "00000000-0000-0000-0000-000000000000"
+    $name = "Test Application"
+}
 # In test mode without a test password and config file exists, skip config loading
-if ($testMode -and -not $TestPassword -and (Test-Path $configFile))
+elseif ($testMode -and -not $TestPassword -and (Test-Path $configFile))
 {
     Write-Verbose "[$scriptName] Test mode enabled without test password, skipping encrypted config file loading"
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode enabled without test password, skipping encrypted config file loading" -LogLevel "Information"
@@ -639,7 +767,7 @@ else
 }
 #endregion Process login
 
-#region initialize script
+#region initialize script objects
 Write-Host "Loading configuration..."
 # Use domain if available, otherwise default to contoso.com
 $domainForDefaults = if ($domain)
@@ -650,6 +778,7 @@ else
 {
     "contoso.com"
 }
+
 $configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -BoundParameters $PSBoundParameters
 if (-not $configResult.Success)
 {
@@ -666,6 +795,13 @@ $requiredScopes = $configResult.RequiredScopes
 # Merge global and local settings into a single settings object
 Write-Verbose "[$scriptName] Merging global and local settings"
 $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+if ($settings.domain -ne $domain)
+{
+    Write-Verbose "[$scriptName] Updating settings domain from $($settings.domain) to $domain"
+    write-log -logFile $logFile -module $scriptName -message "Updating settings domain from $($settings.domain) to $domain"     
+    Write-Warning "[$scriptName] Settings domain updated from $($settings.domain) to $domain"
+    $settings.domain = $domain
+}
 Write-Verbose "[$scriptName] Settings merged successfully. Final settings count: $($settings.Count)"
 Write-Verbose "[$scriptName] Configuration initialization completed successfully"
 Write-Verbose "[$scriptName] Auth settings count: $($auth.Count)"
@@ -699,7 +835,7 @@ if (-not $version.version)
         }
     }
 }
-#endregion Initialize script
+#endregion Initialize script objects
 
 #region Check for password change requirement
 if ($testMode)
@@ -825,10 +961,12 @@ $getTokenParams = BuildAuthSplatTable -auth $auth
 foreach ($key in $getTokenParams.Keys)
 {
     Write-Verbose "[$scriptName] $($key): $($getTokenParams[$key])"
-    if ($showAuth)
-    {
-        Write-Host "$($key): $($getTokenParams[$key])" -ForegroundColor Cyan
-    }
+}
+if ($showAuth)
+{
+    Write-Host "$($key): $($getTokenParams[$key])" -ForegroundColor Cyan
+    $global:previousMenu = New-Object System.Collections.Hashtable
+    # Device enrollment state cache content has been migrated to the unified cache system.
 }
 Write-Verbose "[$scriptName] Using authentication parameters: $($getTokenParams | ConvertTo-Json -Depth $maxJSONDepth)"
 Write-Verbose "[$scriptName] Loading strings from: $stringsFile"
@@ -841,8 +979,6 @@ Write-Verbose "[$scriptName] Loaded $($returnValues.Count) return values, $($dev
 $Global:History = [System.Collections.ArrayList]::new()
 $Global:MenuHistory = [System.Collections.ArrayList]::new()
 $global:previousMenu = New-Object System.Collections.Hashtable
-# Device enrollment state cache content
-$script:DeviceEnrollmentCache = @{}
 #endregion Define variables
 
 #region banner
@@ -863,7 +999,7 @@ if ($settings.showLicenseBanner)
     Write-Host "Use at your own risk. The author is not responsible for any damage or data loss." -ForegroundColor Red
     Write-Host "==========================================================`n" -ForegroundColor White
 }
-if ($updateAvailable.success -eq $true -and $updateAvailable.version -gt $version.version)
+if ($updateAvailable.success -eq $true -and $updateAvailable.version -gt $version)
 {
     Write-Verbose "[$scriptName] An update is available: $($updateAvailable.version.major).$($updateAvailable.version.minor).$($updateAvailable.version.build) ($($updateAvailable.version.revision))"
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "An update is available: $($updateAvailable.version.major).$($updateAvailable.version.minor).$($updateAvailable.version.build) (revision $($updateAvailable.version.revision))"
@@ -936,9 +1072,15 @@ Write-Host "Retrieving access token..."
 Write-Verbose "[$scriptName] Initialization block started."
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Initialization block started" -LogLevel "Information"
 
-if ($testMode)
+if ($testMode -and -not $script:testModeOptions.auth)
 {
-    Write-Verbose "[$scriptName] Test mode: Skipping Graph API token retrieval"
+    Write-Verbose "[$scriptName] Test mode: Skipping Graph API token retrieval (testModeOptions.auth = false)"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode: Skipping Graph API authentication" -LogLevel "Information"
+    $accessToken = "test-mode-fake-token"
+}
+elseif ($testMode)
+{
+    Write-Verbose "[$scriptName] Test mode: Skipping Graph API token retrieval but auth testing enabled"
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode: Skipping Graph API authentication" -LogLevel "Information"
     $accessToken = "test-mode-fake-token"
 }
@@ -1091,7 +1233,12 @@ else
         exit 1
     }
 }
-if ($testMode)
+if ($testMode -and -not $script:testModeOptions.legacyMigration)
+{
+    Write-Verbose "[$scriptName] Test mode: Skipping legacy configuration migration (testModeOptions.legacyMigration = false)"
+    write-log -logFile $logFile -module $scriptName -message "Test mode: Skipping legacy configuration migration" -LogLevel "Information"
+}
+elseif ($testMode)
 {
     Write-Verbose "[$scriptName] Test mode enabled, skipping legacy configuration migration."
     write-log -logFile $logFile -module $scriptName -message "Test mode enabled, skipping legacy configuration migration." -LogLevel "Information"
@@ -1194,6 +1341,20 @@ else
         }
     }
 }
+
+# Early exit point for test mode when exitAfter is true
+if ($testMode -and $script:testModeOptions.exitAfter)
+{
+    Write-Verbose "[$scriptName] Test mode: Exiting after initialization phases (testModeOptions.exitAfter = true)"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode: Exiting after initialization phases complete" -LogLevel "Information"
+    Write-Host "Test mode: Initialization phases completed successfully" -ForegroundColor Green
+    
+    # Cleanup before exit
+    Clear-SecureMemory -ClearScriptVariables
+    Write-Log -LogFile $LogFile -FinishLogging
+    exit 0
+}
+
 #endregion initialization block with access token
 
 #region Create menus
@@ -1220,9 +1381,11 @@ $settingsMenu = NewMenu -MenuName "settingsMenu"
 $autopilotMenu = NewMenu -MenuName "autopilotMenu"
 $environmentMenu = NewMenu -MenuName "environmentMenu"
 $inclusionExclusionMenu = NewMenu -MenuName "inclusionExclusionMenu"
+$deviceReportsMenu = NewMenu -MenuName "deviceReportsMenu"
 #endregion Create menus
 
 #region export menu
+$exportMenu = addMenuItem -menu $exportMenu -name 'Export Device Assignment Reports' -SubMenu $deviceReportsMenu
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Autopilot Devices" -Action {
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'autopilot'
     if ($exported)
@@ -1300,6 +1463,57 @@ $exportMenu = AddMenuItem -menu $exportMenu -name "Export Application Assignment
     }
 }
 #endregion export menu
+
+#region device reports menu
+$deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Assigned Windows Devices" -Action {
+    Write-Host "Exporting assigned device report..."
+    $exportedDeviceAssignment = Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'Assigned' -fileMode 'Overwrite'
+    if ($exportedDeviceAssignment.success)
+    {
+        Write-Host "Assigned device report exported successfully to $($exportedDeviceAssignment.outputFile) with $($exportedDeviceAssignment.deviceCount) devices." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host $exportedDeviceAssignment.message -ForegroundColor Red
+    }           
+}
+$deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Unassigned Windows Devices" -Action {
+    Write-Host "Exporting unassigned device report..."
+    $exportedDeviceAssignment = Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'Unassigned' -fileMode 'Overwrite'
+    if ($exportedDeviceAssignment.success)
+    {
+        Write-Host "Unassigned device report exported successfully to $($exportedDeviceAssignment.outputFile) with $($exportedDeviceAssignment.deviceCount) devices." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host $exportedDeviceAssignment.message -ForegroundColor Red
+    }               
+}
+$deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Pre-provisioned Windows Devices" -Action {
+    Write-Host "Exporting pre-provisioned device report..."
+    $exportedDeviceAssignment = Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'PreProvisioned' -fileMode 'Overwrite'
+    if ($exportedDeviceAssignment.success)
+    {
+        Write-Host "Pre-provisioned device report exported successfully to $($exportedDeviceAssignment.outputFile) with $($exportedDeviceAssignment.deviceCount) devices." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host $exportedDeviceAssignment.message -ForegroundColor Red
+    }                                       
+}
+$deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "All Windows Devices" -Action {
+    Write-Host "Exporting all devices with their assignment status..."
+    $exportedDeviceAssignment = Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'All' -fileMode 'Overwrite'
+    if ($exportedDeviceAssignment.success)
+    {
+        Write-Host "All devices report exported successfully to $($exportedDeviceAssignment.outputFile) with $($exportedDeviceAssignment.deviceCount) devices." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host $exportedDeviceAssignment.message -ForegroundColor Red
+    }                           
+}
+#endregion device reports menu
 
 #region serial number menu
 $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial number" -Action {
@@ -1738,7 +1952,7 @@ $inclusionExclusionMenu = AddMenuItem -menu $inclusionExclusionMenu -Name "Chang
 #endregion Environment menu
 
 #region Settings menu
-$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment Settings" -subMenu $environmentMenu
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment settings" -subMenu $environmentMenu
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Entra Credentials" -Action {
     Write-Host "This will change the authentication information used by the script and will allow you to set a new password."
     $choice = Read-Host "Are you sure you want to change the authentication information? (yes/no)"
@@ -2013,6 +2227,14 @@ $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action
 $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
     Write-Host 'Restarting the device...'
     if (-not (RestartDevice))
+    {
+        Write-Verbose "[$scriptName] RestartDevice function failed."
+        return $returnValues.backoutText
+    }
+}
+$mainMenu = AddMenuItem -menu $mainMenu -name "Shutdown the device" -action {
+    Write-Host 'Shutting down the device...'
+    if (-not (RestartDevice -Question 'Do you want to shut down the device now? (Y/N)' -action 'shutdown' -bootMessage 'Shutting down the device...'))
     {
         Write-Verbose "[$scriptName] RestartDevice function failed."
         return $returnValues.backoutText

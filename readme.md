@@ -34,7 +34,8 @@ This script leverages the Microsoft Graph API to communicate with Intune and pro
 - **🌐 Multi-Domain Support**: Environment-specific configurations for different organizational domains
 - **📱 Device Actions**: Remote device management (restart, wipe, clean, sync) with proper authorization
 - **🎨 Menu Customization**: Flexible menu system that adapts to organizational needs and user permissions
-- **🚄 Performance Optimized**: Advanced performance optimizations deliver up to 92% improvement in startup time with memory-efficient operations, parallel processing, and asynchronous logging for enhanced user experience
+- **� Smart Paging**: Multi-page menu and report display for improved navigation with large datasets
+- **�🚄 Performance Optimized**: Advanced performance optimizations deliver up to 92% improvement in startup time with memory-efficient operations, parallel processing, and asynchronous logging for enhanced user experience
 
 ## Performance Optimizations
 
@@ -72,6 +73,36 @@ Invoke-CacheManagement -Action Monitor -ShowDetails
 # Clear caches if needed
 Invoke-CacheManagement -Action Clear
 ```
+
+### 📄 Smart Paging System
+The application includes intelligent paging for menus and reports when displaying large datasets:
+
+#### Menu Paging
+- **Automatic Activation**: Paging enabled when menu items exceed configured threshold (default: 15 items)
+- **Navigation Controls**: 
+  - `N` - Next page
+  - `P` - Previous page
+  - `1-X` - Jump to specific page
+  - Direct item selection works across all pages
+- **Configuration**: Set `maxMenuItemsPerPage` in settings.psd1 (global or per-domain)
+- **Consistent Numbering**: Items maintain consistent numbers across all pages
+
+#### Report Paging
+- **Generic Utility**: `Show-PagedContent` function for any report-style content
+- **Custom Display**: Supports scriptblocks for flexible formatting
+- **Multiple Content Types**: Handles strings, objects, hashtables, and arrays
+- **Display Modes**: 
+  - `normal` - Interactive paging with user control
+  - `silent` - No output (programmatic use)
+  - `nopaging` - Display all content at once
+
+#### Benefits
+- Improved usability for directory object selection (users/groups)
+- Reduced screen clutter for large menus and reports
+- Consistent user experience across all display types
+- ASCII-only interface for PowerShell 5.1 compatibility
+
+*For technical implementation details, see [Unified Cache Implementation](docs/unified-cache-implementation.md)*
 
 ### 🎯 Real-World Impact
 - **Startup Time**: Reduced from 45+ seconds to under 10 seconds

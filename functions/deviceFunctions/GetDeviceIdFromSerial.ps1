@@ -11,20 +11,23 @@ function GetDeviceIdFromSerial()
     #region Variables and verbose logs    
     $functionName = $MyInvocation.MyCommand.Name
     
-    # Initialize device cache if it doesn't exist
-    if (-not $global:DeviceIdCache)
-    {
-        $global:DeviceIdCache = @{}
-        Write-Verbose "[$functionName] Initialized device ID cache"
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Initialized device ID cache" -LogLevel "Verbose"
-    }
+    # Check unified cache first
+    $cacheKey = "deviceid:$($SerialNumber.ToLower())"
+    $cachedDeviceId = Get-CachedData -CacheType 'Devices' -Key $cacheKey -Settings $global:settings
     
-    # Check cache first
-    if ($global:DeviceIdCache.ContainsKey($SerialNumber))
+    if ($null -ne $cachedDeviceId)
     {
+        # Check if this is a cached "not found" result (empty string sentinel)
+        if ($cachedDeviceId -eq "")
+        {
+            Write-Verbose "[$functionName] Cached not-found result for serial: $SerialNumber"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cached not-found result for serial: $SerialNumber" -LogLevel "Verbose"
+            return $null
+        }
+        
         Write-Verbose "[$functionName] Found cached device ID for serial: $SerialNumber"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found cached device ID for serial: $SerialNumber" -LogLevel "Verbose"
-        return $global:DeviceIdCache[$SerialNumber]
+        return $cachedDeviceId
     }
     
     $managedDeviceUri = "deviceManagement/managedDevices"
@@ -49,16 +52,23 @@ function GetDeviceIdFromSerial()
         $device = $response.value.Id
         Write-Verbose "[$functionName] Device found with ID: $($device)"
         
-        # Cache the result
-        $global:DeviceIdCache[$SerialNumber] = $device
-        Write-Verbose "[$functionName] Cached device ID for serial: $SerialNumber"
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cached device ID for serial: $SerialNumber" -LogLevel "Verbose"
+        # Cache the result using unified cache
+        $cacheKey = "deviceid:$($SerialNumber.ToLower())"
+        $metadata = @{
+            SerialNumber = $SerialNumber
+            DeviceType   = 'ManagedDevice'
+            CachedAt     = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+        }
+        [void](Set-CachedData -CacheType 'Devices' -Key $cacheKey -Data $device -Metadata $metadata -Settings $global:settings)
+        Write-Verbose "[$functionName] Cached device ID for serial: $SerialNumber using unified cache"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cached device ID for serial: $SerialNumber using unified cache" -LogLevel "Verbose"
     }
     else
     {
         Write-Verbose "[$functionName] Device with serial number $SerialNumber not found."
-        # Cache null result to avoid repeated API calls for non-existent devices
-        $global:DeviceIdCache[$SerialNumber] = $null
+        # Cache empty string as sentinel for not-found devices to avoid repeated API calls
+        $cacheKey = "deviceid:$($SerialNumber.ToLower())"
+        [void](Set-CachedData -CacheType 'Devices' -Key $cacheKey -Data "" -Metadata @{ SerialNumber = $SerialNumber; NotFound = $true } -Settings $global:settings)
     }
     return $device
 }

@@ -404,18 +404,22 @@ See Progress Tracking section below for detailed results.
 5. **Documentation**: Serves as executable documentation for application startup
 
 ##### Deliverables
-- [x] `tests/Integration/main/MainInitialization.Tests.ps1` ✅ OPTIMIZED (Day 1-2)
+- [x] `tests/Integration/main/MainInitialization.Tests.ps1` ✅ COMPLETE & OPTIMIZED (Day 1-2)
   - Test application startup and parameter handling ✅
-  - Mock configuration loading (Initialize-ApplicationConfiguration) ✅
-  - Mock authentication flow (Get-GraphAccessToken) ✅
-  - Test command-line parameter precedence (critical bug we just fixed) ✅
-  - Validate global variable initialization (Settings, MenuHistory, History) ✅
-  - **27 test cases (optimized from 49), all passing (100% pass rate)**
-  - **Optimization**: Reduced from 39 to 27 tests (~31% reduction), log checks as last resort
-  - **Performance**: ~40% faster execution (~3-4 min vs 5-8 min)
-  - **Enhanced Error Reporting**: Log excerpts shown on failure (not full logs)
-  - **Estimated Lines Covered**: ~400-500 lines (exceeds original estimate)
-  - **Status**: ✅ Complete - See `OPTIMIZATION_SUMMARY.md` for details
+  - Test configuration file loading ✅
+  - Test settings migration from old config ✅
+  - Test command-line parameter precedence (regression test for Week 6 bug fix) ✅
+  - Test authentication initialization (with mocked dependencies) ✅
+  - Test temporary file cleanup ✅
+  - Test logging initialization and verbosity levels ✅
+  - Test parameter validation (required parameters, invalid combinations) ✅
+  - **Test Results**: 25/25 tests passing (100% pass rate) ✅
+  - **Execution Time**: ~12 minutes (down from ~15 minutes, 20% improvement)
+  - **Optimization Details**: Consolidated from 26 to 17 main.ps1 executions (35% reduction in process spawns)
+  - **Performance Analysis**: Each main.ps1 execution takes ~42 seconds in test mode (inherent initialization overhead)
+  - **Further Optimization Options**: Mock authentication more aggressively, create "minimal test mode" for faster startup, or accept integration test tradeoff
+  - **Estimated Lines Covered**: ~400-500 lines (startup, config, auth flows)
+  - **Status**: ✅ Complete - Performance optimized, all tests passing, 20% faster execution
 
 - [ ] `tests/Integration/main/MainMenuFlow.Tests.ps1` ⏳ NEXT
   - Test menu creation and structure
@@ -513,7 +517,7 @@ See Progress Tracking section below for detailed results.
 - [x] `tests/Unit/setupFunctions/Show-SettingsViewer.Tests.ps1` ✅ COMPLETE (Day 5)
   - Test value formatting (Format-SettingValueForDisplay) - null/empty, primitives, arrays, hashtables, PSCustomObject ✅
   - Test description retrieval (Get-SettingDescription) - known settings, fallbacks ✅
-  - Test setting display (Display-SettingInfo, Display-SettingInfoForViewer) ✅
+  - Test setting display (Show-SettingInfo, Show-SettingInfoForViewer) ✅
   - Test nested settings handling ✅
   - Test deterministic output (alphabetically sorted keys/properties) ✅
   - **37 test cases, all passing (100% pass rate)**
@@ -882,9 +886,9 @@ See Progress Tracking section below for detailed results.
     * Known settings: configFile, maxWaitTime, deviceNamePrefix, authType, repoPath, scope (6 tests)
     * Unknown fallback: generic "Configuration setting: {name}" (2 tests)
     * Coverage validation: core settings (7 settings), auth settings (6 settings) (2 tests)
-  - **Display-SettingInfo (Legacy)** (4 tests): Legacy function compatibility
+  - **Show-SettingInfo (Legacy)** (4 tests): Legacy function compatibility
     * Basic setting, boolean, array, null value display without throwing (4 tests)
-  - **Display-SettingInfoForViewer** (5 tests): SettingInfo object display
+  - **Show-SettingInfoForViewer** (5 tests): SettingInfo object display
     * Flat vs nested settings (Path display), value changes (default diff), complex types (5 tests)
   - Coverage: ~115 lines of settings viewer utilities
   - **Note**: Show-SettingsViewer main function (interactive paging) deferred to integration tests
@@ -911,7 +915,7 @@ See Progress Tracking section below for detailed results.
   - Hashtables/PSCustomObject → `{ key: value, ... }` with alphabetically sorted keys
 - **Deterministic Display**: Alphabetical sorting ensures consistent output for tests and diffs
 - **Description System**: 40+ predefined descriptions, generic fallback for unknown settings
-- **Legacy Compatibility**: Display-SettingInfo maintained for backward compatibility
+- **Legacy Compatibility**: Show-SettingInfo maintained for backward compatibility
 
 **Key Pattern Established** (Days 3-6):
 - **Test Isolation**: Interactive functions deferred to integration tests (Week 8)
