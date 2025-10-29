@@ -186,34 +186,55 @@ function Initialize-ApplicationConfiguration()
                     Write-Verbose "[$functionName] ConfigCore and CacheCore available - checking for cached configuration"
                     Write-Log -logFile $logFile -module $functionName -Message "Checking cache availability for configuration" -logLevel "Verbose"
                     
-                    # Check if any configuration files have changed
-                    $initFileChanged = [Autopilot.ConfigCore.ConfigFileWatcher]::HasChanged($InitFile)
-                    $stringsFileChanged = [Autopilot.ConfigCore.ConfigFileWatcher]::HasChanged($StringsFile)
-                    $menuFileChanged = [Autopilot.ConfigCore.ConfigFileWatcher]::HasChanged($menuFile)
-                    
-                    Write-Verbose "[$functionName] File change detection - InitFile: $initFileChanged, StringsFile: $stringsFileChanged, MenuFile: $menuFileChanged"
-                    Write-Log -logFile $logFile -module $functionName -Message "File change detection - InitFile: $initFileChanged, StringsFile: $stringsFileChanged, MenuFile: $menuFileChanged" -logLevel "Verbose"
-                    
-                    if (-not $initFileChanged -and -not $stringsFileChanged -and -not $menuFileChanged)
+                    # Check if ConfigCache is initialized
+                    if ($null -eq $global:ConfigCache)
                     {
-                        # Try to get cached result
-                        $cachedResult = $global:ConfigCache.Get($cacheKey)
-                        if ($null -ne $cachedResult)
-                        {
-                            $useCache = $true
-                            Write-Verbose "[$functionName] Using cached configuration (48x faster - no file changes detected)"
-                            Write-Log -logFile $logFile -module $functionName -Message "Using cached configuration - no file changes detected" -logLevel "Information"
-                        }
-                        else
-                        {
-                            Write-Verbose "[$functionName] No cached configuration found, will load from disk"
-                            Write-Log -logFile $logFile -module $functionName -Message "No cached configuration found" -logLevel "Verbose"
-                        }
+                        Write-Verbose "[$functionName] ConfigCache not initialized, skipping cache check"
+                        Write-Log -logFile $logFile -module $functionName -Message "ConfigCache not initialized" -logLevel "Verbose"
                     }
                     else
                     {
-                        Write-Verbose "[$functionName] Configuration files changed - reloading from disk"
-                        Write-Log -logFile $logFile -module $functionName -Message "Configuration files changed - reloading from disk" -logLevel "Information"
+                        # Check if any configuration files have changed (with error handling for untracked files)
+                        try
+                        {
+                            $initFileChanged = [Autopilot.ConfigCore.ConfigFileWatcher]::HasChanged($InitFile)
+                            $stringsFileChanged = [Autopilot.ConfigCore.ConfigFileWatcher]::HasChanged($StringsFile)
+                            $menuFileChanged = [Autopilot.ConfigCore.ConfigFileWatcher]::HasChanged($menuFile)
+                            
+                            Write-Verbose "[$functionName] File change detection - InitFile: $initFileChanged, StringsFile: $stringsFileChanged, MenuFile: $menuFileChanged"
+                            Write-Log -logFile $logFile -module $functionName -Message "File change detection - InitFile: $initFileChanged, StringsFile: $stringsFileChanged, MenuFile: $menuFileChanged" -logLevel "Verbose"
+                        }
+                        catch
+                        {
+                            # If file tracking fails (e.g., files never registered), assume files have changed
+                            Write-Verbose "[$functionName] File change detection failed (likely first run): $($_.Exception.Message)"
+                            Write-Log -logFile $logFile -module $functionName -Message "File change detection failed, skipping cache: $($_.Exception.Message)" -logLevel "Verbose"
+                            $initFileChanged = $true
+                            $stringsFileChanged = $true
+                            $menuFileChanged = $true
+                        }
+                        
+                        if (-not $initFileChanged -and -not $stringsFileChanged -and -not $menuFileChanged)
+                        {
+                            # Try to get cached result
+                            $cachedResult = $global:ConfigCache.Get($cacheKey)
+                            if ($null -ne $cachedResult)
+                            {
+                                $useCache = $true
+                                Write-Verbose "[$functionName] Using cached configuration (48x faster - no file changes detected)"
+                                Write-Log -logFile $logFile -module $functionName -Message "Using cached configuration - no file changes detected" -logLevel "Information"
+                            }
+                            else
+                            {
+                                Write-Verbose "[$functionName] No cached configuration found, will load from disk"
+                                Write-Log -logFile $logFile -module $functionName -Message "No cached configuration found" -logLevel "Verbose"
+                            }
+                        }
+                        else
+                        {
+                            Write-Verbose "[$functionName] Configuration files changed - reloading from disk"
+                            Write-Log -logFile $logFile -module $functionName -Message "Configuration files changed - reloading from disk" -logLevel "Information"
+                        }
                     }
                 }
                 else
@@ -495,7 +516,7 @@ function Initialize-ApplicationConfiguration()
         Write-Verbose "[$functionName] Configuration initialization completed successfully"
         
         # Phase 2 Optimization: Cache the result if ConfigCore and CacheCore are available
-        if ($global:AutopilotDllStatus -and $global:AutopilotDllStatus.ConfigCoreLoaded -and $global:AutopilotDllStatus.CacheCoreLoaded)
+        if ($global:AutopilotDllStatus -and $global:AutopilotDllStatus.ConfigCoreLoaded -and $global:AutopilotDllStatus.CacheCoreLoaded -and $null -ne $global:ConfigCache)
         {
             try
             {

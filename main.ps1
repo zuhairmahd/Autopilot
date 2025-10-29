@@ -394,16 +394,6 @@ else
 
 #region Initialize script parameters
 Write-Host "Starting script..."
-
-# PowerShell version check and warning
-if ($PSVersionTable.PSVersion.Major -lt 7)
-{
-    Write-Host "WARNING: PowerShell 5.1 detected. This version has known limitations." -ForegroundColor Yellow
-    Write-Host "For best performance and stability, please upgrade to PowerShell 7 or later." -ForegroundColor Yellow
-    Write-Host "Download: https://aka.ms/powershell" -ForegroundColor Cyan
-    Write-Host ""
-}
-
 #initialize global variables
 $global:maxJSONDepth = 20
 # Set global log level for all Write-Log calls
@@ -422,13 +412,14 @@ else
 
 # Initialize C# DLLs for enhanced performance (optional, falls back to PowerShell if not available)
 Write-Verbose "[$scriptName] Initializing C# DLLs for performance optimization"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Initializing C# DLLs for performance optimization" -LogLevel "Information"
 $AutopilotDllStatus = Initialize-AutopilotDlls -DLLPath "$scriptPath\bin\Release"
-
 # Display DLL load status with performance benefits
 if ($AutopilotDllStatus.Success)
 {
     Write-Verbose "[$scriptName] All performance DLLs loaded successfully"
     Write-Host "Performance DLLs loaded: $($AutopilotDllStatus.LoadedAssemblies -join ', ')" -ForegroundColor Green
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Performance DLLs loaded: $($AutopilotDllStatus.LoadedAssemblies -join ', ')" -LogLevel "Information"
     
     if ($showOptimizations)
     {
@@ -445,6 +436,7 @@ if ($AutopilotDllStatus.Success)
         if ($optimizations.Count -gt 0)
         {
             Write-Host "  Optimizations: $($optimizations -join ', ')" -ForegroundColor Cyan
+            Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Optimizations enabled: $($optimizations -join ', ')" -LogLevel "Information"
         }
     }
 }
@@ -452,13 +444,45 @@ elseif ($AutopilotDllStatus.LoadedCount -gt 0)
 {
     Write-Verbose "[$scriptName] Partial DLL load: $($AutopilotDllStatus.LoadedCount) of 8"
     Write-Host "Performance DLLs partially loaded ($($AutopilotDllStatus.LoadedCount)/8): $($AutopilotDllStatus.LoadedAssemblies -join ', ')" -ForegroundColor Yellow
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Performance DLLs partially loaded ($($AutopilotDllStatus.LoadedCount)/8): $($AutopilotDllStatus.LoadedAssemblies -join ', ')" -LogLevel "Warning"
     Write-Host "  Some operations will use PowerShell fallback" -ForegroundColor Yellow
 }
 else
 {
     Write-Verbose "[$scriptName] No performance DLLs loaded, using PowerShell fallback"
     Write-Host "Using PowerShell implementations (DLLs not found)" -ForegroundColor Yellow
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Using PowerShell implementations (DLLs not found)" -LogLevel "Warning"
     Write-Host "  For better performance, run: .\Build-NativeDlls.ps1 -Configuration Release" -ForegroundColor Cyan
+}
+
+#run cleanup of temp files from previous runs
+if ($testMode -and -not $script:testModeOptions.cleanup)
+{
+    Write-Verbose "[$scriptName] Test mode: Skipping temporary file cleanup (testModeOptions.cleanup = false)"
+    write-log -logFile $logFile -module $scriptName -message "Test mode: Skipping temporary file cleanup"
+    # Create minimal cleanup result
+    $filesCleaned = @{
+        AllRemoved        = $true
+        RemovedFilesCount = 0
+        FailedFilesCount  = 0
+    }
+}
+else
+{
+    $filesCleaned = cleanupTempFiles
+    if ($filesCleaned.AllRemoved)
+    {
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
+    }
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
+}
+#write the commandline options to the log file, one at a time
+Write-Verbose "[$scriptName] Script parameters:"
+foreach ($param in $PSBoundParameters.GetEnumerator())
+{
+    Write-Verbose "[$scriptName]   $($param.Key): $($param.Value)"
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Parameter: $($param.Key) = $($param.Value)"
 }
 
 if ($testMode)
@@ -508,27 +532,14 @@ if ($ShowVersion)
     exit 0
 }
 
-#run cleanup of temp files from previous runs
-if ($testMode -and -not $script:testModeOptions.cleanup)
+# PowerShell version check and warning
+if ($PSVersionTable.PSVersion.Major -lt 7)
 {
-    Write-Verbose "[$scriptName] Test mode: Skipping temporary file cleanup (testModeOptions.cleanup = false)"
-    write-log -logFile $logFile -module $scriptName -message "Test mode: Skipping temporary file cleanup"
-    # Create minimal cleanup result
-    $filesCleaned = @{
-        AllRemoved        = $true
-        RemovedFilesCount = 0
-        FailedFilesCount  = 0
-    }
-}
-else
-{
-    $filesCleaned = cleanupTempFiles
-    if ($filesCleaned.AllRemoved)
-    {
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
-    }
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
+    Write-Host "WARNING: PowerShell 5.1 detected. This version has known limitations." -ForegroundColor Yellow
+    Write-Host "For best performance and stability, please upgrade to PowerShell 7 or later." -ForegroundColor Yellow
+    Write-Host "Download: https://aka.ms/powershell" -ForegroundColor Cyan
+    Write-Host ""
+    write-log -logFile $logFile -module $scriptName -message "PowerShell version $($PSVersionTable.PSVersion) detected. Recommended to upgrade to PowerShell 7 or later." -LogLevel "Warning"
 }
 
 #Check for settings migration
@@ -731,6 +742,7 @@ else
         Write-Verbose "[$scriptName] Initializing application configuration since the earlier initialization attempt failed or did not take place."
         write-log -logFile $logFile -module $scriptName -message "Initializing application configuration since earlier attempt failed or did not take place."
         $configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domain -BoundParameters $PSBoundParameters
+        
         if (-not $configResult.Success)
         {
             Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
@@ -764,7 +776,6 @@ else
         Write-Log -LogFile $LogFile -Module $scriptName -Message "First run wizard failed or was cancelled" -LogLevel "Error"
         Write-Host "Please create a configuration file manually." -ForegroundColor Yellow
         write-log -logFile $logFile -finishLogging
-        exit 1
     }
 }
 #endregion Process login

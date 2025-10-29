@@ -19,7 +19,7 @@ function Write-Log()
         Modified to integrate LogCore DLL functionality directly.
         When LogCore.dll is loaded, provides 10-20x performance improvement.
     #>
-    [CmdletBinding()]
+    # [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true, ParameterSetName = 'Normal')]
         [string]$Message,
@@ -71,7 +71,7 @@ function Write-Log()
         [ValidateSet('Error', 'Warning', 'Information', 'Verbose', 'Debug')]
         [string]$MinimumLogLevel
     )
-    
+    $VerbosePreference = 'SilentlyContinue'
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Writing the following to $($logFile): $message"
     # Check if LogCore DLL is available for high-performance logging
@@ -156,6 +156,7 @@ function Write-Log()
                             "Debug" { Write-Debug "[$Module] $Message" }
                         }
                     }
+                    $VerbosePreference = 'Continue'
                     return
                 }
             }
@@ -183,6 +184,7 @@ function Write-Log()
             if ($PassThru)
             {
                 Write-Verbose "[$functionName] Returning LogCore.dll log entry object since Passthru is $passThru."
+                $VerbosePreference = 'Continue'
                 return [PSCustomObject]@{
                     Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
                     LogLevel  = $LogLevel
@@ -192,7 +194,7 @@ function Write-Log()
                     UsedDLL   = $true
                 }
             }
-            
+            $VerbosePreference = 'Continue'
             return
         }
         
@@ -295,6 +297,7 @@ function Write-Log()
             {
                 Write-Host $separatorLine
             }
+            $VerbosePreference = 'Continue'
             return
         }
         
@@ -345,6 +348,7 @@ function Write-Log()
                     }
                 }
                 Write-Verbose "[$functionName] Skipping log entry due to minimum log level filtering."
+                $VerbosePreference = 'Continue'
                 return
             }
         }
@@ -475,6 +479,7 @@ function Write-Log()
         if ($PassThru)
         {
             Write-Verbose "[$functionName] Returning log entry object since Passthru is $passThru."
+            $VerbosePreference = 'Continue'
             return [PSCustomObject]@{
                 Timestamp = $timestamp
                 LogLevel  = $LogLevel

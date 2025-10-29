@@ -130,7 +130,7 @@ function Initialize-ConfigurationFiles()
         }
 
         # Ensure domain.psd1 exists with defaults
-        Write-Verbose "[$functionName] Ensuring domain.psd1 exists with defaults"
+        Write-Verbose "[$functionName] Ensuring initialization file for $domain at $domainFile exists with defaults"
         $domainCreated = $true
         if (-not (Test-Path $domainFileName))
         {
@@ -139,21 +139,21 @@ function Initialize-ConfigurationFiles()
                 # Get default domain and save as PSD1
                 $defaultDomain = Get-ApplicationDefaults -DefaultType "Domain" -DomainName $Domain
                 $defaultDomain | Export-PowerShellDataFile -Path $domainFileName -validate -Force
-                Write-Verbose "[$functionName] Created domain.psd1 with defaults"
+                Write-Verbose "[$functionName] Created $domainFileName with defaults"
             }
             catch
             {
-                Write-Warning "[$functionName] Failed to create domain.psd1: $($_.Exception.Message)"
+                Write-Warning "[$functionName] Failed to create $($domainFileName): $($_.Exception.Message)"
                 $domainCreated = $false
             }
         }
         else
         {
-            Write-Verbose "[$functionName] domain.psd1 already exists, skipping creation"
+            Write-Verbose "[$functionName] $domainFileName already exists, skipping creation"
         }
         if (-not $domainCreated)
         {
-            $result.ErrorMessage = "Failed to create or validate domain.psd1 file"
+            $result.ErrorMessage = "Failed to create or validate $domainFileName file"
             Write-Verbose "[$functionName] $($result.ErrorMessage)"
             return $result
         }

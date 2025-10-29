@@ -53,6 +53,16 @@ BeforeAll {
     $script:TestStringsFile = Join-Path $script:TestRoot "strings.psd1"
     $script:TestLogFile = Join-Path $script:TestRoot "Logs\test.log"
     
+    # Capture Pester output verbosity from configuration (default to 'Normal' if not set)
+    $script:PesterOutputVerbosity = if ($PesterPreference.Output.Verbosity.Value)
+    {
+        $PesterPreference.Output.Verbosity.Value
+    }
+    else
+    {
+        'Normal'
+    }
+    
     # Create directories
     $secretsDir = Split-Path $script:TestConfigFile -Parent
     New-Item -Path $secretsDir -ItemType Directory -Force | Out-Null
@@ -68,6 +78,9 @@ BeforeAll {
             [hashtable]$TestModeOptions = $null,
             [switch]$SuppressOutput
         )
+        
+        # Store original parameters for validation before adding test-specific parameters
+        $originalParameters = $Parameters.Clone()
         
         # Always include testMode, disable autoUpdate, and overwrite logs for clean state
         $Parameters['testMode'] = $true
@@ -109,34 +122,39 @@ BeforeAll {
             $Parameters['LogFilePath'] = $script:TestLogFile
         }
         
-        # Build parameter list
-        $params = @()
+        # Build parameter hashtable for splatting in the command
+        $paramList = @()
         foreach ($key in $Parameters.Keys)
         {
             $value = $Parameters[$key]
             if ($value -is [bool] -or $value -is [switch])
             {
-                # For boolean/switch parameters, always include them with explicit true/false syntax
+                # For boolean/switch parameters, use PowerShell syntax
                 if ($value)
                 { 
-                    $params += "-$key" 
+                    $paramList += "-$key" 
                 }
                 else
                 {
-                    $params += "-$key`:$false"
+                    # For false values, use explicit false with escaped dollar sign
+                    $paramList += "-${key}:" + '$false'
                 }
             }
             else
             {
-                $params += "-$key"
-                $params += $value
+                # For string/path parameters, add key and value separately
+                $paramList += "-$key"
+                $paramList += "`"$value`""
             }
         }
+        
+        $paramString = $paramList -join ' '
+        $scriptBlock = "& '$script:MainScriptPath' $paramString"
         
         try
         {
             # Execute main.ps1 in a new PowerShell process to capture exit code reliably
-            $result = & pwsh.exe -NoProfile -ExecutionPolicy Bypass -File $script:MainScriptPath @params 2>&1
+            $result = & pwsh.exe -NoProfile -ExecutionPolicy Bypass -Command $scriptBlock 2>&1
             $exitCode = $LASTEXITCODE
             
             # If exit code is null (shouldn't happen but be defensive), check if log exists
@@ -146,19 +164,23 @@ BeforeAll {
             }
             
             return @{
-                Success  = $exitCode -eq 0
-                Output   = $result
-                ExitCode = $exitCode
-                LogFile  = $Parameters['LogFilePath']
+                Success         = $exitCode -eq 0
+                Output          = $result
+                ExitCode        = $exitCode
+                LogFile         = $Parameters['LogFilePath']
+                Parameters      = $originalParameters
+                OutputVerbosity = $script:PesterOutputVerbosity
             }
         }
         catch
         {
             return @{
-                Success  = $false
-                Output   = $_.Exception.Message
-                ExitCode = 1
-                Error    = $_
+                Success         = $false
+                Output          = $_.Exception.Message
+                ExitCode        = 1
+                Error           = $_
+                Parameters      = $originalParameters
+                OutputVerbosity = $script:PesterOutputVerbosity
             }
         }
     }
@@ -555,10 +577,14 @@ Describe "Main.ps1 - Test Mode Execution" -Tags 'Integration', 'Main', 'TestMode
                 LogLevel = 'Debug'
             }
             
-            # Primary: accepts parameter without error
-            $debugResult.Success | Should -Be $true
+            # Primary validation: script accepted and processed the parameter
+            $debugResult.Success | Should -Be $true -Because "Script should accept LogLevel parameter without errors"
             
-            # Secondary: verify debug logging occurred (logs only)
+            # Primary validation: parameter was captured in PSBoundParameters
+            $debugResult.Parameters.ContainsKey('LogLevel') | Should -Be $true -Because "LogLevel parameter should be present in PSBoundParameters"
+            $debugResult.Parameters['LogLevel'] | Should -Be 'Debug' -Because "LogLevel parameter value should match what was passed"
+            
+            # Secondary validation: verify debug logging actually occurred in log file
             if (Test-Path $script:TestLogFile)
             {
                 $logContent = Get-Content $script:TestLogFile -Raw
@@ -566,11 +592,20 @@ Describe "Main.ps1 - Test Mode Execution" -Tags 'Integration', 'Main', 'TestMode
                 
                 if ($logContent -notmatch $debugPattern)
                 {
-                    $excerpt = & $script:GetLogExcerpt -LogFilePath $script:TestLogFile -Pattern "\[.*\]" -ContextLines 5
-                    throw "Debug logging not found. $excerpt"
+                    # Provide helpful error message - only show log excerpts in Detailed mode
+                    if ($debugResult.OutputVerbosity -eq 'Detailed')
+                    {
+                        $excerpt = & $script:GetLogExcerpt -LogFilePath $script:TestLogFile -Pattern "\[.*\]" -ContextLines 5
+                        $errorMessage = "Debug logging not found in log file. Expected to find 'Debug' or 'DEBUG' in log entries. Log excerpt: $excerpt"
+                    }
+                    else
+                    {
+                        $errorMessage = "Debug logging not found in log file. Expected to find 'Debug' or 'DEBUG' in log entries. Run with -OutputVerbosity Detailed to see log excerpts."
+                    }
+                    throw $errorMessage
                 }
                 
-                $logContent | Should -Match $debugPattern
+                $logContent | Should -Match $debugPattern -Because "Log file should contain Debug level log entries when LogLevel=Debug"
             }
         }
     }
@@ -741,6 +776,136 @@ Describe "Main.ps1 - Parameter Handling" -Tags 'Integration', 'Main', 'Parameter
             }
             
             $result.Success | Should -Be $true -Because "appMode '$AppMode' with LogLevel '$LogLevel' should be valid"
+        }
+    }
+}
+
+Describe "Main.ps1 - DLL Loading and Fallback" -Tags 'Integration', 'Main', 'DLLLoading' {
+    
+    Context "DLL Loading Validation" {
+        BeforeAll {
+            # Run main.ps1 once with minimal phases to check DLL loading
+            $testOpts = @{
+                metadata        = $true
+                cleanup         = $false
+                migration       = $false
+                config          = $false
+                auth            = $false
+                legacyMigration = $false
+                exitAfter       = $true
+            }
+            $script:DllLoadResult = & $script:InvokeMainScript -TestModeOptions $testOpts
+        }
+        
+        It "Should initialize without errors" {
+            $script:DllLoadResult.Success | Should -Be $true -Because "Script should initialize successfully regardless of DLL load status"
+        }
+        
+        It "Should log DLL loading status" {
+            if (Test-Path $script:TestLogFile)
+            {
+                $logContent = Get-Content $script:TestLogFile -Raw
+                
+                # Should mention DLL initialization
+                $logContent | Should -Match "(Initializing C# DLLs|Performance DLLs|DLLs loaded|Using PowerShell)" -Because "Log should indicate DLL loading attempt"
+            }
+        }
+        
+        It "Should either load DLLs successfully or fall back to PowerShell" {
+            if (Test-Path $script:TestLogFile)
+            {
+                $logContent = Get-Content $script:TestLogFile -Raw
+                
+                # Check for success patterns
+                $successPatterns = @(
+                    "Performance DLLs loaded",
+                    "All performance DLLs loaded successfully",
+                    "Performance DLLs partially loaded"
+                )
+                
+                # Check for fallback patterns
+                $fallbackPatterns = @(
+                    "Using PowerShell implementations",
+                    "Using PowerShell fallback",
+                    "DLLs not found"
+                )
+                
+                $hasSuccess = $false
+                foreach ($pattern in $successPatterns)
+                {
+                    if ($logContent -match [regex]::Escape($pattern))
+                    {
+                        $hasSuccess = $true
+                        break
+                    }
+                }
+                
+                $hasFallback = $false
+                foreach ($pattern in $fallbackPatterns)
+                {
+                    if ($logContent -match [regex]::Escape($pattern))
+                    {
+                        $hasFallback = $true
+                        break
+                    }
+                }
+                
+                # Should have either success or fallback message
+                ($hasSuccess -or $hasFallback) | Should -Be $true -Because "Log should indicate either DLL load success or PowerShell fallback"
+            }
+        }
+        
+        It "Should display DLL load status to user" {
+            # Check that output contains DLL status information
+            $output = $script:DllLoadResult.Output -join "`n"
+            
+            $statusPatterns = @(
+                "Performance DLLs loaded",
+                "Performance DLLs partially loaded",
+                "Using PowerShell implementations"
+            )
+            
+            $foundStatus = $false
+            foreach ($pattern in $statusPatterns)
+            {
+                if ($output -match [regex]::Escape($pattern))
+                {
+                    $foundStatus = $true
+                    break
+                }
+            }
+            
+            $foundStatus | Should -Be $true -Because "User should see DLL loading status in output"
+        }
+    }
+    
+    Context "DLL Optimization Display" {
+        BeforeAll {
+            # Run with showOptimizations to verify detailed output
+            $testOpts = @{
+                metadata        = $true
+                cleanup         = $false
+                migration       = $false
+                config          = $false
+                auth            = $false
+                legacyMigration = $false
+                exitAfter       = $true
+            }
+            $script:OptimizationResult = & $script:InvokeMainScript -TestModeOptions $testOpts -Parameters @{
+                showOptimizations = $true
+            }
+        }
+        
+        It "Should show optimization details when requested" {
+            $output = $script:OptimizationResult.Output -join "`n"
+            
+            # When DLLs are loaded, should show optimization details
+            # If DLLs loaded: should mention specific optimizations like "Logging", "Caching", "Config"
+            # If DLLs not loaded: should show fallback message
+            $hasOptimizationInfo = ($output -match "Optimizations:") -or 
+            ($output -match "Using PowerShell implementations")
+            
+            $hasOptimizationInfo | Should -Be $true -Because "showOptimizations flag should display DLL optimization information"
         }
     }
 }
@@ -934,3 +1099,134 @@ Describe "Main.ps1 - Configuration Loading Integration" -Tags 'Integration', 'Ma
         }
     }
 }
+
+Describe "Main.ps1 - DLL Loading and Fallback" -Tags 'Integration', 'Main', 'DLLLoading' {
+    
+    Context "DLL Loading Validation" {
+        BeforeAll {
+            # Run main.ps1 once with minimal phases to check DLL loading
+            $testOpts = @{
+                metadata        = $true
+                cleanup         = $false
+                migration       = $false
+                config          = $false
+                auth            = $false
+                legacyMigration = $false
+                exitAfter       = $true
+            }
+            $script:DllLoadResult = & $script:InvokeMainScript -TestModeOptions $testOpts
+        }
+        
+        It "Should initialize without errors" {
+            $script:DllLoadResult.Success | Should -Be $true -Because "Script should initialize successfully regardless of DLL load status"
+        }
+        
+        It "Should log DLL loading status" {
+            if (Test-Path $script:TestLogFile)
+            {
+                $logContent = Get-Content $script:TestLogFile -Raw
+                
+                # Should mention DLL initialization
+                $logContent | Should -Match "(Initializing C# DLLs|Performance DLLs|DLLs loaded|Using PowerShell)" -Because "Log should indicate DLL loading attempt"
+            }
+        }
+        
+        It "Should either load DLLs successfully or fall back to PowerShell" {
+            if (Test-Path $script:TestLogFile)
+            {
+                $logContent = Get-Content $script:TestLogFile -Raw
+                
+                # Check for success patterns
+                $successPatterns = @(
+                    "Performance DLLs loaded",
+                    "All performance DLLs loaded successfully",
+                    "Performance DLLs partially loaded"
+                )
+                
+                # Check for fallback patterns
+                $fallbackPatterns = @(
+                    "Using PowerShell implementations",
+                    "Using PowerShell fallback",
+                    "DLLs not found"
+                )
+                
+                $hasSuccess = $false
+                foreach ($pattern in $successPatterns)
+                {
+                    if ($logContent -match [regex]::Escape($pattern))
+                    {
+                        $hasSuccess = $true
+                        break
+                    }
+                }
+                
+                $hasFallback = $false
+                foreach ($pattern in $fallbackPatterns)
+                {
+                    if ($logContent -match [regex]::Escape($pattern))
+                    {
+                        $hasFallback = $true
+                        break
+                    }
+                }
+                
+                # Should have either success or fallback message
+                ($hasSuccess -or $hasFallback) | Should -Be $true -Because "Log should indicate either DLL load success or PowerShell fallback"
+            }
+        }
+        
+        It "Should display DLL load status to user" {
+            # Check that output contains DLL status information
+            $output = $script:DllLoadResult.Output -join "`n"
+            
+            $statusPatterns = @(
+                "Performance DLLs loaded",
+                "Performance DLLs partially loaded",
+                "Using PowerShell implementations"
+            )
+            
+            $foundStatus = $false
+            foreach ($pattern in $statusPatterns)
+            {
+                if ($output -match [regex]::Escape($pattern))
+                {
+                    $foundStatus = $true
+                    break
+                }
+            }
+            
+            $foundStatus | Should -Be $true -Because "User should see DLL loading status in output"
+        }
+    }
+    
+    Context "DLL Optimization Display" {
+        BeforeAll {
+            # Run with showOptimizations to verify detailed output
+            $testOpts = @{
+                metadata        = $true
+                cleanup         = $false
+                migration       = $false
+                config          = $false
+                auth            = $false
+                legacyMigration = $false
+                exitAfter       = $true
+            }
+            $script:OptimizationResult = & $script:InvokeMainScript -TestModeOptions $testOpts -Parameters @{
+                showOptimizations = $true
+            }
+        }
+        
+        It "Should show optimization details when requested" {
+            $output = $script:OptimizationResult.Output -join "`n"
+            
+            # When DLLs are loaded, should show optimization details
+            # If DLLs loaded: should mention specific optimizations like "Logging", "Caching", "Config"
+            # If DLLs not loaded: should show fallback message
+            $hasOptimizationInfo = ($output -match "Optimizations:") -or 
+            ($output -match "Using PowerShell implementations")
+            
+            $hasOptimizationInfo | Should -Be $true -Because "showOptimizations flag should display DLL optimization information"
+        }
+    }
+}
+

@@ -17,6 +17,7 @@ function ConvertTo-Psd1String()
     if ($useStringCore)
     {
         Write-Verbose "[$functionName] Using StringCore for optimized string escaping (3-5x faster)"
+        write-log -logFile $logFile -module $functionName -message "Using StringCore for optimized string escaping (3-5x faster)"
     }
     
     $indent = "    " * $IndentLevel
@@ -34,7 +35,6 @@ function ConvertTo-Psd1String()
     
     Write-Verbose "[$functionName] Converting $($Configuration.GetType().Name) to PSD1 string at indent level $IndentLevel, child indent '$childIndent'"
     Write-Verbose "[$functionName] Configuration object $($Configuration |Out-String) with keys:"
-    $Configuration.Keys | ForEach-Object { Write-Verbose "[$functionName] Key: $_" }
     # Handle empty hashtables
     if ($Configuration.Keys.Count -eq 0)
     {
