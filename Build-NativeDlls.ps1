@@ -10,7 +10,7 @@
 .PARAMETER Configuration
     Build configuration: Debug or Release (default: Release)
 .PARAMETER Framework
-    Target framework: netstandard2.0 (PS 5.1), net9.0 (PS 7+), or All (default: All)
+    Target framework: netstandard2.0 (PS 5.1), net9.0 (PS 7+), net9.0-windows (WPF), or All (default: All)
 .PARAMETER BinFolder
     Root output directory for compiled binaries (default: bin)
 .PARAMETER Clean
@@ -35,7 +35,7 @@
 param(
     [ValidateSet('Debug', 'Release')]
     [string]$Configuration = 'Release',
-    [ValidateSet('netstandard2.0', 'net9.0', 'All')]
+    [ValidateSet('netstandard2.0', 'net9.0', 'net9.0-windows', 'All')]
     [string]$Framework = 'All',
     [string]$BinFolder = 'bin',
     [switch]$Clean
@@ -88,7 +88,7 @@ Write-Host ""
 # Define target frameworks based on parameter
 if ($Framework -eq 'All')
 {
-    $frameworks = @('netstandard2.0', 'net9.0')
+    $frameworks = @('netstandard2.0', 'net9.0', 'net9.0-windows')
     Write-Verbose "Building all frameworks: $($frameworks -join ', ')"
 }
 else
@@ -100,7 +100,13 @@ else
 Write-Host "Target Framework(s): $($frameworks -join ', ')" -ForegroundColor Cyan
 foreach ($fw in $frameworks)
 {
-    $psVersion = if ($fw -eq 'netstandard2.0') { "PowerShell 5.1 (.NET Framework 4.x)" } else { "PowerShell 7+ (.NET 9.0)" }
+    $psVersion = switch ($fw)
+    {
+        'netstandard2.0' { "PowerShell 5.1 (.NET Framework 4.x)" }
+        'net9.0' { "PowerShell 7+ (.NET 9.0)" }
+        'net9.0-windows' { "PowerShell 7+ / WPF Applications (.NET 9.0)" }
+        default { "Unknown" }
+    }
     Write-Host "  $fw -> $psVersion" -ForegroundColor Gray
 }
 Write-Host ""

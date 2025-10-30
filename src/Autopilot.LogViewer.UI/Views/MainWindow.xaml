@@ -7,6 +7,7 @@
         xmlns:converters="clr-namespace:Autopilot.LogViewer.UI.Converters"
         xmlns:helpers="clr-namespace:Autopilot.LogViewer.UI.Helpers"
         xmlns:controls="clr-namespace:Autopilot.LogViewer.UI.Controls"
+        xmlns:behaviors="clr-namespace:Autopilot.LogViewer.UI.Behaviors"
         mc:Ignorable="d"
         Title="Autopilot Log Viewer"
         Height="700"
@@ -20,7 +21,6 @@
 
     <Window.Resources>
         <converters:BooleanToVisibilityConverter x:Key="BoolToVis"/>
-        <converters:BooleanToDataGridLengthConverter x:Key="BoolToWidth"/>
         <helpers:BindingProxy x:Key="proxy"
                               Data="{Binding}"/>
     </Window.Resources>
@@ -195,102 +195,101 @@
             <controls:AccessibleDataGrid.Columns>
                 <DataGridTextColumn Header="Timestamp"
                                     Binding="{Binding Timestamp, StringFormat=yyyy-MM-dd HH:mm:ss.fff}"
-                                    Width="{Binding Data.ShowTimestamp, Source={StaticResource proxy}, Converter={StaticResource BoolToWidth}, ConverterParameter=180}"
+                                    Width="180"
                                     MinWidth="0"
-                                    DisplayIndex="0">
+                                    DisplayIndex="0"
+                                    behaviors:DataGridColumnVisibilityBehavior.IsVisible="{Binding Data.ShowTimestamp, Source={StaticResource proxy}}"
+                                    behaviors:DataGridColumnVisibilityBehavior.DesiredWidth="180">
                     <DataGridTextColumn.HeaderStyle>
                         <Style TargetType="DataGridColumnHeader">
                             <Setter Property="AutomationProperties.Name"
                                     Value="Timestamp Column Header"/>
                             <Setter Property="AutomationProperties.HelpText"
                                     Value="Timestamp when log entry was created"/>
-                            <Setter Property="Visibility"
-                                    Value="{Binding Data.ShowTimestamp, Source={StaticResource proxy}, Converter={StaticResource BoolToVis}}"/>
                         </Style>
                     </DataGridTextColumn.HeaderStyle>
                 </DataGridTextColumn>
 
                 <DataGridTextColumn Header="Level"
                                     Binding="{Binding Level}"
-                                    Width="{Binding Data.ShowLevel, Source={StaticResource proxy}, Converter={StaticResource BoolToWidth}, ConverterParameter=100}"
+                                    Width="100"
                                     MinWidth="0"
-                                    DisplayIndex="1">
+                                    DisplayIndex="1"
+                                    behaviors:DataGridColumnVisibilityBehavior.IsVisible="{Binding Data.ShowLevel, Source={StaticResource proxy}}"
+                                    behaviors:DataGridColumnVisibilityBehavior.DesiredWidth="100">
                     <DataGridTextColumn.HeaderStyle>
                         <Style TargetType="DataGridColumnHeader">
                             <Setter Property="AutomationProperties.Name"
                                     Value="Level Column Header"/>
                             <Setter Property="AutomationProperties.HelpText"
                                     Value="Log entry severity level"/>
-                            <Setter Property="Visibility"
-                                    Value="{Binding Data.ShowLevel, Source={StaticResource proxy}, Converter={StaticResource BoolToVis}}"/>
                         </Style>
                     </DataGridTextColumn.HeaderStyle>
                 </DataGridTextColumn>
 
                 <DataGridTextColumn Header="Module"
                                     Binding="{Binding Module}"
-                                    Width="{Binding Data.ShowModule, Source={StaticResource proxy}, Converter={StaticResource BoolToWidth}, ConverterParameter=200}"
+                                    Width="200"
                                     MinWidth="0"
-                                    DisplayIndex="2">
+                                    DisplayIndex="2"
+                                    behaviors:DataGridColumnVisibilityBehavior.IsVisible="{Binding Data.ShowModule, Source={StaticResource proxy}}"
+                                    behaviors:DataGridColumnVisibilityBehavior.DesiredWidth="200">
                     <DataGridTextColumn.HeaderStyle>
                         <Style TargetType="DataGridColumnHeader">
                             <Setter Property="AutomationProperties.Name"
                                     Value="Module Column Header"/>
                             <Setter Property="AutomationProperties.HelpText"
                                     Value="Module or function that generated the log entry"/>
-                            <Setter Property="Visibility"
-                                    Value="{Binding Data.ShowModule, Source={StaticResource proxy}, Converter={StaticResource BoolToVis}}"/>
                         </Style>
                     </DataGridTextColumn.HeaderStyle>
                 </DataGridTextColumn>
 
                 <DataGridTextColumn Header="Thread"
                                     Binding="{Binding ThreadId}"
-                                    Width="{Binding Data.ShowThreadId, Source={StaticResource proxy}, Converter={StaticResource BoolToWidth}, ConverterParameter=70}"
+                                    Width="70"
                                     MinWidth="0"
-                                    DisplayIndex="3">
+                                    DisplayIndex="3"
+                                    behaviors:DataGridColumnVisibilityBehavior.IsVisible="{Binding Data.ShowThreadId, Source={StaticResource proxy}}"
+                                    behaviors:DataGridColumnVisibilityBehavior.DesiredWidth="70">
                     <DataGridTextColumn.HeaderStyle>
                         <Style TargetType="DataGridColumnHeader">
                             <Setter Property="AutomationProperties.Name"
                                     Value="Thread ID Column Header"/>
                             <Setter Property="AutomationProperties.HelpText"
                                     Value="Thread identifier"/>
-                            <Setter Property="Visibility"
-                                    Value="{Binding Data.ShowThreadId, Source={StaticResource proxy}, Converter={StaticResource BoolToVis}}"/>
                         </Style>
                     </DataGridTextColumn.HeaderStyle>
                 </DataGridTextColumn>
 
                 <DataGridTextColumn Header="Context"
                                     Binding="{Binding Context}"
-                                    Width="{Binding Data.ShowContext, Source={StaticResource proxy}, Converter={StaticResource BoolToWidth}, ConverterParameter=150}"
+                                    Width="150"
                                     MinWidth="0"
-                                    DisplayIndex="4">
+                                    DisplayIndex="4"
+                                    behaviors:DataGridColumnVisibilityBehavior.IsVisible="{Binding Data.ShowContext, Source={StaticResource proxy}}"
+                                    behaviors:DataGridColumnVisibilityBehavior.DesiredWidth="150">
                     <DataGridTextColumn.HeaderStyle>
                         <Style TargetType="DataGridColumnHeader">
                             <Setter Property="AutomationProperties.Name"
                                     Value="Context Column Header"/>
                             <Setter Property="AutomationProperties.HelpText"
                                     Value="User or system context"/>
-                            <Setter Property="Visibility"
-                                    Value="{Binding Data.ShowContext, Source={StaticResource proxy}, Converter={StaticResource BoolToVis}}"/>
                         </Style>
                     </DataGridTextColumn.HeaderStyle>
                 </DataGridTextColumn>
 
                 <DataGridTextColumn Header="Message"
                                     Binding="{Binding Message}"
-                                    Width="{Binding Data.ShowMessage, Source={StaticResource proxy}, Converter={StaticResource BoolToWidth}, ConverterParameter=*}"
+                                    Width="*"
                                     MinWidth="0"
-                                    DisplayIndex="5">
+                                    DisplayIndex="5"
+                                    behaviors:DataGridColumnVisibilityBehavior.IsVisible="{Binding Data.ShowMessage, Source={StaticResource proxy}}">
                     <DataGridTextColumn.HeaderStyle>
                         <Style TargetType="DataGridColumnHeader">
                             <Setter Property="AutomationProperties.Name"
                                     Value="Message Column Header"/>
                             <Setter Property="AutomationProperties.HelpText"
                                     Value="Log message content"/>
-                            <Setter Property="Visibility"
-                                    Value="{Binding Data.ShowMessage, Source={StaticResource proxy}, Converter={StaticResource BoolToVis}}"/>
                         </Style>
                     </DataGridTextColumn.HeaderStyle>
                     <DataGridTextColumn.ElementStyle>
