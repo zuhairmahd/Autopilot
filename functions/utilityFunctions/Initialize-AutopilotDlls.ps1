@@ -154,7 +154,6 @@ function Initialize-AutopilotDlls()
     Write-Verbose "[$functionName] Registered AssemblyResolve handler for dependency loading"
     
     # Try to load each DLL
-    # Skip LogCore on PowerShell 5.1 due to stack overflow issues
     $dlls = @(
         @{ Name = "Autopilot.GraphCore"; Flag = "GraphCoreLoaded" }
         @{ Name = "Autopilot.DeviceCore"; Flag = "DeviceCoreLoaded" }
@@ -163,13 +162,8 @@ function Initialize-AutopilotDlls()
         @{ Name = "Autopilot.StringCore"; Flag = "StringCoreLoaded" }
         @{ Name = "Autopilot.CsvCore"; Flag = "CsvCoreLoaded" }
         @{ Name = "Autopilot.CollectionCore"; Flag = "CollectionCoreLoaded" }
+        @{ Name = "Autopilot.LogCore"; Flag = "LogCoreLoaded" }
     )
-    
-    # Only load LogCore on PowerShell 7+
-    if ($PSVersionTable.PSVersion.Major -ge 7)
-    {
-        $dlls += @{ Name = "Autopilot.LogCore"; Flag = "LogCoreLoaded" }
-    }
     
     foreach ($dll in $dlls)
     {

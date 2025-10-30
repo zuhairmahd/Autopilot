@@ -418,7 +418,9 @@ $AutopilotDllStatus = Initialize-AutopilotDlls -DLLPath "$scriptPath\bin\Release
 if ($AutopilotDllStatus.Success)
 {
     Write-Verbose "[$scriptName] All performance DLLs loaded successfully"
-    Write-Host "Performance DLLs loaded: $($AutopilotDllStatus.LoadedAssemblies -join ', ')" -ForegroundColor Green
+    # Write-Host "Performance DLLs loaded: $($AutopilotDllStatus.LoadedAssemblies -join ', ')" -ForegroundColor Green
+    Write-Host "Performance DLLs loaded" -ForegroundColor Green         
+    Write-Host "The script will use optimized DLL libraries for better performance." -ForegroundColor Green          
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Performance DLLs loaded: $($AutopilotDllStatus.LoadedAssemblies -join ', ')" -LogLevel "Information"
     
     if ($showOptimizations)
