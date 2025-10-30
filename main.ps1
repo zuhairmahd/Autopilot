@@ -2323,6 +2323,61 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
     $null = Show-AboutApplication -accessToken $accessToken -Release $latestRelease -appId $appId -tenantId $tenantId -name $name -updateAvailable $updateAvailable
 }
+$mainMenu = AddMenuItem -Menu $mainMenu -Name "View Logs" -Action {
+    $functionName = "View Logs Action"
+    Write-Verbose "[$functionName] Launching Autopilot Log Viewer"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "User initiated log viewer" -LogLevel Information
+    
+    # Determine log viewer executable path
+    $logViewerExe = "$scriptPath\bin\Release\net9.0-windows\AutopilotLogViewer.exe"
+    if (-not (Test-Path $logViewerExe))
+    {
+        # Try alternate path
+        $logViewerExe = "$scriptPath\src\Autopilot.LogViewer.UI\bin\Release\net9.0-windows\AutopilotLogViewer.exe"
+    }
+    
+    if (-not (Test-Path $logViewerExe))
+    {
+        Write-Host "Log viewer application not found. Please ensure the application is built." -ForegroundColor Red
+        Write-Host "Expected location: $scriptPath\bin\Release\net9.0-windows\AutopilotLogViewer.exe" -ForegroundColor Yellow
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Log viewer executable not found at: $logViewerExe" -LogLevel Error
+        return $returnValues.backoutText
+    }
+    
+    # Determine log file path
+    $logFilePath = $LogFile
+    if (-not (Test-Path $logFilePath))
+    {
+        $logFilePath = "$scriptPath\Logs\Autopilot.log"
+    }
+    
+    try
+    {
+        # Launch the log viewer with the current log file
+        Write-Host "Launching log viewer..." -ForegroundColor Cyan
+        if (Test-Path $logFilePath)
+        {
+            Start-Process -FilePath $logViewerExe -ArgumentList "`"$logFilePath`"" -WindowStyle Normal
+            Write-Verbose "[$functionName] Log viewer launched with log file: $logFilePath"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Log viewer launched successfully with file: $logFilePath" -LogLevel Information
+        }
+        else
+        {
+            Start-Process -FilePath $logViewerExe -WindowStyle Normal
+            Write-Verbose "[$functionName] Log viewer launched without log file (file not found)"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Log viewer launched without log file (file not found at: $logFilePath)" -LogLevel Warning
+        }
+        
+        Write-Host "Log viewer opened successfully." -ForegroundColor Green
+    }
+    catch
+    {
+        Write-Host "Failed to launch log viewer: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to launch log viewer: $($_.Exception.Message)" -LogLevel Error
+    }
+    
+    return $returnValues.backoutText
+}
 #region show menus
 # Add the main menu to both history arrays for proper stack synchronization
 try

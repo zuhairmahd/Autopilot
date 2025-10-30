@@ -162,6 +162,7 @@ $buildSuccess = $true
 $builtDlls = @{}  # Dictionary: framework -> array of DLL paths
 $totalBuilds = $projects.Count * $frameworks.Count
 $successCount = 0
+$skipCount = 0
 
 Write-Verbose "Starting build process: $($projects.Count) projects x $($frameworks.Count) frameworks = $totalBuilds total builds"
 
@@ -170,7 +171,7 @@ foreach ($project in $projects)
     # Get the actual assembly name from the .csproj file
     $projectName = [System.IO.Path]::GetFileNameWithoutExtension($project.Name)
     
-    # Read the .csproj file to find the AssemblyName property
+    # Read the .csproj file to find the AssemblyName property and target frameworks
     $projectContent = Get-Content $project.FullName -Raw
     $assemblyNameMatch = [regex]::Match($projectContent, '<AssemblyName>([^<]+)</AssemblyName>')
     
@@ -186,8 +187,40 @@ foreach ($project in $projects)
         Write-Verbose "Project $projectName uses default AssemblyName: $assemblyName"
     }
     
+    # Detect project's target frameworks
+    $projectFrameworks = @()
+    $targetFrameworksMatch = [regex]::Match($projectContent, '<TargetFrameworks>([^<]+)</TargetFrameworks>')
+    $targetFrameworkMatch = [regex]::Match($projectContent, '<TargetFramework>([^<]+)</TargetFramework>')
+    
+    if ($targetFrameworksMatch.Success)
+    {
+        # Multiple frameworks (TargetFrameworks with 's')
+        $projectFrameworks = $targetFrameworksMatch.Groups[1].Value -split ';' | ForEach-Object { $_.Trim() }
+        Write-Verbose "Project $projectName targets multiple frameworks: $($projectFrameworks -join ', ')"
+    }
+    elseif ($targetFrameworkMatch.Success)
+    {
+        # Single framework (TargetFramework without 's')
+        $projectFrameworks = @($targetFrameworkMatch.Groups[1].Value.Trim())
+        Write-Verbose "Project $projectName targets single framework: $($projectFrameworks -join ', ')"
+    }
+    else
+    {
+        Write-Warning "Could not detect target frameworks for $projectName, skipping"
+        continue
+    }
+    
     foreach ($framework in $frameworks)
     {
+        # Skip if project doesn't support this framework
+        if ($projectFrameworks -notcontains $framework)
+        {
+            Write-Verbose "Skipping $projectName ($framework) - project does not target this framework"
+            Write-Host "  [SKIP] $projectName does not target $framework" -ForegroundColor Yellow
+            $skipCount++
+            continue
+        }
+        
         # Determine output path based on strategy
         if ($useFrameworkSubfolders)
         {
@@ -271,14 +304,20 @@ foreach ($project in $projects)
 
 Write-Host "========================================" -ForegroundColor Cyan
 
-if ($buildSuccess -and $successCount -eq $totalBuilds)
+$attemptedBuilds = $totalBuilds - $skipCount
+
+if ($buildSuccess -and $successCount -eq $attemptedBuilds)
 {
     Write-Host "  BUILD SUCCESSFUL" -ForegroundColor Green
     Write-Host "========================================`n" -ForegroundColor Cyan
     
     Write-Verbose "All builds completed successfully"
     Write-Host "Build Summary:" -ForegroundColor Yellow
-    Write-Host "  Success: $successCount / $totalBuilds builds" -ForegroundColor Green
+    Write-Host "  Success: $successCount / $attemptedBuilds builds" -ForegroundColor Green
+    if ($skipCount -gt 0)
+    {
+        Write-Host "  Skipped: $skipCount builds (incompatible frameworks)" -ForegroundColor Yellow
+    }
     Write-Host "  Configuration: $Configuration" -ForegroundColor Gray
     Write-Host "  Framework(s): $($frameworks -join ', ')" -ForegroundColor Gray
     Write-Host ""
@@ -350,8 +389,13 @@ else
 {
     Write-Host "  BUILD FAILED" -ForegroundColor Red
     Write-Host "========================================`n" -ForegroundColor Cyan
-    Write-Host "Success: $successCount / $totalBuilds builds" -ForegroundColor Red
-    Write-Verbose "Build failed: $successCount of $totalBuilds builds succeeded"
+    
+    Write-Verbose "Build failed: $successCount of $attemptedBuilds builds succeeded"
+    Write-Host "Success: $successCount / $attemptedBuilds builds" -ForegroundColor Red
+    if ($skipCount -gt 0)
+    {
+        Write-Host "Skipped: $skipCount builds (incompatible frameworks)" -ForegroundColor Yellow
+    }
     Write-Host ""
     exit 1
 }

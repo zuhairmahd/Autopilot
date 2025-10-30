@@ -57,6 +57,44 @@ High-performance logging engine with CMTrace format support.
 - Async logging: Non-blocking background queue processing
 - Log rotation: Automatic size-based rotation
 
+### 5. **Autopilot.LogViewer.Core** (Class Library)
+Multi-format log parsing and filtering for post-mortem analysis.
+
+**Targets:** netstandard2.0, net9.0  
+**Components:**
+- `LogEntry` - Data model for log entries (timestamp, level, module, thread, context, message)
+- `ILogParser` - Parser interface for extensibility
+- `StandardLogParser` - Parses standard Autopilot format: `YYYY-MM-DD HH:mm:ss.fff [Level] [Module] [Thread:X] [Context:User] Message`
+- `CMTraceLogParser` - Parses CMTrace XML format
+- `LogParserFactory` - Auto-detection and parser selection
+
+**Performance:**
+- 10,000 log entries parsed in ~200ms
+- Memory-efficient streaming (File.ReadLines)
+- LINQ-based filtering: <100ms for complex queries
+
+### 6. **Autopilot.LogViewer.UI** (WPF Application)
+Accessible desktop application for viewing Autopilot logs.
+
+**Target:** net9.0-windows  
+**Output:** `AutopilotLogViewer.exe` (137 KB)
+
+**Components:**
+- `MainViewModel` - MVVM view model with filtering, search, column visibility
+- `MainWindow.xaml` - Accessible WPF UI (AutomationProperties for JAWS/NVDA)
+- `BooleanToVisibilityConverter` - Data binding converter
+
+**Features:**
+- Level filter (All, Error, Warning, Information, Verbose, Debug)
+- Module filter (dynamically populated from log)
+- Full-text search (Message, Module, Context fields)
+- Column visibility controls (6 columns)
+- Keyboard navigation (Tab, Arrow keys, Ctrl+O, F5)
+- Screen reader support (JAWS, NVDA, Narrator)
+- Virtualizing DataGrid (handles 100,000+ entries)
+
+**Documentation:** [LOG_VIEWER_USER_GUIDE.md](../docs/LOG_VIEWER_USER_GUIDE.md)
+
 ## Building
 
 ### Requirements

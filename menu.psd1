@@ -216,6 +216,17 @@
                     'helpdesk',
                     'registration'
                 )
+            },
+            @{
+                description           = 'View and analyze Autopilot log files'
+                name                  = 'View Logs'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin',
+                    'advanced',
+                    'helpdesk'
+                )
             }
         )
         type                  = 'static'

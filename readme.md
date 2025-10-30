@@ -27,15 +27,16 @@ This script leverages the Microsoft Graph API to communicate with Intune and pro
 - **👥 User Readiness Validation**: Intelligent assessment of user eligibility based on group memberships and organizational policies
 - **🏢 Corporate Device Management**: Mark devices as corporate-owned for Intune Device Preparation and compliance
 - **📊 Advanced Reporting & Export**: CSV exports for devices, assignments, storage analysis, and application deployments with comprehensive group assignment analysis covering scripts, app protection policies, security baselines, and configuration policies. Optimized with Microsoft Graph batch API for efficient data retrieval.
-- **🔐 Enterprise Security**: AES-256 encrypted configuration, secure credential handling, and multi-factor authentication support
+- **� Accessible Log Viewer**: Desktop WPF application for post-mortem log analysis with screen reader support (JAWS, NVDA), multi-format parsing, advanced filtering, and column customization. See [Log Viewer User Guide](docs/LOG_VIEWER_USER_GUIDE.md) for details.
+- **�🔐 Enterprise Security**: AES-256 encrypted configuration, secure credential handling, and multi-factor authentication support
 - **⚙️ Automated Setup**: First Run Wizard with guided configuration and automatic credential encryption
 - **🔄 Smart Updates**: Automatic application updates with digital signature verification and rollback capabilities
 - **🧪 Unified Testing Framework**: Comprehensive Test-Runner.ps1 system with categorized testing (syntax, core, unit, integration, comprehensive) supporting over 261 PowerShell files with 100% success rates and advanced reporting capabilities
 - **🌐 Multi-Domain Support**: Environment-specific configurations for different organizational domains
 - **📱 Device Actions**: Remote device management (restart, wipe, clean, sync) with proper authorization
 - **🎨 Menu Customization**: Flexible menu system that adapts to organizational needs and user permissions
-- **� Smart Paging**: Multi-page menu and report display for improved navigation with large datasets
-- **�🚄 Performance Optimized**: Advanced performance optimizations deliver up to 92% improvement in startup time with memory-efficient operations, parallel processing, and asynchronous logging for enhanced user experience
+- **📄 Smart Paging**: Multi-page menu and report display for improved navigation with large datasets
+- **🚄 Performance Optimized**: Advanced performance optimizations deliver up to 92% improvement in startup time with memory-efficient operations, parallel processing, and asynchronous logging for enhanced user experience
 
 ## Performance Optimizations
 
