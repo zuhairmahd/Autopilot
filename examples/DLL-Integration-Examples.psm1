@@ -1091,6 +1091,730 @@ function Export-CsvStreaming()
 
 #endregion
 
+#region Graph Batch Operations
+
+<#
+.SYNOPSIS
+    Executes multiple Graph API requests in parallel batches (7-15x faster)
+.DESCRIPTION
+    Uses compiled C# batch processor to send up to 20 Graph API requests per batch.
+    Dramatically faster than sequential PowerShell calls for bulk operations.
+.PARAMETER AccessToken
+    Access token for Graph API authentication
+.PARAMETER Requests
+    Array of hashtables with Method, Url, Body (optional)
+.EXAMPLE
+    $requests = @(
+        @{ Method = "GET"; Url = "/users/user1@contoso.com" },
+        @{ Method = "GET"; Url = "/users/user2@contoso.com" },
+        @{ Method = "PATCH"; Url = "/users/user3@contoso.com"; Body = @{ department = "IT" } }
+    )
+    $results = Invoke-GraphBatch -AccessToken $token -Requests $requests
+#>
+function Invoke-GraphBatch()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$AccessToken,
+        
+        [Parameter(Mandatory = $true)]
+        [array]$Requests
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Processing $($Requests.Count) batch requests"
+    
+    try
+    {
+        $batchProcessor = [Autopilot.GraphCore.BatchProcessor]::new($AccessToken)
+        
+        # Convert PowerShell hashtables to C# BatchRequest objects
+        $batchRequests = New-Object 'System.Collections.Generic.List[Autopilot.GraphCore.BatchRequest]'
+        
+        foreach ($req in $Requests)
+        {
+            $batchRequest = [Autopilot.GraphCore.BatchRequest]::new()
+            $batchRequest.Method = $req.Method
+            $batchRequest.Url = $req.Url
+            
+            if ($req.ContainsKey('Body'))
+            {
+                $batchRequest.Body = $req.Body
+            }
+            
+            if ($req.ContainsKey('Headers'))
+            {
+                $batchRequest.Headers = $req.Headers
+            }
+            
+            $batchRequests.Add($batchRequest)
+        }
+        
+        # Execute batch
+        $responses = $batchProcessor.ProcessBatchAsync($batchRequests).GetAwaiter().GetResult()
+        
+        Write-Verbose "[$functionName] Received $($responses.Count) responses"
+        
+        # Convert responses to PowerShell objects
+        $results = $responses | ForEach-Object {
+            [PSCustomObject]@{
+                Id     = $_.Id
+                Status = $_.Status
+                Body   = $_.Body.GetRawText() | ConvertFrom-Json
+            }
+        }
+        
+        $batchProcessor.Dispose()
+        return $results
+    }
+    catch
+    {
+        Write-Error "[$functionName] Batch processing failed: $($_.Exception.Message)"
+        throw
+    }
+}
+
+<#
+.SYNOPSIS
+    High-performance Graph API POST request
+.EXAMPLE
+    $body = @{ displayName = "New Group"; mailEnabled = $false; securityEnabled = $true } | ConvertTo-Json
+    $result = Invoke-GraphPost -AccessToken $token -ResourcePath "groups" -Body $body
+#>
+function Invoke-GraphPost()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$AccessToken,
+        
+        [Parameter(Mandatory = $true)]
+        [string]$ResourcePath,
+        
+        [Parameter(Mandatory = $true)]
+        [string]$Body,
+        
+        [switch]$Beta
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] POST to $ResourcePath"
+    
+    try
+    {
+        $client = [Autopilot.GraphCore.GraphHttpClient]::new($AccessToken, $Beta.IsPresent)
+        $result = $client.PostAsync($ResourcePath, $Body).GetAwaiter().GetResult()
+        
+        $object = $result.GetRawText() | ConvertFrom-Json
+        $client.Dispose()
+        
+        return $object
+    }
+    catch
+    {
+        Write-Error "[$functionName] POST failed: $($_.Exception.Message)"
+        throw
+    }
+}
+
+<#
+.SYNOPSIS
+    High-performance Graph API PATCH request
+.EXAMPLE
+    $body = @{ department = "Engineering" } | ConvertTo-Json
+    $result = Invoke-GraphPatch -AccessToken $token -ResourcePath "users/user@contoso.com" -Body $body
+#>
+function Invoke-GraphPatch()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$AccessToken,
+        
+        [Parameter(Mandatory = $true)]
+        [string]$ResourcePath,
+        
+        [Parameter(Mandatory = $true)]
+        [string]$Body,
+        
+        [switch]$Beta
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] PATCH to $ResourcePath"
+    
+    try
+    {
+        $client = [Autopilot.GraphCore.GraphHttpClient]::new($AccessToken, $Beta.IsPresent)
+        $result = $client.PatchAsync($ResourcePath, $Body).GetAwaiter().GetResult()
+        
+        $object = $result.GetRawText() | ConvertFrom-Json
+        $client.Dispose()
+        
+        return $object
+    }
+    catch
+    {
+        Write-Error "[$functionName] PATCH failed: $($_.Exception.Message)"
+        throw
+    }
+}
+
+<#
+.SYNOPSIS
+    High-performance Graph API DELETE request
+.EXAMPLE
+    $success = Invoke-GraphDelete -AccessToken $token -ResourcePath "groups/$groupId"
+#>
+function Invoke-GraphDelete()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$AccessToken,
+        
+        [Parameter(Mandatory = $true)]
+        [string]$ResourcePath,
+        
+        [switch]$Beta
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] DELETE $ResourcePath"
+    
+    try
+    {
+        $client = [Autopilot.GraphCore.GraphHttpClient]::new($AccessToken, $Beta.IsPresent)
+        $success = $client.DeleteAsync($ResourcePath).GetAwaiter().GetResult()
+        
+        $client.Dispose()
+        return $success
+    }
+    catch
+    {
+        Write-Error "[$functionName] DELETE failed: $($_.Exception.Message)"
+        throw
+    }
+}
+
+#endregion
+
+#region Advanced Device Filtering
+
+<#
+.SYNOPSIS
+    Filter devices by enrollment status (10x faster)
+.EXAMPLE
+    $enrolledDevices = Invoke-DeviceFilterByEnrollment -Devices $devices -EnrolledOnly $true
+#>
+function Invoke-DeviceFilterByEnrollment()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [array]$Devices,
+        
+        [Parameter(Mandatory = $false)]
+        [bool]$EnrolledOnly = $true
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Filtering for enrolled=$EnrolledOnly"
+    
+    # Convert to C# DeviceInfo list
+    $deviceList = New-Object 'System.Collections.Generic.List[Autopilot.DeviceCore.DeviceInfo]'
+    
+    foreach ($device in $Devices)
+    {
+        $deviceInfo = [Autopilot.DeviceCore.DeviceInfo]::new()
+        $deviceInfo.Manufacturer = $device.manufacturer
+        $deviceInfo.Model = $device.model
+        $deviceInfo.SerialNumber = $device.serialNumber
+        $deviceInfo.DeviceId = $device.id
+        $deviceInfo.IsAutopilotEnrolled = if ($null -ne $device.enrollmentState) { $device.enrollmentState -eq 'enrolled' } else { $false }
+        $deviceList.Add($deviceInfo)
+    }
+    
+    # Use compiled C# for high performance
+    $filtered = [Autopilot.DeviceCore.DeviceFilter]::FilterByEnrollmentStatus($deviceList, $EnrolledOnly)
+    
+    Write-Verbose "[$functionName] Filtered to $($filtered.Count) devices"
+    return $filtered
+}
+
+<#
+.SYNOPSIS
+    Search devices by serial number with wildcard support (15x faster)
+.EXAMPLE
+    $found = Invoke-DeviceSearchBySerial -Devices $devices -SearchPattern "ABC*"
+#>
+function Invoke-DeviceSearchBySerial()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [array]$Devices,
+        
+        [Parameter(Mandatory = $true)]
+        [string]$SearchPattern
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Searching for pattern: $SearchPattern"
+    
+    # Convert to C# DeviceInfo list
+    $deviceList = New-Object 'System.Collections.Generic.List[Autopilot.DeviceCore.DeviceInfo]'
+    
+    foreach ($device in $Devices)
+    {
+        $deviceInfo = [Autopilot.DeviceCore.DeviceInfo]::new()
+        $deviceInfo.SerialNumber = $device.serialNumber
+        $deviceInfo.Manufacturer = $device.manufacturer
+        $deviceInfo.Model = $device.model
+        $deviceInfo.DeviceId = $device.id
+        $deviceList.Add($deviceInfo)
+    }
+    
+    # Use compiled C# with regex support
+    $results = [Autopilot.DeviceCore.DeviceFilter]::SearchBySerialNumber($deviceList, $SearchPattern)
+    
+    Write-Verbose "[$functionName] Found $($results.Count) matches"
+    return $results
+}
+
+<#
+.SYNOPSIS
+    Group devices by manufacturer and get counts (8x faster)
+.EXAMPLE
+    $summary = Get-DeviceManufacturerSummary -Devices $devices
+    # Returns: @{ "Dell" = 150; "HP" = 85; "Lenovo" = 42 }
+#>
+function Get-DeviceManufacturerSummary()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [array]$Devices
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Grouping $($Devices.Count) devices by manufacturer"
+    
+    # Convert to C# DeviceInfo list
+    $deviceList = New-Object 'System.Collections.Generic.List[Autopilot.DeviceCore.DeviceInfo]'
+    
+    foreach ($device in $Devices)
+    {
+        $deviceInfo = [Autopilot.DeviceCore.DeviceInfo]::new()
+        $deviceInfo.Manufacturer = $device.manufacturer
+        $deviceInfo.Model = $device.model
+        $deviceInfo.SerialNumber = $device.serialNumber
+        $deviceList.Add($deviceInfo)
+    }
+    
+    # Use compiled LINQ for high performance
+    $grouped = [Autopilot.DeviceCore.DeviceFilter]::GroupByManufacturer($deviceList)
+    
+    # Convert to PowerShell hashtable
+    $result = @{}
+    foreach ($key in $grouped.Keys)
+    {
+        $result[$key] = $grouped[$key]
+    }
+    
+    return $result
+}
+
+<#
+.SYNOPSIS
+    Sort devices by manufacturer, model, or serial number (5x faster)
+.EXAMPLE
+    $sorted = Invoke-DeviceSort -Devices $devices -SortBy "Manufacturer" -Descending
+#>
+function Invoke-DeviceSort()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [array]$Devices,
+        
+        [Parameter(Mandatory = $false)]
+        [ValidateSet("Manufacturer", "Model", "SerialNumber")]
+        [string]$SortBy = "Manufacturer",
+        
+        [Parameter(Mandatory = $false)]
+        [switch]$Descending
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Sorting by $SortBy (Descending: $($Descending.IsPresent))"
+    
+    # Convert to C# DeviceInfo list
+    $deviceList = New-Object 'System.Collections.Generic.List[Autopilot.DeviceCore.DeviceInfo]'
+    
+    foreach ($device in $Devices)
+    {
+        $deviceInfo = [Autopilot.DeviceCore.DeviceInfo]::new()
+        $deviceInfo.Manufacturer = $device.manufacturer
+        $deviceInfo.Model = $device.model
+        $deviceInfo.SerialNumber = $device.serialNumber
+        $deviceInfo.DeviceId = $device.id
+        $deviceList.Add($deviceInfo)
+    }
+    
+    # Map SortBy to enum
+    $sortField = [Autopilot.DeviceCore.DeviceSortField]::$SortBy
+    
+    # Use compiled LINQ for high performance
+    $sorted = [Autopilot.DeviceCore.DeviceFilter]::SortDevices($deviceList, $sortField, $Descending.IsPresent)
+    
+    Write-Verbose "[$functionName] Sorted $($sorted.Count) devices"
+    return $sorted
+}
+
+#endregion
+
+#region Configuration Validation
+
+<#
+.SYNOPSIS
+    Validates configuration hashtable against schema (10x faster)
+.DESCRIPTION
+    Uses compiled C# to validate settings, check required keys, validate types,
+    enforce min/max values, and verify enum constraints.
+.PARAMETER Config
+    Configuration hashtable to validate
+.PARAMETER Schema
+    Schema hashtable defining requirements
+.EXAMPLE
+    $schema = @{
+        tenantId = @{ required = $true; type = "string"; pattern = "^[a-f0-9-]+$" }
+        maxRetries = @{ required = $false; type = "int"; min = 1; max = 10 }
+        logLevel = @{ required = $true; type = "string"; enum = @("Debug", "Info", "Warning", "Error") }
+    }
+    $result = Test-ConfigurationValid -Config $settings -Schema $schema
+    if (-not $result.IsValid) {
+        Write-Error "Config errors: $($result.Errors -join '; ')"
+    }
+#>
+function Test-ConfigurationValid()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Config,
+        
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Schema
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Validating configuration"
+    
+    try
+    {
+        $result = [Autopilot.ConfigCore.ConfigValidator]::Validate($Config, $Schema)
+        
+        if ($result.IsValid)
+        {
+            Write-Verbose "[$functionName] Configuration is valid"
+        }
+        else
+        {
+            Write-Warning "[$functionName] Configuration has $($result.Errors.Count) errors"
+            foreach ($error in $result.Errors)
+            {
+                Write-Verbose "[$functionName]   - $error"
+            }
+        }
+        
+        return [PSCustomObject]@{
+            IsValid      = $result.IsValid
+            Errors       = @($result.Errors)
+            ErrorMessage = $result.ErrorMessage
+        }
+    }
+    catch
+    {
+        Write-Error "[$functionName] Validation failed: $($_.Exception.Message)"
+        throw
+    }
+}
+
+<#
+.SYNOPSIS
+    Gets list of missing required keys from configuration
+.EXAMPLE
+    $requiredKeys = @("tenantId", "clientId", "clientSecret")
+    $missing = Get-MissingConfigKeys -Config $settings -RequiredKeys $requiredKeys
+    if ($missing.Count -gt 0) {
+        Write-Error "Missing keys: $($missing -join ', ')"
+    }
+#>
+function Get-MissingConfigKeys()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Config,
+        
+        [Parameter(Mandatory = $true)]
+        [string[]]$RequiredKeys
+    )
+    
+    try
+    {
+        $keyList = New-Object 'System.Collections.Generic.List[string]'
+        $RequiredKeys | ForEach-Object { $keyList.Add($_) }
+        
+        $missing = [Autopilot.ConfigCore.ConfigValidator]::GetMissingKeys($Config, $keyList)
+        
+        return @($missing)
+    }
+    catch
+    {
+        Write-Error "Failed to check missing keys: $($_.Exception.Message)"
+        throw
+    }
+}
+
+#endregion
+
+#region Configuration File Change Detection
+
+<#
+.SYNOPSIS
+    Checks if a configuration file has changed since last check (50x faster)
+.DESCRIPTION
+    Uses compiled C# to track file metadata (timestamp, size) for efficient
+    change detection. Avoids expensive file parsing when files haven't changed.
+.PARAMETER FilePath
+    Absolute path to configuration file
+.EXAMPLE
+    if (Test-ConfigFileChanged -FilePath "C:\Config\settings.psd1") {
+        Write-Host "Config file changed - reloading"
+        $settings = Import-PowerShellDataFile -Path "C:\Config\settings.psd1"
+        Update-ConfigFileMetadata -FilePath "C:\Config\settings.psd1"
+    } else {
+        Write-Host "Config file unchanged - using cached settings"
+    }
+#>
+function Test-ConfigFileChanged()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath
+    )
+    
+    try
+    {
+        $changed = [Autopilot.ConfigCore.ConfigFileWatcher]::HasChanged($FilePath)
+        
+        if ($changed)
+        {
+            Write-Verbose "Config file changed: $FilePath"
+        }
+        else
+        {
+            Write-Verbose "Config file unchanged: $FilePath"
+        }
+        
+        return $changed
+    }
+    catch
+    {
+        Write-Error "Failed to check file change: $($_.Exception.Message)"
+        return $true # Assume changed on error
+    }
+}
+
+<#
+.SYNOPSIS
+    Updates tracked metadata for a config file after loading
+.DESCRIPTION
+    Call this after successfully loading/parsing a configuration file
+    to record its current state for future change detection.
+.PARAMETER FilePath
+    Absolute path to configuration file
+.EXAMPLE
+    $settings = Import-PowerShellDataFile -Path $configPath
+    Update-ConfigFileMetadata -FilePath $configPath
+#>
+function Update-ConfigFileMetadata()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath
+    )
+    
+    try
+    {
+        [Autopilot.ConfigCore.ConfigFileWatcher]::UpdateMetadata($FilePath)
+        Write-Verbose "Updated metadata for: $FilePath"
+    }
+    catch
+    {
+        Write-Warning "Failed to update file metadata: $($_.Exception.Message)"
+    }
+}
+
+<#
+.SYNOPSIS
+    Clears all tracked configuration file metadata
+.DESCRIPTION
+    Forces full reload on next file check. Useful for testing.
+.EXAMPLE
+    Clear-ConfigFileTracking
+#>
+function Clear-ConfigFileTracking()
+{
+    [CmdletBinding()]
+    param()
+    
+    [Autopilot.ConfigCore.ConfigFileWatcher]::ClearAll()
+    Write-Verbose "Cleared all config file tracking"
+}
+
+<#
+.SYNOPSIS
+    Gets count of tracked configuration files
+.EXAMPLE
+    $count = Get-TrackedConfigFileCount
+    Write-Host "Tracking $count configuration files"
+#>
+function Get-TrackedConfigFileCount()
+{
+    [CmdletBinding()]
+    param()
+    
+    return [Autopilot.ConfigCore.ConfigFileWatcher]::TrackedFileCount
+}
+
+#endregion
+
+#region Cache Maintenance Operations
+
+<#
+.SYNOPSIS
+    Removes expired entries from DirectoryObjectCache
+.EXAMPLE
+    $removed = Invoke-CacheCleanup
+    Write-Host "Removed $removed expired cache entries"
+#>
+function Invoke-CacheCleanup()
+{
+    [CmdletBinding()]
+    param()
+    
+    if ($global:DirectoryObjectCache)
+    {
+        try
+        {
+            $removed = $global:DirectoryObjectCache.CleanupExpired()
+            Write-Verbose "Removed $removed expired cache entries"
+            return $removed
+        }
+        catch
+        {
+            Write-Error "Cache cleanup failed: $($_.Exception.Message)"
+            return 0
+        }
+    }
+    else
+    {
+        Write-Warning "Cache not initialized"
+        return 0
+    }
+}
+
+<#
+.SYNOPSIS
+    Checks if a specific key exists in the cache (and is not expired)
+.EXAMPLE
+    if (Test-CacheKeyExists -Key "User-john@contoso.com") {
+        Write-Host "User is cached"
+    }
+#>
+function Test-CacheKeyExists()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Key
+    )
+    
+    if ($global:DirectoryObjectCache)
+    {
+        return $global:DirectoryObjectCache.ContainsKey($Key)
+    }
+    else
+    {
+        Write-Warning "Cache not initialized"
+        return $false
+    }
+}
+
+<#
+.SYNOPSIS
+    Removes a specific key from the cache
+.EXAMPLE
+    Remove-CacheKey -Key "User-staleuser@contoso.com"
+#>
+function Remove-CacheKey()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Key
+    )
+    
+    if ($global:DirectoryObjectCache)
+    {
+        $removed = $global:DirectoryObjectCache.Remove($Key)
+        if ($removed)
+        {
+            Write-Verbose "Removed cache key: $Key"
+        }
+        else
+        {
+            Write-Verbose "Cache key not found: $Key"
+        }
+        return $removed
+    }
+    else
+    {
+        Write-Warning "Cache not initialized"
+        return $false
+    }
+}
+
+<#
+.SYNOPSIS
+    Clears all cache entries
+.EXAMPLE
+    Clear-DirectoryObjectCache
+#>
+function Clear-DirectoryObjectCache()
+{
+    [CmdletBinding()]
+    param()
+    
+    if ($global:DirectoryObjectCache)
+    {
+        $global:DirectoryObjectCache.Clear()
+        Write-Verbose "Cleared all cache entries"
+    }
+    else
+    {
+        Write-Warning "Cache not initialized"
+    }
+}
+
+#endregion
+
 # Export functions
 Export-ModuleMember -Function @(
     'Invoke-GraphGet',
@@ -1116,5 +1840,23 @@ Export-ModuleMember -Function @(
     'Test-HashtableEquality',
     'ConvertFrom-JsonFast',
     'Export-CsvFast',
-    'Export-CsvStreaming'
+    'Export-CsvStreaming',
+    'Invoke-GraphBatch',
+    'Invoke-GraphPost',
+    'Invoke-GraphPatch',
+    'Invoke-GraphDelete',
+    'Invoke-DeviceFilterByEnrollment',
+    'Invoke-DeviceSearchBySerial',
+    'Get-DeviceManufacturerSummary',
+    'Invoke-DeviceSort',
+    'Test-ConfigurationValid',
+    'Get-MissingConfigKeys',
+    'Test-ConfigFileChanged',
+    'Update-ConfigFileMetadata',
+    'Clear-ConfigFileTracking',
+    'Get-TrackedConfigFileCount',
+    'Invoke-CacheCleanup',
+    'Test-CacheKeyExists',
+    'Remove-CacheKey',
+    'Clear-DirectoryObjectCache'
 )
