@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>AutopilotLogViewer</AssemblyName>
+    <Authors>Autopilot Team</Authors>
+    <Product>Autopilot Log Viewer</Product>
+    <Description>Accessible WPF application for viewing Autopilot log files</Description>
+    <Copyright>Copyright © 2025</Copyright>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Autopilot.LogViewer.Core\Autopilot.LogViewer.Core.csproj" />
+  </ItemGroup>
+
+</Project>
