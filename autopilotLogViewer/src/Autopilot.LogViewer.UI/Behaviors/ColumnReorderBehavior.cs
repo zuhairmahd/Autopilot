@@ -6,6 +6,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Automation.Peers;
 using System.Windows.Automation;
+using Autopilot.LogViewer.UI.Controls;
 
 namespace Autopilot.LogViewer.UI.Behaviors
 {
@@ -54,9 +55,6 @@ namespace Autopilot.LogViewer.UI.Behaviors
 
             // Attach context menus to all column headers
             AttachContextMenusToHeaders(dataGrid);
-
-            // Update accessibility metadata for headers (position/size)
-            UpdateHeaderAutomation(dataGrid);
         }
 
         private static void AttachContextMenusToHeaders(DataGrid dataGrid)
@@ -96,14 +94,25 @@ namespace Autopilot.LogViewer.UI.Behaviors
         {
             var contextMenu = new ContextMenu();
 
+            // Move to Beginning menu item
+            var moveToBeginningItem = new MenuItem
+            {
+                Header = "Move to _Beginning"
+            };
+            AutomationProperties.SetName(moveToBeginningItem, "Move Column to Beginning");
+            AutomationProperties.SetHelpText(moveToBeginningItem, "Moves this column to the first position on the left");
+            moveToBeginningItem.Click += (s, e) => MoveColumnToBeginning(dataGrid, column);
+            moveToBeginningItem.InputGestureText = "Ctrl+Shift+Home";
+            contextMenu.Items.Add(moveToBeginningItem);
+
             // Move Left menu item
             var moveLeftItem = new MenuItem
             {
                 Header = "Move _Left"
             };
             AutomationProperties.SetName(moveLeftItem, "Move Column Left");
+            AutomationProperties.SetHelpText(moveLeftItem, "Moves this column one position to the left");
             moveLeftItem.Click += (s, e) => MoveColumnLeft(dataGrid, column);
-            // Keyboard shortcut: Ctrl+Shift+Left
             moveLeftItem.InputGestureText = "Ctrl+Shift+Left";
             contextMenu.Items.Add(moveLeftItem);
 
@@ -113,10 +122,37 @@ namespace Autopilot.LogViewer.UI.Behaviors
                 Header = "Move _Right"
             };
             AutomationProperties.SetName(moveRightItem, "Move Column Right");
+            AutomationProperties.SetHelpText(moveRightItem, "Moves this column one position to the right");
             moveRightItem.Click += (s, e) => MoveColumnRight(dataGrid, column);
-            // Keyboard shortcut: Ctrl+Shift+Right
             moveRightItem.InputGestureText = "Ctrl+Shift+Right";
             contextMenu.Items.Add(moveRightItem);
+
+            // Move to End menu item
+            var moveToEndItem = new MenuItem
+            {
+                Header = "Move to _End"
+            };
+            AutomationProperties.SetName(moveToEndItem, "Move Column to End");
+            AutomationProperties.SetHelpText(moveToEndItem, "Moves this column to the last position on the right");
+            moveToEndItem.Click += (s, e) => MoveColumnToEnd(dataGrid, column);
+            moveToEndItem.InputGestureText = "Ctrl+Shift+End";
+            contextMenu.Items.Add(moveToEndItem);
+
+            contextMenu.Opened += (_, _) =>
+            {
+                var visibleColumns = dataGrid.Columns
+                    .Where(c => c.Visibility == Visibility.Visible)
+                    .OrderBy(c => c.DisplayIndex)
+                    .ToList();
+                var position = visibleColumns.IndexOf(column);
+                var canMoveLeft = position > 0;
+                var canMoveRight = position >= 0 && position < visibleColumns.Count - 1;
+
+                moveToBeginningItem.IsEnabled = canMoveLeft;
+                moveLeftItem.IsEnabled = canMoveLeft;
+                moveRightItem.IsEnabled = canMoveRight;
+                moveToEndItem.IsEnabled = canMoveRight;
+            };
 
             contextMenu.Items.Add(new Separator());
 
@@ -137,7 +173,13 @@ namespace Autopilot.LogViewer.UI.Behaviors
             // Also support keyboard shortcuts when header has focus
             header.KeyDown += (s, e) =>
             {
-                if (e.Key == Key.Left && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control
+                if (e.Key == Key.Home && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control
+                    && (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift)
+                {
+                    MoveColumnToBeginning(dataGrid, column);
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.Left && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control
                     && (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift)
                 {
                     MoveColumnLeft(dataGrid, column);
@@ -147,6 +189,12 @@ namespace Autopilot.LogViewer.UI.Behaviors
                     && (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift)
                 {
                     MoveColumnRight(dataGrid, column);
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.End && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control
+                    && (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift)
+                {
+                    MoveColumnToEnd(dataGrid, column);
                     e.Handled = true;
                 }
                 else if (e.Key == Key.Apps || (e.Key == Key.F10 && (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift))
@@ -164,7 +212,8 @@ namespace Autopilot.LogViewer.UI.Behaviors
             // Set accessibility properties
             AutomationProperties.SetHelpText(header,
                 $"Column header for {column.Header}. Right-click or press Shift+F10 for column arrangement options. " +
-                $"Use Ctrl+Shift+Left or Ctrl+Shift+Right to reorder.");
+                $"Use Ctrl+Shift+Home to move to beginning, Ctrl+Shift+End to move to end, " +
+                $"Ctrl+Shift+Left or Ctrl+Shift+Right to move one position.");
         }
 
         private static void MoveColumnLeft(DataGrid dataGrid, DataGridColumn column)
@@ -172,26 +221,19 @@ namespace Autopilot.LogViewer.UI.Behaviors
             int currentIndex = column.DisplayIndex;
             if (currentIndex > 0)
             {
-                // Find the column to the left
-                var leftColumn = dataGrid.Columns.FirstOrDefault(c => c.DisplayIndex == currentIndex - 1);
-                if (leftColumn != null)
-                {
-                    // Swap display indices
-                    column.DisplayIndex = currentIndex - 1;
-                    leftColumn.DisplayIndex = currentIndex;
+                int newIndex = currentIndex - 1;
 
-                    // Announce the change to screen readers
-                    AnnounceColumnMove(column, "left", currentIndex, currentIndex - 1);
+                // Simply set the new DisplayIndex - WPF will automatically adjust other columns
+                column.DisplayIndex = newIndex;
 
-                    // Save the new arrangement
-                    SaveColumnOrder(dataGrid);
+                // Announce the change to screen readers
+                AnnounceColumnMove(column, "left", currentIndex, newIndex);
 
-                    // Update row accessible names to reflect new column order
-                    UpdateRowAccessibleNames(dataGrid);
+                // Update automation properties for screen readers
+                UpdateAutomationProperties(dataGrid);
 
-                    // Update header automation for accurate index announcements
-                    UpdateHeaderAutomation(dataGrid);
-                }
+                // Save the new arrangement
+                SaveColumnOrder(dataGrid);
             }
         }
 
@@ -202,26 +244,61 @@ namespace Autopilot.LogViewer.UI.Behaviors
 
             if (currentIndex < maxIndex)
             {
-                // Find the column to the right
-                var rightColumn = dataGrid.Columns.FirstOrDefault(c => c.DisplayIndex == currentIndex + 1);
-                if (rightColumn != null)
-                {
-                    // Swap display indices
-                    column.DisplayIndex = currentIndex + 1;
-                    rightColumn.DisplayIndex = currentIndex;
+                int newIndex = currentIndex + 1;
 
-                    // Announce the change to screen readers
-                    AnnounceColumnMove(column, "right", currentIndex, currentIndex + 1);
+                // Simply set the new DisplayIndex - WPF will automatically adjust other columns
+                column.DisplayIndex = newIndex;
 
-                    // Save the new arrangement
-                    SaveColumnOrder(dataGrid);
+                // Announce the change to screen readers
+                AnnounceColumnMove(column, "right", currentIndex, newIndex);
 
-                    // Update row accessible names to reflect new column order
-                    UpdateRowAccessibleNames(dataGrid);
+                // Update automation properties for screen readers
+                UpdateAutomationProperties(dataGrid);
 
-                    // Update header automation for accurate index announcements
-                    UpdateHeaderAutomation(dataGrid);
-                }
+                // Save the new arrangement
+                SaveColumnOrder(dataGrid);
+            }
+        }
+
+        private static void MoveColumnToBeginning(DataGrid dataGrid, DataGridColumn column)
+        {
+            int currentIndex = column.DisplayIndex;
+            if (currentIndex > 0)
+            {
+                // Move to first position (index 0)
+                column.DisplayIndex = 0;
+
+                // Announce the change to screen readers
+                var message = $"{column.Header} column moved to beginning (position 1)";
+                System.Diagnostics.Debug.WriteLine(message);
+
+                // Update automation properties for screen readers
+                UpdateAutomationProperties(dataGrid);
+
+                // Save the new arrangement
+                SaveColumnOrder(dataGrid);
+            }
+        }
+
+        private static void MoveColumnToEnd(DataGrid dataGrid, DataGridColumn column)
+        {
+            int currentIndex = column.DisplayIndex;
+            int maxIndex = dataGrid.Columns.Count - 1;
+
+            if (currentIndex < maxIndex)
+            {
+                // Move to last position
+                column.DisplayIndex = maxIndex;
+
+                // Announce the change to screen readers
+                var message = $"{column.Header} column moved to end (position {maxIndex + 1})";
+                System.Diagnostics.Debug.WriteLine(message);
+
+                // Update automation properties for screen readers
+                UpdateAutomationProperties(dataGrid);
+
+                // Save the new arrangement
+                SaveColumnOrder(dataGrid);
             }
         }
 
@@ -244,14 +321,11 @@ namespace Autopilot.LogViewer.UI.Behaviors
             var message = "Column order reset to default";
             System.Diagnostics.Debug.WriteLine(message);
 
+            // Update automation properties for screen readers
+            UpdateAutomationProperties(dataGrid);
+
             // Save the reset order
             SaveColumnOrder(dataGrid);
-
-            // Update row accessible names
-            UpdateRowAccessibleNames(dataGrid);
-
-            // Update header automation for accurate index announcements
-            UpdateHeaderAutomation(dataGrid);
         }
 
         private static void AnnounceColumnMove(DataGridColumn column, string direction, int oldIndex, int newIndex)
@@ -263,9 +337,31 @@ namespace Autopilot.LogViewer.UI.Behaviors
             // In a production app, you might use UIAutomation's RaiseNotificationEvent
         }
 
+        private static void UpdateAutomationProperties(DataGrid dataGrid)
+        {
+            var visibleColumns = dataGrid.Columns.Where(c => c.Visibility == Visibility.Visible)
+                                                .OrderBy(c => c.DisplayIndex)
+                                                .ToList();
+            int visibleColumnCount = visibleColumns.Count;
+
+            for (int i = 0; i < visibleColumnCount; i++)
+            {
+                var column = visibleColumns[i];
+                var header = FindColumnHeader(dataGrid, column);
+                if (header != null)
+                {
+                    AutomationProperties.SetPositionInSet(header, i + 1);
+                    AutomationProperties.SetSizeOfSet(header, visibleColumnCount);
+                }
+            }
+        }
+
         private static void SaveColumnOrder(DataGrid dataGrid)
         {
             var settings = new System.Collections.Generic.List<Helpers.ColumnSetting>();
+            var includeHeadersPreference = dataGrid is AccessibleDataGrid accessibleGrid
+                ? accessibleGrid.IncludeHeadersInRowAutomationName
+                : false;
 
             foreach (var column in dataGrid.Columns)
             {
@@ -283,44 +379,7 @@ namespace Autopilot.LogViewer.UI.Behaviors
                 });
             }
 
-            Helpers.ColumnSettings.Save(settings);
-        }
-
-        private static void UpdateRowAccessibleNames(DataGrid dataGrid)
-        {
-            // Trigger re-evaluation of row accessible names in AccessibleDataGrid
-            // This is handled automatically by the AccessibleDataGrid.OnColumnsCollectionChanged
-            // But we can force an update by refreshing the items
-            if (dataGrid is Controls.AccessibleDataGrid accessibleGrid)
-            {
-                // The grid's CollectionChanged handler will update accessible names
-                dataGrid.Items.Refresh();
-            }
-        }
-
-        private static void UpdateHeaderAutomation(DataGrid dataGrid)
-        {
-            // Update PositionInSet and SizeOfSet so screen readers announce correct "x of y"
-            var headerPresenter = FindVisualChild<DataGridColumnHeadersPresenter>(dataGrid);
-            if (headerPresenter == null)
-                return;
-
-            int visibleCount = dataGrid.Columns.Count(c => c.Visibility == Visibility.Visible);
-            for (int i = 0; i < headerPresenter.Items.Count; i++)
-            {
-                if (headerPresenter.ItemContainerGenerator.ContainerFromIndex(i) is DataGridColumnHeader header && header.Column != null)
-                {
-                    int pos = header.Column.DisplayIndex + 1;
-                    AutomationProperties.SetPositionInSet(header, pos);
-                    AutomationProperties.SetSizeOfSet(header, visibleCount);
-
-                    // Ensure a clear, stable name for SRs
-                    if (header.Column.Header != null)
-                    {
-                        AutomationProperties.SetName(header, header.Column.Header.ToString());
-                    }
-                }
-            }
+            Helpers.ColumnSettings.Save(settings, includeHeadersPreference);
         }
 
         private static T? FindVisualChild<T>(DependencyObject? parent) where T : DependencyObject

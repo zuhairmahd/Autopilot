@@ -16,10 +16,11 @@ The **Autopilot Log Viewer** is a high-performance desktop application designed 
 - **High Performance**: Virtualizing DataGrid handles large log files (100,000+ entries) efficiently
 
 ### Accessibility Features
-- **Screen Reader Support**: Full compatibility with JAWS and NVDA screen readers
+- **Screen Reader Support**: Full compatibility with JAWS, NVDA, and Narrator screen readers using native WPF accessibility
 - **Keyboard Navigation**: Complete keyboard support (Tab, Arrow keys, shortcuts)
 - **WCAG 2.1 Level AA Compliance**: Meets Microsoft accessibility guidelines
 - **AutomationProperties**: All controls have descriptive names and help text
+- **Native WPF Automation**: Leverages WPF's built-in UI Automation framework for reliable accessibility
 
 ## System Requirements
 
@@ -297,6 +298,7 @@ Notes:
 - [User Guide](docs/LOG_VIEWER_USER_GUIDE.md) - Comprehensive end-user documentation
 - [Implementation Summary](docs/LOG_VIEWER_IMPLEMENTATION_SUMMARY.md) - Technical implementation details
 - [Subtree Integration Guide](docs/SUBTREE_INTEGRATION.md) - Integration with main Autopilot repository
+- [Accessibility Simplification](docs/ACCESSIBILITY_SIMPLIFICATION.md) - Native WPF accessibility approach (Oct 2025)
 
 ## Contributing
 

@@ -3,9 +3,9 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net9.0-windows</TargetFramework>
-    <LangVersion>latest</LangVersion>
-    <Nullable>enable</Nullable>
-    <UseWPF>true</UseWPF>
+        <LangVersion>latest</LangVersion>
+        <Nullable>enable</Nullable>
+        <UseWPF>true</UseWPF>
     <AssemblyName>AutopilotLogViewer</AssemblyName>
     <Authors>Autopilot Team</Authors>
     <Product>Autopilot Log Viewer</Product>
