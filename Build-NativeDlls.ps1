@@ -45,7 +45,8 @@ param(
     [string]$Framework = 'All',
     [string]$BinFolder = 'bin',
     [switch]$Clean,
-    [switch]$signOnly
+    [switch]$signOnly,
+    [switch]$showSummary
 )
 
 $ErrorActionPreference = 'Stop'
@@ -586,81 +587,82 @@ if ($buildSuccess -and $successCount -eq $attemptedBuilds)
     {
         Write-Host "  [WARNING] Code signing failed or skipped" -ForegroundColor Yellow                                         
     }
-    Write-Host "  BUILD SUCCESSFUL" -ForegroundColor Green
+    Write-Host "  [OK] BUILD SUCCESSFUL" -ForegroundColor Green
     Write-Host "========================================`n" -ForegroundColor Cyan
-    
-    Write-Verbose "All builds completed successfully"
-    Write-Host "Build Summary:" -ForegroundColor Yellow
-    Write-Host "  Success: $successCount / $attemptedBuilds builds" -ForegroundColor Green
-    if ($skipCount -gt 0)
+    if ($showSummary)
     {
-        Write-Host "  Skipped: $skipCount builds (incompatible frameworks)" -ForegroundColor Yellow
-    }
-    Write-Host "  Configuration: $Configuration" -ForegroundColor Gray
-    Write-Host "  Framework(s): $($frameworks -join ', ')" -ForegroundColor Gray
-    Write-Host ""
-    
-    # Display output directories and files
-    if ($useFrameworkSubfolders)
-    {
-        # Multiple frameworks - show each framework's output
-        Write-Host "Output Directories:" -ForegroundColor Cyan
-        foreach ($framework in $frameworks)
+        Write-Verbose "All builds completed successfully"
+        Write-Host "Build Summary:" -ForegroundColor Yellow
+        Write-Host "  Success: $successCount / $attemptedBuilds builds" -ForegroundColor Green
+        if ($skipCount -gt 0)
         {
-            $frameworkPath = Join-Path (Join-Path $BinFolder $Configuration) $framework
-            $frameworkDllCount = (Get-ChildItem "$frameworkPath\*.dll" -ErrorAction SilentlyContinue).Count
-            $psVersion = if ($framework -eq 'netstandard2.0') { "PowerShell 5.1" } else { "PowerShell 7+" }
-            Write-Host "  $frameworkPath ($frameworkDllCount DLLs, $psVersion)" -ForegroundColor Gray
-            Write-Verbose "Framework $framework output: $frameworkPath with $frameworkDllCount DLL files"
-            
-            if ($builtDlls.ContainsKey($framework))
+            Write-Host "  Skipped: $skipCount builds (incompatible frameworks)" -ForegroundColor Yellow
+        }
+        Write-Host "  Configuration: $Configuration" -ForegroundColor Gray
+        Write-Host "  Framework(s): $($frameworks -join ', ')" -ForegroundColor Gray
+        Write-Host ""
+    
+        # Display output directories and files
+        if ($useFrameworkSubfolders)
+        {
+            # Multiple frameworks - show each framework's output
+            Write-Host "Output Directories:" -ForegroundColor Cyan
+            foreach ($framework in $frameworks)
             {
-                $builtDlls[$framework] | ForEach-Object {
-                    $fileName = Split-Path $_ -Leaf
-                    Write-Host "    - $fileName" -ForegroundColor DarkGray
-                    Write-Verbose "      Full path: $_"
+                $frameworkPath = Join-Path (Join-Path $BinFolder $Configuration) $framework
+                $frameworkDllCount = (Get-ChildItem "$frameworkPath\*.dll" -ErrorAction SilentlyContinue).Count
+                $psVersion = if ($framework -eq 'netstandard2.0') { "PowerShell 5.1" } else { "PowerShell 7+" }
+                Write-Host "  $frameworkPath ($frameworkDllCount DLLs, $psVersion)" -ForegroundColor Gray
+                Write-Verbose "Framework $framework output: $frameworkPath with $frameworkDllCount DLL files"
+            
+                if ($builtDlls.ContainsKey($framework))
+                {
+                    $builtDlls[$framework] | ForEach-Object {
+                        $fileName = Split-Path $_ -Leaf
+                        Write-Host "    - $fileName" -ForegroundColor DarkGray
+                        Write-Verbose "      Full path: $_"
+                    }
                 }
             }
         }
-    }
-    else
-    {
-        # Single framework - show single output directory
-        $outputPath = Join-Path $BinFolder $Configuration
-        $allDllCount = (Get-ChildItem "$outputPath\*.dll" -ErrorAction SilentlyContinue).Count
-        Write-Host "Output Directory: $outputPath ($allDllCount DLL files total)" -ForegroundColor Cyan
-        Write-Verbose "Output directory contains $allDllCount DLL files"
-        
-        foreach ($framework in $builtDlls.Keys)
+        else
         {
-            $builtDlls[$framework] | ForEach-Object {
-                $fileName = Split-Path $_ -Leaf
-                Write-Host "  - $fileName" -ForegroundColor Gray
-                Write-Verbose "    Full path: $_"
+            # Single framework - show single output directory
+            $outputPath = Join-Path $BinFolder $Configuration
+            $allDllCount = (Get-ChildItem "$outputPath\*.dll" -ErrorAction SilentlyContinue).Count
+            Write-Host "Output Directory: $outputPath ($allDllCount DLL files total)" -ForegroundColor Cyan
+            Write-Verbose "Output directory contains $allDllCount DLL files"
+        
+            foreach ($framework in $builtDlls.Keys)
+            {
+                $builtDlls[$framework] | ForEach-Object {
+                    $fileName = Split-Path $_ -Leaf
+                    Write-Host "  - $fileName" -ForegroundColor Gray
+                    Write-Verbose "    Full path: $_"
+                }
             }
         }
-    }
-    Write-Host ""
+        Write-Host ""
     
-    Write-Host "To use in PowerShell:" -ForegroundColor Yellow
-    if ($useFrameworkSubfolders)
-    {
-        Write-Host "  `$dllStatus = Initialize-AutopilotDlls -DLLPath '$BinFolder\$Configuration'" -ForegroundColor Gray
-        Write-Host "  # Automatically selects correct framework based on PS version" -ForegroundColor DarkGray
-    }
-    else
-    {
-        $outputPath = Join-Path $BinFolder $Configuration
-        Write-Host "  Add-Type -Path '$outputPath\<DllName>.dll'" -ForegroundColor Gray
-        Write-Host "  # Or use Initialize-AutopilotDlls for automatic loading" -ForegroundColor DarkGray
-    }
-    Write-Host ""
+        Write-Host "To use in PowerShell:" -ForegroundColor Yellow
+        if ($useFrameworkSubfolders)
+        {
+            Write-Host "  `$dllStatus = Initialize-AutopilotDlls -DLLPath '$BinFolder\$Configuration'" -ForegroundColor Gray
+            Write-Host "  # Automatically selects correct framework based on PS version" -ForegroundColor DarkGray
+        }
+        else
+        {
+            $outputPath = Join-Path $BinFolder $Configuration
+            Write-Host "  Add-Type -Path '$outputPath\<DllName>.dll'" -ForegroundColor Gray
+            Write-Host "  # Or use Initialize-AutopilotDlls for automatic loading" -ForegroundColor DarkGray
+        }
+        Write-Host ""
     
-    Write-Host "Example usage:" -ForegroundColor Yellow
-    Write-Host "  `$client = [Autopilot.GraphCore.GraphHttpClient]::new(`$accessToken)" -ForegroundColor Gray
-    Write-Host "  `$devices = `$client.GetAsync('devices').GetAwaiter().GetResult()" -ForegroundColor Gray
-    Write-Host ""
-    
+        Write-Host "Example usage:" -ForegroundColor Yellow
+        Write-Host "  `$client = [Autopilot.GraphCore.GraphHttpClient]::new(`$accessToken)" -ForegroundColor Gray
+        Write-Host "  `$devices = `$client.GetAsync('devices').GetAwaiter().GetResult()" -ForegroundColor Gray
+        Write-Host ""
+    }
     Write-Verbose "Build script completed successfully"
 }
 else
