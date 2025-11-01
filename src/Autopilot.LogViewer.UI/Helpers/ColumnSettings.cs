@@ -18,7 +18,16 @@ namespace Autopilot.LogViewer.UI.Helpers
     }
 
     /// <summary>
-    /// Manages persistence of column settings (order, visibility, width).
+    /// Represents the persisted state for column layout preferences.
+    /// </summary>
+    public class ColumnLayoutState
+    {
+        public List<ColumnSetting> Columns { get; set; } = new List<ColumnSetting>();
+        public bool IncludeHeadersInRowAutomationName { get; set; }
+    }
+
+    /// <summary>
+    /// Manages persistence of column settings (order, visibility, width) and layout preferences.
     /// </summary>
     public class ColumnSettings
     {
@@ -37,7 +46,21 @@ namespace Autopilot.LogViewer.UI.Helpers
         /// <summary>
         /// Saves column settings to persistent storage.
         /// </summary>
-        public static void Save(IEnumerable<ColumnSetting> settings)
+        public static void Save(IEnumerable<ColumnSetting> settings, bool includeHeadersInRowAutomationName)
+        {
+            var state = new ColumnLayoutState
+            {
+                Columns = settings.ToList(),
+                IncludeHeadersInRowAutomationName = includeHeadersInRowAutomationName
+            };
+
+            Save(state);
+        }
+
+        /// <summary>
+        /// Saves column layout state to persistent storage.
+        /// </summary>
+        public static void Save(ColumnLayoutState state)
         {
             try
             {
@@ -46,7 +69,7 @@ namespace Autopilot.LogViewer.UI.Helpers
                     Directory.CreateDirectory(SettingsDirectory);
                 }
 
-                var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions
+                var json = JsonSerializer.Serialize(state, new JsonSerializerOptions
                 {
                     WriteIndented = true
                 });
@@ -61,9 +84,9 @@ namespace Autopilot.LogViewer.UI.Helpers
         }
 
         /// <summary>
-        /// Loads column settings from persistent storage.
+        /// Loads column layout state from persistent storage.
         /// </summary>
-        public static List<ColumnSetting>? Load()
+        public static ColumnLayoutState? Load()
         {
             try
             {
@@ -73,7 +96,30 @@ namespace Autopilot.LogViewer.UI.Helpers
                 }
 
                 var json = File.ReadAllText(SettingsFilePath);
-                return JsonSerializer.Deserialize<List<ColumnSetting>>(json);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    return null;
+                }
+
+                using var document = JsonDocument.Parse(json);
+                if (document.RootElement.ValueKind == JsonValueKind.Array)
+                {
+                    // Backward compatibility with older layout files that contained only columns.
+                    var columns = JsonSerializer.Deserialize<List<ColumnSetting>>(json) ?? new List<ColumnSetting>();
+                    return new ColumnLayoutState
+                    {
+                        Columns = columns,
+                        IncludeHeadersInRowAutomationName = false
+                    };
+                }
+
+                var state = JsonSerializer.Deserialize<ColumnLayoutState>(json);
+                if (state != null && state.Columns == null)
+                {
+                    state.Columns = new List<ColumnSetting>();
+                }
+
+                return state;
             }
             catch (Exception ex)
             {

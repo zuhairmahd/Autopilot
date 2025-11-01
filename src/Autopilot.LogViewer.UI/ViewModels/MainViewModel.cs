@@ -32,6 +32,7 @@ namespace Autopilot.LogViewer.UI.ViewModels
         private bool _showThreadId = true;
         private bool _showContext = true;
         private bool _showMessage = true;
+        private bool _includeHeadersInRowAutomationName;
 
         // Column order settings
         private Dictionary<string, int> _columnDisplayIndices = new();
@@ -206,6 +207,12 @@ namespace Autopilot.LogViewer.UI.ViewModels
         {
             get => _showMessage;
             set => SetProperty(ref _showMessage, value);
+        }
+
+        public bool IncludeHeadersInRowAutomationName
+        {
+            get => _includeHeadersInRowAutomationName;
+            set => SetProperty(ref _includeHeadersInRowAutomationName, value);
         }
 
         #endregion
@@ -406,11 +413,21 @@ namespace Autopilot.LogViewer.UI.ViewModels
 
         private void LoadColumnSettings()
         {
-            var settings = ColumnSettings.Load();
-            if (settings != null && settings.Count > 0)
+            var state = ColumnSettings.Load();
+
+            if (state != null)
+            {
+                IncludeHeadersInRowAutomationName = state.IncludeHeadersInRowAutomationName;
+            }
+            else
+            {
+                IncludeHeadersInRowAutomationName = false;
+            }
+
+            if (state != null && state.Columns.Count > 0)
             {
                 // Apply loaded settings
-                foreach (var setting in settings)
+                foreach (var setting in state.Columns)
                 {
                     _columnDisplayIndices[setting.Header] = setting.DisplayIndex;
 
@@ -450,6 +467,7 @@ namespace Autopilot.LogViewer.UI.ViewModels
             // This will be called by the view when column order changes
             // Settings are saved automatically by ColumnReorderBehavior
             StatusText = "Column layout saved";
+            ColumnLayoutSaveRequested?.Invoke(this, EventArgs.Empty);
         }
 
         private void ResetColumnLayout()
@@ -469,9 +487,10 @@ namespace Autopilot.LogViewer.UI.ViewModels
             ShowThreadId = true;
             ShowContext = true;
             ShowMessage = true;
+            IncludeHeadersInRowAutomationName = false;
 
             // Save the reset layout
-            ColumnSettings.Save(defaults);
+            ColumnSettings.Save(defaults, includeHeadersInRowAutomationName: IncludeHeadersInRowAutomationName);
 
             // Trigger the reset event for the view
             ColumnLayoutReset?.Invoke(this, EventArgs.Empty);
@@ -483,6 +502,11 @@ namespace Autopilot.LogViewer.UI.ViewModels
         /// Event raised when column layout is reset to notify the view.
         /// </summary>
         public event EventHandler? ColumnLayoutReset;
+
+        /// <summary>
+        /// Event raised when column layout should be saved (menu command).
+        /// </summary>
+        public event EventHandler? ColumnLayoutSaveRequested;
 
         #endregion
     }

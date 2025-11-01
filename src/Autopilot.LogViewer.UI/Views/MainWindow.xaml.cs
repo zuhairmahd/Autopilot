@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
+using System.Windows.Input;
 using System.Diagnostics;
 using System.IO;
 using Autopilot.LogViewer.UI.ViewModels;
@@ -19,9 +21,72 @@ namespace Autopilot.LogViewer.UI.Views
             if (DataContext is MainViewModel viewModel)
             {
                 viewModel.ColumnLayoutReset += OnColumnLayoutReset;
+                viewModel.ColumnLayoutSaveRequested += OnColumnLayoutSaveRequested;
             }
 
             Loaded += MainWindow_Loaded;
+        }
+
+        /// <summary>
+        /// Handles F6 key press to cycle focus between main UI components.
+        /// </summary>
+        private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.F6)
+            {
+                e.Handled = true;
+                CycleFocus();
+            }
+        }
+
+        /// <summary>
+        /// Cycles focus between filter panel and data grid.
+        /// </summary>
+        private void CycleFocus()
+        {
+            // Check which component currently has focus
+            var focusedElement = Keyboard.FocusedElement as DependencyObject;
+
+            if (focusedElement == null)
+            {
+                // No element has focus, start with filter panel
+                LevelFilterComboBox.Focus();
+                return;
+            }
+
+            // Check if focus is within the filter panel
+            if (IsElementInParent(focusedElement, FilterPanel))
+            {
+                // Move focus to data grid
+                LogDataGrid.Focus();
+            }
+            else if (IsElementInParent(focusedElement, LogDataGrid))
+            {
+                // Move focus back to filter panel
+                LevelFilterComboBox.Focus();
+            }
+            else
+            {
+                // Focus is elsewhere (menu, etc.), move to filter panel
+                LevelFilterComboBox.Focus();
+            }
+        }
+
+        /// <summary>
+        /// Checks if an element is a child of a specified parent element.
+        /// </summary>
+        private static bool IsElementInParent(DependencyObject element, DependencyObject parent)
+        {
+            var current = element;
+            while (current != null)
+            {
+                if (current == parent)
+                {
+                    return true;
+                }
+                current = System.Windows.Media.VisualTreeHelper.GetParent(current);
+            }
+            return false;
         }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -31,6 +96,8 @@ namespace Autopilot.LogViewer.UI.Views
             {
                 viewModel.ColumnLayoutReset -= OnColumnLayoutReset; // Remove if already added
                 viewModel.ColumnLayoutReset += OnColumnLayoutReset;
+                viewModel.ColumnLayoutSaveRequested -= OnColumnLayoutSaveRequested;
+                viewModel.ColumnLayoutSaveRequested += OnColumnLayoutSaveRequested;
             }
         }
 
@@ -55,6 +122,28 @@ namespace Autopilot.LogViewer.UI.Views
                     column.DisplayIndex = setting.DisplayIndex;
                 }
             }
+        }
+
+        private void OnColumnLayoutSaveRequested(object? sender, System.EventArgs e)
+        {
+            var settings = new List<Helpers.ColumnSetting>();
+
+            foreach (var column in LogDataGrid.Columns)
+            {
+                var header = column.Header?.ToString() ?? string.Empty;
+                var width = column.Width.IsAuto || column.Width.IsStar ? 0 : column.Width.Value;
+
+                settings.Add(new Helpers.ColumnSetting
+                {
+                    Header = header,
+                    DisplayIndex = column.DisplayIndex,
+                    IsVisible = column.Visibility == Visibility.Visible,
+                    Width = width
+                });
+            }
+
+            var includeHeaders = LogDataGrid.IncludeHeadersInRowAutomationName;
+            Helpers.ColumnSettings.Save(settings, includeHeaders);
         }
 
         /// <summary>

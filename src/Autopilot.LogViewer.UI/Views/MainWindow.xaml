@@ -12,6 +12,7 @@
         Title="Autopilot Log Viewer"
         Height="700"
         Width="1400"
+        PreviewKeyDown="Window_PreviewKeyDown"
         AutomationProperties.Name="Autopilot Log Viewer Main Window"
         AutomationProperties.HelpText="View and filter Autopilot log files with full accessibility support">
 
@@ -117,6 +118,11 @@
                           IsChecked="{Binding ShowMessage}"
                           AutomationProperties.Name="Show Message Column"
                           AutomationProperties.HelpText="Toggle visibility of the message column"/>
+                <MenuItem Header="Include Column _Headers in Row Readout"
+                          IsCheckable="True"
+                          IsChecked="{Binding IncludeHeadersInRowAutomationName}"
+                          AutomationProperties.Name="Include Column Headers in Row Readout"
+                          AutomationProperties.HelpText="When enabled, row navigation reads each value with its column header"/>
                 <Separator/>
                 <MenuItem Header="Save Column _Layout"
                           Command="{Binding SaveColumnLayoutCommand}"
@@ -172,7 +178,9 @@
 
         <!-- Filter Panel -->
         <Grid Grid.Row="2"
+              x:Name="FilterPanel"
               Background="#E0E0E0"
+              KeyboardNavigation.TabNavigation="Local"
               Margin="0,2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
@@ -190,6 +198,7 @@
                        Margin="5"
                        AutomationProperties.Name="Level Filter Label"/>
             <ComboBox Grid.Column="1"
+                      x:Name="LevelFilterComboBox"
                       ItemsSource="{Binding AvailableLevels}"
                       SelectedItem="{Binding SelectedLevel}"
                       Margin="5"
@@ -202,6 +211,7 @@
                        Margin="5"
                        AutomationProperties.Name="Module Filter Label"/>
             <ComboBox Grid.Column="3"
+                      x:Name="ModuleFilterComboBox"
                       ItemsSource="{Binding AvailableModules}"
                       SelectedItem="{Binding SelectedModule}"
                       Margin="5"
@@ -214,12 +224,14 @@
                        Margin="5"
                        AutomationProperties.Name="Search Label"/>
             <TextBox Grid.Column="5"
+                     x:Name="SearchTextBox"
                      Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                      Margin="5"
                      AutomationProperties.Name="Search Text Box"
                      AutomationProperties.HelpText="Search in message, module, and context fields"/>
 
             <Button Grid.Column="6"
+                    x:Name="ClearFiltersButton"
                     Content="Clear Filters"
                     Command="{Binding ClearFiltersCommand}"
                     Margin="5"
@@ -241,6 +253,7 @@
                                      GridLinesVisibility="Horizontal"
                                      AlternatingRowBackground="#F9F9F9"
                                      behaviors:ColumnReorderBehavior.IsEnabled="True"
+                                     IncludeHeadersInRowAutomationName="{Binding IncludeHeadersInRowAutomationName}"
                                      AutomationProperties.Name="Log Entries Data Grid"
                                      AutomationProperties.HelpText="Displays filtered log entries. Use arrow keys to navigate, Tab to move between columns. Right-click column headers or press Shift+F10 to rearrange columns.">
 

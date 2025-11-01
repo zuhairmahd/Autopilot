@@ -33,7 +33,9 @@ param(
     [ValidateSet('net9.0', 'net9.0-windows')]
     [string]$Framework = 'net9.0-windows',
     [string]$BinFolder = 'bin',
-    [switch]$Clean
+    [switch]$Clean,
+    [switch]$ShowSummary,
+    [switch]$SignOnly
 )
 
 function SignScripts()
@@ -42,9 +44,12 @@ function SignScripts()
     param(
         [Parameter(Mandatory = $true)]
         [string[]]$Path,
-        [string[]]$Exclusions = @()
+        [string[]]$Exclusions = @(),
+        [switch]$Recurse
     )
     $functionName = $MyInvocation.MyCommand.Name
+    $excludedFiles = 0
+    $signedFiles = 0
     Write-Verbose "[$functionName] Got $($Path.Count) folders to sign."
     $success = $false
     $filesToSign = @()
@@ -60,22 +65,31 @@ function SignScripts()
         elseif (Test-Path $folder -PathType Container)
         {
             # A directory was provided - collect .exe and .dll files (Filter accepts only a single pattern)
-            $exeFiles = Get-ChildItem -Path $folder -File -Filter *.exe -ErrorAction SilentlyContinue
-            if ($exeFiles) { $files += $exeFiles }
-            $dllFiles = Get-ChildItem -Path $folder -File -Filter *.dll -ErrorAction SilentlyContinue
-            if ($dllFiles) { $files += $dllFiles }
+            $params = @{
+                Path        = $folder
+                ErrorAction = 'SilentlyContinue'
+            }
+            if ($Recurse) { $params['Recurse'] = $true }
+            $params['filter'] = '*.exe'
+            $exeFiles = Get-ChildItem @params
+            Write-Verbose "[$functionName] Found $($exeFiles.Count) EXE files in $folder"
+            if ($exeFiles.Count -gt 0) { $files += $exeFiles }
+            $params['Filter'] = '*.dll'
+            $dllFiles = Get-ChildItem @params
+            Write-Verbose "[$functionName] Found $($dllFiles.Count) DLL files in $folder"
+            if ($dllFiles.Count -gt 0) { $files += $dllFiles }
         }
-
+        Write-Host "Found a total of $($exeFiles.Count) EXE files and $($dllFiles.Count) DLL files"
         Write-Verbose "[$functionName] Signing $($files.Count) files in $folder and excluding $($Exclusions.Count) files."
         if ($files.Count -gt 0)
         {
-            Write-Host "Found $($files.Count) executable files in $folder"
             foreach ($file in $files)
             {
                 Write-Verbose "[$functionName] Processing file: $file"
                 if ($file.BaseName -in $Exclusions)
                 {
                     Write-Verbose "[$functionName] Skipping $($file.BaseName) because it is in the exclusions list"
+                    $excludedFiles++
                     continue
                 }
                 #Check if the file is already signed
@@ -90,6 +104,7 @@ function SignScripts()
                 else
                 {
                     Write-Verbose "[$functionName] $($file.FullName) is already signed."
+                    $signedFiles++
                 }
             }
         }
@@ -98,8 +113,14 @@ function SignScripts()
             Write-Host "No executable files found in $Path"
         }
     }
+    Write-Host "==============================="
+    Write-Host "Total binary files found: $($files.count)"
+    Write-Host "Total files excluded from signing: $excludedFiles"
+    Write-Host "Number of files already signed: $signedFiles"
     if ($filesToSign.Count -gt 0)
     {
+        Write-Host "==============================="
+        Write-Host "Submitting $($filesToSign.Count) files for signing..."
         Write-Verbose "[$functionName] Signing $($filesToSign.Count) files..."
         $filesToSign = $filesToSign -join ","
         $params = @{
@@ -133,8 +154,6 @@ function SignScripts()
     return $success
 }
 
-$ErrorActionPreference = 'Stop'
-
 Write-Verbose "Starting Autopilot Log Viewer Build"
 Write-Verbose "Configuration: $Configuration"
 Write-Verbose "Framework: $Framework"
@@ -167,6 +186,21 @@ if ($currentVersion -lt $requiredVersion)
     Write-Host "  Download from: https://dotnet.microsoft.com/download/dotnet/9.0" -ForegroundColor Yellow
     exit 1
 }
+
+if ($SignOnly)
+{
+    Write-Host "`nSigning only mode enabled. Skipping build..." -ForegroundColor Yellow
+    if (SignScripts -path @($BinFolder) -Recurse)
+    {
+        Write-Host "  [OK] Code signing completed" -ForegroundColor Green
+        exit 0
+    }
+    else
+    {
+        Write-Host "  [ERROR] Code signing failed" -ForegroundColor Red
+        exit 1
+    }
+}                                       
 
 # Find solution file
 $solutionFile = "AutopilotLogViewer.sln"
@@ -329,52 +363,48 @@ Write-Host "========================================" -ForegroundColor Cyan
 
 if ($buildSuccess)
 {
-    if (SignScripts -path @($logCoreDllPath, $coreDllPath))
+    if (SignScripts -path @($BinFolder) -Recurse)
     {
         Write-Host "  [OK] Code signing completed" -ForegroundColor Green
     }
     else
     {
         Write-Host "  [WARNING] Code signing failed or skipped" -ForegroundColor Yellow                                         
-        exit 1
     }
 
-    Write-Host "  BUILD SUCCESSFUL" -ForegroundColor Green
-    Write-Host "========================================`n" -ForegroundColor Cyan
-    
-    Write-Verbose "Build completed successfully"
-    Write-Host "Build Summary:" -ForegroundColor Yellow
-    Write-Host "  Configuration: $Configuration" -ForegroundColor Gray
-    Write-Host "  Framework: $Framework" -ForegroundColor Gray
-    Write-Host "  Output: $publishPath" -ForegroundColor Gray
-    Write-Host ""
-    
-    # Display output files
-    Write-Host "Output Files:" -ForegroundColor Cyan
-    $allFiles = Get-ChildItem "$publishPath\*" -File | Sort-Object Name
-    $totalSize = ($allFiles | Measure-Object -Property Length -Sum).Sum / 1KB
-    Write-Host "  Total: $($allFiles.Count) files ($($totalSize.ToString('F1')) KB)" -ForegroundColor Gray
-    Write-Host ""
-    
-    Write-Host "Key Files:" -ForegroundColor Yellow
-    Write-Host "  AutopilotLogViewer.exe - Main application" -ForegroundColor Gray
-    Write-Host "  Autopilot.LogViewer.Core.dll - Log parsing engine" -ForegroundColor Gray
-    Write-Host "  Autopilot.LogCore.dll - Logging infrastructure" -ForegroundColor Gray
-    Write-Host ""
-    
-    Write-Host "To run:" -ForegroundColor Yellow
-    Write-Host "  $publishPath\AutopilotLogViewer.exe" -ForegroundColor Gray
-    Write-Host "  # Or with a log file:" -ForegroundColor DarkGray
-    Write-Host "  $publishPath\AutopilotLogViewer.exe `"C:\Path\To\Autopilot.log`"" -ForegroundColor Gray
-    Write-Host ""
-    
+    Write-Host "  [OK] BUILD SUCCESSFUL" -ForegroundColor Green
+    if ($ShowSummary)
+    {
+        Write-Host "========================================`n" -ForegroundColor Cyan
+        Write-Verbose "Build completed successfully"
+        Write-Host "Build Summary:" -ForegroundColor Yellow
+        Write-Host "  Configuration: $Configuration" -ForegroundColor Gray
+        Write-Host "  Framework: $Framework" -ForegroundColor Gray
+        Write-Host "  Output: $publishPath" -ForegroundColor Gray
+        Write-Host ""
+        # Display output files
+        Write-Host "Output Files:" -ForegroundColor Cyan
+        $allFiles = Get-ChildItem "$publishPath\*" -File | Sort-Object Name
+        $totalSize = ($allFiles | Measure-Object -Property Length -Sum).Sum / 1KB
+        Write-Host "  Total: $($allFiles.Count) files ($($totalSize.ToString('F1')) KB)" -ForegroundColor Gray
+        Write-Host ""
+        Write-Host "Key Files:" -ForegroundColor Yellow
+        Write-Host "  AutopilotLogViewer.exe - Main application" -ForegroundColor Gray
+        Write-Host "  Autopilot.LogViewer.Core.dll - Log parsing engine" -ForegroundColor Gray
+        Write-Host "  Autopilot.LogCore.dll - Logging infrastructure" -ForegroundColor Gray
+        Write-Host ""
+        Write-Host "To run:" -ForegroundColor Yellow
+        Write-Host "  $publishPath\AutopilotLogViewer.exe" -ForegroundColor Gray
+        Write-Host "  # Or with a log file:" -ForegroundColor DarkGray
+        Write-Host "  $publishPath\AutopilotLogViewer.exe `"C:\Path\To\Autopilot.log`"" -ForegroundColor Gray
+        Write-Host ""
+    }
     Write-Verbose "Build script completed successfully"
 }
 else
 {
     Write-Host "  BUILD FAILED" -ForegroundColor Red
     Write-Host "========================================`n" -ForegroundColor Cyan
-    
     Write-Verbose "Build failed: One or more required files missing"
     Write-Host "Some required files were not created. Check build output for errors." -ForegroundColor Red
     Write-Host ""
