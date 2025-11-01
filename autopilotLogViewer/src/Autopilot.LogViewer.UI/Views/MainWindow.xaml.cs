@@ -1,10 +1,15 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Input;
 using System.Diagnostics;
 using System.IO;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using Autopilot.LogViewer.UI.ViewModels;
+using Autopilot.LogViewer.UI.Commands;
+using Autopilot.LogViewer.UI.Behaviors;
 
 namespace Autopilot.LogViewer.UI.Views
 {
@@ -13,6 +18,8 @@ namespace Autopilot.LogViewer.UI.Views
     /// </summary>
     public partial class MainWindow : Window
     {
+        private DataGridColumn? _focusedColumn;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -23,6 +30,9 @@ namespace Autopilot.LogViewer.UI.Views
                 viewModel.ColumnLayoutReset += OnColumnLayoutReset;
                 viewModel.ColumnLayoutSaveRequested += OnColumnLayoutSaveRequested;
             }
+
+            RegisterColumnReorderCommandBindings();
+            LogDataGrid.AddHandler(UIElement.GotKeyboardFocusEvent, new KeyboardFocusChangedEventHandler(OnLogDataGridGotKeyboardFocus), true);
 
             Loaded += MainWindow_Loaded;
         }
@@ -99,6 +109,129 @@ namespace Autopilot.LogViewer.UI.Views
                 viewModel.ColumnLayoutSaveRequested -= OnColumnLayoutSaveRequested;
                 viewModel.ColumnLayoutSaveRequested += OnColumnLayoutSaveRequested;
             }
+
+            ApplySavedColumnLayout();
+        }
+
+        private void RegisterColumnReorderCommandBindings()
+        {
+            CommandBindings.Add(new CommandBinding(
+                ColumnReorderCommands.MoveColumnToBeginning,
+                ExecuteMoveColumnToBeginning,
+                CanExecuteMoveColumnToBeginning));
+            CommandBindings.Add(new CommandBinding(
+                ColumnReorderCommands.MoveColumnLeft,
+                ExecuteMoveColumnLeft,
+                CanExecuteMoveColumnLeft));
+            CommandBindings.Add(new CommandBinding(
+                ColumnReorderCommands.MoveColumnRight,
+                ExecuteMoveColumnRight,
+                CanExecuteMoveColumnRight));
+            CommandBindings.Add(new CommandBinding(
+                ColumnReorderCommands.MoveColumnToEnd,
+                ExecuteMoveColumnToEnd,
+                CanExecuteMoveColumnToEnd));
+            CommandBindings.Add(new CommandBinding(
+                ColumnReorderCommands.ResetColumnOrder,
+                ExecuteResetColumnOrder,
+                CanExecuteResetColumnOrder));
+        }
+
+        private void OnLogDataGridGotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            if (e.NewFocus is DataGridColumnHeader header && header.Column != null)
+            {
+                _focusedColumn = header.Column;
+                CommandManager.InvalidateRequerySuggested();
+            }
+        }
+
+        private DataGridColumn? GetTargetColumn(object? parameter)
+        {
+            return parameter switch
+            {
+                DataGridColumn column => column,
+                DataGridColumnHeader header => header.Column,
+                _ => _focusedColumn
+            };
+        }
+
+        private void ExecuteMoveColumnToBeginning(object sender, ExecutedRoutedEventArgs e)
+        {
+            var column = GetTargetColumn(e.Parameter);
+            if (column != null && ColumnReorderBehavior.MoveColumnToBeginning(LogDataGrid, column))
+            {
+                e.Handled = true;
+            }
+        }
+
+        private void CanExecuteMoveColumnToBeginning(object sender, CanExecuteRoutedEventArgs e)
+        {
+            var column = GetTargetColumn(e.Parameter);
+            e.CanExecute = column != null && ColumnReorderBehavior.CanMoveColumnToBeginning(LogDataGrid, column);
+            e.Handled = true;
+        }
+
+        private void ExecuteMoveColumnLeft(object sender, ExecutedRoutedEventArgs e)
+        {
+            var column = GetTargetColumn(e.Parameter);
+            if (column != null && ColumnReorderBehavior.MoveColumnLeft(LogDataGrid, column))
+            {
+                e.Handled = true;
+            }
+        }
+
+        private void CanExecuteMoveColumnLeft(object sender, CanExecuteRoutedEventArgs e)
+        {
+            var column = GetTargetColumn(e.Parameter);
+            e.CanExecute = column != null && ColumnReorderBehavior.CanMoveColumnLeft(LogDataGrid, column);
+            e.Handled = true;
+        }
+
+        private void ExecuteMoveColumnRight(object sender, ExecutedRoutedEventArgs e)
+        {
+            var column = GetTargetColumn(e.Parameter);
+            if (column != null && ColumnReorderBehavior.MoveColumnRight(LogDataGrid, column))
+            {
+                e.Handled = true;
+            }
+        }
+
+        private void CanExecuteMoveColumnRight(object sender, CanExecuteRoutedEventArgs e)
+        {
+            var column = GetTargetColumn(e.Parameter);
+            e.CanExecute = column != null && ColumnReorderBehavior.CanMoveColumnRight(LogDataGrid, column);
+            e.Handled = true;
+        }
+
+        private void ExecuteMoveColumnToEnd(object sender, ExecutedRoutedEventArgs e)
+        {
+            var column = GetTargetColumn(e.Parameter);
+            if (column != null && ColumnReorderBehavior.MoveColumnToEnd(LogDataGrid, column))
+            {
+                e.Handled = true;
+            }
+        }
+
+        private void CanExecuteMoveColumnToEnd(object sender, CanExecuteRoutedEventArgs e)
+        {
+            var column = GetTargetColumn(e.Parameter);
+            e.CanExecute = column != null && ColumnReorderBehavior.CanMoveColumnToEnd(LogDataGrid, column);
+            e.Handled = true;
+        }
+
+        private void ExecuteResetColumnOrder(object sender, ExecutedRoutedEventArgs e)
+        {
+            if (ColumnReorderBehavior.ResetColumnOrder(LogDataGrid))
+            {
+                e.Handled = true;
+            }
+        }
+
+        private void CanExecuteResetColumnOrder(object sender, CanExecuteRoutedEventArgs e)
+        {
+            e.CanExecute = ColumnReorderBehavior.CanResetColumnOrder(LogDataGrid);
+            e.Handled = true;
         }
 
         private void OnColumnLayoutReset(object? sender, System.EventArgs e)
@@ -144,6 +277,68 @@ namespace Autopilot.LogViewer.UI.Views
 
             var includeHeaders = LogDataGrid.IncludeHeadersInRowAutomationName;
             Helpers.ColumnSettings.Save(settings, includeHeaders);
+        }
+
+        private void ApplySavedColumnLayout()
+        {
+            var state = Helpers.ColumnSettings.Load();
+            if (state?.Columns == null || state.Columns.Count == 0 || LogDataGrid.Columns.Count == 0)
+            {
+                return;
+            }
+
+            var columnLookup = LogDataGrid.Columns
+                .Where(column => column.Header is string header && !string.IsNullOrWhiteSpace(header))
+                .ToDictionary(
+                    column => column.Header!.ToString()!,
+                    column => column,
+                    StringComparer.Ordinal);
+
+            var orderedSettings = state.Columns
+                .Where(setting => !string.IsNullOrWhiteSpace(setting.Header))
+                .OrderBy(setting => setting.DisplayIndex)
+                .ToList();
+
+            if (orderedSettings.Count == 0)
+            {
+                return;
+            }
+
+            var appliedHeaders = new HashSet<string>(StringComparer.Ordinal);
+            var nextDisplayIndex = 0;
+
+            foreach (var setting in orderedSettings)
+            {
+                if (!columnLookup.TryGetValue(setting.Header, out var column))
+                {
+                    continue;
+                }
+
+                appliedHeaders.Add(setting.Header);
+
+                if (setting.Width > 0)
+                {
+                    column.Width = new DataGridLength(setting.Width);
+                }
+
+                if (column.DisplayIndex != nextDisplayIndex)
+                {
+                    column.DisplayIndex = nextDisplayIndex;
+                }
+
+                nextDisplayIndex++;
+            }
+
+            foreach (var column in LogDataGrid.Columns
+                         .Where(column => column.Header is string header && !appliedHeaders.Contains(header)))
+            {
+                if (column.DisplayIndex != nextDisplayIndex)
+                {
+                    column.DisplayIndex = nextDisplayIndex;
+                }
+
+                nextDisplayIndex++;
+            }
         }
 
         /// <summary>

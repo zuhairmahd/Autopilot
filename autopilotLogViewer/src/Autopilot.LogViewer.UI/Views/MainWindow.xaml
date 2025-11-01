@@ -6,6 +6,7 @@
         xmlns:vm="clr-namespace:Autopilot.LogViewer.UI.ViewModels"
         xmlns:converters="clr-namespace:Autopilot.LogViewer.UI.Converters"
         xmlns:helpers="clr-namespace:Autopilot.LogViewer.UI.Helpers"
+        xmlns:commands="clr-namespace:Autopilot.LogViewer.UI.Commands"
         xmlns:controls="clr-namespace:Autopilot.LogViewer.UI.Controls"
         xmlns:behaviors="clr-namespace:Autopilot.LogViewer.UI.Behaviors"
         mc:Ignorable="d"
@@ -124,6 +125,40 @@
                           AutomationProperties.Name="Include Column Headers in Row Readout"
                           AutomationProperties.HelpText="When enabled, row navigation reads each value with its column header"/>
                 <Separator/>
+                <MenuItem Header="Column _Order"
+                          AutomationProperties.Name="Column Order Menu"
+                          AutomationProperties.HelpText="Rearrange the focused column or reset the column order">
+                    <MenuItem Header="Move to _Beginning"
+                              Command="{x:Static commands:ColumnReorderCommands.MoveColumnToBeginning}"
+                              CommandTarget="{Binding ElementName=LogDataGrid}"
+                              InputGestureText="Ctrl+Shift+Home"
+                              AutomationProperties.Name="Move Column to Beginning"
+                              AutomationProperties.HelpText="Moves the focused column to the first position on the left"/>
+                    <MenuItem Header="Move _Left"
+                              Command="{x:Static commands:ColumnReorderCommands.MoveColumnLeft}"
+                              CommandTarget="{Binding ElementName=LogDataGrid}"
+                              InputGestureText="Ctrl+Shift+Left"
+                              AutomationProperties.Name="Move Column Left"
+                              AutomationProperties.HelpText="Moves the focused column one position to the left"/>
+                    <MenuItem Header="Move _Right"
+                              Command="{x:Static commands:ColumnReorderCommands.MoveColumnRight}"
+                              CommandTarget="{Binding ElementName=LogDataGrid}"
+                              InputGestureText="Ctrl+Shift+Right"
+                              AutomationProperties.Name="Move Column Right"
+                              AutomationProperties.HelpText="Moves the focused column one position to the right"/>
+                    <MenuItem Header="Move to _End"
+                              Command="{x:Static commands:ColumnReorderCommands.MoveColumnToEnd}"
+                              CommandTarget="{Binding ElementName=LogDataGrid}"
+                              InputGestureText="Ctrl+Shift+End"
+                              AutomationProperties.Name="Move Column to End"
+                              AutomationProperties.HelpText="Moves the focused column to the last position on the right"/>
+                    <Separator/>
+                    <MenuItem Header="_Reset Column Order"
+                              Command="{x:Static commands:ColumnReorderCommands.ResetColumnOrder}"
+                              CommandTarget="{Binding ElementName=LogDataGrid}"
+                              AutomationProperties.Name="Reset Column Order"
+                              AutomationProperties.HelpText="Reset column order to the default configuration"/>
+                </MenuItem>
                 <MenuItem Header="Save Column _Layout"
                           Command="{Binding SaveColumnLayoutCommand}"
                           AutomationProperties.Name="Save Column Layout"
