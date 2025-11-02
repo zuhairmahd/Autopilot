@@ -6,7 +6,7 @@ function CallGraphAPI()
         [Parameter(Mandatory = $true)]
         [string]$accessToken,
         [Parameter(Mandatory = $true)]
-        [string]$ResourcePath,
+        [object]$ResourcePath,  # Can be string or string array for batch processing
         [string]$APIVersion = 'beta',
         [string]$method = 'get',
         [string]$Filter = $null,
@@ -19,6 +19,158 @@ function CallGraphAPI()
     
     #region variables and logs
     $functionName = $MyInvocation.MyCommand.Name
+    # Check if ResourcePath is an array
+    $isArrayInput = $ResourcePath -is [array]
+    # Handle single-item array
+    if ($isArrayInput -and $ResourcePath.Count -eq 1)
+    {
+        Write-Log -LogFile $logFile -Module $functionName -Message "Single-item array detected, processing as single request" -LogLevel "Verbose"
+        $ResourcePath = $ResourcePath[0]
+        $isArrayInput = $false
+    }
+    # Check if batch processing is requested (array with multiple items)
+    $isBatchRequest = $isArrayInput -and $ResourcePath.Count -gt 1
+    $batchThreshold = 1
+    
+    if ($isBatchRequest -and $ResourcePath.Count -ge $batchThreshold)
+    {
+        Write-Log -LogFile $logFile -Module $functionName -Message "Batch request detected: $($ResourcePath.Count) resources" -LogLevel "Information"
+        # Attempt to use native Graph API $batch endpoint
+        # Graph API supports up to 20 requests per batch
+        $maxBatchSize = 20
+        $allResults = @()
+        $successCount = 0
+        $failureCount = 0
+        # Split requests into batches of max 20
+        $batches = @()
+        for ($i = 0; $i -lt $ResourcePath.Count; $i += $maxBatchSize)
+        {
+            $batchSize = [Math]::Min($maxBatchSize, $ResourcePath.Count - $i)
+            $batches += , @($ResourcePath[$i..($i + $batchSize - 1)])
+        }
+        Write-Log -LogFile $logFile -Module $functionName -Message "Processing $($ResourcePath.Count) requests in $($batches.Count) batch(es)" -LogLevel "Information"
+        foreach ($batch in $batches)
+        {
+            # Build batch request body according to Graph API spec
+            $batchRequests = @()
+            $requestId = 1
+            foreach ($path in $batch)
+            {
+                # Build full URL for the request
+                $requestUrl = "/$path"
+                # Handle filters, search, and extra parameters in the URL
+                $queryParams = @()
+                if ($Filter)
+                {
+                    $queryParams += "`$filter=$([uri]::EscapeUriString($Filter))"
+                }
+                if ($Search)
+                {
+                    $queryParams += "`$search=$([uri]::EscapeUriString($Search))"
+                }
+                if ($ExtraParameters)
+                {
+                    $queryParams += $ExtraParameters
+                }
+                if ($queryParams.Count -gt 0)
+                {
+                    $requestUrl += "?" + ($queryParams -join "&")
+                }
+                # Build request object
+                $batchRequest = @{
+                    id     = $requestId.ToString()
+                    method = $method.ToUpper()
+                    url    = $requestUrl
+                }
+                # Add headers if needed
+                if ($consistencyLevel)
+                {
+                    $batchRequest['headers'] = @{
+                        'ConsistencyLevel' = 'eventual'
+                    }
+                }
+                # Add body if provided
+                if ($body)
+                {
+                    $batchRequest['body'] = $body | ConvertFrom-Json
+                    if (-not $batchRequest.ContainsKey('headers'))
+                    {
+                        $batchRequest['headers'] = @{}
+                    }
+                    $batchRequest['headers']['Content-Type'] = 'application/json'
+                }
+                $batchRequests += $batchRequest
+                $requestId++
+            }
+            # Create batch request body
+            $batchBody = @{
+                requests = $batchRequests
+            } | ConvertTo-Json -Depth 10
+            Write-Log -LogFile $logFile -Module $functionName -Message "Sending batch with $($batchRequests.Count) requests to `$batch endpoint" -LogLevel "Verbose"
+            # Send batch request to Graph API
+            try
+            {
+                $batchHeaders = @{
+                    'Authorization' = "Bearer $accessToken"
+                    'Content-Type'  = 'application/json'
+                }
+                $batchUri = "https://graph.microsoft.com/$APIVersion/`$batch"
+                $batchResponse = Invoke-RestMethod -Uri $batchUri -Method Post -Headers $batchHeaders -Body $batchBody -UseBasicParsing
+                # Process batch responses
+                foreach ($response in $batchResponse.responses)
+                {
+                    if ($response.status -ge 200 -and $response.status -lt 300)
+                    {
+                        $allResults += $response.body
+                        $successCount++
+                        Write-Log -LogFile $logFile -Module $functionName -Message "Batch request $($response.id) succeeded (status: $($response.status))" -LogLevel "Verbose"
+                    }
+                    else
+                    {
+                        $failureCount++
+                        $errorMsg = if ($response.body.error) { $response.body.error.message } else { "Unknown error" }
+                        Write-Log -LogFile $logFile -Module $functionName -Message "Batch request $($response.id) failed (status: $($response.status)): $errorMsg" -LogLevel "Warning"
+                    }
+                }
+            }
+            catch
+            {
+                Write-Log -LogFile $logFile -Module $functionName -Message "Batch endpoint failed: $($_.Exception.Message). Falling back to sequential processing." -LogLevel "Warning"
+                # Final fallback: process each resource path individually
+                foreach ($path in $batch)
+                {
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Processing resource sequentially: $path" -LogLevel "Verbose"
+                    # Recursive call with single resource path
+                    $result = CallGraphAPI -accessToken $accessToken -ResourcePath $path -APIVersion $APIVersion `
+                        -method $method -Filter $Filter -Search $Search -ExtraParameters $ExtraParameters `
+                        -body $body -consistencyLevel:$consistencyLevel -secureString:$secureString
+                    # Check if result is an error status code (integer) or null
+                    if ($null -eq $result -or $result -is [int])
+                    {
+                        $failureCount++
+                        Write-Log -LogFile $logFile -Module $functionName -Message "Failed to process resource: $path (Status: $result)" -LogLevel "Warning"
+                    }
+                    else
+                    {
+                        $allResults += $result
+                        $successCount++
+                    }
+                }
+            }
+        }
+        Write-Log -LogFile $logFile -Module $functionName -Message "Batch processing completed: $successCount successful, $failureCount failed" -LogLevel "Information"
+        # Return combined results
+        return @{
+            value          = $allResults
+            batchProcessed = $true
+            batchMethod    = if ($useBatchProcessor) { "GraphCore" } else { "NativeBatch" }
+            successCount   = $successCount
+            failureCount   = $failureCount
+            totalCount     = $ResourcePath.Count
+        }
+    }
+    
+    # Single request processing (original behavior continues below)
     if ($accessToken)
     {
         Write-Log -LogFile $logFile -Module $functionName -Message "Access token provided." -LogLevel "Information"
