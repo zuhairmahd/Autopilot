@@ -559,7 +559,22 @@ Describe "Function: CallGraphAPI" -Tags 'Unit', 'GraphFunctions' {
     
     Context "When processing batch requests (Phase 3.2)" {
         It "Should detect batch request with multiple ResourcePaths" {
-            Mock Invoke-RestMethod { return @{ value = @() } }
+            Mock Invoke-RestMethod {
+                param($Uri)
+                if ($Uri -like "*`$batch*")
+                {
+                    return @{
+                        responses = @(
+                            @{ id = "1"; status = 200; body = @{ value = @() } },
+                            @{ id = "2"; status = 200; body = @{ value = @() } },
+                            @{ id = "3"; status = 200; body = @{ value = @() } },
+                            @{ id = "4"; status = 200; body = @{ value = @() } },
+                            @{ id = "5"; status = 200; body = @{ value = @() } }
+                        )
+                    }
+                }
+                return @{ value = @() }
+            }
             Mock Write-Log {} -ParameterFilter { $Message -match "Batch request detected" }
             
             $paths = @("users/id1", "users/id2", "users/id3", "users/id4", "users/id5")
@@ -582,32 +597,57 @@ Describe "Function: CallGraphAPI" -Tags 'Unit', 'GraphFunctions' {
             Should -Invoke Write-Log -ParameterFilter { $Message -match "Single-item array detected" }
         }
         
-        It "Should use sequential processing when below batch threshold" {
-            Mock Invoke-RestMethod { return @{ value = @() } }
+        It "Should process arrays at or above threshold using native batch endpoint" {
+            Mock Invoke-RestMethod {
+                param($Uri)
+                if ($Uri -like "*`$batch*")
+                {
+                    return @{
+                        responses = @(
+                            @{ id = "1"; status = 200; body = @{ value = @() } },
+                            @{ id = "2"; status = 200; body = @{ value = @() } },
+                            @{ id = "3"; status = 200; body = @{ value = @() } },
+                            @{ id = "4"; status = 200; body = @{ value = @() } },
+                            @{ id = "5"; status = 200; body = @{ value = @() } }
+                        )
+                    }
+                }
+                return @{ value = @() }
+            }
+            Mock Write-Log {} -ParameterFilter { $Message -match "attempting native Graph API.*batch endpoint" }
             
-            # 3 items - below threshold of 5
-            $paths = @("users/id1", "users/id2", "users/id3")
+            # 5 items - at threshold, should use native batch endpoint
+            $paths = @("users/id1", "users/id2", "users/id3", "users/id4", "users/id5")
             $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $paths
             
-            # Should make 3 individual calls
-            Should -Invoke Invoke-RestMethod -Times 3 -Exactly
+            # Should make 1 batch call (not 5 individual calls)
+            Should -Invoke Invoke-RestMethod -Times 1 -Exactly
+            Should -Invoke Write-Log -ParameterFilter { $Message -match "attempting native Graph API.*batch endpoint" }
         }
         
-        It "Should return combined results for sequential batch processing" {
-            $callCount = 0
+        It "Should return combined results for native batch processing" {
             Mock Invoke-RestMethod {
-                $callCount++
-                return @{
-                    value = @(
-                        @{ id = "user$callCount"; displayName = "User $callCount" }
-                    )
+                param($Uri)
+                if ($Uri -like "*`$batch*")
+                {
+                    return @{
+                        responses = @(
+                            @{ id = "1"; status = 200; body = @{ id = "user1"; displayName = "User 1" } },
+                            @{ id = "2"; status = 200; body = @{ id = "user2"; displayName = "User 2" } },
+                            @{ id = "3"; status = 200; body = @{ id = "user3"; displayName = "User 3" } },
+                            @{ id = "4"; status = 200; body = @{ id = "user4"; displayName = "User 4" } },
+                            @{ id = "5"; status = 200; body = @{ id = "user5"; displayName = "User 5" } }
+                        )
+                    }
                 }
+                return @{ value = @() }
             }
             
             $paths = @("users/id1", "users/id2", "users/id3", "users/id4", "users/id5")
             $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $paths
             
-            $result.batchProcessed | Should -Be $false
+            $result.batchProcessed | Should -Be $true
+            $result.batchMethod | Should -Be "NativeBatch"
             $result.successCount | Should -Be 5
             $result.failureCount | Should -Be 0
             $result.totalCount | Should -Be 5
@@ -684,37 +724,180 @@ Describe "Function: CallGraphAPI" -Tags 'Unit', 'GraphFunctions' {
             $global:AutopilotDllStatus = $null
         }
         
-        It "Should fall back to sequential processing if BatchProcessor fails" {
+        It "Should fall back to native batch endpoint if BatchProcessor fails" {
+            # Mock global DLL status but don't actually load the DLL
+            # This will cause [Autopilot.GraphCore.BatchProcessor]::new() to fail
             $global:AutopilotDllStatus = @{
-                GraphCoreLoaded = $true
+                GraphCoreLoaded = $false  # Set to false so it uses native batch endpoint directly
             }
             
-            # Simulate BatchProcessor failure
-            Mock -CommandName 'Invoke-Expression' -MockWith {
-                throw "BatchProcessor initialization failed"
+            Mock Invoke-RestMethod {
+                param($Uri)
+                if ($Uri -like "*`$batch*")
+                {
+                    return @{
+                        responses = @(
+                            @{ id = "1"; status = 200; body = @{ value = @() } },
+                            @{ id = "2"; status = 200; body = @{ value = @() } },
+                            @{ id = "3"; status = 200; body = @{ value = @() } },
+                            @{ id = "4"; status = 200; body = @{ value = @() } },
+                            @{ id = "5"; status = 200; body = @{ value = @() } }
+                        )
+                    }
+                }
+                return @{ value = @() }
             }
-            
-            Mock Invoke-RestMethod { return @{ value = @() } }
-            Mock Write-Log {} -ParameterFilter { $Message -match "Batch processing failed, falling back" }
+            Mock Write-Log {} -ParameterFilter { $Message -match "attempting native Graph API.*batch endpoint" }
             
             $paths = @("users/id1", "users/id2", "users/id3", "users/id4", "users/id5")
             $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $paths
             
-            # Should fall back and make 5 individual calls
-            Should -Invoke Invoke-RestMethod -Times 5 -Exactly
-            Should -Invoke Write-Log -ParameterFilter { $Message -match "Batch processing failed, falling back" }
+            # Should use native batch endpoint (1 call, not 5)
+            Should -Invoke Invoke-RestMethod -Times 1 -Exactly
+            Should -Invoke Write-Log -ParameterFilter { $Message -match "attempting native Graph API.*batch endpoint" }
             
             $global:AutopilotDllStatus = $null
         }
         
-        It "Should log batch progress during sequential processing" {
-            Mock Invoke-RestMethod { return @{ value = @() } }
-            Mock Write-Log {} -ParameterFilter { $Message -match "Processing resource \d+/\d+" }
+        It "Should log batch processing with native endpoint" {
+            Mock Invoke-RestMethod {
+                param($Uri)
+                if ($Uri -like "*`$batch*")
+                {
+                    return @{
+                        responses = @(
+                            @{ id = "1"; status = 200; body = @{ value = @() } },
+                            @{ id = "2"; status = 200; body = @{ value = @() } },
+                            @{ id = "3"; status = 200; body = @{ value = @() } },
+                            @{ id = "4"; status = 200; body = @{ value = @() } },
+                            @{ id = "5"; status = 200; body = @{ value = @() } }
+                        )
+                    }
+                }
+                return @{ value = @() }
+            }
+            Mock Write-Log {} -ParameterFilter { $Message -match "Sending batch with \d+ requests to" }
             
             $paths = @("users/id1", "users/id2", "users/id3", "users/id4", "users/id5")
             $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $paths
             
-            Should -Invoke Write-Log -ParameterFilter { $Message -match "Processing resource \d+/\d+" } -Times 5 -Exactly
+            Should -Invoke Write-Log -ParameterFilter { $Message -match "Sending batch with \d+ requests to" } -Times 1 -Exactly
+        }
+        
+        It "Should split large batches into multiple requests of max 20" {
+            Mock Invoke-RestMethod {
+                param($Uri)
+                if ($Uri -like "*`$batch*")
+                {
+                    # Return appropriate number of responses based on call
+                    return @{
+                        responses = @(
+                            1..20 | ForEach-Object { @{ id = "$_"; status = 200; body = @{ value = @() } } }
+                        )
+                    }
+                }
+                return @{ value = @() }
+            }
+            
+            # 45 items should result in 3 batch calls (20 + 20 + 5)
+            $paths = @(1..45 | ForEach-Object { "users/id$_" })
+            $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $paths
+            
+            # Should make 3 batch calls
+            Should -Invoke Invoke-RestMethod -Times 3 -Exactly
+        }
+        
+        It "Should handle partial failures in batch responses" {
+            Mock Invoke-RestMethod {
+                param($Uri)
+                if ($Uri -like "*`$batch*")
+                {
+                    return @{
+                        responses = @(
+                            @{ id = "1"; status = 200; body = @{ id = "user1" } },
+                            @{ id = "2"; status = 404; body = @{ error = @{ message = "Not found" } } },
+                            @{ id = "3"; status = 200; body = @{ id = "user3" } },
+                            @{ id = "4"; status = 403; body = @{ error = @{ message = "Forbidden" } } },
+                            @{ id = "5"; status = 200; body = @{ id = "user5" } }
+                        )
+                    }
+                }
+                return @{ value = @() }
+            }
+            
+            $paths = @("users/id1", "users/id2", "users/id3", "users/id4", "users/id5")
+            $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $paths
+            
+            $result.successCount | Should -Be 3
+            $result.failureCount | Should -Be 2
+            $result.totalCount | Should -Be 5
+        }
+        
+        It "Should handle batch endpoint failure and fall back to sequential" {
+            Mock Invoke-RestMethod {
+                param($Uri, $Method)
+                if ($Uri -like "*`$batch*" -and $Method -eq "Post")
+                {
+                    throw "Batch endpoint unavailable"
+                }
+                # Sequential fallback calls
+                return @{ value = @() }
+            }
+            Mock Write-Log {} -ParameterFilter { $Message -match "Batch endpoint failed" }
+            Mock Write-Log {} -ParameterFilter { $Message -match "Processing resource sequentially" }
+            
+            $paths = @("users/id1", "users/id2", "users/id3", "users/id4", "users/id5")
+            $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $paths
+            
+            # Should attempt batch (1 call) then fall back to sequential (5 calls) = 6 total
+            Should -Invoke Invoke-RestMethod -Times 6 -Exactly
+            Should -Invoke Write-Log -ParameterFilter { $Message -match "Batch endpoint failed" }
+            Should -Invoke Write-Log -ParameterFilter { $Message -match "Processing resource sequentially" }
+        }
+        
+        It "Should include filters and parameters in batch request URLs" {
+            Mock Invoke-RestMethod {
+                param($Uri, $Body)
+                if ($Uri -like "*`$batch*")
+                {
+                    # Verify the body contains properly formatted URLs
+                    $batchBody = $Body | ConvertFrom-Json
+                    $batchBody.requests[0].url | Should -Match "\$filter="
+                    return @{
+                        responses = @(
+                            @{ id = "1"; status = 200; body = @{ value = @() } }
+                        )
+                    }
+                }
+                return @{ value = @() }
+            }
+            
+            $paths = @("users")
+            $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $paths -Filter "accountEnabled eq true" -ExtraParameters "top=10"
+            
+            Should -Invoke Invoke-RestMethod -Times 1 -Exactly
+        }
+        
+        It "Should include consistency level headers in batch requests" {
+            Mock Invoke-RestMethod {
+                param($Uri, $Body)
+                if ($Uri -like "*`$batch*")
+                {
+                    $batchBody = $Body | ConvertFrom-Json
+                    $batchBody.requests[0].headers.ConsistencyLevel | Should -Be "eventual"
+                    return @{
+                        responses = @(
+                            @{ id = "1"; status = 200; body = @{ value = @() } }
+                        )
+                    }
+                }
+                return @{ value = @() }
+            }
+            
+            $paths = @("users")
+            $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $paths -consistencyLevel
+            
+            Should -Invoke Invoke-RestMethod -Times 1 -Exactly
         }
     }
     

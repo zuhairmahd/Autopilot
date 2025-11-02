@@ -1,3 +1,180 @@
+<#
+.SYNOPSIS
+    Main entry point for the Intune Helpdesk Menu application.
+
+.DESCRIPTION
+    This PowerShell script initializes configuration, authentication, and menu structures for managing Windows Autopilot devices and related Intune operations.
+    It supports exporting device lists, managing Autopilot profiles, updating application settings, and handling authentication with Microsoft Graph API.
+    The script loads supporting functions from the 'functions' folder and provides a menu-driven interface for helpdesk and administrative tasks.
+
+.PARAMETER configFile
+    Path to the configuration file containing authentication details. Default: "$pwd\.secrets\config.json"
+
+.PARAMETER InitFile
+    Path to the initialization file containing application settings. Default: "$pwd\settings.psd1"
+
+.PARAMETER stringsFile
+    Path to the strings file containing localized text. Default: "$pwd\strings.psd1"
+
+.PARAMETER menuFile
+    Path to the menu configuration file. Default: "$pwd\menu.psd1"
+
+.PARAMETER maxWaitTime
+    Maximum wait time in seconds for API operations.
+
+.PARAMETER timeInSeconds
+    Time limit in seconds for specific operations.
+
+.PARAMETER GroupTag
+    Autopilot group tag to assign to devices during import operations.
+
+.PARAMETER showLicenseBanner
+    Display the license banner on application startup.
+
+.PARAMETER showAuth
+    Display authentication configuration details during startup.
+
+.PARAMETER showVersion
+    Display the application version information and exit.
+
+.PARAMETER showSettings
+    Display all application settings during startup.
+
+.PARAMETER OverwriteLogs
+    Overwrite existing log files instead of appending to them.
+
+.PARAMETER SecureString
+    Use secure string encryption for sensitive data.
+
+.PARAMETER ResetAuth
+    Reset authentication credentials and launch the authentication wizard.
+
+.PARAMETER ForceNewToken
+    Force retrieval of a new access token, ignoring cached tokens.
+
+.PARAMETER delegated
+    Use delegated authentication flow (requires user interaction).
+
+.PARAMETER ForceNewRefreshToken
+    Force retrieval of a new refresh token (delegated auth only).
+
+.PARAMETER NoSaveRefreshToken
+    Do not save refresh tokens to disk (delegated auth only).
+
+.PARAMETER Scope
+    Microsoft Graph API scopes to request (delegated auth only).
+
+.PARAMETER AuthType
+    Authentication type for delegated flow. Valid values: 'PublicAuthFlow', 'Interactive', 'Private'
+
+.PARAMETER CacheType
+    Token cache storage type. Valid values: 'file', 'memory'
+
+.PARAMETER Repo
+    Repository source for updates. Valid values: 'github', 'gitlab'
+
+.PARAMETER Release
+    Specific release version to use for updates.
+
+.PARAMETER appMode
+    Application mode determining available features. Valid values: 'full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom'
+
+.PARAMETER LogFilePath
+    Path to the log file. Default: "$pwd\Logs\Autopilot.log"
+
+.PARAMETER LogLevel
+    Logging level for the application. Valid values: 'Error', 'Warning', 'Information', 'Verbose', 'Debug'
+
+.PARAMETER testMode
+    Enable test mode to skip interactive prompts and menu display. Used primarily for automated testing.
+
+.PARAMETER testModeMetadata
+    Test mode: Enable metadata initialization phase (default: true). Only effective with -testMode.
+
+.PARAMETER testModeCleanup
+    Test mode: Enable temporary file cleanup phase (default: true). Only effective with -testMode.
+
+.PARAMETER testModeMigration
+    Test mode: Enable settings migration check phase (default: true). Only effective with -testMode.
+
+.PARAMETER testModeConfig
+    Test mode: Enable configuration loading phase (default: true). Only effective with -testMode.
+
+.PARAMETER testModeAuth
+    Test mode: Enable authentication phase (default: false). Only effective with -testMode.
+
+.PARAMETER testModeLegacyMigration
+    Test mode: Enable legacy migration phase (default: false). Only effective with -testMode.
+
+.PARAMETER testModeExitAfter
+    Test mode: Exit after initialization phases complete (default: true). Only effective with -testMode.
+
+.PARAMETER TestPassword
+    Test password for encryption operations during test mode. Only works with -testMode.
+
+.EXAMPLE
+    .\main.ps1
+    Run the application with default settings and display the main menu.
+
+.EXAMPLE
+    .\main.ps1 -showVersion
+    Display version information and exit without launching the menu.
+
+.EXAMPLE
+    .\main.ps1 -appMode helpDesk -LogLevel Verbose
+    Launch the application in help desk mode with verbose logging.
+
+.EXAMPLE
+    .\main.ps1 -delegated -AuthType Interactive -Scope "DeviceManagementManagedDevices.ReadWrite.All"
+    Use delegated authentication with interactive login and specific Graph API scopes.
+
+.EXAMPLE
+    .\main.ps1 -ResetAuth
+    Reset authentication credentials and launch the first-run wizard.
+
+.EXAMPLE
+    .\main.ps1 -GroupTag "IT-Devices" -OverwriteLogs -LogLevel Debug
+    Run with a specific group tag for Autopilot imports, overwrite existing logs, and enable debug logging.
+
+.EXAMPLE
+    .\main.ps1 -configFile "C:\Config\custom-config.json" -InitFile "C:\Config\custom-settings.psd1"
+    Use custom configuration and settings files instead of defaults.
+
+.EXAMPLE
+    .\main.ps1 -ForceNewToken -CacheType memory
+    Force a new access token and store it in memory only (not on disk).
+
+.EXAMPLE
+    .\main.ps1 -testMode -testModeMetadata -testModeExitAfter
+    Run in test mode, only testing metadata initialization phase then exit.
+
+.LINK
+    Project Repository: https://github.com/zuhairmahd/autopilot
+
+.NOTES
+    Author: Zuhair Mahmoud
+    Copyright: (c) 2024 Zuhair Mahmoud
+    License: MIT License
+    
+    Project URL: https://github.com/zuhairmahd/autopilot
+    
+    Prerequisites:
+    - PowerShell 5.1 or later
+    - Microsoft Graph PowerShell modules
+    - Appropriate permissions in Microsoft Intune/Entra ID
+    
+    First Run:
+    If no configuration file exists, the script will launch a first-run wizard to set up authentication and basic settings.
+    
+    Authentication:
+    The script supports both application (client credentials) and delegated (user interactive) authentication flows.
+    Configuration is stored securely with encryption.
+    
+    Logging:
+    All operations are logged to the specified log file. Use -LogLevel to control verbosity.
+    Use -OverwriteLogs to start with a fresh log file on each run.
+#>
+
 [CmdletBinding()]
 param(
     [string]$configFile = "$pwd\.secrets\config.json",
@@ -9,12 +186,20 @@ param(
     [String] $GroupTag,
     [switch]$showLicenseBanner,
     [switch]$showAuth,
+    [switch]$showOptimizations,
     [switch]$showVersion,
     [switch]$showSettings,
     [switch]$OverwriteLogs,
     [switch]$SecureString,
     [bool]$autoUpdate,
     [switch]$testMode,
+    [switch]$testModeMetadata,
+    [switch]$testModeCleanup,
+    [switch]$testModeMigration,
+    [switch]$testModeConfig,
+    [switch]$testModeAuth,
+    [switch]$testModeLegacyMigration,
+    [switch]$testModeExitAfter,
     [string]$TestPassword,
     [switch]$ResetAuth,
     [switch]$ForceNewToken,
@@ -41,6 +226,7 @@ param(
     [string]$LogLevel = 'Information'
 )
 
+#region Initialize test mode
 # Store test password in script scope if provided (only works with testMode for security)
 if ($testMode -and $TestPassword)
 {
@@ -48,6 +234,45 @@ if ($testMode -and $TestPassword)
     $global:UserEncryptionPassword = $TestPassword
 }
 
+# Initialize testModeOptions with defaults if testMode is enabled
+function Get-TestModeOption()
+{
+    param(
+        [string]$ParameterName,
+        $DefaultValue
+    )
+    if ($PSBoundParameters.ContainsKey($ParameterName))
+    {
+        return (Get-Variable -Name $ParameterName -Scope 1).Value.IsPresent
+    }
+    else
+    {
+        return $DefaultValue
+    }
+}
+
+if ($testMode)
+{
+    # Default test mode options - only execute essential phases unless specified
+    $defaultTestModeOptions = @{
+        metadata        = Get-TestModeOption -ParameterName 'testModeMetadata' -DefaultValue $true
+        cleanup         = Get-TestModeOption -ParameterName 'testModeCleanup' -DefaultValue $true
+        migration       = Get-TestModeOption -ParameterName 'testModeMigration' -DefaultValue $true
+        config          = Get-TestModeOption -ParameterName 'testModeConfig' -DefaultValue $true
+        auth            = Get-TestModeOption -ParameterName 'testModeAuth' -DefaultValue $false
+        legacyMigration = Get-TestModeOption -ParameterName 'testModeLegacyMigration' -DefaultValue $false
+        menu            = $false  # Never show menu in test mode
+        exitAfter       = Get-TestModeOption -ParameterName 'testModeExitAfter' -DefaultValue $true
+    }
+    
+    # Store in script scope
+    $script:testModeOptions = $defaultTestModeOptions
+    
+    Write-Verbose "[$scriptName] Test mode options initialized: $($script:testModeOptions | ConvertTo-Json -Compress)"
+}
+#endregion Initialize test mode
+
+#region Initialize script variables
 $scriptName = $MyInvocation.MyCommand.Name
 if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
 {
@@ -70,6 +295,7 @@ else
         Write-Verbose "[$scriptName] Full script path: $fullScriptPath"
     }
 }
+#endregion Initialize script variables
 
 #region import functions.
 function Find-FolderPath()
@@ -186,56 +412,102 @@ else
 
 # Initialize C# DLLs for enhanced performance (optional, falls back to PowerShell if not available)
 Write-Verbose "[$scriptName] Initializing C# DLLs for performance optimization"
-$global:AutopilotDllStatus = Initialize-AutopilotDlls -DLLPath "$scriptPath\bin\Release"
-# Display DLL load status
-if ($global:AutopilotDllStatus.Success)
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Initializing C# DLLs for performance optimization" -LogLevel "Information"
+$AutopilotDllStatus = Initialize-AutopilotDlls -DLLPath "$scriptPath\bin\Release"
+# Display DLL load status with performance benefits
+if ($AutopilotDllStatus.Success)
 {
     Write-Verbose "[$scriptName] All performance DLLs loaded successfully"
-    Write-Host "Performance DLLs loaded: $($global:AutopilotDllStatus.LoadedAssemblies -join ', ')" -ForegroundColor Green
+    # Write-Host "Performance DLLs loaded: $($AutopilotDllStatus.LoadedAssemblies -join ', ')" -ForegroundColor Green
+    Write-Host "Performance DLLs loaded" -ForegroundColor Green         
+    Write-Host "The script will use optimized DLL libraries for better performance." -ForegroundColor Green          
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Performance DLLs loaded: $($AutopilotDllStatus.LoadedAssemblies -join ', ')" -LogLevel "Information"
+    
+    if ($showOptimizations)
+    {
+        # Show specific optimizations enabled
+        $optimizations = @()
+        if ($AutopilotDllStatus.LogCoreLoaded) { $optimizations += "Logging (10-20x)" }
+        if ($AutopilotDllStatus.CacheCoreLoaded) { $optimizations += "Caching" }
+        if ($AutopilotDllStatus.ConfigCoreLoaded) { $optimizations += "Config (10-48x)" }
+        if ($AutopilotDllStatus.StringCoreLoaded) { $optimizations += "String ops (3-5x)" }
+        if ($AutopilotDllStatus.GraphCoreLoaded) { $optimizations += "Graph API (5-10x)" }
+        if ($AutopilotDllStatus.DeviceCoreLoaded) { $optimizations += "Device filtering (3-6x)" }
+        if ($AutopilotDllStatus.CsvCoreLoaded) { $optimizations += "CSV export (5-10x)" }
+        if ($AutopilotDllStatus.CollectionCoreLoaded) { $optimizations += "Collections (3-8x)" }
+        if ($optimizations.Count -gt 0)
+        {
+            Write-Host "  Optimizations: $($optimizations -join ', ')" -ForegroundColor Cyan
+            Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Optimizations enabled: $($optimizations -join ', ')" -LogLevel "Information"
+        }
+    }
 }
-elseif ($global:AutopilotDllStatus.LoadedCount -gt 0)
+elseif ($AutopilotDllStatus.LoadedCount -gt 0)
 {
-    Write-Verbose "[$scriptName] Partial DLL load: $($global:AutopilotDllStatus.LoadedCount) of 3"
-    Write-Host "Performance DLLs partially loaded ($($global:AutopilotDllStatus.LoadedCount)/3): $($global:AutopilotDllStatus.LoadedAssemblies -join ', ')" -ForegroundColor Yellow
+    Write-Verbose "[$scriptName] Partial DLL load: $($AutopilotDllStatus.LoadedCount) of 8"
+    Write-Host "Performance DLLs partially loaded ($($AutopilotDllStatus.LoadedCount)/8): $($AutopilotDllStatus.LoadedAssemblies -join ', ')" -ForegroundColor Yellow
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Performance DLLs partially loaded ($($AutopilotDllStatus.LoadedCount)/8): $($AutopilotDllStatus.LoadedAssemblies -join ', ')" -LogLevel "Warning"
+    Write-Host "  Some operations will use PowerShell fallback" -ForegroundColor Yellow
 }
 else
 {
     Write-Verbose "[$scriptName] No performance DLLs loaded, using PowerShell fallback"
     Write-Host "Using PowerShell implementations (DLLs not found)" -ForegroundColor Yellow
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Using PowerShell implementations (DLLs not found)" -LogLevel "Warning"
+    Write-Host "  For better performance, run: .\Build-NativeDlls.ps1 -Configuration Release" -ForegroundColor Cyan
 }
 
-#If the scriptname is a Powershell, change the extension to an exe.
-if ($scriptName -match '\.ps1$' -and $MyInvocation.MyCommand.CommandType -eq "ExternalScript")
+#run cleanup of temp files from previous runs
+if ($testMode -and -not $script:testModeOptions.cleanup)
 {
-    Write-Log -logFile $LogFile -module $scriptName -Message "Script name ends with .ps1, changing to .exe for version check." -logLevel "Verbose"
-    Write-Verbose "[$scriptName] Script name ends with .ps1, changing to .exe for version check."
-    $scriptNameExe = $scriptName -replace '\.ps1$', '.exe'
+    Write-Verbose "[$scriptName] Test mode: Skipping temporary file cleanup (testModeOptions.cleanup = false)"
+    write-log -logFile $logFile -module $scriptName -message "Test mode: Skipping temporary file cleanup"
+    # Create minimal cleanup result
+    $filesCleaned = @{
+        AllRemoved        = $true
+        RemovedFilesCount = 0
+        FailedFilesCount  = 0
+    }
 }
 else
 {
-    Write-Log -logFile $LogFile -module $scriptName -Message "Script file name is already an executable: $scriptName" -LogLevel "Warning"
-    Write-Verbose "[$scriptName] Script file name is already an executable: $scriptName"
-    $scriptNameExe = $scriptName
+    $filesCleaned = cleanupTempFiles
+    if ($filesCleaned.AllRemoved)
+    {
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
+    }
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
 }
-if (Test-Path "$scriptPath\$scriptNameExe")
+#write the commandline options to the log file, one at a time
+Write-Verbose "[$scriptName] Script parameters:"
+foreach ($param in $PSBoundParameters.GetEnumerator())
 {
-    Write-Log -logFile $LogFile -module $scriptName -Message "Found executable file: $scriptNameExe" -logLevel "Verbose"
-    Write-Verbose "[$scriptName] Found executable file: $scriptNameExe"
-    $version = GetFileVersion -executableFileName "$scriptPath\$scriptNameExe"
+    Write-Verbose "[$scriptName]   $($param.Key): $($param.Value)"
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Parameter: $($param.Key) = $($param.Value)"
 }
-else
-{
-    Write-Log -logFile $LogFile -module $scriptName -Message "Script file '$scriptName' found." -LogLevel "Verbose"
-    Write-Verbose "[$scriptName] Script file found: $scriptName"
-    $version = GetFileVersion -executableFileName "$scriptPath\$scriptName"
-}
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Version: $($version | Out-String)" -LogLevel "Information"
-Write-Verbose "[$scriptName] Initializing application configuration"
+
 if ($testMode)
 {
     Write-Verbose "[$scriptName] Test mode enabled: Initializing application metadata in silent mode"   
     write-log -logFile $logFile -module $scriptName -message "Test mode enabled: Initializing application metadata in silent mode"
-    $appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile -scriptName $scriptName -scriptPath $ScriptPath -Silent
+    
+    # Check if metadata phase should be executed
+    if ($script:testModeOptions.metadata)
+    {
+        $appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile -scriptName $scriptName -scriptPath $ScriptPath -Silent
+    }
+    else
+    {
+        Write-Verbose "[$scriptName] Test mode: Skipping metadata initialization (testModeOptions.metadata = false)"
+        write-log -logFile $logFile -module $scriptName -message "Test mode: Skipping metadata initialization"
+        # Set minimal metadata for scripts that need it
+        $appMetaData = @{
+            version     = New-Object System.Version 0, 0, 0, 0
+            companyName = "Test"
+            release     = "test"
+        }
+    }
 }
 else
 {
@@ -262,19 +534,29 @@ if ($ShowVersion)
     exit 0
 }
 
-#run cleanup of temp files from previous runs
-$filesCleaned = cleanupTempFiles
-if ($filesCleaned.AllRemoved)
+# PowerShell version check and warning
+if ($PSVersionTable.PSVersion.Major -lt 7)
 {
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
+    Write-Host "WARNING: PowerShell 5.1 detected. This version has known limitations." -ForegroundColor Yellow
+    Write-Host "For best performance and stability, please upgrade to PowerShell 7 or later." -ForegroundColor Yellow
+    Write-Host "Download: https://aka.ms/powershell" -ForegroundColor Cyan
+    Write-Host ""
+    write-log -logFile $logFile -module $scriptName -message "PowerShell version $($PSVersionTable.PSVersion) detected. Recommended to upgrade to PowerShell 7 or later." -LogLevel "Warning"
 }
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
+
 #Check for settings migration
-write-log -logFile $logFile -module $scriptName -message "Checking for settings migration need." -LogLevel "Information"
-Write-Verbose "[$scriptName] Checking for settings migration need."
-$migrationCheck = Invoke-SettingsMigration -RemoveJsonFiles -Force
-# $migrationCheck = Invoke-SettingsMigration -Force
+if ($testMode -and -not $script:testModeOptions.migration)
+{
+    Write-Verbose "[$scriptName] Test mode: Skipping settings migration check (testModeOptions.migration = false)"
+    write-log -logFile $logFile -module $scriptName -message "Test mode: Skipping settings migration check"
+    $migrationCheck = @{ MigrationNeeded = $false }
+}
+else
+{
+    write-log -logFile $logFile -module $scriptName -message "Checking for settings migration need." -LogLevel "Information"
+    Write-Verbose "[$scriptName] Checking for settings migration need."
+    $migrationCheck = Invoke-SettingsMigration -RemoveJsonFiles -Force
+}
 write-log -logFile $logFile -module $scriptName -message "Migration needed: $($migrationCheck.migrationNeeded), Success: $($migrationCheck.success)" -LogLevel "Information"
 if ($migrationCheck.success -and $migrationCheck.migrationNeeded)
 {
@@ -312,8 +594,19 @@ if (-not (Test-Path $secretsDir))
 $configContent = $null
 $script:maxRetries = 6
 
+# Skip config loading entirely if testMode and config flag is false
+if ($testMode -and -not $script:testModeOptions.config)
+{
+    Write-Verbose "[$scriptName] Test mode: Skipping configuration loading (testModeOptions.config = false)"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode: Skipping configuration loading" -LogLevel "Information"
+    # Set minimal test values
+    $domain = "test.contoso.com"
+    $appId = "00000000-0000-0000-0000-000000000000"
+    $tenantId = "00000000-0000-0000-0000-000000000000"
+    $name = "Test Application"
+}
 # In test mode without a test password and config file exists, skip config loading
-if ($testMode -and -not $TestPassword -and (Test-Path $configFile))
+elseif ($testMode -and -not $TestPassword -and (Test-Path $configFile))
 {
     Write-Verbose "[$scriptName] Test mode enabled without test password, skipping encrypted config file loading"
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode enabled without test password, skipping encrypted config file loading" -LogLevel "Information"
@@ -451,6 +744,7 @@ else
         Write-Verbose "[$scriptName] Initializing application configuration since the earlier initialization attempt failed or did not take place."
         write-log -logFile $logFile -module $scriptName -message "Initializing application configuration since earlier attempt failed or did not take place."
         $configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domain -BoundParameters $PSBoundParameters
+        
         if (-not $configResult.Success)
         {
             Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
@@ -484,12 +778,11 @@ else
         Write-Log -LogFile $LogFile -Module $scriptName -Message "First run wizard failed or was cancelled" -LogLevel "Error"
         Write-Host "Please create a configuration file manually." -ForegroundColor Yellow
         write-log -logFile $logFile -finishLogging
-        exit 1
     }
 }
 #endregion Process login
 
-#region initialize script
+#region initialize script objects
 Write-Host "Loading configuration..."
 # Use domain if available, otherwise default to contoso.com
 $domainForDefaults = if ($domain)
@@ -500,6 +793,7 @@ else
 {
     "contoso.com"
 }
+
 $configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -BoundParameters $PSBoundParameters
 if (-not $configResult.Success)
 {
@@ -516,6 +810,13 @@ $requiredScopes = $configResult.RequiredScopes
 # Merge global and local settings into a single settings object
 Write-Verbose "[$scriptName] Merging global and local settings"
 $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+if ($settings.domain -ne $domain)
+{
+    Write-Verbose "[$scriptName] Updating settings domain from $($settings.domain) to $domain"
+    write-log -logFile $logFile -module $scriptName -message "Updating settings domain from $($settings.domain) to $domain"     
+    Write-Warning "[$scriptName] Settings domain updated from $($settings.domain) to $domain"
+    $settings.domain = $domain
+}
 Write-Verbose "[$scriptName] Settings merged successfully. Final settings count: $($settings.Count)"
 Write-Verbose "[$scriptName] Configuration initialization completed successfully"
 Write-Verbose "[$scriptName] Auth settings count: $($auth.Count)"
@@ -549,53 +850,7 @@ if (-not $version.version)
         }
     }
 }
-#endregion Initialize script
-
-#region Check for password change requirement
-if ($testMode)
-{
-    Write-Verbose "[$scriptName] Test mode enabled, skipping password change check."
-    write-log -logFile $logFile -Module $scriptName -Message "Test mode enabled, skipping password change check." -LogLevel "Information"
-}
-else 
-{
-    if ((Test-Path $configFile) -and $auth.changePWOnNextStart -eq $true)
-    {
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change required (changePWOnNextStart=true)" -LogLevel "Information"
-    
-        # Need to reload configContent for password change process
-        $tempSessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword -PasswordPrompt "Enter your password" -Silent:$testMode
-        if ($tempSessionResult.Success)
-        {
-            $configContent = $tempSessionResult.ConfigContent
-        
-            # Invoke password change process
-            $passwordChangeResult = Invoke-PasswordChangeProcess -ConfigFile $configFile -ConfigContent $configContent -SettingsFile $InitFile
-            if ($passwordChangeResult)
-            {
-                Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change completed successfully" -LogLevel "Information"
-                Write-Host "Password changed successfully. Please restart the application and log in with your new password." -ForegroundColor Green
-                Write-Host "To do so, type 'main' and press enter when you see the command prompt." -ForegroundColor Green
-                Write-Log -LogFile $LogFile -FinishLogging
-                exit 0
-            }
-            else
-            {
-                Write-Host "Password change failed. Continuing with current password." -ForegroundColor Yellow
-                Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change failed. Continuing with current password." -LogLevel "Warning"
-            }
-        
-            # Clear the config content from memory
-            $configContent = $null
-        }
-        else
-        {
-            Write-Host "Failed to reload configuration for password change: $($tempSessionResult.ErrorMessage)" -ForegroundColor Red
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to reload configuration for password change: $($tempSessionResult.ErrorMessage)" -LogLevel "Error"
-        }
-    }
-}
-#endregion Check for password change requirement
+#endregion Initialize script objects
 
 #region Define variables
 $scope = $auth.scope
@@ -622,6 +877,7 @@ $scope = $auth.scope
 # $autopilotCsv = [System.Collections.ArrayList]@()
 # $importedCsv = [System.Collections.ArrayList]@()
 # $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $scope -AuthType 'MGGraph' -verbose 
+$deviceConfigurationPoliciesURI = "deviceManagement/configurationPolicies"
 $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $scope -AuthType 'PublicAuthFlow'
 # $accessToken = GetGraphAccessToken -configFile $configFile
 # $autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken -extraParameters $autopilotExtraParameters -consistencyLevel -verbose
@@ -635,6 +891,17 @@ $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $sc
 # }
 #endregion Define variables
 
+$resourceURIToDelete = @()
+Write-Host "Fetching device configurations..."
+$global:deviceConfigurations = CallGraphAPI -accessToken $accessToken -ResourcePath $deviceConfigurationPoliciesURI
+$global:devicesToDelete = $global:deviceConfigurations.value | Where-Object { $_.name -like 'win*-*oib*' }
+Write-Host "Found $($devicesToDelete.Count) device configurations to delete."
+foreach ($device in $devicesToDelete)
+{
+    Write-Host "Deleting device configuration: $($device.name) with id $($device.id)..."
+    $resourceURIToDelete += "$deviceConfigurationPoliciesURI/$($device.id)"       
+}
+Write-Host "Resources to delete: $($resourceURIToDelete.count)"
 exit 0
 #region Usage examples for GetGraphObjectMetadata
 # Example 1: Get metadata for users collection
