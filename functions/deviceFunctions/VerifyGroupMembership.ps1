@@ -224,7 +224,7 @@ function VerifyGroupMembership()
     if ((Test-GroupFormat -groups $groupsToInclude) -eq "StringArray" -and $includeGroupIds.Count -gt 0)
     {
         $needsConfigUpdate = $true
-        $updatedIncludeGroups = New-HashTableGroupFormat-HashTableGroupFormat -groupNames $includeGroupNames -groupIds $includeGroupIds
+        $updatedIncludeGroups = New-HashTableGroupFormat -groupNames $includeGroupNames -groupIds $includeGroupIds
         Write-Verbose "[$functionName] Created updated include groups format with $($updatedIncludeGroups.Count) groups"
         Write-Log -logFile $logFile -module $functionName -Message "Created updated include groups format with $($updatedIncludeGroups.Count) groups"
     }
@@ -462,12 +462,12 @@ function VerifyGroupMembership()
                 # Use ID-based comparison when IDs are available
                 Write-Verbose "[$functionName] Using ID-based comparison for forbidden groups"
                 Write-Log -logFile $logFile -module $functionName -Message "Using ID-based comparison for forbidden groups"
-                $excludeGroupIds = $excludedGroupMembership
+                $membershipIdsExclude = $excludedGroupMembership
                 # Check which excluded IDs the user is actually a member of
                 for ($i = 0; $i -lt $excludeGroupIds.Count; $i++)
                 {
                     $excludedId = $excludeGroupIds[$i]
-                    if ($null -ne $excludedId -and $excludedId -ne "" -and $membershipIds -contains $excludedId)
+                    if ($null -ne $excludedId -and $excludedId -ne "" -and $membershipIdsExclude -contains $excludedId)
                     {
                         $forbiddenGroupIds += $excludedId
                         
