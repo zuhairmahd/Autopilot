@@ -60,7 +60,7 @@ namespace Autopilot.LogViewer.UI.Views
             if (focusedElement == null)
             {
                 // No element has focus, start with filter panel
-                LevelFilterComboBox.Focus();
+                LevelSelectAllCheckBox.Focus();
                 return;
             }
 
@@ -73,12 +73,12 @@ namespace Autopilot.LogViewer.UI.Views
             else if (IsElementInParent(focusedElement, LogDataGrid))
             {
                 // Move focus back to filter panel
-                LevelFilterComboBox.Focus();
+                LevelSelectAllCheckBox.Focus();
             }
             else
             {
                 // Focus is elsewhere (menu, etc.), move to filter panel
-                LevelFilterComboBox.Focus();
+                LevelSelectAllCheckBox.Focus();
             }
         }
 
