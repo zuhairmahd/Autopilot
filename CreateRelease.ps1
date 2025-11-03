@@ -1134,18 +1134,36 @@ function Update-TargetSettings()
             
             # Load or create domain configuration
             $global:domainConfig = Get-DomainConfigurationFromFiles -DomainName $TargetConfig.domain -ConfigurationPath $ConfigurationPath
-            #remove the first element of the domainConfig if it is not a hashtable
-            if ($domainConfig -and $domainConfig.Count -gt 0 -and -not ($domainConfig[0] -is [hashtable]))
+            
+            # Ensure we have a proper hashtable or ordered dictionary
+            if ($null -eq $domainConfig)
             {
-                for ($i = 0; $i -lt $domainConfig.Count; $i++)
+                Write-Verbose "[$functionName] No existing domain config found, creating new ordered dictionary"
+                $global:domainConfig = [ordered]@{}
+            }
+            elseif ($domainConfig -is [array] -and $domainConfig.Count -gt 0)
+            {
+                # If array returned, find the first hashtable/ordered dictionary element
+                Write-Verbose "[$functionName] Domain config is an array, extracting dictionary"
+                $foundDict = $null
+                foreach ($item in $domainConfig)
                 {
-                    if ($domainConfig[$i] -is [hashtable] -or $i -eq $domainConfig.Count - 1)
+                    if ($item -is [hashtable] -or $item -is [System.Collections.Specialized.OrderedDictionary])
                     {
-                        $global:domainConfig = $domainConfig[$i]
+                        $foundDict = $item
                         break
                     }
                 }
+                $global:domainConfig = if ($foundDict) { $foundDict } else { [ordered]@{} }
             }
+            elseif ($domainConfig -isnot [hashtable] -and $domainConfig -isnot [System.Collections.Specialized.OrderedDictionary])
+            {
+                Write-Warning "[$functionName] Domain config is not a hashtable or ordered dictionary (type: $($domainConfig.GetType().Name)), creating new ordered dictionary"
+                $global:domainConfig = [ordered]@{}
+            }
+            
+            Write-Verbose "[$functionName] Domain config type after validation: $($domainConfig.GetType().Name)"
+            
             # Apply domain settings
             foreach ($key in $TargetConfig.domainSettings.Keys)
             {
@@ -1153,10 +1171,12 @@ function Update-TargetSettings()
                 if ($domainConfig.Keys -contains $key)
                 {
                     $domainConfig[$key] = $TargetConfig.domainSettings[$key]
+                    Write-Verbose "[$functionName] Updated existing domain setting: $key = $($TargetConfig.domainSettings[$key])"
                 }
                 else
                 {
                     $domainConfig.Add($key, $TargetConfig.domainSettings[$key])
+                    Write-Verbose "[$functionName] Added new domain setting: $key = $($TargetConfig.domainSettings[$key])"
                 }
                 Write-Verbose "[$functionName] Applied domain setting: $key = $($TargetConfig.domainSettings[$key])"
             }
