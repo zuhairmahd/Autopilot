@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.ComponentModel;
@@ -11,6 +12,7 @@ using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace Autopilot.LogViewer.UI.Controls
 {
@@ -36,6 +38,9 @@ namespace Autopilot.LogViewer.UI.Controls
                 typeof(bool),
                 typeof(AccessibleDataGrid),
                 new PropertyMetadata(false, OnIncludeHeadersInRowAutomationNameChanged));
+
+        private INotifyCollectionChanged? _currentItemsSource;
+        private bool _automationRefreshQueued;
 
         public AccessibleDataGrid()
         {
@@ -79,6 +84,7 @@ namespace Autopilot.LogViewer.UI.Controls
         {
             AttachColumnPropertyHandlers();
             UpdateAutomationProperties();
+            RaiseAutomationStructureChanged();
         }
 
         private void OnColumnsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -90,29 +96,39 @@ namespace Autopilot.LogViewer.UI.Controls
         private void OnColumnDisplayIndexChanged(object? sender, EventArgs e)
         {
             UpdateAutomationProperties();
+            RaiseAutomationStructureChanged();
 
-            // Notify UI Automation clients that the structure has changed.
-            if (AutomationPeer.ListenerExists(AutomationEvents.StructureChanged))
-            {
-                if (UIElementAutomationPeer.CreatePeerForElement(this) is AutomationPeer peer)
-                {
-                    peer.RaiseAutomationEvent(AutomationEvents.StructureChanged);
-                }
-            }
         }
 
         private void OnColumnVisibilityChanged(object? sender, EventArgs e)
         {
             UpdateAutomationProperties();
+            RaiseAutomationStructureChanged();
+        }
 
-            // Notify UI Automation clients that the structure has changed.
-            if (AutomationPeer.ListenerExists(AutomationEvents.StructureChanged))
+        protected override void OnItemsSourceChanged(IEnumerable? oldValue, IEnumerable? newValue)
+        {
+            if (_currentItemsSource != null)
             {
-                if (UIElementAutomationPeer.CreatePeerForElement(this) is AutomationPeer peer)
-                {
-                    peer.RaiseAutomationEvent(AutomationEvents.StructureChanged);
-                }
+                _currentItemsSource.CollectionChanged -= OnItemsSourceCollectionChanged;
+                _currentItemsSource = null;
             }
+
+            base.OnItemsSourceChanged(oldValue, newValue);
+
+            if (newValue is INotifyCollectionChanged notifyCollection)
+            {
+                _currentItemsSource = notifyCollection;
+                _currentItemsSource.CollectionChanged += OnItemsSourceCollectionChanged;
+            }
+
+            ScheduleAutomationRefresh();
+        }
+
+        protected override void OnItemsChanged(NotifyCollectionChangedEventArgs e)
+        {
+            base.OnItemsChanged(e);
+            ScheduleAutomationRefresh();
         }
 
         private void OnLoadingRow(object? sender, DataGridRowEventArgs e)
@@ -224,6 +240,42 @@ namespace Autopilot.LogViewer.UI.Controls
             }
 
             UpdateRowAutomationName(row, segments, includeHeadersInRowName);
+        }
+
+        private void OnItemsSourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            ScheduleAutomationRefresh();
+        }
+
+        private void ScheduleAutomationRefresh()
+        {
+            if (!IsLoaded || _automationRefreshQueued)
+            {
+                return;
+            }
+
+            _automationRefreshQueued = true;
+            Dispatcher.BeginInvoke(
+                DispatcherPriority.Background,
+                new Action(() =>
+                {
+                    _automationRefreshQueued = false;
+                    UpdateAutomationProperties();
+                    RaiseAutomationStructureChanged();
+                }));
+        }
+
+        private void RaiseAutomationStructureChanged()
+        {
+            if (!AutomationPeer.ListenerExists(AutomationEvents.StructureChanged))
+            {
+                return;
+            }
+
+            if (UIElementAutomationPeer.CreatePeerForElement(this) is AutomationPeer peer)
+            {
+                peer.RaiseAutomationEvent(AutomationEvents.StructureChanged);
+            }
         }
 
         private List<DataGridColumn> GetVisibleColumnsInDisplayOrder()

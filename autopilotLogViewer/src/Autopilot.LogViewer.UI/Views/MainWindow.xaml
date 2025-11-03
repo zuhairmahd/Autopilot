@@ -27,6 +27,11 @@
                               Data="{Binding}"/>
     </Window.Resources>
 
+    <Window.InputBindings>
+        <KeyBinding Key="F5"
+                    Command="{Binding RefreshCommand}"/>
+    </Window.InputBindings>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -219,9 +224,9 @@
               Margin="0,2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="200"/>
+                <ColumnDefinition Width="2*"/>
                 <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="200"/>
+                <ColumnDefinition Width="3*"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
@@ -232,26 +237,88 @@
                        VerticalAlignment="Center"
                        Margin="5"
                        AutomationProperties.Name="Level Filter Label"/>
-            <ComboBox Grid.Column="1"
-                      x:Name="LevelFilterComboBox"
-                      ItemsSource="{Binding AvailableLevels}"
-                      SelectedItem="{Binding SelectedLevel}"
-                      Margin="5"
-                      AutomationProperties.Name="Level Filter"
-                      AutomationProperties.HelpText="Filter log entries by level: All, Error, Warning, Information, Verbose, or Debug"/>
+            <StackPanel Grid.Column="1"
+                        Margin="5"
+                        AutomationProperties.Name="Level Filter Options"
+                        AutomationProperties.HelpText="Select one or more log levels to include in the grid.">
+                <CheckBox x:Name="LevelSelectAllCheckBox"
+                          Content="Include all levels"
+                          IsChecked="{Binding AreAllLevelsSelected, Mode=TwoWay}"
+                          Margin="0,0,0,6"
+                          AutomationProperties.Name="Include all log levels"
+                          AutomationProperties.HelpText="Select to include every log level or clear to manage specific levels."/>
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              MaxHeight="120">
+                    <ItemsControl ItemsSource="{Binding LevelFilterOptions}"
+                                  AutomationProperties.Name="Individual log level filters"
+                                  AutomationProperties.HelpText="Check a level to include it in the results.">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Content="{Binding Name}"
+                                          IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                          Margin="0,0,12,6"
+                                          AutomationProperties.Name="{Binding AutomationName}"
+                                          AutomationProperties.HelpText="{Binding HelpText}"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+                <TextBlock Margin="0,4,0,0"
+                           Text="{Binding LevelFilterSummary}"
+                           AutomationProperties.Name="Level filter summary"
+                           AutomationProperties.HelpText="Summary of selected log levels"
+                           AutomationProperties.LiveSetting="Polite"/>
+            </StackPanel>
 
             <TextBlock Grid.Column="2"
                        Text="Module:"
                        VerticalAlignment="Center"
                        Margin="5"
                        AutomationProperties.Name="Module Filter Label"/>
-            <ComboBox Grid.Column="3"
-                      x:Name="ModuleFilterComboBox"
-                      ItemsSource="{Binding AvailableModules}"
-                      SelectedItem="{Binding SelectedModule}"
-                      Margin="5"
-                      AutomationProperties.Name="Module Filter"
-                      AutomationProperties.HelpText="Filter log entries by module name"/>
+            <StackPanel Grid.Column="3"
+                        Margin="5"
+                        AutomationProperties.Name="Module Filter Options"
+                        AutomationProperties.HelpText="Select one or more modules to include in the grid.">
+                <CheckBox x:Name="ModuleSelectAllCheckBox"
+                          Content="Include all modules"
+                          IsChecked="{Binding AreAllModulesSelected, Mode=TwoWay}"
+                          Margin="0,0,0,6"
+                          AutomationProperties.Name="Include all modules"
+                          AutomationProperties.HelpText="Select to include all modules or clear to manage specific modules."/>
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              MaxHeight="120">
+                    <ItemsControl ItemsSource="{Binding ModuleFilterOptions}"
+                                  AutomationProperties.Name="Individual module filters"
+                                  AutomationProperties.HelpText="Check a module to include it in the results.">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Content="{Binding Name}"
+                                          IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                          Margin="0,0,12,6"
+                                          AutomationProperties.Name="{Binding AutomationName}"
+                                          AutomationProperties.HelpText="{Binding HelpText}"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+                <TextBlock Margin="0,4,0,0"
+                           Text="{Binding ModuleFilterSummary}"
+                           AutomationProperties.Name="Module filter summary"
+                           AutomationProperties.HelpText="Summary of selected modules"
+                           AutomationProperties.LiveSetting="Polite"/>
+            </StackPanel>
 
             <TextBlock Grid.Column="4"
                        Text="Search:"
