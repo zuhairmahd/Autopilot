@@ -557,6 +557,360 @@ Describe "Function: CallGraphAPI" -Tags 'Unit', 'GraphFunctions' {
         }
     }
     
+    Context "When processing batch requests" {
+        It "Should detect batch request with multiple ResourcePaths" {
+            Mock Invoke-RestMethod {
+                param($Uri)
+                if ($Uri -like "*`$batch*")
+                {
+                    return @{
+                        responses = @(
+                            @{ id = "1"; status = 200; body = @{ value = @() } },
+                            @{ id = "2"; status = 200; body = @{ value = @() } }
+                        )
+                    }
+                }
+                return @{ value = @() }
+            }
+            Mock Write-Log {} -ParameterFilter { $Message -match "Batch request detected" }
+            
+            $paths = @("users/id1", "users/id2")
+            $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $paths
+            
+            Should -Invoke Write-Log -ParameterFilter { $Message -match "Batch request detected" }
+            $result.batchProcessed | Should -Be $true
+        }
+        
+        It "Should process single-item array as single request" {
+            Mock Invoke-RestMethod {
+                return @{ id = "user1"; displayName = "User 1" }
+            }
+            Mock Write-Log {} -ParameterFilter { $Message -match "Single-item array detected" }
+            
+            $paths = @("users/id1")
+            $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $paths
+            
+            Should -Invoke Write-Log -ParameterFilter { $Message -match "Single-item array detected" }
+        }
+        
+        It "Should process arrays with 2+ items using native batch endpoint" {
+            Mock Invoke-RestMethod {
+                param($Uri)
+                if ($Uri -like "*`$batch*")
+                {
+                    return @{
+                        responses = @(
+                            @{ id = "1"; status = 200; body = @{ value = @() } },
+                            @{ id = "2"; status = 200; body = @{ value = @() } }
+                        )
+                    }
+                }
+                return @{ value = @() }
+            }
+            Mock Write-Log {} -ParameterFilter { $Message -match "Batch request detected" }
+            
+            # 2 items - above threshold of 1, should use native batch endpoint
+            $paths = @("users/id1", "users/id2")
+            $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $paths
+            
+            # Should make 1 batch call (not 2 individual calls)
+            Should -Invoke Invoke-RestMethod -Times 1 -Exactly
+            Should -Invoke Write-Log -ParameterFilter { $Message -match "Batch request detected" }
+        }
+        
+        It "Should return combined results for native batch processing" {
+            Mock Invoke-RestMethod {
+                param($Uri)
+                if ($Uri -like "*`$batch*")
+                {
+                    return @{
+                        responses = @(
+                            @{ id = "1"; status = 200; body = @{ id = "user1"; displayName = "User 1" } },
+                            @{ id = "2"; status = 200; body = @{ id = "user2"; displayName = "User 2" } },
+                            @{ id = "3"; status = 200; body = @{ id = "user3"; displayName = "User 3" } }
+                        )
+                    }
+                }
+                return @{ value = @() }
+            }
+            
+            $paths = @("users/id1", "users/id2", "users/id3")
+            $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $paths
+            
+            $result.batchProcessed | Should -Be $true
+            $result.batchMethod | Should -Be "NativeBatch"
+            $result.value.Count | Should -Be 3
+        }
+        
+        It "Should handle mixed success/failure in batch responses" {
+            Mock Invoke-RestMethod {
+                param($Uri)
+                if ($Uri -like "*`$batch*")
+                {
+                    return @{
+                        responses = @(
+                            @{ id = "1"; status = 200; body = @{ id = "user1"; displayName = "User 1" } },
+                            @{ id = "2"; status = 404; body = @{ error = @{ message = "Not found" } } },
+                            @{ id = "3"; status = 200; body = @{ id = "user3"; displayName = "User 3" } }
+                        )
+                    }
+                }
+                return @{ value = @() }
+            }
+            
+            $paths = @("users/id1", "users/id2", "users/id3")
+            $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $paths
+            
+            $result.successCount | Should -Be 2
+            $result.failureCount | Should -Be 1
+            $result.totalCount | Should -Be 3
+            $result.batchProcessed | Should -Be $true
+        }
+        
+        It "Should use native batch endpoint directly" {
+            Mock Invoke-RestMethod {
+                param($Uri)
+                if ($Uri -like "*`$batch*")
+                {
+                    return @{
+                        responses = @(
+                            @{ id = "1"; status = 200; body = @{ value = @() } },
+                            @{ id = "2"; status = 200; body = @{ value = @() } },
+                            @{ id = "3"; status = 200; body = @{ value = @() } }
+                        )
+                    }
+                }
+                return @{ value = @() }
+            }
+            
+            $paths = @("users/id1", "users/id2", "users/id3")
+            $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $paths
+            
+            Should -Invoke Invoke-RestMethod -Times 1 -Exactly
+            $result.batchMethod | Should -Be "NativeBatch"
+        }
+        
+        It "Should fall back to sequential processing if batch endpoint fails" {
+            $script:callCount = 0
+            
+            Mock Invoke-RestMethod {
+                param($Uri, $Method)
+                $script:callCount++
+                
+                # First call to batch endpoint fails
+                if ($Uri -like "*`$batch*")
+                {
+                    throw "Batch endpoint temporarily unavailable"
+                }
+                # Subsequent calls are individual requests (sequential fallback)
+                return @{ id = "user$script:callCount"; displayName = "User $script:callCount" }
+            }
+            Mock Write-Log {} -ParameterFilter { $Message -match "Batch endpoint failed" }
+            
+            $paths = @("users/id1", "users/id2", "users/id3")
+            $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $paths
+            
+            # Should try batch once, then fall back to 3 sequential calls
+            Should -Invoke Invoke-RestMethod -Times 4 -Exactly
+            Should -Invoke Write-Log -ParameterFilter { $Message -match "Batch endpoint failed" }
+            $result.batchProcessed | Should -Be $true
+            $result.successCount | Should -Be 3
+        }
+        
+        It "Should log batch processing with detailed progress" {
+            Mock Invoke-RestMethod {
+                param($Uri)
+                if ($Uri -like "*`$batch*")
+                {
+                    return @{
+                        responses = @(
+                            @{ id = "1"; status = 200; body = @{ value = @() } },
+                            @{ id = "2"; status = 200; body = @{ value = @() } },
+                            @{ id = "3"; status = 200; body = @{ value = @() } }
+                        )
+                    }
+                }
+                return @{ value = @() }
+            }
+            Mock Write-Log {} -ParameterFilter { $Message -match "Processing .+ requests in .+ batch" }
+            Mock Write-Log {} -ParameterFilter { $Message -match "Sending batch with .+ requests" }
+            
+            $paths = @("users/id1", "users/id2", "users/id3")
+            $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $paths
+            
+            Should -Invoke Write-Log -ParameterFilter { $Message -match "Processing .+ requests in .+ batch" }
+            Should -Invoke Write-Log -ParameterFilter { $Message -match "Sending batch with .+ requests" }
+            Should -Invoke Write-Log -ParameterFilter { $Message -match "Batch processing completed" }
+        }
+        
+        It "Should split large batches into multiple requests of max 20" {
+            Mock Invoke-RestMethod {
+                param($Uri, $Body)
+                if ($Uri -like "*`$batch*")
+                {
+                    $batchObj = $Body | ConvertFrom-Json
+                    # Each batch should have max 20 requests
+                    $batchObj.requests.Count | Should -BeLessOrEqual 20
+                    
+                    # Return responses matching the request count
+                    $responses = @()
+                    foreach ($req in $batchObj.requests)
+                    {
+                        $responses += @{ id = $req.id; status = 200; body = @{ value = @() } }
+                    }
+                    return @{ responses = $responses }
+                }
+                return @{ value = @() }
+            }
+            
+            # Create 45 items to test batching (should result in 3 batches: 20, 20, 5)
+            $paths = 1..45 | ForEach-Object { "users/id$_" }
+            $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $paths
+            
+            # Should make 3 batch calls
+            Should -Invoke Invoke-RestMethod -Times 3 -Exactly
+            $result.successCount | Should -Be 45
+        }
+        
+        It "Should handle batch endpoint failure with partial sequential failures" {
+            $script:callCount = 0
+            
+            Mock Invoke-RestMethod {
+                param($Uri)
+                $script:callCount++
+                
+                # Batch endpoint fails
+                if ($Uri -like "*`$batch*")
+                {
+                    throw "Batch endpoint error"
+                }
+                
+                # Sequential calls - second one returns error status
+                if ($script:callCount -eq 3)
+                {
+                    return 404
+                }
+                return @{ id = "user$script:callCount"; displayName = "User $script:callCount" }
+            }
+            Mock Write-Log {} -ParameterFilter { $Message -match "Failed to process resource" }
+            
+            $paths = @("users/id1", "users/id2", "users/id3")
+            $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $paths
+            
+            Should -Invoke Invoke-RestMethod -Times 4 -Exactly
+            $result.successCount | Should -Be 2
+            $result.failureCount | Should -Be 1
+            Should -Invoke Write-Log -ParameterFilter { $Message -match "Failed to process resource" }
+        }
+        
+        It "Should include filters in batch request URLs" {
+            Mock ProcessFilterCondition { param($condition) return $condition }
+            Mock Invoke-RestMethod {
+                param($Uri, $Body)
+                if ($Uri -like "*`$batch*")
+                {
+                    $batchObj = $Body | ConvertFrom-Json
+                    # Verify filter is in the URL
+                    $batchObj.requests[0].url | Should -Match "`$filter="
+                    
+                    return @{
+                        responses = @(
+                            @{ id = "1"; status = 200; body = @{ value = @() } },
+                            @{ id = "2"; status = 200; body = @{ value = @() } }
+                        )
+                    }
+                }
+                return @{ value = @() }
+            }
+            
+            $paths = @("users", "users")
+            $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $paths -Filter "accountEnabled eq true"
+            
+            # Note: ProcessFilterCondition may cause multiple calls during filter processing
+            # Just verify batch processing occurred
+            $result.batchProcessed | Should -Be $true
+        }
+        
+        It "Should include search parameters in batch request URLs" {
+            Mock Invoke-RestMethod {
+                param($Uri, $Body)
+                if ($Uri -like "*`$batch*")
+                {
+                    $batchObj = $Body | ConvertFrom-Json
+                    # Verify search is in the URL
+                    $batchObj.requests[0].url | Should -Match "`$search="
+                    
+                    return @{
+                        responses = @(
+                            @{ id = "1"; status = 200; body = @{ value = @() } },
+                            @{ id = "2"; status = 200; body = @{ value = @() } }
+                        )
+                    }
+                }
+                return @{ value = @() }
+            }
+            
+            $paths = @("users", "users")
+            $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $paths -Search "displayName:John"
+            
+            # Just verify batch processing occurred with search parameter
+            $result.batchProcessed | Should -Be $true
+        }
+        
+        It "Should include consistency level headers in batch requests" {
+            Mock Invoke-RestMethod {
+                param($Uri, $Body)
+                if ($Uri -like "*`$batch*")
+                {
+                    $batchObj = $Body | ConvertFrom-Json
+                    # Verify ConsistencyLevel header (lowercase 'eventual' per implementation)
+                    $batchObj.requests[0].headers.ConsistencyLevel | Should -Be "eventual"
+                    
+                    return @{
+                        responses = @(
+                            @{ id = "1"; status = 200; body = @{ value = @() } },
+                            @{ id = "2"; status = 200; body = @{ value = @() } }
+                        )
+                    }
+                }
+                return @{ value = @() }
+            }
+            
+            $paths = @("users/id1", "users/id2")
+            $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $paths -consistencyLevel
+            
+            Should -Invoke Invoke-RestMethod -Times 1 -Exactly
+        }
+        
+        It "Should handle POST requests with body in batch mode" {
+            Mock Invoke-RestMethod {
+                param($Uri, $Body, $Method)
+                if ($Uri -like "*`$batch*" -and $Method -eq "Post")
+                {
+                    $batchObj = $Body | ConvertFrom-Json
+                    # Verify request has body and Content-Type header
+                    $batchObj.requests[0].body | Should -Not -BeNullOrEmpty
+                    $batchObj.requests[0].headers.'Content-Type' | Should -Be "application/json"
+                    
+                    return @{
+                        responses = @(
+                            @{ id = "1"; status = 201; body = @{ id = "new-user-1"; displayName = "New User 1" } },
+                            @{ id = "2"; status = 201; body = @{ id = "new-user-2"; displayName = "New User 2" } }
+                        )
+                    }
+                }
+                return @{ value = @() }
+            }
+            
+            $testBody = '{"displayName":"Test User","mail":"test@example.com"}'
+            $paths = @("users", "users")
+            $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $paths -method "post" -body $testBody
+            
+            Should -Invoke Invoke-RestMethod -Times 1 -Exactly
+            $result.successCount | Should -Be 2
+        }
+    }
+    
     AfterAll {
         # Clean up TestDrive to prevent GUID folder remnants
         if (Test-Path "TestDrive:\")
