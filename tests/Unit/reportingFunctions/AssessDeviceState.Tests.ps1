@@ -80,7 +80,7 @@ Describe "Function: AssessDeviceState" -Tags 'Unit', 'reportingFunctions' {
             contactHelpdesk  = 'Contact the helpdesk'
             WipeOrClean      = 'Wipe or clean the device'
             none             = 'No action'
-            connectToNetwork = 'Connect to network'  # Note: Not in strings.psd1 but referenced in AssessDeviceState.ps1 line 177
+            connectToNetwork = 'Connect to network'   
         }
         
         # Mock settings

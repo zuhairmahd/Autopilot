@@ -329,10 +329,11 @@ function Get-ApplicationDefaults()
         Strings        = [ordered]@{
             Description   = "This is the strings file for the Intune Helpdesk script. It contains all the user-facing strings used in the script."
             deviceActions = @{
-                none            = "No action"
-                contactAdmin    = "Contact an Intune administrator"
-                contactHelpdesk = "Contact the helpdesk"
-                WipeOrClean     = "Wipe or clean the device"
+                none             = "No action"
+                contactAdmin     = "Contact an Intune administrator"
+                contactHelpdesk  = "Contact the helpdesk"
+                connectToNetwork = "Connect the device to a network"
+                WipeOrClean      = "Wipe or clean the device"
             }
             deviceStates  = @{
                 Ready    = "The device is ready for the next user"
