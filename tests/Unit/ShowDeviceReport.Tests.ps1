@@ -47,7 +47,8 @@ Describe "Function: ShowDeviceReport" -Tags 'Unit', 'reportingFunctions' {
         $global:settings = @{ testMode = $true }
         
         # Create stub function for Export-DeviceReport (referenced in ShowDeviceReport but not loaded)
-        function Export-DeviceReport {
+        function Export-DeviceReport
+        {
             param($formattedOutput, $ExportFormat)
             return @{ success = $true; message = "Export successful" }
         }
@@ -158,8 +159,8 @@ Describe "Function: ShowDeviceReport" -Tags 'Unit', 'reportingFunctions' {
                         managementState                         = "managed"
                         managedDeviceOwnerType                  = "company"
                     }
-                    memory  = 16
-                    users   = @{
+                    memory = 16
+                    users  = @{
                         AzureUser         = "user@contoso.com"
                         userDisplayName   = "John Doe"
                         lastLogOnDateTime = "2025-11-03T16:00:00Z"
@@ -167,22 +168,22 @@ Describe "Function: ShowDeviceReport" -Tags 'Unit', 'reportingFunctions' {
                 }
                 autopilot     = @{
                     device = @{
-                        id                                    = "autopilot-guid-123"
-                        enrollmentState                       = "enrolled"
-                        deploymentProfileAssignmentStatus     = "assigned"
-                        deploymentProfileAssignedDateTime     = "2025-01-15T07:00:00Z"
-                        deploymentProfile                     = @{
+                        id                                = "autopilot-guid-123"
+                        enrollmentState                   = "enrolled"
+                        deploymentProfileAssignmentStatus = "assigned"
+                        deploymentProfileAssignedDateTime = "2025-01-15T07:00:00Z"
+                        deploymentProfile                 = @{
                             displayName = "Corp Deployment Profile"
                         }
-                        userPrincipalName                     = "user@contoso.com"
-                        lastContactedDateTime                 = "2025-11-01T10:00:00Z"
+                        userPrincipalName                 = "user@contoso.com"
+                        lastContactedDateTime             = "2025-11-01T10:00:00Z"
                     }
                     events = @(
                         @{
-                            eventDateTime                                   = "2025-01-15T08:30:00Z"
-                            windowsAutopilotDeploymentProfileDisplayName    = "Corp Profile"
-                            deploymentState                                 = "success"
-                            enrollmentFailureDetails                        = $null
+                            eventDateTime                                = "2025-01-15T08:30:00Z"
+                            windowsAutopilotDeploymentProfileDisplayName = "Corp Profile"
+                            deploymentState                              = "success"
+                            enrollmentFailureDetails                     = $null
                         }
                     )
                 }
@@ -284,58 +285,84 @@ Describe "Function: ShowDeviceReport" -Tags 'Unit', 'reportingFunctions' {
             $minimalState = @{
                 managedDevice = @{
                     device = @{
-                        deviceName        = "TEST"
-                        serialNumber      = "SN"
-                        Id                = "1"
-                        autopilotEnrolled = $true
+                        deviceName              = "TEST-DEVICE"
+                        serialNumber            = "SN123"
+                        Id                      = "managed-id-123"
+                        enrolledDateTime        = "2025-01-15T08:00:00Z"
+                        lastSyncDateTime        = "2025-11-04T10:00:00Z"
+                        enrollmentProfileName   = "Test Profile"
+                        userPrincipalName       = "test@contoso.com"
+                        autopilotEnrolled       = $true
+                        deviceRegistrationState = "registered"
+                        complianceState         = "compliant"
+                        managementState         = "managed"
+                        osVersion               = "10.0.22631"
                     }
-                    memory = 8
+                    memory = 16
                     users  = @{}
                 }
                 autopilot     = @{
-                    device = @{ id = "1"; enrollmentState = "enrolled"; deploymentProfileAssignmentStatus = "assigned"; deploymentProfile = @{} }
+                    device = @{
+                        id                                = "autopilot-id-123"
+                        enrollmentState                   = "enrolled"
+                        deploymentProfileAssignmentStatus = "assigned"
+                        deploymentProfileAssignedDateTime = "2025-01-15T07:00:00Z"
+                        deploymentProfile                 = @{ displayName = "Corp Profile" }
+                        userPrincipalName                 = "test@contoso.com"
+                    }
                     events = @()
                 }
             }
         }
         
-        It "Should format property names with spaces before capitals" {
-            # This test checks that the code contains the formatting logic
+        It "Should format property names with spaces before capitals via code inspection" {
+            # Arrange - Get the function source code
             $content = Get-Content $script:FilePath -Raw
             
-            $hasSpaceInsertion = $content -match '\[regex\]::Replace.*(?<=[a-z])(?=[A-Z])'
-            
-            $hasSpaceInsertion | Should -Be $true -Because "Function should insert spaces before capital letters"
+            # Assert - Check that the formatting logic exists in the code
+            # Looking for: [regex]::Replace($variable, '(?<=[a-z])(?=[A-Z])', ' ')
+            $content | Should -Match '\[regex\]::Replace\(\$\w+, .\(\?<=\[a-z\]\)\(\?=\[A-Z\]\)., . .\)' `
+                -Because "Function should use regex to insert spaces before capitals"
         }
         
-        It "Should handle prefix list for property formatting" {
-            # Check that PrefixList parameter exists and is used
+        It "Should handle prefix formatting via code inspection" {
+            # Arrange - Get the function source code
             $content = Get-Content $script:FilePath -Raw
             
-            $hasPrefixListParam = $content -match '\[string\[\]\]\$PrefixList'
-            $usesPrefixList = $content -match 'foreach.*\$prefix.*in.*\$PrefixList'
-            
-            $hasPrefixListParam | Should -Be $true -Because "Function should have PrefixList parameter"
-            $usesPrefixList | Should -Be $true -Because "Function should iterate over PrefixList"
+            # Assert - Check for prefix handling logic
+            $content | Should -Match 'foreach.*\$prefix.*in.*\$PrefixList' `
+                -Because "Function should iterate through PrefixList for prefix matching"
+            $content | Should -Match 'if.*\$key.*-match.*"\^\(\$prefix\)' `
+                -Because "Function should match keys against prefix patterns"
         }
         
-        It "Should format Intune prefixed properties correctly" {
-            # Test that code handles 'Intune' prefix (default in PrefixList)
+        It "Should accept custom PrefixList parameter" {
+            # Arrange - Get function definition
             $content = Get-Content $script:FilePath -Raw
             
-            $matchesPrefixPattern = $content -match 'if.*key.*-match.*".*\(\$prefix\)'
-            
-            $matchesPrefixPattern | Should -Be $true -Because "Function should check for prefix matches"
+            # Assert - Check for PrefixList parameter
+            $content | Should -Match '\[string\[\]\]\$PrefixList' `
+                -Because "Function should have a PrefixList parameter"
         }
         
-        It "Should format Autopilot prefixed properties correctly" {
-            # Test that code handles 'Autopilot' prefix (default in PrefixList)
+        It "Should use default prefix list of Intune and Autopilot" {
+            # Arrange - Get function definition
             $content = Get-Content $script:FilePath -Raw
             
-            # Verify default PrefixList includes 'Autopilot'
-            $hasAutopilotDefault = $content -match "PrefixList.*=.*@\('Intune', 'Autopilot'\)"
+            # Assert - Check for default PrefixList value
+            $content | Should -Match '\$PrefixList = @\(''Intune'', ''Autopilot''\)' `
+                -Because "Function should default to Intune and Autopilot prefixes"
+        }
+        
+        It "Should handle null values by setting them to N/A via code inspection" {
+            # Arrange - Get the function source code
+            $content = Get-Content $script:FilePath -Raw
             
-            $hasAutopilotDefault | Should -Be $true -Because "Function should default PrefixList to include Autopilot"
+            # Assert - Check for null handling
+            $content | Should -Match 'if.*\$null -eq \$output\[\$key\]' `
+                -Because "Function should check for null values"
+            $content | Should -Match '\$formattedValue.*=.*"N/A"' `
+                -Because "Function should set null values to N/A"
         }
     }
     

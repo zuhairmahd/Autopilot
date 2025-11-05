@@ -77,6 +77,14 @@ Describe "Function: Export-DeviceList" -Tags 'Unit' {
         Mock Export-Csv { }
     }
     
+    AfterAll {
+        # Remove the custom Export-Csv function to restore the original cmdlet
+        # This prevents leaking the stub to other tests in the session
+        if (Test-Path Function:Export-Csv) {
+            Remove-Item Function:Export-Csv -ErrorAction SilentlyContinue
+        }
+    }
+    
     Context "Autopilot Device Export" {
         BeforeAll {
             $autopilotDevices = @{
