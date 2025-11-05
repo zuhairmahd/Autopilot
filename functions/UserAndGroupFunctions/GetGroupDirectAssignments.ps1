@@ -16,6 +16,7 @@ function GetGroupDirectAssignments()
     $functionName = $MyInvocation.MyCommand.Name
     #log the incoming parameters 
     Write-Verbose "[$functionName] Incoming parameters:"
+    write-log -logFile $logFile -Module $module -Message "Incoming parameters for:" -logLevel "Information"
     if ($AccessToken)
     {
         Write-Verbose "[$functionName] AccessToken provided"
@@ -29,7 +30,7 @@ function GetGroupDirectAssignments()
     Write-Log -logFile $LogFile -module $functionName -Message "Incoming parameters:" -logLevel "Information"
     Write-Log -logFile $LogFile -module $functionName -Message "GroupName: $GroupName" -logLevel "Information"
     Write-Log -logFile $LogFile -module $functionName -Message "IncludeBeta: $IncludeBeta" -logLevel "Information"
-Write-Log -logFile $LogFile -module $functionName -Message "ShowSummary: $ShowSummary" -LogLevel "Verbose"
+    Write-Log -logFile $LogFile -module $functionName -Message "ShowSummary: $ShowSummary" -LogLevel "Verbose"
     Write-Log -logFile $LogFile -module $functionName -Message "BatchSize: $BatchSize" -logLevel "Information"
     # PowerShell 5.1 compatible array handling and safe indexing
     $groupIds = $GroupName
@@ -42,7 +43,7 @@ Write-Log -logFile $LogFile -module $functionName -Message "ShowSummary: $ShowSu
     # Validate that we have a group ID to work with
     if (-not $groupId.Id)
     {
-Write-Log -logFile $LogFile -module $functionName -Message "No group ID available, cannot proceed with assignment retrieval" -LogLevel "Warning"
+        Write-Log -logFile $LogFile -module $functionName -Message "No group ID available, cannot proceed with assignment retrieval" -LogLevel "Warning"
         return $assignments
     }
     
@@ -79,7 +80,7 @@ Write-Log -logFile $LogFile -module $functionName -Message "No group ID availabl
     Write-Log -logFile $LogFile -module $functionName -Message "Using API version: $apiVersion with batch size: $BatchSize" -logLevel "Information"
     
     # Helper function to process batch assignments
-    function Invoke-BatchAssignments
+    function Invoke-BatchAssignments()
     {
         [CmdletBinding()]
         param(
@@ -89,14 +90,14 @@ Write-Log -logFile $LogFile -module $functionName -Message "No group ID availabl
             [string]$AssignmentCategory
         )
         $functionName = $MyInvocation.MyCommand.Name
-Write-Log -logFile $LogFile -module $functionName -Message "Processing ${ResourceType} resources" -LogLevel "Verbose"
+        Write-Log -logFile $LogFile -module $functionName -Message "Processing ${ResourceType} resources" -LogLevel "Verbose"
         if (-not $Resources -or $Resources.Count -eq 0)
         {
             Write-Log -logFile $LogFile -module $functionName -Message "No ${ResourceType} resources to process" -logLevel "Warning"
             return
         }
         
-Write-Log -logFile $LogFile -module $functionName -Message "Processing $($Resources.Count) ${ResourceType} resources using batch API" -LogLevel "Verbose"
+        Write-Log -logFile $LogFile -module $functionName -Message "Processing $($Resources.Count) ${ResourceType} resources using batch API" -LogLevel "Verbose"
         
         # Process resources in batches to reduce API calls
         for ($batchIndex = 0; $batchIndex -lt $Resources.Count; $batchIndex += $BatchSize)
@@ -118,15 +119,15 @@ Write-Log -logFile $LogFile -module $functionName -Message "Processing $($Resour
             }
             
             Write-Verbose "[$functionName] Sending batch request for ${ResourceType} batch $($batchIndex / $BatchSize + 1) (items $batchIndex to $($batchIndex + $batch.Count - 1))"
-Write-Log -logFile $LogFile -module $functionName -Message "Sending batch request for ${ResourceType} batch $($batchIndex / $BatchSize + 1)" -LogLevel "Debug"
+            Write-Log -logFile $LogFile -module $functionName -Message "Sending batch request for ${ResourceType} batch $($batchIndex / $BatchSize + 1)" -LogLevel "Debug"
             
             try
             {
                 $batchResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath "`$batch" -APIVersion $apiVersion -Method "POST" -Body ($batchRequestBody | ConvertTo-Json -Depth $global:maxJSONDepth)
-Write-Log -logFile $LogFile -module $functionName -Message "Received batch response for ${ResourceType} batch $($batchIndex / $BatchSize + 1)" -LogLevel "Debug"
+                Write-Log -logFile $LogFile -module $functionName -Message "Received batch response for ${ResourceType} batch $($batchIndex / $BatchSize + 1)" -LogLevel "Debug"
                 if ($batchResponse -and $batchResponse.responses)
                 {
-Write-Log -logFile $LogFile -module $functionName -Message "Processing batch response for ${ResourceType} batch $($batchIndex / $BatchSize + 1)" -LogLevel "Debug"
+                    Write-Log -logFile $LogFile -module $functionName -Message "Processing batch response for ${ResourceType} batch $($batchIndex / $BatchSize + 1)" -LogLevel "Debug"
                     foreach ($response in $batchResponse.responses)
                     {
                         if ($response.status -eq 200 -and $response.body -and $response.body.value)
@@ -285,7 +286,7 @@ Write-Log -logFile $LogFile -module $functionName -Message "Processing batch res
         # Process batch response
         if ($batchResponse -and $batchResponse.responses)
         {
-Write-Log -logFile $LogFile -module $functionName -Message "Processing batch response for resource lists" -LogLevel "Verbose"
+            Write-Log -logFile $LogFile -module $functionName -Message "Processing batch response for resource lists" -LogLevel "Verbose"
             
             foreach ($response in $batchResponse.responses)
             {
@@ -368,16 +369,16 @@ Write-Log -logFile $LogFile -module $functionName -Message "Processing batch res
             Invoke-BatchAssignments -Resources $groupPolicyConfigs -ResourceType "Group Policy Configurations" -BaseUri "deviceManagement/groupPolicyConfigurations" -AssignmentCategory "GroupPolicy"
         }
         
-Write-Log -logFile $LogFile -module $functionName -Message "Batch processing complete. Found assignments - Apps: $($assignments.AppAssignments.Count), Configs: $($assignments.ConfigurationAssignments.Count), Compliance: $($assignments.ComplianceAssignments.Count), Autopilot: $($assignments.AutopilotAssignments.Count), Scripts: $($assignments.ScriptAssignments.Count), HealthScripts: $($assignments.HealthScriptAssignments.Count), AppProtection: $($assignments.AppProtectionAssignments.Count), Intents: $($assignments.IntentAssignments.Count), ResourceAccess: $($assignments.ResourceAccessAssignments.Count), ConfigPolicies: $($assignments.ConfigurationPolicyAssignments.Count), GroupPolicy: $($assignments.GroupPolicyAssignments.Count)" -LogLevel "Verbose"
+        Write-Log -logFile $LogFile -module $functionName -Message "Batch processing complete. Found assignments - Apps: $($assignments.AppAssignments.Count), Configs: $($assignments.ConfigurationAssignments.Count), Compliance: $($assignments.ComplianceAssignments.Count), Autopilot: $($assignments.AutopilotAssignments.Count), Scripts: $($assignments.ScriptAssignments.Count), HealthScripts: $($assignments.HealthScriptAssignments.Count), AppProtection: $($assignments.AppProtectionAssignments.Count), Intents: $($assignments.IntentAssignments.Count), ResourceAccess: $($assignments.ResourceAccessAssignments.Count), ConfigPolicies: $($assignments.ConfigurationPolicyAssignments.Count), GroupPolicy: $($assignments.GroupPolicyAssignments.Count)" -LogLevel "Verbose"
     }
     catch
     {
-Write-Log -logFile $LogFile -module $functionName -Message "Error in batch assignment processing: $($_.Exception.Message)" -LogLevel "Verbose"
+        Write-Log -logFile $LogFile -module $functionName -Message "Error in batch assignment processing: $($_.Exception.Message)" -LogLevel "Verbose"
     }
     
     # Summary
     $totalAssignments = $assignments.AllAssignments.Count
-Write-Log -logFile $LogFile -module $functionName -Message "Total assignments found for group '$($groupId.displayName)': $totalAssignments" -LogLevel "Verbose"
+    Write-Log -logFile $LogFile -module $functionName -Message "Total assignments found for group '$($groupId.displayName)': $totalAssignments" -LogLevel "Verbose"
     if ($ShowSummary)
     {
         Write-Host "Group Direct Assignments Summary for '$($groupId.displayName)':" -ForegroundColor Green
