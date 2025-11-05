@@ -1,10 +1,11 @@
 ﻿@{
     Description   = 'This is the strings file for the Intune Helpdesk script. It contains all the user-facing strings used in the script.'
     deviceActions = @{
-        contactAdmin    = 'Contact an Intune administrator'
-        contactHelpdesk = 'Contact the helpdesk'
-        WipeOrClean     = 'Wipe or clean the device'
-        none            = 'No action'
+        contactAdmin     = 'Contact an Intune administrator'
+        contactHelpdesk  = 'Contact the helpdesk'
+        WipeOrClean      = 'Wipe or clean the device'
+        connectToNetwork = 'Connect the device to a network'
+        none             = 'No action'
     }
     deviceStates  = @{
         Ready    = 'The device is ready for the next user'
