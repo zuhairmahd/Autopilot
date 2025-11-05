@@ -80,7 +80,7 @@ Describe "Function: AssessDeviceState" -Tags 'Unit', 'reportingFunctions' {
             contactHelpdesk  = 'Contact the helpdesk'
             WipeOrClean      = 'Wipe or clean the device'
             none             = 'No action'
-            connectToNetwork = 'Connect to network'  # Note: Not in strings.psd1 but referenced in AssessDeviceState.ps1 line 177
+            connectToNetwork = 'Connect to network'  # Production bug: Not in strings.psd1 but referenced in AssessDeviceState.ps1 line 177. See test context "Production Bug: connectToNetwork missing from strings.psd1" for validation.
         }
         
         # Mock settings
@@ -548,6 +548,51 @@ Describe "Function: AssessDeviceState" -Tags 'Unit', 'reportingFunctions' {
             $result.Action | Should -BeIn @($script:deviceActions.connectToNetwork, $script:deviceActions.WipeOrClean)
             $result.AllActions | Should -Contain $script:deviceActions.WipeOrClean
             $result.AllActions | Should -Contain $script:deviceActions.contactAdmin
+        }
+    }
+    
+    Context "Production Bug: connectToNetwork missing from strings.psd1" {
+        <#
+        .NOTES
+            This test documents and validates a production bug where the AssessDeviceState function
+            references $deviceActions.connectToNetwork (line 177 in AssessDeviceState.ps1), but this
+            key does not exist in the production strings.psd1 file.
+            
+            Expected Fix: Add 'connectToNetwork = "Connect to network"' to the deviceActions section
+            in strings.psd1 to match the production code's usage.
+            
+            This test validates:
+            1. That connectToNetwork is indeed missing from production strings.psd1
+            2. That the function attempts to use this missing key
+            3. That our test mocks provide this value to allow tests to pass
+        #>
+        
+        It "Should validate that connectToNetwork is missing from production strings.psd1" {
+            # Arrange - Load actual production strings.psd1
+            $stringsPath = "$script:RepoRoot/strings.psd1"
+            $productionStrings = Import-PowerShellDataFile -Path $stringsPath
+            
+            # Assert - Verify the production bug exists
+            $productionStrings.deviceActions.Keys | Should -Not -Contain 'connectToNetwork'
+            $productionStrings.deviceActions.Keys | Should -Contain 'contactAdmin'
+            $productionStrings.deviceActions.Keys | Should -Contain 'contactHelpdesk'
+            $productionStrings.deviceActions.Keys | Should -Contain 'WipeOrClean'
+            $productionStrings.deviceActions.Keys | Should -Contain 'none'
+        }
+        
+        It "Should validate that test mock provides connectToNetwork to enable tests" {
+            # Assert - Verify our test mock has the missing value
+            $script:deviceActions.Keys | Should -Contain 'connectToNetwork'
+            $script:deviceActions.connectToNetwork | Should -Be 'Connect to network'
+        }
+        
+        It "Should validate production code references connectToNetwork" {
+            # Arrange - Read the production function source
+            $functionPath = "$script:RepoRoot/functions/reportingFunctions/AssessDeviceState.ps1"
+            $functionContent = Get-Content -Path $functionPath -Raw
+            
+            # Assert - Verify the production code uses the missing key
+            $functionContent | Should -Match '\$deviceActions\.connectToNetwork'
         }
     }
     
