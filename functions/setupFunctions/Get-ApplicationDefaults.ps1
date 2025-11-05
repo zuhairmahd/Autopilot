@@ -94,6 +94,7 @@ function Get-ApplicationDefaults()
                 "Device.ReadWrite.All",
                 "DeviceManagementApps.Read.All",
                 "DeviceManagementConfiguration.ReadWrite.All",
+                "DeviceManagementScripts.Read.All",
                 "DeviceManagementManagedDevices.PrivilegedOperations.All",
                 "DeviceManagementManagedDevices.ReadWrite.All",
                 "DeviceManagementServiceConfig.ReadWrite.All"
@@ -306,6 +307,20 @@ function Get-ApplicationDefaults()
                 reason    = "Required to create, update, and delete Intune managed device properties."
                 endpoints = @(
                     "deviceManagement/managedDevices"
+                )
+            },
+            @{
+                scope     = "DeviceManagementScripts.Read.All"
+                reason    = "Required to read Intune device management scripts."
+                endpoints = @(
+                    "deviceManagement/deviceHealthScripts"
+                )
+            },
+            @{
+                scope     = "DeviceManagementScripts.ReadWrite.All"
+                reason    = "Required to create, update, and delete Intune device management scripts."
+                endpoints = @(
+                    "deviceManagement/deviceHealthScripts"
                 )
             },
             @{

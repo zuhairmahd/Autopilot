@@ -95,6 +95,20 @@
             Reason    = 'Required for highly privileged operations, specifically to read local admin (LAPS) passwords.'
         },
         @{
+            scope     = "DeviceManagementScripts.Read.All"
+            reason    = "Required to read Intune device management scripts."
+            endpoints = @(
+                "deviceManagement/deviceHealthScripts"
+            )
+        },
+        @{
+            scope     = "DeviceManagementScripts.ReadWrite.All"
+            reason    = "Required to create, update, and delete Intune device management scripts."
+            endpoints = @(
+                "deviceManagement/deviceHealthScripts"
+            )
+        },
+        @{
             Scope     = 'DeviceManagementServiceConfig.ReadWrite.All'
             Endpoints = @(
                 'deviceManagement/autopilotEvents',
@@ -160,6 +174,7 @@
             'DeviceManagementApps.Read.All',
             'DeviceManagementConfiguration.ReadWrite.All',
             'DeviceManagementManagedDevices.PrivilegedOperations.All',
+            'DeviceManagementScripts.Read.All',
             'DeviceManagementManagedDevices.ReadWrite.All',
             'DeviceManagementServiceConfig.ReadWrite.All'
         )
