@@ -16,7 +16,7 @@
     - Mock all dependency functions (GetAutopilotDeviceRelevantProperties, GetManagedDeviceRelevantProperties, GetLastDeviceContactDate)
     - Test all state determination branches (ready, notReady with various issues)
     - Validate return object structure (ReadinessState, Action, Device, AllIssues, AllActions, IssueCount, IsReady)
-    - Test assessment types (NextUserReadiness, PropperEnrollmentVerification, TroubleShooting)
+    - Test assessment types (NextUserReadiness, ProperEnrollmentVerification, TroubleShooting)
     - Focus on NextUserReadiness as it contains the core logic
 #>
 
