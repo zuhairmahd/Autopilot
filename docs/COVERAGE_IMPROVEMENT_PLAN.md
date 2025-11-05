@@ -679,7 +679,7 @@ See Progress Tracking section below for detailed results.
   * Connectivity issues (device hasn't contacted Intune within threshold)
   * Device not registered in Autopilot scenarios
   * Multiple simultaneous issues with action prioritization
-  * Assessment type validation (NextUserReadiness, PropperEnrollmentVerification, TroubleShooting)
+  * Assessment type validation (NextUserReadiness, ProperEnrollmentVerification, TroubleShooting)
   * Return object structure validation (all 7 properties present and correct types)
   * Dependencies mocked: GetAutopilotDeviceRelevantProperties, GetManagedDeviceRelevantProperties, GetLastDeviceContactDate
   * Global mocks: Write-Log, accessToken, deviceStates, deviceActions, settings
