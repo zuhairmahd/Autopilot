@@ -7,15 +7,13 @@ function Test-ScopeAvailability()
         [Parameter(Mandatory = $false)]
         [array]$RequiredScopes = @(),
         [Parameter(Mandatory = $true)]
-        [hashtable]$AuthConfiguration,
-        [Parameter(Mandatory = $false)]
-        [array]$RequestedScopes = @()
+        [hashtable]$AuthConfiguration
     )
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Starting scope availability validation"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Starting scope availability validation" -logLevel "Information"
-    
+    $requestedScopes = $AuthConfiguration.Scope
     # Define scopes that should be excluded from validation for non-delegated (application) authentication
     # These are OAuth/OIDC protocol scopes, not Microsoft Graph API scopes
     $excludedScopesForApplication = @(
@@ -42,7 +40,6 @@ function Test-ScopeAvailability()
     # Handle empty required scopes - if no scopes are required, all are available
     Write-Verbose "[$functionName] Checking if required scopes are specified (Count: $($RequiredScopes.Count))"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Required scopes count: $($RequiredScopes.Count)" -LogLevel "Debug"
-    
     if ($RequiredScopes.Count -eq 0)
     {
         Write-Verbose "[$functionName] No required scopes specified - returning success"
@@ -221,13 +218,11 @@ function Test-ScopeAvailability()
             Write-Verbose "[$functionName] Performing hierarchical scope comparison for: $scopeName"
             Write-Log -LogFile $LogFile -Module $functionName -Message "Invoking Test-ScopeHierarchy for scope: $scopeName" -LogLevel "Debug"
             $isAvailable = Test-ScopeHierarchy -RequiredScope $scopeName -AvailableScopes $result.AvailableScopes
-            
             if (-not $isAvailable)
             {
                 Write-Verbose "[$functionName] Scope NOT satisfied: $scopeName (no available scope satisfies this requirement)"
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Missing required scope: $scopeName (not satisfied by any available scope)" -LogLevel "Warning"
                 $missingScopes += $requiredScope
-                
                 # Add to unavailable functionality
                 $unavailableFunctionality += @{
                     Scope     = $scopeName
@@ -244,16 +239,13 @@ function Test-ScopeAvailability()
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Required scope satisfied: $scopeName" -LogLevel "Information"
             }
         }
-        
         Write-Verbose "[$functionName] Scope comparison complete - Missing: $($missingScopes.Count), Satisfied: $($RequiredScopes.Count - $missingScopes.Count)"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Scope comparison complete - Total checked: $scopeCheckCount, Missing: $($missingScopes.Count), Satisfied: $($RequiredScopes.Count - $missingScopes.Count)" -logLevel "Information"
-        
         Write-Verbose "[$functionName] Building result object"
         $result.MissingScopes = $missingScopes
         $result.UnavailableFunctionality = $unavailableFunctionality
         $result.HasAllRequiredScopes = $missingScopes.Count -eq 0
         Write-Log -LogFile $LogFile -Module $functionName -Message "Result object populated - HasAllRequiredScopes: $($result.HasAllRequiredScopes)" -LogLevel "Debug"
-        
         # Set recommended action based on authentication type and missing scopes
         Write-Verbose "[$functionName] Determining recommended action based on validation results"
         if ($result.HasAllRequiredScopes)
@@ -266,7 +258,6 @@ function Test-ScopeAvailability()
         {
             Write-Verbose "[$functionName] Some required scopes are missing - generating recommendations"
             Write-Log -LogFile $LogFile -Module $functionName -Message "Some required Microsoft Graph API scopes are missing." -LogLevel "Warning"
-            
             if ($isDelegated)
             {
                 $result.RecommendedAction = "Re-authenticate with additional scopes to enable full functionality."

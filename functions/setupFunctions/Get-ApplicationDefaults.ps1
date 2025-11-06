@@ -44,7 +44,7 @@ function Get-ApplicationDefaults()
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [ValidateSet('Settings', 'Auth', 'Global', 'Domain', 'Menus', 'Strings', 'Overwrite', 'All')]
+        [ValidateSet('Settings', 'Auth', 'Global', 'Domain', 'Menus', 'Strings', 'requiredScopes', 'Overwrite', 'All')]
         [string]$DefaultType,
         [string]$DomainName,
         [string]$Version
@@ -1503,6 +1503,13 @@ function Get-ApplicationDefaults()
             $script:defaultsCache[$cacheKey] = $result
             return $result
         }
+        'requiredScopes'
+        {
+            Write-Verbose "[$functionName] Returning required scopes defaults"
+            $result = $defaults.RequiredScopes
+            $script:defaultsCache[$cacheKey] = $result
+            return $result
+        }                               
         'Overwrite'
         {
             Write-Verbose "[$functionName] Returning overwrite configuration"

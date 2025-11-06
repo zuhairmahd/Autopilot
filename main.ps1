@@ -491,7 +491,6 @@ else
     Write-Verbose "[$scriptName] Checking for settings migration need."
     $migrationCheck = Invoke-SettingsMigration -RemoveJsonFiles -Force
 }
-# $migrationCheck = Invoke-SettingsMigration -Force
 write-log -logFile $logFile -module $scriptName -message "Migration needed: $($migrationCheck.migrationNeeded), Success: $($migrationCheck.success)" -LogLevel "Information"
 if ($migrationCheck.success -and $migrationCheck.migrationNeeded)
 {
@@ -625,7 +624,6 @@ else
         # Launch the first run wizard (pass Silent switch if testMode is active)
         $wizardResult = Start-FirstRunWizard -ConfigFile $configFile -SettingsFile $InitFile -StringsFile "$PWD\strings.psd1" -Silent:$testMode
     }
-    
     if ($wizardResult)
     {
         if (-not $testMode)
@@ -703,8 +701,6 @@ else
         Write-Verbose "[$scriptName] Menus count: $($menus.Count)"
         Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
         Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
-
-
     }
     else
     {
@@ -742,9 +738,13 @@ $auth = $configResult.Auth
 $globalSettings = $configResult.GlobalSettings
 $localSettings = $configResult.LocalSettings
 $requiredScopes = $configResult.RequiredScopes
+
 # Merge global and local settings into a single settings object
 Write-Verbose "[$scriptName] Merging global and local settings"
 $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+
+#merge required scopes
+
 if ($settings.domain -ne $domain)
 {
     Write-Verbose "[$scriptName] Updating settings domain from $($settings.domain) to $domain"
@@ -1066,7 +1066,7 @@ if ($accessToken)
             $currentRequestedScopes = @()
             if ($auth.Delegated -eq $true)
             {
-                $currentRequestedScopes = $requiredScopes | ForEach-Object { $_.Scope }
+                $currentRequestedScopes = $auth.scope | ForEach-Object { $_.Scope }
                 Write-Log -LogFile $LogFile -Module $scriptName -Message "Delegated authentication - using required scopes as requested scopes" -LogLevel "Information"
             }
             # Perform scope validation
