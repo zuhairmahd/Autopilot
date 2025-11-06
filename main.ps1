@@ -2013,10 +2013,9 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings"
     }
 }
 
-# Create repoInfo edit menu
-$repoInfoEditMenu = NewMenu -MenuName "repoInfoEditMenu"
-$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Edit repository information" -subMenu $repoInfoEditMenu
-$repoInfoEditMenu = AddMenuItem -menu $repoInfoEditMenu -Name "Edit repository name" -Action {
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Edit repository information" -Action {
+    Write-Host "Launching repository information editor..." -ForegroundColor Cyan
+    Write-Host "These settings control repository URLs and paths used for updates." -ForegroundColor Gray
     $result = Show-RepoInfoEditor -SettingsFile $InitFile
     if ($result -eq "Back" -or $result -eq "back")
     {
@@ -2032,12 +2031,11 @@ $repoInfoEditMenu = AddMenuItem -menu $repoInfoEditMenu -Name "Edit repository n
     {
         return $result
     }
-} -ReturnsValue
+}
 
-# Create cacheSettings edit menu
-$cacheSettingsEditMenu = NewMenu -MenuName "cacheSettingsEditMenu"
-$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Edit cache settings" -subMenu $cacheSettingsEditMenu
-$cacheSettingsEditMenu = AddMenuItem -menu $cacheSettingsEditMenu -Name "Toggle global cache enabled/disabled" -Action {
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Edit cache settings" -Action {
+    Write-Host "Launching cache settings editor..." -ForegroundColor Cyan
+    Write-Host "These settings control caching behavior, expiration times, and size limits." -ForegroundColor Gray
     $result = Show-CacheSettingsEditor -SettingsFile $InitFile
     if ($result -eq "Back" -or $result -eq "back")
     {
@@ -2053,7 +2051,7 @@ $cacheSettingsEditMenu = AddMenuItem -menu $cacheSettingsEditMenu -Name "Toggle 
     {
         return $result
     }
-} -ReturnsValue
+}
 
 #endregion Settings menu
 

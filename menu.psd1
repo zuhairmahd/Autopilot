@@ -414,20 +414,18 @@
                 )
             },
             @{
-                menuName              = 'repoInfoEditMenu'
                 description           = 'Edit repository information settings'
                 name                  = 'Edit repository information'
-                blockType             = 'menu'
+                blockType             = 'action'
                 includeInDisplayModes = @(
                     'full',
                     'admin'
                 )
             },
             @{
-                menuName              = 'cacheSettingsEditMenu'
                 description           = 'Edit cache settings'
                 name                  = 'Edit cache settings'
-                blockType             = 'menu'
+                blockType             = 'action'
                 includeInDisplayModes = @(
                     'full',
                     'admin'
