@@ -32,7 +32,7 @@ function Get-TokenFromCache()
     # If we have a cached token, validate and return it
     if ($accessTokenObject)
     {
-        $validToken = Test-CachedTokenValidity -accessTokenObject $accessTokenObject -timeBuffer $timeBuffer -domain $domain -cacheType $cacheType
+        $validToken = Test-CachedTokenValidity -accessTokenObject $accessTokenObject -timeBuffer $timeBuffer -domain $domain -cacheType $cacheType -requestedScopes $scopes
         if ($validToken)
         {
             return $validToken

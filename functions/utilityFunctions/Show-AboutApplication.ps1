@@ -52,6 +52,18 @@ function Show-AboutApplication()
     if ($auth.delegated)
     {
         Write-Host "Authentication type: $($auth.AuthType)"
+        #display the application's scopes
+        Write-Host "Application scopes:"
+        foreach ($scope in $requiredScopes)
+        {
+            Write-Host "`tScope: $($scope.Scope)"
+            Write-Host "`tEndpoints:"
+            foreach ($endpoint in $scope.Endpoints)
+            {
+                Write-Host "`t`t$endpoint"
+            }
+            Write-Host "`tReason: $($scope.Reason)`n"
+        }                       
     }
     Write-Host "Auto Update enabled: $($settings.autoUpdate)" -ForegroundColor Cyan
     Write-Host "Update branch: $Release" -ForegroundColor Cyan

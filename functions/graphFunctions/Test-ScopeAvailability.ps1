@@ -7,15 +7,13 @@ function Test-ScopeAvailability()
         [Parameter(Mandatory = $false)]
         [array]$RequiredScopes = @(),
         [Parameter(Mandatory = $true)]
-        [hashtable]$AuthConfiguration,
-        [Parameter(Mandatory = $false)]
-        [array]$RequestedScopes = @()
+        [hashtable]$AuthConfiguration
     )
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Starting scope availability validation"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Starting scope availability validation" -logLevel "Information"
-    
+    $RequestedScopes = if ($AuthConfiguration.delegated -eq $true) { $AuthConfiguration.scope } else { @() }               
     # Define scopes that should be excluded from validation for non-delegated (application) authentication
     # These are OAuth/OIDC protocol scopes, not Microsoft Graph API scopes
     $excludedScopesForApplication = @(
@@ -42,7 +40,6 @@ function Test-ScopeAvailability()
     # Handle empty required scopes - if no scopes are required, all are available
     Write-Verbose "[$functionName] Checking if required scopes are specified (Count: $($RequiredScopes.Count))"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Required scopes count: $($RequiredScopes.Count)" -LogLevel "Debug"
-    
     if ($RequiredScopes.Count -eq 0)
     {
         Write-Verbose "[$functionName] No required scopes specified - returning success"
@@ -60,54 +57,104 @@ function Test-ScopeAvailability()
         Write-Log -LogFile $LogFile -Module $functionName -Message "Authentication type: $(if ($isDelegated) { 'Delegated' } else { 'Application' })" -LogLevel "Information"
         Write-Log -LogFile $LogFile -Module $functionName -Message "AuthConfiguration.Delegated value: $($AuthConfiguration.Delegated)" -LogLevel "Debug"
         
-        # Filter required scopes for application authentication - exclude OIDC protocol scopes
-        # These scopes only apply to delegated authentication and should not be validated for application auth
-        $filteredRequiredScopes = $RequiredScopes
-        if (-not $isDelegated)
-        {
-            $originalCount = $RequiredScopes.Count
-            $filteredRequiredScopes = $RequiredScopes | Where-Object { 
-                $scopeName = $_.Scope
-                $excludedScopesForApplication -notcontains $scopeName
-            }
-            $excludedFromRequired = $originalCount - $filteredRequiredScopes.Count
-            if ($excludedFromRequired -gt 0)
-            {
-                $excludedScopeNames = $RequiredScopes | Where-Object { 
-                    $excludedScopesForApplication -contains $_.Scope 
-                } | ForEach-Object { $_.Scope }
-                Write-Verbose "[$functionName] Excluded $excludedFromRequired OIDC scope(s) from required scopes for application auth: $($excludedScopeNames -join ', ')"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Excluded $excludedFromRequired OIDC scope(s) from required scopes: $($excludedScopeNames -join ', ')" -LogLevel "Information"
-            }
-            Write-Verbose "[$functionName] Filtered required scopes count for application auth: $($filteredRequiredScopes.Count)"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Required scopes after filtering: $($filteredRequiredScopes.Count)" -LogLevel "Debug"
+        # Filter required scopes - exclude OIDC protocol scopes for BOTH delegated and application auth
+        # These scopes (openid, profile, offline_access) are OAuth/OIDC protocol scopes, not Microsoft Graph API scopes
+        # They should NEVER be validated as "missing" because:
+        #   1. They're automatically granted during authentication flow
+        #   2. They're not Graph API permissions
+        #   3. They're filtered out of the available scopes list
+        # Therefore, we exclude them from the required scopes list to prevent false "missing scope" warnings
+        $originalCount = $RequiredScopes.Count
+        $filteredRequiredScopes = $RequiredScopes | Where-Object { 
+            $scopeName = $_.Scope
+            $excludedScopesForApplication -notcontains $scopeName
         }
+        $excludedFromRequired = $originalCount - $filteredRequiredScopes.Count
+        if ($excludedFromRequired -gt 0)
+        {
+            $excludedScopeNames = $RequiredScopes | Where-Object { 
+                $excludedScopesForApplication -contains $_.Scope 
+            } | ForEach-Object { $_.Scope }
+            $authTypeLabel = if ($isDelegated) { "delegated" } else { "application" }
+            Write-Verbose "[$functionName] Excluded $excludedFromRequired OIDC protocol scope(s) from required scopes for $authTypeLabel auth: $($excludedScopeNames -join ', ')"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Excluded $excludedFromRequired OIDC protocol scope(s) from required scopes for $authTypeLabel auth: $($excludedScopeNames -join ', ')" -LogLevel "Information"
+        }
+        Write-Verbose "[$functionName] Filtered required scopes count: $($filteredRequiredScopes.Count) (excluded OIDC protocol scopes)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Required scopes after filtering out OIDC protocol scopes: $($filteredRequiredScopes.Count)" -LogLevel "Debug"
         
         # Update RequiredScopes to use the filtered list
         $RequiredScopes = $filteredRequiredScopes
         if ($isDelegated)
         {
-            # For delegated authentication, use the scopes that were requested during authentication
+            # For delegated authentication, decode the JWT token to get ACTUAL granted scopes
+            # Important: We must check what was GRANTED (scp claim), not what was REQUESTED
             Write-Verbose "[$functionName] Processing delegated authentication scopes"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Using delegated authentication - checking requested scopes" -logLevel "Information"
-            $result.ScopeSource = "Delegated (Requested during authentication)"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Using delegated authentication - decoding JWT token to check granted scopes" -logLevel "Information"
+            $result.ScopeSource = "Delegated (JWT token 'scp' claim)"
             
-            # Get the scopes that were actually requested
-            Write-Verbose "[$functionName] Checking RequestedScopes parameter (Count: $($RequestedScopes.Count))"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "RequestedScopes count: $($RequestedScopes.Count)" -LogLevel "Debug"
-            
-            if ($RequestedScopes -and $RequestedScopes.Count -gt 0)
+            try
             {
-                $result.AvailableScopes = $RequestedScopes
-                Write-Verbose "[$functionName] Available delegated scopes: $($RequestedScopes -join ', ')"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Available delegated scopes: $($RequestedScopes -join ', ')" -LogLevel "Information"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Total delegated scopes available: $($RequestedScopes.Count)" -LogLevel "Debug"
+                Write-Verbose "[$functionName] Decoding JWT access token to extract granted scopes"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Attempting to decode JWT token for delegated auth" -LogLevel "Debug"
+                $decodedToken = DecodeJwtToken -Token $AccessToken -raw
+                Write-Verbose "[$functionName] Successfully decoded JWT token"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully decoded JWT token" -LogLevel "Information"
+                
+                # Extract scopes from the 'scp' claim (delegated permissions)
+                $tokenScopes = @()
+                Write-Verbose "[$functionName] Extracting scopes from JWT token 'scp' claim"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Extracting scopes from JWT token 'scp' claim" -LogLevel "Debug"
+                
+                if ($decodedToken.scp)
+                {
+                    # scp claim is a space-separated string for delegated auth
+                    $scpScopes = $decodedToken.scp -split ' ' | Where-Object { $_ -and $_.Trim() }
+                    $tokenScopes += $scpScopes
+                    Write-Verbose "[$functionName] Found $($scpScopes.Count) scopes in 'scp' claim: $($decodedToken.scp)"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Found scopes in 'scp' claim: $($decodedToken.scp)" -logLevel "Information"
+                }
+                else
+                {
+                    Write-Verbose "[$functionName] No 'scp' claim found in JWT token for delegated auth"
+                    Write-Warning "[$functionName] No 'scp' claim found in JWT token - this may indicate an issue with the token"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "No 'scp' claim found in JWT token" -LogLevel "Warning"
+                }
+                
+                # Filter out non-Graph scopes for delegated authentication
+                Write-Verbose "[$functionName] Filtering token scopes - excluding non-Graph scopes"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Filtering out excluded scopes: $($excludedScopesForApplication -join ', ')" -LogLevel "Debug"
+                
+                $unfilteredScopes = $tokenScopes
+                Write-Verbose "[$functionName] Unfiltered scopes count: $($unfilteredScopes.Count)"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Unfiltered scopes: $($unfilteredScopes -join ', ')" -LogLevel "Debug"
+                
+                # Exclude OAuth/OIDC protocol scopes that don't apply to Graph API
+                $filteredScopes = $unfilteredScopes | Where-Object { $excludedScopesForApplication -notcontains $_ }
+                
+                $excludedCount = $unfilteredScopes.Count - $filteredScopes.Count
+                if ($excludedCount -gt 0)
+                {
+                    $excludedItems = $unfilteredScopes | Where-Object { $excludedScopesForApplication -contains $_ }
+                    Write-Verbose "[$functionName] Excluded $excludedCount non-Graph scope(s): $($excludedItems -join ', ')"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Excluded $excludedCount non-Graph scope(s): $($excludedItems -join ', ')" -logLevel "Information"
+                }
+                else
+                {
+                    Write-Verbose "[$functionName] No scopes excluded from filtering"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "No scopes excluded - all scopes are Graph API scopes" -LogLevel "Debug"
+                }
+                
+                $result.AvailableScopes = @($filteredScopes | Sort-Object -Unique)
+                Write-Verbose "[$functionName] Available delegated scopes from token: $($result.AvailableScopes -join ', ')"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Available delegated scopes from token: $($result.AvailableScopes -join ', ')" -LogLevel "Information"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Total delegated scopes available: $($result.AvailableScopes.Count)" -LogLevel "Debug"
             }
-            else
+            catch
             {
-                Write-Verbose "[$functionName] No requested scopes provided for delegated authentication"
-                Write-Warning "[$functionName] No requested scopes provided for delegated authentication"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "No requested scopes provided for delegated authentication" -LogLevel "Warning"
+                Write-Verbose "[$functionName] Failed to decode JWT token for delegated auth: $($_.Exception.Message)"
+                Write-Error "[$functionName] Failed to decode JWT token for delegated auth: $($_.Exception.Message)"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to decode JWT token: $($_.Exception.Message)" -LogLevel "Error"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Exception details: $($_.Exception.GetType().FullName)" -LogLevel "Debug"
                 $result.AvailableScopes = @()
             }
         }
@@ -180,7 +227,7 @@ function Test-ScopeAvailability()
                     Write-Log -LogFile $LogFile -Module $functionName -Message "No scopes excluded - all scopes are Graph API scopes" -LogLevel "Debug"
                 }
                 
-                $result.AvailableScopes = $filteredScopes | Sort-Object -Unique
+                $result.AvailableScopes = @($filteredScopes | Sort-Object -Unique)
                 Write-Verbose "[$functionName] Available application scopes after filtering: $($result.AvailableScopes -join ', ')"
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Available application scopes: $($result.AvailableScopes -join ', ')" -LogLevel "Information"
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Total application scopes available: $($result.AvailableScopes.Count)" -LogLevel "Debug"
@@ -221,13 +268,11 @@ function Test-ScopeAvailability()
             Write-Verbose "[$functionName] Performing hierarchical scope comparison for: $scopeName"
             Write-Log -LogFile $LogFile -Module $functionName -Message "Invoking Test-ScopeHierarchy for scope: $scopeName" -LogLevel "Debug"
             $isAvailable = Test-ScopeHierarchy -RequiredScope $scopeName -AvailableScopes $result.AvailableScopes
-            
             if (-not $isAvailable)
             {
                 Write-Verbose "[$functionName] Scope NOT satisfied: $scopeName (no available scope satisfies this requirement)"
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Missing required scope: $scopeName (not satisfied by any available scope)" -LogLevel "Warning"
                 $missingScopes += $requiredScope
-                
                 # Add to unavailable functionality
                 $unavailableFunctionality += @{
                     Scope     = $scopeName
@@ -244,16 +289,13 @@ function Test-ScopeAvailability()
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Required scope satisfied: $scopeName" -LogLevel "Information"
             }
         }
-        
         Write-Verbose "[$functionName] Scope comparison complete - Missing: $($missingScopes.Count), Satisfied: $($RequiredScopes.Count - $missingScopes.Count)"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Scope comparison complete - Total checked: $scopeCheckCount, Missing: $($missingScopes.Count), Satisfied: $($RequiredScopes.Count - $missingScopes.Count)" -logLevel "Information"
-        
         Write-Verbose "[$functionName] Building result object"
         $result.MissingScopes = $missingScopes
         $result.UnavailableFunctionality = $unavailableFunctionality
         $result.HasAllRequiredScopes = $missingScopes.Count -eq 0
         Write-Log -LogFile $LogFile -Module $functionName -Message "Result object populated - HasAllRequiredScopes: $($result.HasAllRequiredScopes)" -LogLevel "Debug"
-        
         # Set recommended action based on authentication type and missing scopes
         Write-Verbose "[$functionName] Determining recommended action based on validation results"
         if ($result.HasAllRequiredScopes)
@@ -266,7 +308,6 @@ function Test-ScopeAvailability()
         {
             Write-Verbose "[$functionName] Some required scopes are missing - generating recommendations"
             Write-Log -LogFile $LogFile -Module $functionName -Message "Some required Microsoft Graph API scopes are missing." -LogLevel "Warning"
-            
             if ($isDelegated)
             {
                 $result.RecommendedAction = "Re-authenticate with additional scopes to enable full functionality."

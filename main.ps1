@@ -491,7 +491,6 @@ else
     Write-Verbose "[$scriptName] Checking for settings migration need."
     $migrationCheck = Invoke-SettingsMigration -RemoveJsonFiles -Force
 }
-# $migrationCheck = Invoke-SettingsMigration -Force
 write-log -logFile $logFile -module $scriptName -message "Migration needed: $($migrationCheck.migrationNeeded), Success: $($migrationCheck.success)" -LogLevel "Information"
 if ($migrationCheck.success -and $migrationCheck.migrationNeeded)
 {
@@ -625,7 +624,6 @@ else
         # Launch the first run wizard (pass Silent switch if testMode is active)
         $wizardResult = Start-FirstRunWizard -ConfigFile $configFile -SettingsFile $InitFile -StringsFile "$PWD\strings.psd1" -Silent:$testMode
     }
-    
     if ($wizardResult)
     {
         if (-not $testMode)
@@ -703,8 +701,6 @@ else
         Write-Verbose "[$scriptName] Menus count: $($menus.Count)"
         Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
         Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
-
-
     }
     else
     {
@@ -742,9 +738,11 @@ $auth = $configResult.Auth
 $globalSettings = $configResult.GlobalSettings
 $localSettings = $configResult.LocalSettings
 $requiredScopes = $configResult.RequiredScopes
+
 # Merge global and local settings into a single settings object
 Write-Verbose "[$scriptName] Merging global and local settings"
 $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+
 if ($settings.domain -ne $domain)
 {
     Write-Verbose "[$scriptName] Updating settings domain from $($settings.domain) to $domain"
@@ -1063,15 +1061,9 @@ if ($accessToken)
         {
             # Get the current requested scopes for delegated authentication
             Write-Log -logFile $LogFile -Module $scriptName -Message "Getting current requested scopes for delegated authentication" -LogLevel "Information"
-            $currentRequestedScopes = @()
-            if ($auth.Delegated -eq $true)
-            {
-                $currentRequestedScopes = $requiredScopes | ForEach-Object { $_.Scope }
-                Write-Log -LogFile $LogFile -Module $scriptName -Message "Delegated authentication - using required scopes as requested scopes" -LogLevel "Information"
-            }
             # Perform scope validation
             Write-Log -LogFile $LogFile -Module $scriptName -Message "Performing scope validation..." -LogLevel "Information"
-            $scopeValidation = Test-ScopeAvailability -AccessToken $accessToken -RequiredScopes $requiredScopes -AuthConfiguration $auth -RequestedScopes $currentRequestedScopes
+            $scopeValidation = Test-ScopeAvailability -AccessToken $accessToken -RequiredScopes $requiredScopes -AuthConfiguration $auth
             if ($scopeValidation.HasAllRequiredScopes)
             {
                 Write-Log -LogFile $LogFile -Module $scriptName -Message "All required Microsoft Graph scopes are available" -LogLevel "Information"
@@ -1097,7 +1089,7 @@ if ($accessToken)
                         Write-Log -LogFile $LogFile -Module $scriptName -Message "  - $($missingScope.Scope)`n    Impact: $($missingScope.Reason)" -LogLevel "Information"
                     }
                 }
-                Write-Host "`nRecommended action: $($scopeValidation.RecommendedAction)" -ForegroundColor Cyan
+                Write-Host "`nRecommended action:`n $($scopeValidation.RecommendedAction)" -ForegroundColor Cyan
                 Write-Log -LogFile $LogFile -Module $scriptName -Message "Recommended action: $($scopeValidation.RecommendedAction)" -LogLevel "Information"
                 # For delegated authentication, offer to request additional scopes
                 if ($auth.Delegated -eq $true -and -not ($auth.ForceNewToken -or $auth.ForceNewRefreshToken -or $auth.NoSaveRefreshToken))
@@ -1122,7 +1114,8 @@ if ($accessToken)
                         Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to obtain additional scopes: $($scopeRequest.ErrorMessage)" -LogLevel "Warning"
                     }
                 }
-            
+                Write-Host "Press any key to continue..."
+                $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
                 Write-Host ""
                 Write-Log -LogFile $LogFile -Module $scriptName -Message "Scope validation completed with $($scopeValidation.MissingScopes.Count) missing scopes" -LogLevel "Warning"
             }
