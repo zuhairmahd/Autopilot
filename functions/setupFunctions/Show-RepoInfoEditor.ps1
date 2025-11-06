@@ -56,12 +56,24 @@ function Show-RepoInfoEditor()
             return $false
         }
         
-        # Load current settings
-        $configData = Get-ConfigurationData -ConfigurationFile $SettingsFile
+        # Load current settings using Import-PowerShellDataFile
+        try
+        {
+            $configData = Import-PowerShellDataFile -Path $SettingsFile
+            Write-Log -LogFile $logFile -Module $functionName -Message "Settings file loaded successfully" -LogLevel "Information"
+            Write-Verbose "[$functionName] Settings file loaded successfully"
+        }
+        catch
+        {
+            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to load settings file: $($_.Exception.Message)" -LogLevel "Error"
+            Write-Warning "[$functionName] Failed to load settings file: $($_.Exception.Message)"
+            return $false
+        }
+        
         if ($null -eq $configData -or $null -eq $configData.globalSettings)
         {
-            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to load settings or globalSettings section not found" -LogLevel "Error"
-            Write-Warning "[$functionName] Failed to load settings or globalSettings section not found"
+            Write-Log -LogFile $logFile -Module $functionName -Message "globalSettings section not found" -LogLevel "Error"
+            Write-Warning "[$functionName] globalSettings section not found"
             return $false
         }
         
