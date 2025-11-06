@@ -800,7 +800,7 @@ function Get-ApplicationDefaults()
                     },
                     @{
                         description           = 'Edit repository information settings'
-                        name                  = 'Edit repository information'
+                        name                  = 'Change repository information'
                         blockType             = 'action'
                         includeInDisplayModes = @(
                             'full',
@@ -809,7 +809,7 @@ function Get-ApplicationDefaults()
                     },
                     @{
                         description           = 'Edit cache settings'
-                        name                  = 'Edit cache settings'
+                        name                  = 'Change cache settings'
                         blockType             = 'action'
                         includeInDisplayModes = @(
                             'full',

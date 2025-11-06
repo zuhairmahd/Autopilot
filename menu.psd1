@@ -415,7 +415,7 @@
             },
             @{
                 description           = 'Edit repository information settings'
-                name                  = 'Edit repository information'
+                name                  = 'Change repository information'
                 blockType             = 'action'
                 includeInDisplayModes = @(
                     'full',
@@ -423,8 +423,8 @@
                 )
             },
             @{
-                description           = 'Edit cache settings'
-                name                  = 'Edit cache settings'
+                description           = 'Change cache settings'
+                name                  = 'Change cache settings'
                 blockType             = 'action'
                 includeInDisplayModes = @(
                     'full',

@@ -2013,7 +2013,7 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings"
     }
 }
 
-$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Edit repository information" -Action {
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change repository information" -Action {
     Write-Host "Launching repository information editor..." -ForegroundColor Cyan
     Write-Host "These settings control repository URLs and paths used for updates." -ForegroundColor Gray
     $result = Show-RepoInfoEditor -SettingsFile $InitFile
@@ -2033,7 +2033,7 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Edit repository informati
     }
 }
 
-$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Edit cache settings" -Action {
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change cache settings" -Action {
     Write-Host "Launching cache settings editor..." -ForegroundColor Cyan
     Write-Host "These settings control caching behavior, expiration times, and size limits." -ForegroundColor Gray
     $result = Show-CacheSettingsEditor -SettingsFile $InitFile
