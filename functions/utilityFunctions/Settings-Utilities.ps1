@@ -140,7 +140,7 @@ function Get-FlattenedSettingsForProcessing()
                 $currentValue = $defaultValue 
             }
             
-            if ($defaultValue -is [hashtable] -or $defaultValue -is [PSCustomObject])
+            if ($defaultValue -is [hashtable] -or $defaultValue -is [PSCustomObject] -or $defaultValue -is [System.Collections.Specialized.OrderedDictionary])
             {
                 Write-Verbose "[$functionName] Processing nested settings for: $key"
                 write-log -logFile $logFile -module $functionName -message "Processing nested settings for: $key"
@@ -194,7 +194,7 @@ function Get-FlattenedSettingsForProcessing()
                 $currentValue = $defaultValue 
             }
             
-            if ($defaultValue -is [hashtable] -or $defaultValue -is [PSCustomObject])
+            if ($defaultValue -is [hashtable] -or $defaultValue -is [PSCustomObject] -or $defaultValue -is [System.Collections.Specialized.OrderedDictionary])
             {
                 # Process nested object recursively
                 $nestedSettings = Get-FlattenedSettingsForProcessing -SettingsTemplate $defaultValue -CurrentValues $currentValue -ExcludeSettings $ExcludeSettings

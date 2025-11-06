@@ -197,7 +197,7 @@ Describe "GetAutopilotProfile Function" -Tags 'Unit', 'Autopilot', 'GraphAPI', '
             
             # Verify cache contains the result
             $cacheKey = "autopilot:$testProfileName1|False"
-            $cachedData = Get-CachedData -CacheType 'Configuration' -Key $cacheKey -Settings $global:settings
+            $cachedData = Get-CachedData -CacheType 'Configuration' -Key $cacheKey -CacheSettings $global:cacheSettings
             $cachedData | Should -Not -BeNullOrEmpty
         }
         
@@ -244,8 +244,8 @@ Describe "GetAutopilotProfile Function" -Tags 'Unit', 'Autopilot', 'GraphAPI', '
             $exactCacheKey = "autopilot:$testProfileName1|False"
             $fuzzyCacheKey = "autopilot:Corporate|True"
             
-            $exactCache = Get-CachedData -CacheType 'Configuration' -Key $exactCacheKey -Settings $global:settings
-            $fuzzyCache = Get-CachedData -CacheType 'Configuration' -Key $fuzzyCacheKey -Settings $global:settings
+            $exactCache = Get-CachedData -CacheType 'Configuration' -Key $exactCacheKey -CacheSettings $global:cacheSettings
+            $fuzzyCache = Get-CachedData -CacheType 'Configuration' -Key $fuzzyCacheKey -CacheSettings $global:cacheSettings
             
             $exactCache | Should -Not -BeNullOrEmpty
             $fuzzyCache | Should -Not -BeNullOrEmpty
@@ -309,7 +309,7 @@ Describe "GetAutopilotProfile Function" -Tags 'Unit', 'Autopilot', 'GraphAPI', '
             
             # Verify cache (GetAll uses empty ProfileName)
             $cacheKey = "autopilot:|False"
-            $cachedData = Get-CachedData -CacheType 'Configuration' -Key $cacheKey -Settings $global:settings
+            $cachedData = Get-CachedData -CacheType 'Configuration' -Key $cacheKey -CacheSettings $global:cacheSettings
             $cachedData | Should -Not -BeNullOrEmpty
         }
         

@@ -689,6 +689,8 @@ else
         $globalSettings = $configResult.GlobalSettings
         $localSettings = $configResult.LocalSettings
         $requiredScopes = $configResult.RequiredScopes
+        $repoInfo = $configResult.RepoInfo
+        $global:cacheSettings = $configResult.CacheSettings            
         # Merge global and local settings into a single settings object
         Write-Verbose "[$scriptName] Merging global and local settings"
         $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
@@ -738,7 +740,9 @@ $auth = $configResult.Auth
 $globalSettings = $configResult.GlobalSettings
 $localSettings = $configResult.LocalSettings
 $requiredScopes = $configResult.RequiredScopes
-
+$repoInfo = $configResult.RepoInfo
+$global:cacheSettings = $configResult.CacheSettings            
+        
 # Merge global and local settings into a single settings object
 Write-Verbose "[$scriptName] Merging global and local settings"
 $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
@@ -834,36 +838,36 @@ else
 #region Define variables
 #define repo parameters
 $defaultBranch = 'master'
-$baseSourceURL = if ($settings.baseSourceURL)
+$baseSourceURL = if ($repoInfo.baseSourceURL)
 {
-    $settings.baseSourceURL
+    $repoInfo.baseSourceURL
 }
 else
 {
     'https://raw.githubusercontent.com'
 }
 Write-Log -logFile $LogFile -Module $scriptName -Message "Base source URL: $baseSourceURL" -LogLevel "Information"
-$baseURL = if ($settings.baseURL)
-{
-    $settings.baseURL
+$baseURL = if ($repoInfo.baseURL)
+{       
+    $repoInfo.baseURL
 }
 else
 {
     "https://www.github.com"
 }
 Write-Log -logFile $LogFile -Module $scriptName -Message "Base URL: $baseURL" -LogLevel "Information"
-$repoPath = if ($settings.repoPath)
+$repoPath = if ($repoInfo.repoPath)
 {
-    $settings.repoPath
+    $repoInfo.repoPath
 }
 else
 {
     'zuhairmahd'
 }
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Repository path: $repoPath" -LogLevel "Information"
-$repoName = if ($settings.repoName)
+$repoName = if ($repoInfo.repoName)
 {
-    $settings.repoName
+    $repoInfo.repoName
 }
 else
 {
@@ -1052,7 +1056,7 @@ if ($accessToken)
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Access token retrieved successfully." -LogLevel "Information"
     
     # Validate scope availability for the retrieved access token
-    if ($settings.validateScopes)
+    if ($settings.validateScopes -and $auth.delegated)
     {
         Write-Verbose "[$scriptName] Validating Microsoft Graph API scope availability..."
         Write-Host "Validating Microsoft Graph API scope availability..."
@@ -2012,6 +2016,47 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings"
         return $null
     }
 }
+
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change repository information" -Action {
+    Write-Host "Launching repository information editor..." -ForegroundColor Cyan
+    Write-Host "These settings control repository URLs and paths used for updates." -ForegroundColor Gray
+    $result = Show-RepoInfoEditor -SettingsFile $InitFile
+    if ($result -eq "Back" -or $result -eq "back")
+    {
+        Write-Verbose "[$scriptName] User selected Back from repository info editor"
+        return $returnValues.backoutText
+    }
+    elseif ($result -eq "Main Menu" -or $result -eq "main menu")
+    {
+        Write-Verbose "[$scriptName] User selected Main Menu from repository info editor"
+        return $returnValues.mainMenuText
+    }
+    else
+    {
+        return $result
+    }
+}
+
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change cache settings" -Action {
+    Write-Host "Launching cache settings editor..." -ForegroundColor Cyan
+    Write-Host "These settings control caching behavior, expiration times, and size limits." -ForegroundColor Gray
+    $result = Show-CacheSettingsEditor -SettingsFile $InitFile
+    if ($result -eq "Back" -or $result -eq "back")
+    {
+        Write-Verbose "[$scriptName] User selected Back from cache settings editor"
+        return $returnValues.backoutText
+    }
+    elseif ($result -eq "Main Menu" -or $result -eq "main menu")
+    {
+        Write-Verbose "[$scriptName] User selected Main Menu from cache settings editor"
+        return $returnValues.mainMenuText
+    }
+    else
+    {
+        return $result
+    }
+}
+
 #endregion Settings menu
 
 $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by Serial Number" -Submenu $serialNumberMenu

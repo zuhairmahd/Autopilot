@@ -52,18 +52,44 @@ function Show-AboutApplication()
     if ($auth.delegated)
     {
         Write-Host "Authentication type: $($auth.AuthType)"
-        #display the application's scopes
-        Write-Host "Application scopes:"
-        foreach ($scope in $requiredScopes)
+        
+        # Decode the access token to get actual granted scopes
+        try
         {
-            Write-Host "`tScope: $($scope.Scope)"
-            Write-Host "`tEndpoints:"
-            foreach ($endpoint in $scope.Endpoints)
+            $decodedToken = DecodeJwtToken -Token $accessToken -raw
+            $grantedScopes = @()
+            
+            if ($decodedToken.scp)
             {
-                Write-Host "`t`t$endpoint"
+                # Delegated auth - scp is space-separated string
+                $grantedScopes = $decodedToken.scp -split ' ' | Where-Object { $_ -and $_.Trim() }
+                Write-Verbose "[$FunctionName] Token has delegated scopes (scp): $($grantedScopes -join ', ')"
             }
-            Write-Host "`tReason: $($scope.Reason)`n"
-        }                       
+            elseif ($decodedToken.roles)
+            {
+                # Application auth - roles is array
+                $grantedScopes = $decodedToken.roles
+                Write-Verbose "[$FunctionName] Token has application scopes (roles): $($grantedScopes -join ', ')"
+            }
+            
+            if ($grantedScopes.Count -gt 0)
+            {
+                Write-Host "Acquired token scopes ($($grantedScopes.Count)):"
+                foreach ($scope in ($grantedScopes | Sort-Object))
+                {
+                    Write-Host "`t$scope"
+                }
+            }
+            else
+            {
+                Write-Host "No scopes found in token." -ForegroundColor Yellow
+            }
+        }
+        catch
+        {
+            Write-Verbose "[$FunctionName] Failed to decode access token: $($_.Exception.Message)"
+            Write-Host "Unable to decode token scopes: $($_.Exception.Message)" -ForegroundColor Yellow
+        }
     }
     Write-Host "Auto Update enabled: $($settings.autoUpdate)" -ForegroundColor Cyan
     Write-Host "Update branch: $Release" -ForegroundColor Cyan

@@ -71,7 +71,7 @@ function Get-EntraDirectoryObject()
     $cacheKey = "$EntityType|$EntityName|$FindSimilar"
     
     # Check unified cache first
-    $cachedResult = Get-CachedData -CacheType 'DirectoryObjects' -Key $cacheKey -Settings $global:settings
+    $cachedResult = Get-CachedData -CacheType 'DirectoryObjects' -Key $cacheKey -CacheSettings $global:cacheSettings
     if ($null -ne $cachedResult)
     {
         Write-Verbose "[$functionName] Found cached result for $EntityType`: $EntityName (FindSimilar: $FindSimilar)"
@@ -146,7 +146,7 @@ function Get-EntraDirectoryObject()
             SearchType = 'ExactMatch'
             EntityName = $EntityName
         }
-        $cached = Set-CachedData -CacheType 'DirectoryObjects' -Key $cacheKey -Data $result -Metadata $metadata -Settings $global:settings
+        $cached = Set-CachedData -CacheType 'DirectoryObjects' -Key $cacheKey -Data $result -Metadata $metadata -CacheSettings $global:cacheSettings
         if ($cached)
         {
             Write-Verbose "[$functionName] Cached exact match result for $EntityType`: $EntityName"
@@ -334,7 +334,7 @@ function Get-EntraDirectoryObject()
                 EntityName  = $EntityName
                 ResultCount = $filteredResponse.value.Count
             }
-            $cached = Set-CachedData -CacheType 'DirectoryObjects' -Key $cacheKey -Data $result -Metadata $metadata -Settings $global:settings
+            $cached = Set-CachedData -CacheType 'DirectoryObjects' -Key $cacheKey -Data $result -Metadata $metadata -CacheSettings $global:cacheSettings
             if ($cached)
             {
                 Write-Verbose "[$functionName] Cached fuzzy search result for $EntityType`: $EntityName"

@@ -151,7 +151,7 @@ Describe "Get-ConfigurationData Function" -Tags 'Unit', 'Configuration', 'Cache'
             
             # Verify cache contains the data
             $cacheKey = "config:$testFile"
-            $cachedData = Get-CachedData -CacheType 'Configuration' -Key $cacheKey -Settings $global:settings
+            $cachedData = Get-CachedData -CacheType 'Configuration' -Key $cacheKey -CacheSettings $global:cacheSettings
             
             $cachedData | Should -Not -BeNullOrEmpty
             $cachedData.ConfigData.cachedSetting | Should -Be "cachedValue"
@@ -181,7 +181,7 @@ Describe "Get-ConfigurationData Function" -Tags 'Unit', 'Configuration', 'Cache'
             # (we'll verify cache hit by checking if we get original value)
             # Note: Real implementation checks timestamp, but for this test we verify cache exists
             $cacheKey = "config:$testFile"
-            $cachedData = Get-CachedData -CacheType 'Configuration' -Key $cacheKey -Settings $global:settings
+            $cachedData = Get-CachedData -CacheType 'Configuration' -Key $cacheKey -CacheSettings $global:cacheSettings
             
             $cachedData | Should -Not -BeNullOrEmpty
             $cachedData.ConfigData.setting | Should -Be "originalValue"
@@ -289,7 +289,7 @@ Describe "Get-ConfigurationData Function" -Tags 'Unit', 'Configuration', 'Cache'
             
             # Verify cache does NOT contain the data
             $cacheKey = "config:$testFile"
-            $cachedData = Get-CachedData -CacheType 'Configuration' -Key $cacheKey -Settings $global:settings
+            $cachedData = Get-CachedData -CacheType 'Configuration' -Key $cacheKey -CacheSettings $global:cacheSettings
             
             $cachedData | Should -BeNullOrEmpty
         }

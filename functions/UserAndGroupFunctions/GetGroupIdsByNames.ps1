@@ -81,7 +81,7 @@ function GetGroupIdsByNames()
             {
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Checking cache for ID: $id" -LogLevel "Verbose"
                 $cacheKey = "group:id:$id"
-                $cachedName = Get-CachedData -CacheType 'DirectoryObjects' -Key $cacheKey -Settings $global:settings
+                $cachedName = Get-CachedData -CacheType 'DirectoryObjects' -Key $cacheKey -CacheSettings $global:cacheSettings
                 if ($null -ne $cachedName)
                 {
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Found ID in cache: $id" -LogLevel "Verbose"
@@ -102,7 +102,7 @@ function GetGroupIdsByNames()
             {
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Checking cache for Name: $name" -LogLevel "Verbose"
                 $cacheKey = "group:name:$($name.ToLower())"
-                $cachedId = Get-CachedData -CacheType 'DirectoryObjects' -Key $cacheKey -Settings $global:settings
+                $cachedId = Get-CachedData -CacheType 'DirectoryObjects' -Key $cacheKey -CacheSettings $global:cacheSettings
                 if ($null -ne $cachedId)
                 {
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Found Name in cache: $name" -LogLevel "Verbose"
@@ -177,9 +177,9 @@ function GetGroupIdsByNames()
                             }
                             
                             # Cache ID -> Name mapping
-                            Set-CachedData -CacheType 'DirectoryObjects' -Key $idKey -Data $group.displayName -Metadata $metadata -Settings $global:settings | Out-Null
+                            Set-CachedData -CacheType 'DirectoryObjects' -Key $idKey -Data $group.displayName -Metadata $metadata -CacheSettings $global:cacheSettings | Out-Null
                             # Cache Name -> ID mapping
-                            Set-CachedData -CacheType 'DirectoryObjects' -Key $nameKey -Data $group.id.ToLower() -Metadata $metadata -Settings $global:settings | Out-Null
+                            Set-CachedData -CacheType 'DirectoryObjects' -Key $nameKey -Data $group.id.ToLower() -Metadata $metadata -CacheSettings $global:cacheSettings | Out-Null
                             
                             # Add to result if it was requested
                             foreach ($item in $missingItems)

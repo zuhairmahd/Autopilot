@@ -44,7 +44,7 @@ function Get-ApplicationDefaults()
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [ValidateSet('Settings', 'Auth', 'Global', 'Domain', 'Menus', 'Strings', 'requiredScopes', 'Overwrite', 'All')]
+        [ValidateSet('Settings', 'Auth', 'Global', 'Domain', 'Menus', 'Strings', 'requiredScopes', 'cacheSettings', 'repoInfo', 'Overwrite', 'All')]
         [string]$DefaultType,
         [string]$DomainName,
         [string]$Version
@@ -147,7 +147,36 @@ function Get-ApplicationDefaults()
             operatingSystem              = "Windows"
             autoUpdate                   = $true
         }
-        
+
+        #cache settings defaults - single source of truth   
+        cacheSettings  = [ordered]@{
+            enabled                  = $true
+            defaultExpirationMinutes = 15
+            maxCacheSize             = 1000
+            cacheTypes               = [ordered]@{
+                Configuration    = [ordered]@{
+                    enabled           = $true
+                    expirationMinutes = 60
+                }
+                DirectoryObjects = [ordered]@{
+                    enabled           = $true
+                    expirationMinutes = 15
+                }
+                Devices          = [ordered]@{
+                    enabled           = $true
+                    expirationMinutes = 15
+                }
+            }
+        }
+
+        # Repository information defaults - single source of truth  
+        repoInfo       = [ordered]@{
+            repoName      = 'Autopilot'
+            baseSourceURL = 'https://raw.githubusercontent.com'
+            baseURL       = 'https://www.github.com'
+            repoPath      = 'zuhairmahd'
+        }
+    
         # Domain template defaults - single source of truth for domain structure
         Domain         = [ordered]@{
             groupsToInclude                 = @()
@@ -797,7 +826,25 @@ function Get-ApplicationDefaults()
                             'full',
                             'admin'
                         )
-                    }
+                    },
+                    @{
+                        description           = 'Edit repository information settings'
+                        name                  = 'Change repository information'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin'
+                        )
+                    },
+                    @{
+                        description           = 'Edit cache settings'
+                        name                  = 'Change cache settings'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin'
+                        )
+                    }            
                 )
                 type                  = 'static'
                 includeInDisplayModes = @(
@@ -1414,6 +1461,8 @@ function Get-ApplicationDefaults()
         description    = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
         version        = $Version
         auth           = $defaults.Auth
+        cacheSettings  = $defaults.cacheSettings
+        repoInfo       = $defaults.repoInfo 
         requiredScopes = $defaults.RequiredScopes
         globalSettings = $defaults.Global
     }
@@ -1453,11 +1502,25 @@ function Get-ApplicationDefaults()
         }
         'Global'
         {
-            Write-Verbose "[$functionName] Returning global defaults"
+            Write-Verbose "[$functionName] Returning global settings defaults"
             $result = $defaults.Global
             $script:defaultsCache[$cacheKey] = $result
             return $result
         }
+        'cacheSettings'
+        {
+            Write-Verbose "[$functionName] Returning cache settings defaults"
+            $result = $defaults.cacheSettings
+            $script:defaultsCache[$cacheKey] = $result
+            return $result
+        }
+        'repoInfo'
+        {
+            Write-Verbose "[$functionName] Returning repository information defaults"
+            $result = $defaults.repoInfo
+            $script:defaultsCache[$cacheKey] = $result
+            return $result
+        }                                   
         'Domain'
         {
             Write-Verbose "[$functionName] Returning domain template defaults for: $DomainName"
@@ -1562,3 +1625,33 @@ function Get-DomainDefaults()
     
     return Get-ApplicationDefaults -DefaultType "Domain" -DomainName $DomainName
 }
+
+function Get-CacheDefaults()
+{
+    <#
+    .SYNOPSIS
+        Returns the default cache settings structure.
+    
+    .DESCRIPTION
+        Wrapper function that calls Get-ApplicationDefaults for cache settings.
+    #>
+    [CmdletBinding()]
+    param()
+    
+    return Get-ApplicationDefaults -DefaultType "cacheSettings"
+}                                                       
+
+function Get-RepoInfoDefaults()
+{
+    <#
+    .SYNOPSIS
+        Returns the default repository information structure.
+    
+    .DESCRIPTION
+        Wrapper function that calls Get-ApplicationDefaults for repository information.
+    #>
+    [CmdletBinding()]
+    param()
+    
+    return Get-ApplicationDefaults -DefaultType "repoInfo"
+}                                   

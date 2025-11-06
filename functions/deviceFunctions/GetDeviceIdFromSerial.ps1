@@ -13,7 +13,7 @@ function GetDeviceIdFromSerial()
     
     # Check unified cache first
     $cacheKey = "deviceid:$($SerialNumber.ToLower())"
-    $cachedDeviceId = Get-CachedData -CacheType 'Devices' -Key $cacheKey -Settings $global:settings
+    $cachedDeviceId = Get-CachedData -CacheType 'Devices' -Key $cacheKey -CacheSettings $global:cacheSettings
     
     if ($null -ne $cachedDeviceId)
     {
@@ -59,7 +59,7 @@ function GetDeviceIdFromSerial()
             DeviceType   = 'ManagedDevice'
             CachedAt     = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
         }
-        [void](Set-CachedData -CacheType 'Devices' -Key $cacheKey -Data $device -Metadata $metadata -Settings $global:settings)
+        [void](Set-CachedData -CacheType 'Devices' -Key $cacheKey -Data $device -Metadata $metadata -CacheSettings $global:cacheSettings)
         Write-Verbose "[$functionName] Cached device ID for serial: $SerialNumber using unified cache"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cached device ID for serial: $SerialNumber using unified cache" -LogLevel "Verbose"
     }
@@ -68,7 +68,7 @@ function GetDeviceIdFromSerial()
         Write-Verbose "[$functionName] Device with serial number $SerialNumber not found."
         # Cache empty string as sentinel for not-found devices to avoid repeated API calls
         $cacheKey = "deviceid:$($SerialNumber.ToLower())"
-        [void](Set-CachedData -CacheType 'Devices' -Key $cacheKey -Data "" -Metadata @{ SerialNumber = $SerialNumber; NotFound = $true } -Settings $global:settings)
+        [void](Set-CachedData -CacheType 'Devices' -Key $cacheKey -Data "" -Metadata @{ SerialNumber = $SerialNumber; NotFound = $true } -CacheSettings $global:cacheSettings)
     }
     return $device
 }

@@ -38,17 +38,20 @@ Describe "Get-CachedDeviceEnrollmentStatus Function" -Tags 'Unit', 'Device', 'En
         $global:LogFile = Join-Path $tempPath "test-deviceenrollment.log"
         
         # Initialize cache settings
-        $global:settings = @{
-            cacheSettings = @{
-                enabled                  = $true
-                defaultExpirationMinutes = 15
-                maxCacheSize             = 1000
-                cacheTypes               = @{
-                    Configuration    = @{ enabled = $true; expirationMinutes = 60 }
-                    DirectoryObjects = @{ enabled = $true; expirationMinutes = 15 }
-                    Devices          = @{ enabled = $true; expirationMinutes = 15 }
-                }
+        $global:cacheSettings = @{
+            enabled                  = $true
+            defaultExpirationMinutes = 15
+            maxCacheSize             = 1000
+            cacheTypes               = @{
+                Configuration    = @{ enabled = $true; expirationMinutes = 60 }
+                DirectoryObjects = @{ enabled = $true; expirationMinutes = 15 }
+                Devices          = @{ enabled = $true; expirationMinutes = 15 }
             }
+        }
+        
+        # Also set $global:settings for function parameter compatibility
+        $global:settings = @{
+            cacheSettings = $global:cacheSettings
         }
         
         # Test data
@@ -82,7 +85,7 @@ Describe "Get-CachedDeviceEnrollmentStatus Function" -Tags 'Unit', 'Device', 'En
     Context "Basic Enrollment State Retrieval" {
         
         It "Should fetch enrollment state from API" {
-            $result = Get-CachedDeviceEnrollmentStatus -SerialNumber $testSerialNumber -AccessToken $mockAccessToken -Settings $global:settings
+            $result = Get-CachedDeviceEnrollmentStatus -SerialNumber $testSerialNumber -AccessToken $mockAccessToken
             
             $result | Should -Not -BeNullOrEmpty
             $result.enrollmentState | Should -Be "Enrolled"
@@ -90,7 +93,7 @@ Describe "Get-CachedDeviceEnrollmentStatus Function" -Tags 'Unit', 'Device', 'En
         }
         
         It "Should return null for non-existent serial number" {
-            $result = Get-CachedDeviceEnrollmentStatus -SerialNumber "NONEXISTENT-SERIAL" -AccessToken $mockAccessToken -Settings $global:settings
+            $result = Get-CachedDeviceEnrollmentStatus -SerialNumber "NONEXISTENT-SERIAL" -AccessToken $mockAccessToken
             
             $result | Should -BeNullOrEmpty
         }
@@ -100,12 +103,12 @@ Describe "Get-CachedDeviceEnrollmentStatus Function" -Tags 'Unit', 'Device', 'En
         
         It "Should cache enrollment state after first retrieval" {
             # First call - should hit API
-            $result = Get-CachedDeviceEnrollmentStatus -SerialNumber $testSerialNumber -AccessToken $mockAccessToken -Settings $global:settings
+            $result = Get-CachedDeviceEnrollmentStatus -SerialNumber $testSerialNumber -AccessToken $mockAccessToken
             $result | Should -Not -BeNullOrEmpty
             
             # Verify cache contains the data
             $cacheKey = "enrollment:$testSerialNumber"
-            $cachedData = Get-CachedData -CacheType 'Devices' -Key $cacheKey -Settings $global:settings
+            $cachedData = Get-CachedData -CacheType 'Devices' -Key $cacheKey -CacheSettings $global:cacheSettings
             
             $cachedData | Should -Not -BeNullOrEmpty
             $cachedData.enrollmentState | Should -Be "Enrolled"
@@ -113,7 +116,7 @@ Describe "Get-CachedDeviceEnrollmentStatus Function" -Tags 'Unit', 'Device', 'En
         
         It "Should use cached enrollment state on subsequent calls" {
             # Prime the cache
-            $null = Get-CachedDeviceEnrollmentStatus -SerialNumber $testSerialNumber -AccessToken $mockAccessToken -Settings $global:settings
+            $null = Get-CachedDeviceEnrollmentStatus -SerialNumber $testSerialNumber -AccessToken $mockAccessToken
             
             # Remove the API mock to prove it doesn't get called
             Mock -CommandName Get-DeviceEnrollmentStatus -MockWith { 
@@ -121,7 +124,7 @@ Describe "Get-CachedDeviceEnrollmentStatus Function" -Tags 'Unit', 'Device', 'En
             }
             
             # Second call - should use cache
-            $result = Get-CachedDeviceEnrollmentStatus -SerialNumber $testSerialNumber -AccessToken $mockAccessToken -Settings $global:settings
+            $result = Get-CachedDeviceEnrollmentStatus -SerialNumber $testSerialNumber -AccessToken $mockAccessToken
             
             $result | Should -Not -BeNullOrEmpty
             $result.enrollmentState | Should -Be "Enrolled"
@@ -129,7 +132,7 @@ Describe "Get-CachedDeviceEnrollmentStatus Function" -Tags 'Unit', 'Device', 'En
         
         It "Should refresh cache when -flushCache is specified" {
             # Prime the cache with initial data
-            $null = Get-CachedDeviceEnrollmentStatus -SerialNumber $testSerialNumber -AccessToken $mockAccessToken -Settings $global:settings
+            $null = Get-CachedDeviceEnrollmentStatus -SerialNumber $testSerialNumber -AccessToken $mockAccessToken
             
             # Mock returns updated enrollment state
             Mock -CommandName Get-DeviceEnrollmentStatus -MockWith {
@@ -142,7 +145,7 @@ Describe "Get-CachedDeviceEnrollmentStatus Function" -Tags 'Unit', 'Device', 'En
             }
             
             # Call with flushCache - should bypass cache and get new data
-            $result = Get-CachedDeviceEnrollmentStatus -SerialNumber $testSerialNumber -AccessToken $mockAccessToken -Settings $global:settings -flushCache
+            $result = Get-CachedDeviceEnrollmentStatus -SerialNumber $testSerialNumber -AccessToken $mockAccessToken -flushCache
             
             $result | Should -Not -BeNullOrEmpty
             $result.enrollmentState | Should -Be "Updated"
@@ -151,13 +154,13 @@ Describe "Get-CachedDeviceEnrollmentStatus Function" -Tags 'Unit', 'Device', 'En
         
         It "Should not cache null/empty results" {
             # Call with non-existent serial
-            $result = Get-CachedDeviceEnrollmentStatus -SerialNumber "NONEXISTENT" -AccessToken $mockAccessToken -Settings $global:settings
+            $result = Get-CachedDeviceEnrollmentStatus -SerialNumber "NONEXISTENT" -AccessToken $mockAccessToken
             
             $result | Should -BeNullOrEmpty
             
             # Verify cache does NOT contain entry
             $cacheKey = "enrollment:NONEXISTENT"
-            $cachedData = Get-CachedData -CacheType 'Devices' -Key $cacheKey -Settings $global:settings
+            $cachedData = Get-CachedData -CacheType 'Devices' -Key $cacheKey -CacheSettings $global:cacheSettings
             
             $cachedData | Should -BeNullOrEmpty
         }
@@ -167,7 +170,7 @@ Describe "Get-CachedDeviceEnrollmentStatus Function" -Tags 'Unit', 'Device', 'En
         
         It "Should store serial number in cache metadata" {
             # Fetch and cache enrollment state
-            $null = Get-CachedDeviceEnrollmentStatus -SerialNumber $testSerialNumber -AccessToken $mockAccessToken -Settings $global:settings
+            $null = Get-CachedDeviceEnrollmentStatus -SerialNumber $testSerialNumber -AccessToken $mockAccessToken
             
             # Access cache entry directly to check metadata
             $cacheKey = "enrollment:$testSerialNumber"
@@ -183,7 +186,7 @@ Describe "Get-CachedDeviceEnrollmentStatus Function" -Tags 'Unit', 'Device', 'En
         
         It "Should respect cache expiration settings" {
             # First call - populate cache
-            $result1 = Get-CachedDeviceEnrollmentStatus -SerialNumber $testSerialNumber -AccessToken $mockAccessToken -Settings $global:settings
+            $result1 = Get-CachedDeviceEnrollmentStatus -SerialNumber $testSerialNumber -AccessToken $mockAccessToken
             $result1 | Should -Not -BeNullOrEmpty
             
             # Manually expire the cache entry by setting old timestamp
@@ -207,7 +210,7 @@ Describe "Get-CachedDeviceEnrollmentStatus Function" -Tags 'Unit', 'Device', 'En
             }
             
             # Second call - should detect expiration and call API
-            $result2 = Get-CachedDeviceEnrollmentStatus -SerialNumber $testSerialNumber -AccessToken $mockAccessToken -Settings $global:settings
+            $result2 = Get-CachedDeviceEnrollmentStatus -SerialNumber $testSerialNumber -AccessToken $mockAccessToken
             
             $result2.enrollmentState | Should -Be "RefreshedAfterExpiration"
         }
@@ -241,15 +244,15 @@ Describe "Get-CachedDeviceEnrollmentStatus Function" -Tags 'Unit', 'Device', 'En
             }
             
             # Fetch both
-            $result1 = Get-CachedDeviceEnrollmentStatus -SerialNumber $serial1 -AccessToken $mockAccessToken -Settings $global:settings
-            $result2 = Get-CachedDeviceEnrollmentStatus -SerialNumber $serial2 -AccessToken $mockAccessToken -Settings $global:settings
+            $result1 = Get-CachedDeviceEnrollmentStatus -SerialNumber $serial1 -AccessToken $mockAccessToken
+            $result2 = Get-CachedDeviceEnrollmentStatus -SerialNumber $serial2 -AccessToken $mockAccessToken
             
             # Verify both are cached independently
             $result1.enrollmentState | Should -Be "Enrolled"
             $result2.enrollmentState | Should -Be "Pending"
             
-            $cache1 = Get-CachedData -CacheType 'Devices' -Key "enrollment:$serial1" -Settings $global:settings
-            $cache2 = Get-CachedData -CacheType 'Devices' -Key "enrollment:$serial2" -Settings $global:settings
+            $cache1 = Get-CachedData -CacheType 'Devices' -Key "enrollment:$serial1" -CacheSettings $global:cacheSettings
+            $cache2 = Get-CachedData -CacheType 'Devices' -Key "enrollment:$serial2" -CacheSettings $global:cacheSettings
             
             $cache1.enrollmentState | Should -Be "Enrolled"
             $cache2.enrollmentState | Should -Be "Pending"
@@ -263,7 +266,7 @@ Describe "Get-CachedDeviceEnrollmentStatus Function" -Tags 'Unit', 'Device', 'En
                 throw "API error"
             }
             
-            { Get-CachedDeviceEnrollmentStatus -SerialNumber $testSerialNumber -AccessToken $mockAccessToken -Settings $global:settings } |
+            { Get-CachedDeviceEnrollmentStatus -SerialNumber $testSerialNumber -AccessToken $mockAccessToken } |
                 Should -Throw
         }
     }
@@ -283,16 +286,25 @@ Describe "Get-CachedDeviceEnrollmentStatus Function" -Tags 'Unit', 'Device', 'En
                 }
             }
             
-            $result = Get-CachedDeviceEnrollmentStatus -SerialNumber $testSerialNumber -AccessToken $mockAccessToken -Settings $disabledSettings
+            # Temporarily override global cache settings
+            $originalSettings = $global:cacheSettings
+            $global:cacheSettings = $disabledSettings.cacheSettings
             
-            $result | Should -Not -BeNullOrEmpty
-            $result.enrollmentState | Should -Be "Enrolled"
-            
-            # Verify nothing was cached
-            $cacheKey = "enrollment:$testSerialNumber"
-            $cachedData = Get-CachedData -CacheType 'Devices' -Key $cacheKey -Settings $disabledSettings
-            
-            $cachedData | Should -BeNullOrEmpty
+            try {
+                $result = Get-CachedDeviceEnrollmentStatus -SerialNumber $testSerialNumber -AccessToken $mockAccessToken
+                
+                $result | Should -Not -BeNullOrEmpty
+                $result.enrollmentState | Should -Be "Enrolled"
+                
+                # Verify nothing was cached
+                $cacheKey = "enrollment:$testSerialNumber"
+                $cachedData = Get-CachedData -CacheType 'Devices' -Key $cacheKey -CacheSettings $global:cacheSettings
+                
+                $cachedData | Should -BeNullOrEmpty
+            }
+            finally {
+                $global:cacheSettings = $originalSettings
+            }
         }
     }
 }

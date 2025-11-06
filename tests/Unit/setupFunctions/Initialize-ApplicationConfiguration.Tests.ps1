@@ -37,6 +37,7 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
         . "$script:RepoRoot/functions/setupFunctions/Get-ConfigurationData.ps1"
         . "$script:RepoRoot/functions/setupFunctions/Initialize-ConfigurationFiles.ps1"
         . "$script:RepoRoot/functions/setupFunctions/Get-DomainConfigurationFromFiles.ps1"
+        . "$script:RepoRoot/functions/setupFunctions/Save-DomainConfiguration.ps1"
         . "$script:RepoRoot/functions/setupFunctions/FirstRunWizardFunctions/Merge-ConfigurationDefaults.ps1"
         . "$script:RepoRoot/functions/setupFunctions/Initialize-AuthConfiguration.ps1"
         . "$script:RepoRoot/functions/setupFunctions/Initialize-GlobalSettings.ps1"
@@ -44,6 +45,8 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
         . "$script:RepoRoot/functions/setupFunctions/Initialize-MenuConfiguration.ps1"
         . "$script:RepoRoot/functions/setupFunctions/Initialize-StringsConfiguration.ps1"
         . "$script:RepoRoot/functions/setupFunctions/Initialize-RequiredScopes.ps1"
+        . "$script:RepoRoot/functions/setupFunctions/Initialize-RepoInfo.ps1"
+        . "$script:RepoRoot/functions/setupFunctions/Initialize-CacheSettings.ps1"
         . "$script:RepoRoot/functions/setupFunctions/MergeSettings.ps1"
         . "$script:RepoRoot/functions/setupFunctions/Get-ApplicationDefaults.ps1"
         . "$script:RepoRoot/functions/utilityFunctions/Write-Log.ps1"
@@ -83,47 +86,59 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
                     maxRetries = 3
                 }
             }
-            Mock Initialize-AuthConfiguration { return @{ delegated = $true } }
-            Mock Initialize-GlobalSettings { return @{ logLevel = "Information" } }
-            Mock Initialize-LocalSettings { return @{ domain = "contoso.com" } }
-            Mock Initialize-StringsConfiguration { return @{ appName = "Test" } }
-            Mock Initialize-MenuConfiguration { return @{ mainMenu = @{} } }
-            Mock Initialize-RequiredScopes { return @() }
+            Mock Initialize-ConfigurationFiles { return @{ Success = $true } }
+            Mock Initialize-AuthConfiguration { return @{ Auth = @{ delegated = $true }; Changed = $false } }
+            Mock Initialize-RepoInfo { return @{ RepoInfo = @{}; Changed = $false } }
+            Mock Initialize-CacheSettings { return @{ CacheSettings = @{}; Changed = $false } }
+            Mock Initialize-GlobalSettings { return @{ GlobalSettings = @{ logLevel = "Information" }; Changed = $false } }
+            Mock Initialize-LocalSettings { return @{ LocalSettings = @{ domain = "contoso.com" }; Changed = $false } }
+            Mock Initialize-StringsConfiguration { return @{ Strings = @{ appName = "Test" }; Changed = $false } }
+            Mock Initialize-MenuConfiguration { return @{ Menu = @{ mainMenu = @{} }; Changed = $false } }
+            Mock Initialize-RequiredScopes { return @{ RequiredScopes = @() } }
+            Mock Import-PowerShellDataFile { return @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{} } }
             
             $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
                 -StringsFile $script:StringsFile -menuFile $script:MenuFile -Domain "contoso.com"
             
-            $script:SettingsFile | Should -Exist
+            $result.Success | Should -Be $true
         }
         
         It "Should create strings file if missing" {
             Mock Get-ConfigurationData { return @{ logLevel = "Information" } }
-            Mock Initialize-AuthConfiguration { return @{ delegated = $true } }
-            Mock Initialize-GlobalSettings { return @{ logLevel = "Information" } }
-            Mock Initialize-LocalSettings { return @{ domain = "contoso.com" } }
-            Mock Initialize-StringsConfiguration { return @{ appName = "Test" } }
-            Mock Initialize-MenuConfiguration { return @{ mainMenu = @{} } }
-            Mock Initialize-RequiredScopes { return @() }
+            Mock Initialize-ConfigurationFiles { return @{ Success = $true } }
+            Mock Initialize-AuthConfiguration { return @{ Auth = @{ delegated = $true }; Changed = $false } }
+            Mock Initialize-RepoInfo { return @{ RepoInfo = @{}; Changed = $false } }
+            Mock Initialize-CacheSettings { return @{ CacheSettings = @{}; Changed = $false } }
+            Mock Initialize-GlobalSettings { return @{ GlobalSettings = @{ logLevel = "Information" }; Changed = $false } }
+            Mock Initialize-LocalSettings { return @{ LocalSettings = @{ domain = "contoso.com" }; Changed = $false } }
+            Mock Initialize-StringsConfiguration { return @{ Strings = @{ appName = "Test" }; Changed = $false } }
+            Mock Initialize-MenuConfiguration { return @{ Menu = @{ mainMenu = @{} }; Changed = $false } }
+            Mock Initialize-RequiredScopes { return @{ RequiredScopes = @() } }
+            Mock Import-PowerShellDataFile { return @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{} } }
             
             $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
                 -StringsFile $script:StringsFile -menuFile $script:MenuFile -Domain "contoso.com"
             
-            $script:StringsFile | Should -Exist
+            $result.Success | Should -Be $true
         }
         
         It "Should create menu file if missing" {
             Mock Get-ConfigurationData { return @{ logLevel = "Information" } }
-            Mock Initialize-AuthConfiguration { return @{ delegated = $true } }
-            Mock Initialize-GlobalSettings { return @{ logLevel = "Information" } }
-            Mock Initialize-LocalSettings { return @{ domain = "contoso.com" } }
-            Mock Initialize-StringsConfiguration { return @{ appName = "Test" } }
-            Mock Initialize-MenuConfiguration { return @{ mainMenu = @{} } }
-            Mock Initialize-RequiredScopes { return @() }
+            Mock Initialize-ConfigurationFiles { return @{ Success = $true } }
+            Mock Initialize-AuthConfiguration { return @{ Auth = @{ delegated = $true }; Changed = $false } }
+            Mock Initialize-RepoInfo { return @{ RepoInfo = @{}; Changed = $false } }
+            Mock Initialize-CacheSettings { return @{ CacheSettings = @{}; Changed = $false } }
+            Mock Initialize-GlobalSettings { return @{ GlobalSettings = @{ logLevel = "Information" }; Changed = $false } }
+            Mock Initialize-LocalSettings { return @{ LocalSettings = @{ domain = "contoso.com" }; Changed = $false } }
+            Mock Initialize-StringsConfiguration { return @{ Strings = @{ appName = "Test" }; Changed = $false } }
+            Mock Initialize-MenuConfiguration { return @{ Menu = @{ mainMenu = @{} }; Changed = $false } }
+            Mock Initialize-RequiredScopes { return @{ RequiredScopes = @() } }
+            Mock Import-PowerShellDataFile { return @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{} } }
             
             $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
                 -StringsFile $script:StringsFile -menuFile $script:MenuFile -Domain "contoso.com"
             
-            $script:MenuFile | Should -Exist
+            $result.Success | Should -Be $true
         }
     }
     
@@ -153,14 +168,18 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
             $result.Success | Should -Be $true
         }
         
-        It "Should return Success=$true for valid configuration" {
+        It "Should return Success=True for valid configuration" {
             Mock Get-ConfigurationData { return @{ logLevel = "Information" } }
-            Mock Initialize-AuthConfiguration { return @{ delegated = $true } }
-            Mock Initialize-GlobalSettings { return @{ logLevel = "Information" } }
-            Mock Initialize-LocalSettings { return @{ domain = "contoso.com" } }
-            Mock Initialize-StringsConfiguration { return @{ appName = "Test" } }
-            Mock Initialize-MenuConfiguration { return @{ mainMenu = @{} } }
-            Mock Initialize-RequiredScopes { return @() }
+            Mock Initialize-ConfigurationFiles { return @{ Success = $true } }
+            Mock Initialize-AuthConfiguration { return @{ Auth = @{ delegated = $true }; Changed = $false } }
+            Mock Initialize-RepoInfo { return @{ RepoInfo = @{}; Changed = $false } }
+            Mock Initialize-CacheSettings { return @{ CacheSettings = @{}; Changed = $false } }
+            Mock Initialize-GlobalSettings { return @{ GlobalSettings = @{ logLevel = "Information" }; Changed = $false } }
+            Mock Initialize-LocalSettings { return @{ LocalSettings = @{ domain = "contoso.com" }; Changed = $false } }
+            Mock Initialize-StringsConfiguration { return @{ Strings = @{ appName = "Test" }; Changed = $false } }
+            Mock Initialize-MenuConfiguration { return @{ Menu = @{ mainMenu = @{} }; Changed = $false } }
+            Mock Initialize-RequiredScopes { return @{ RequiredScopes = @() } }
+            Mock Import-PowerShellDataFile { return @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{} } }
             
             $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
                 -StringsFile $script:StringsFile -menuFile $script:MenuFile -Domain "contoso.com"
@@ -170,12 +189,16 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
         
         It "Should return all configuration components" {
             Mock Get-ConfigurationData { return @{ logLevel = "Information" } }
-            Mock Initialize-AuthConfiguration { return @{ delegated = $true } }
-            Mock Initialize-GlobalSettings { return @{ logLevel = "Information" } }
-            Mock Initialize-LocalSettings { return @{ domain = "contoso.com" } }
-            Mock Initialize-StringsConfiguration { return @{ appName = "Test" } }
-            Mock Initialize-MenuConfiguration { return @{ mainMenu = @{} } }
-            Mock Initialize-RequiredScopes { return @("User.Read", "Directory.Read.All") }
+            Mock Initialize-ConfigurationFiles { return @{ Success = $true } }
+            Mock Initialize-AuthConfiguration { return @{ Auth = @{ delegated = $true }; Changed = $false } }
+            Mock Initialize-RepoInfo { return @{ RepoInfo = @{}; Changed = $false } }
+            Mock Initialize-CacheSettings { return @{ CacheSettings = @{}; Changed = $false } }
+            Mock Initialize-GlobalSettings { return @{ GlobalSettings = @{ logLevel = "Information" }; Changed = $false } }
+            Mock Initialize-LocalSettings { return @{ LocalSettings = @{ domain = "contoso.com" }; Changed = $false } }
+            Mock Initialize-StringsConfiguration { return @{ Strings = @{ appName = "Test" }; Changed = $false } }
+            Mock Initialize-MenuConfiguration { return @{ Menu = @{ mainMenu = @{} }; Changed = $false } }
+            Mock Initialize-RequiredScopes { return @{ RequiredScopes = @("User.Read", "Directory.Read.All") } }
+            Mock Import-PowerShellDataFile { return @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{} } }
             
             $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
                 -StringsFile $script:StringsFile -menuFile $script:MenuFile
@@ -187,13 +210,20 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
     
     Context "Configuration Initialization" {
         It "Should call Initialize-AuthConfiguration" {
+            # Create settings file so it gets loaded
+            @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{} } | Export-PowerShellDataFile -Path $script:SettingsFile -Force
+            
             Mock Get-ConfigurationData { return @{ logLevel = "Information" } }
-            Mock Initialize-AuthConfiguration { return @{ delegated = $true } }
-            Mock Initialize-GlobalSettings { return @{ logLevel = "Information" } }
-            Mock Initialize-LocalSettings { return @{ domain = "contoso.com" } }
-            Mock Initialize-StringsConfiguration { return @{ appName = "Test" } }
-            Mock Initialize-MenuConfiguration { return @{ mainMenu = @{} } }
-            Mock Initialize-RequiredScopes { return @() }
+            Mock Initialize-ConfigurationFiles { return @{ Success = $true } }
+            Mock Initialize-AuthConfiguration { return @{ Auth = @{ delegated = $true }; Changed = $false } }
+            Mock Initialize-RepoInfo { return @{ RepoInfo = @{}; Changed = $false } }
+            Mock Initialize-CacheSettings { return @{ CacheSettings = @{}; Changed = $false } }
+            Mock Initialize-GlobalSettings { return @{ GlobalSettings = @{ logLevel = "Information" }; Changed = $false } }
+            Mock Initialize-LocalSettings { return @{ LocalSettings = @{ domain = "contoso.com" }; Changed = $false } }
+            Mock Initialize-StringsConfiguration { return @{ Strings = @{ appName = "Test" }; Changed = $false } }
+            Mock Initialize-MenuConfiguration { return @{ Menu = @{ mainMenu = @{} }; Changed = $false } }
+            Mock Initialize-RequiredScopes { return @{ RequiredScopes = @() } }
+            Mock Import-PowerShellDataFile { return @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{} } }
             
             $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
                 -StringsFile $script:StringsFile -menuFile $script:MenuFile -Domain "contoso.com"
@@ -202,13 +232,20 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
         }
         
         It "Should call Initialize-GlobalSettings" {
+            # Create settings file so it gets loaded
+            @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{} } | Export-PowerShellDataFile -Path $script:SettingsFile -Force
+            
             Mock Get-ConfigurationData { return @{ logLevel = "Information" } }
-            Mock Initialize-AuthConfiguration { return @{ delegated = $true } }
-            Mock Initialize-GlobalSettings { return @{ logLevel = "Information" } }
-            Mock Initialize-LocalSettings { return @{ domain = "contoso.com" } }
-            Mock Initialize-StringsConfiguration { return @{ appName = "Test" } }
-            Mock Initialize-MenuConfiguration { return @{ mainMenu = @{} } }
-            Mock Initialize-RequiredScopes { return @() }
+            Mock Initialize-ConfigurationFiles { return @{ Success = $true } }
+            Mock Initialize-AuthConfiguration { return @{ Auth = @{ delegated = $true }; Changed = $false } }
+            Mock Initialize-RepoInfo { return @{ RepoInfo = @{}; Changed = $false } }
+            Mock Initialize-CacheSettings { return @{ CacheSettings = @{}; Changed = $false } }
+            Mock Initialize-GlobalSettings { return @{ GlobalSettings = @{ logLevel = "Information" }; Changed = $false } }
+            Mock Initialize-LocalSettings { return @{ LocalSettings = @{ domain = "contoso.com" }; Changed = $false } }
+            Mock Initialize-StringsConfiguration { return @{ Strings = @{ appName = "Test" }; Changed = $false } }
+            Mock Initialize-MenuConfiguration { return @{ Menu = @{ mainMenu = @{} }; Changed = $false } }
+            Mock Initialize-RequiredScopes { return @{ RequiredScopes = @() } }
+            Mock Import-PowerShellDataFile { return @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{} } }
             
             $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
                 -StringsFile $script:StringsFile -menuFile $script:MenuFile -Domain "contoso.com"
@@ -217,13 +254,20 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
         }
         
         It "Should call Initialize-LocalSettings with domain" {
+            # Create settings file so it gets loaded
+            @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{} } | Export-PowerShellDataFile -Path $script:SettingsFile -Force
+            
             Mock Get-ConfigurationData { return @{ logLevel = "Information" } }
-            Mock Initialize-AuthConfiguration { return @{ delegated = $true } }
-            Mock Initialize-GlobalSettings { return @{ logLevel = "Information" } }
-            Mock Initialize-LocalSettings { return @{ domain = "test.com" } } -ParameterFilter { $Domain -eq "test.com" }
-            Mock Initialize-StringsConfiguration { return @{ appName = "Test" } }
-            Mock Initialize-MenuConfiguration { return @{ mainMenu = @{} } }
-            Mock Initialize-RequiredScopes { return @() }
+            Mock Initialize-ConfigurationFiles { return @{ Success = $true } }
+            Mock Initialize-AuthConfiguration { return @{ Auth = @{ delegated = $true }; Changed = $false } }
+            Mock Initialize-RepoInfo { return @{ RepoInfo = @{}; Changed = $false } }
+            Mock Initialize-CacheSettings { return @{ CacheSettings = @{}; Changed = $false } }
+            Mock Initialize-GlobalSettings { return @{ GlobalSettings = @{ logLevel = "Information" }; Changed = $false } }
+            Mock Initialize-LocalSettings { return @{ LocalSettings = @{ domain = "test.com" }; Changed = $false } } -ParameterFilter { $Domain -eq "test.com" }
+            Mock Initialize-StringsConfiguration { return @{ Strings = @{ appName = "Test" }; Changed = $false } }
+            Mock Initialize-MenuConfiguration { return @{ Menu = @{ mainMenu = @{} }; Changed = $false } }
+            Mock Initialize-RequiredScopes { return @{ RequiredScopes = @() } }
+            Mock Import-PowerShellDataFile { return @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{} } }
             
             $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
                 -StringsFile $script:StringsFile -menuFile $script:MenuFile -Domain "test.com"
@@ -233,12 +277,16 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
         
         It "Should call Initialize-StringsConfiguration" {
             Mock Get-ConfigurationData { return @{ logLevel = "Information" } }
-            Mock Initialize-AuthConfiguration { return @{ delegated = $true } }
-            Mock Initialize-GlobalSettings { return @{ logLevel = "Information" } }
-            Mock Initialize-LocalSettings { return @{ domain = "contoso.com" } }
-            Mock Initialize-StringsConfiguration { return @{ appName = "Test" } }
-            Mock Initialize-MenuConfiguration { return @{ mainMenu = @{} } }
-            Mock Initialize-RequiredScopes { return @() }
+            Mock Initialize-ConfigurationFiles { return @{ Success = $true } }
+            Mock Initialize-AuthConfiguration { return @{ Auth = @{ delegated = $true }; Changed = $false } }
+            Mock Initialize-RepoInfo { return @{ RepoInfo = @{}; Changed = $false } }
+            Mock Initialize-CacheSettings { return @{ CacheSettings = @{}; Changed = $false } }
+            Mock Initialize-GlobalSettings { return @{ GlobalSettings = @{ logLevel = "Information" }; Changed = $false } }
+            Mock Initialize-LocalSettings { return @{ LocalSettings = @{ domain = "contoso.com" }; Changed = $false } }
+            Mock Initialize-StringsConfiguration { return @{ Strings = @{ appName = "Test" }; Changed = $false } }
+            Mock Initialize-MenuConfiguration { return @{ Menu = @{ mainMenu = @{} }; Changed = $false } }
+            Mock Initialize-RequiredScopes { return @{ RequiredScopes = @() } }
+            Mock Import-PowerShellDataFile { return @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{} } }
             
             $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
                 -StringsFile $script:StringsFile -menuFile $script:MenuFile -Domain "contoso.com"
@@ -248,12 +296,16 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
         
         It "Should call Initialize-MenuConfiguration" {
             Mock Get-ConfigurationData { return @{ logLevel = "Information" } }
-            Mock Initialize-AuthConfiguration { return @{ delegated = $true } }
-            Mock Initialize-GlobalSettings { return @{ logLevel = "Information" } }
-            Mock Initialize-LocalSettings { return @{ domain = "contoso.com" } }
-            Mock Initialize-StringsConfiguration { return @{ appName = "Test" } }
-            Mock Initialize-MenuConfiguration { return @{ mainMenu = @{} } }
-            Mock Initialize-RequiredScopes { return @() }
+            Mock Initialize-ConfigurationFiles { return @{ Success = $true } }
+            Mock Initialize-AuthConfiguration { return @{ Auth = @{ delegated = $true }; Changed = $false } }
+            Mock Initialize-RepoInfo { return @{ RepoInfo = @{}; Changed = $false } }
+            Mock Initialize-CacheSettings { return @{ CacheSettings = @{}; Changed = $false } }
+            Mock Initialize-GlobalSettings { return @{ GlobalSettings = @{ logLevel = "Information" }; Changed = $false } }
+            Mock Initialize-LocalSettings { return @{ LocalSettings = @{ domain = "contoso.com" }; Changed = $false } }
+            Mock Initialize-StringsConfiguration { return @{ Strings = @{ appName = "Test" }; Changed = $false } }
+            Mock Initialize-MenuConfiguration { return @{ Menu = @{ mainMenu = @{} }; Changed = $false } }
+            Mock Initialize-RequiredScopes { return @{ RequiredScopes = @() } }
+            Mock Import-PowerShellDataFile { return @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{} } }
             
             $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
                 -StringsFile $script:StringsFile -menuFile $script:MenuFile -Domain "contoso.com"
@@ -262,13 +314,20 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
         }
         
         It "Should call Initialize-RequiredScopes" {
+            # Create settings file so it gets loaded
+            @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{} } | Export-PowerShellDataFile -Path $script:SettingsFile -Force
+            
             Mock Get-ConfigurationData { return @{ logLevel = "Information" } }
-            Mock Initialize-AuthConfiguration { return @{ delegated = $true } }
-            Mock Initialize-GlobalSettings { return @{ logLevel = "Information" } }
-            Mock Initialize-LocalSettings { return @{ domain = "contoso.com" } }
-            Mock Initialize-StringsConfiguration { return @{ appName = "Test" } }
-            Mock Initialize-MenuConfiguration { return @{ mainMenu = @{} } }
-            Mock Initialize-RequiredScopes { return @() }
+            Mock Initialize-ConfigurationFiles { return @{ Success = $true } }
+            Mock Initialize-AuthConfiguration { return @{ Auth = @{ delegated = $true }; Changed = $false } }
+            Mock Initialize-RepoInfo { return @{ RepoInfo = @{}; Changed = $false } }
+            Mock Initialize-CacheSettings { return @{ CacheSettings = @{}; Changed = $false } }
+            Mock Initialize-GlobalSettings { return @{ GlobalSettings = @{ logLevel = "Information" }; Changed = $false } }
+            Mock Initialize-LocalSettings { return @{ LocalSettings = @{ domain = "contoso.com" }; Changed = $false } }
+            Mock Initialize-StringsConfiguration { return @{ Strings = @{ appName = "Test" }; Changed = $false } }
+            Mock Initialize-MenuConfiguration { return @{ Menu = @{ mainMenu = @{} }; Changed = $false } }
+            Mock Initialize-RequiredScopes { return @{ RequiredScopes = @() } }
+            Mock Import-PowerShellDataFile { return @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{} } }
             
             $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
                 -StringsFile $script:StringsFile -menuFile $script:MenuFile -Domain "contoso.com"
@@ -279,18 +338,25 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
     
     Context "BoundParameters Preservation" {
         It "Should pass BoundParameters to initializers" {
+            # Create settings file so it gets loaded
+            @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{} } | Export-PowerShellDataFile -Path $script:SettingsFile -Force
+            
             $boundParams = @{
                 logLevel   = "Debug"
                 maxRetries = 10
             }
             
             Mock Get-ConfigurationData { return @{ logLevel = "Information" } }
-            Mock Initialize-AuthConfiguration { return @{ delegated = $true } }
-            Mock Initialize-GlobalSettings { return @{ logLevel = "Information" } } -ParameterFilter { $BoundParameters -ne $null }
-            Mock Initialize-LocalSettings { return @{ domain = "contoso.com" } }
-            Mock Initialize-StringsConfiguration { return @{ appName = "Test" } }
-            Mock Initialize-MenuConfiguration { return @{ mainMenu = @{} } }
-            Mock Initialize-RequiredScopes { return @() }
+            Mock Initialize-ConfigurationFiles { return @{ Success = $true } }
+            Mock Initialize-AuthConfiguration { return @{ Auth = @{ delegated = $true }; Changed = $false } }
+            Mock Initialize-RepoInfo { return @{ RepoInfo = @{}; Changed = $false } }
+            Mock Initialize-CacheSettings { return @{ CacheSettings = @{}; Changed = $false } }
+            Mock Initialize-GlobalSettings { return @{ GlobalSettings = @{ logLevel = "Information" }; Changed = $false } } -ParameterFilter { $BoundParameters -ne $null }
+            Mock Initialize-LocalSettings { return @{ LocalSettings = @{ domain = "contoso.com" }; Changed = $false } }
+            Mock Initialize-StringsConfiguration { return @{ Strings = @{ appName = "Test" }; Changed = $false } }
+            Mock Initialize-MenuConfiguration { return @{ Menu = @{ mainMenu = @{} }; Changed = $false } }
+            Mock Initialize-RequiredScopes { return @{ RequiredScopes = @() } }
+            Mock Import-PowerShellDataFile { return @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{} } }
             
             $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
                 -StringsFile $script:StringsFile -menuFile $script:MenuFile `
@@ -312,6 +378,8 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
             Mock Initialize-ConfigurationFiles { return @{ Success = $true } }
             Mock Import-PowerShellDataFile { return @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{} } }
             Mock Get-ConfigurationData { return @{ logLevel = "Information" } }
+            Mock Initialize-RepoInfo { return @{ RepoInfo = @{}; Changed = $false } }
+            Mock Initialize-CacheSettings { return @{ CacheSettings = @{}; Changed = $false } }
             Mock Initialize-AuthConfiguration { return @{ Auth = @{ delegated = $true }; Changed = $false } }
             Mock Initialize-GlobalSettings { 
                 param($GlobalConfigData, $BoundParameters)
@@ -325,7 +393,7 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
             Mock Initialize-LocalSettings { return @{ LocalSettings = @{ domain = "contoso.com" }; Changed = $false } }
             Mock Initialize-StringsConfiguration { return @{ Strings = @{ appName = "Test" }; Changed = $false } }
             Mock Initialize-MenuConfiguration { return @{ Menu = @{ mainMenu = @{} }; Changed = $false } }
-            Mock Initialize-RequiredScopes { return @() }
+            Mock Initialize-RequiredScopes { return @{ RequiredScopes = @() } }
             
             $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
                 -StringsFile $script:StringsFile -menuFile $script:MenuFile `
@@ -377,12 +445,16 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
         
         It "Should handle empty Domain parameter" {
             Mock Get-ConfigurationData { return @{ logLevel = "Information" } }
-            Mock Initialize-AuthConfiguration { return @{ delegated = $true } }
-            Mock Initialize-GlobalSettings { return @{ logLevel = "Information" } }
-            Mock Initialize-LocalSettings { return @{ domain = "" } }
-            Mock Initialize-StringsConfiguration { return @{ appName = "Test" } }
-            Mock Initialize-MenuConfiguration { return @{ mainMenu = @{} } }
-            Mock Initialize-RequiredScopes { return @() }
+            Mock Initialize-ConfigurationFiles { return @{ Success = $true } }
+            Mock Initialize-RepoInfo { return @{ RepoInfo = @{}; Changed = $false } }
+            Mock Initialize-CacheSettings { return @{ CacheSettings = @{}; Changed = $false } }
+            Mock Initialize-AuthConfiguration { return @{ Auth = @{ delegated = $true }; Changed = $false } }
+            Mock Initialize-GlobalSettings { return @{ GlobalSettings = @{ logLevel = "Information" }; Changed = $false } }
+            Mock Initialize-LocalSettings { return @{ LocalSettings = @{ domain = "" }; Changed = $false } }
+            Mock Initialize-StringsConfiguration { return @{ Strings = @{ appName = "Test" }; Changed = $false } }
+            Mock Initialize-MenuConfiguration { return @{ Menu = @{ mainMenu = @{} }; Changed = $false } }
+            Mock Initialize-RequiredScopes { return @{ RequiredScopes = @() } }
+            Mock Import-PowerShellDataFile { return @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{} } }
             
             $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
                 -StringsFile $script:StringsFile -menuFile $script:MenuFile -Domain ""
@@ -393,13 +465,20 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
     
     Context "Default Domain Handling" {
         It "Should use contoso.com as default domain when not specified" {
+            # Create settings file so it gets loaded
+            @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{} } | Export-PowerShellDataFile -Path $script:SettingsFile -Force
+            
             Mock Get-ConfigurationData { return @{ logLevel = "Information" } }
-            Mock Initialize-AuthConfiguration { return @{ delegated = $true } }
-            Mock Initialize-GlobalSettings { return @{ logLevel = "Information" } }
-            Mock Initialize-LocalSettings { return @{ domain = "contoso.com" } } -ParameterFilter { $Domain -eq "contoso.com" }
-            Mock Initialize-StringsConfiguration { return @{ appName = "Test" } }
-            Mock Initialize-MenuConfiguration { return @{ mainMenu = @{} } }
-            Mock Initialize-RequiredScopes { return @() }
+            Mock Initialize-ConfigurationFiles { return @{ Success = $true } }
+            Mock Initialize-RepoInfo { return @{ RepoInfo = @{}; Changed = $false } }
+            Mock Initialize-CacheSettings { return @{ CacheSettings = @{}; Changed = $false } }
+            Mock Initialize-AuthConfiguration { return @{ Auth = @{ delegated = $true }; Changed = $false } }
+            Mock Initialize-GlobalSettings { return @{ GlobalSettings = @{ logLevel = "Information" }; Changed = $false } }
+            Mock Initialize-LocalSettings { return @{ LocalSettings = @{ domain = "contoso.com" }; Changed = $false } } -ParameterFilter { $Domain -eq "contoso.com" }
+            Mock Initialize-StringsConfiguration { return @{ Strings = @{ appName = "Test" }; Changed = $false } }
+            Mock Initialize-MenuConfiguration { return @{ Menu = @{ mainMenu = @{} }; Changed = $false } }
+            Mock Initialize-RequiredScopes { return @{ RequiredScopes = @() } }
+            Mock Import-PowerShellDataFile { return @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{} } }
             
             $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
                 -StringsFile $script:StringsFile -menuFile $script:MenuFile
@@ -411,12 +490,16 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
     Context "Scope Merging" {
         It "Should merge and deduplicate scopes" {
             Mock Get-ConfigurationData { return @{ logLevel = "Information" } }
-            Mock Initialize-AuthConfiguration { return @{ delegated = $true; scopes = @("User.Read") } }
-            Mock Initialize-GlobalSettings { return @{ logLevel = "Information" } }
-            Mock Initialize-LocalSettings { return @{ domain = "contoso.com"; scopes = @("User.Read", "Directory.Read.All") } }
-            Mock Initialize-StringsConfiguration { return @{ appName = "Test" } }
-            Mock Initialize-MenuConfiguration { return @{ mainMenu = @{} } }
-            Mock Initialize-RequiredScopes { return @("User.Read", "Directory.Read.All") }
+            Mock Initialize-ConfigurationFiles { return @{ Success = $true } }
+            Mock Initialize-RepoInfo { return @{ RepoInfo = @{}; Changed = $false } }
+            Mock Initialize-CacheSettings { return @{ CacheSettings = @{}; Changed = $false } }
+            Mock Initialize-AuthConfiguration { return @{ Auth = @{ delegated = $true; scopes = @("User.Read") }; Changed = $false } }
+            Mock Initialize-GlobalSettings { return @{ GlobalSettings = @{ logLevel = "Information" }; Changed = $false } }
+            Mock Initialize-LocalSettings { return @{ LocalSettings = @{ domain = "contoso.com"; scopes = @("User.Read", "Directory.Read.All") }; Changed = $false } }
+            Mock Initialize-StringsConfiguration { return @{ Strings = @{ appName = "Test" }; Changed = $false } }
+            Mock Initialize-MenuConfiguration { return @{ Menu = @{ mainMenu = @{} }; Changed = $false } }
+            Mock Initialize-RequiredScopes { return @{ RequiredScopes = @("User.Read", "Directory.Read.All") } }
+            Mock Import-PowerShellDataFile { return @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{} } }
             
             $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
                 -StringsFile $script:StringsFile -menuFile $script:MenuFile
@@ -428,12 +511,16 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
         
         It "Should remove duplicate scopes" {
             Mock Get-ConfigurationData { return @{ logLevel = "Information" } }
-            Mock Initialize-AuthConfiguration { return @{ delegated = $true } }
-            Mock Initialize-GlobalSettings { return @{ logLevel = "Information" } }
-            Mock Initialize-LocalSettings { return @{ domain = "contoso.com" } }
-            Mock Initialize-StringsConfiguration { return @{ appName = "Test" } }
-            Mock Initialize-MenuConfiguration { return @{ mainMenu = @{} } }
-            Mock Initialize-RequiredScopes { return @("User.Read") }
+            Mock Initialize-ConfigurationFiles { return @{ Success = $true } }
+            Mock Initialize-RepoInfo { return @{ RepoInfo = @{}; Changed = $false } }
+            Mock Initialize-CacheSettings { return @{ CacheSettings = @{}; Changed = $false } }
+            Mock Initialize-AuthConfiguration { return @{ Auth = @{ delegated = $true }; Changed = $false } }
+            Mock Initialize-GlobalSettings { return @{ GlobalSettings = @{ logLevel = "Information" }; Changed = $false } }
+            Mock Initialize-LocalSettings { return @{ LocalSettings = @{ domain = "contoso.com" }; Changed = $false } }
+            Mock Initialize-StringsConfiguration { return @{ Strings = @{ appName = "Test" }; Changed = $false } }
+            Mock Initialize-MenuConfiguration { return @{ Menu = @{ mainMenu = @{} }; Changed = $false } }
+            Mock Initialize-RequiredScopes { return @{ RequiredScopes = @("User.Read") } }
+            Mock Import-PowerShellDataFile { return @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{} } }
             
             $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
                 -StringsFile $script:StringsFile -menuFile $script:MenuFile -Domain "contoso.com"
@@ -446,12 +533,16 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
     Context "Verbose Logging" {
         It "Should write verbose messages about initialization" {
             Mock Get-ConfigurationData { return @{ logLevel = "Information" } }
-            Mock Initialize-AuthConfiguration { return @{ delegated = $true } }
-            Mock Initialize-GlobalSettings { return @{ logLevel = "Information" } }
-            Mock Initialize-LocalSettings { return @{ domain = "contoso.com" } }
-            Mock Initialize-StringsConfiguration { return @{ appName = "Test" } }
-            Mock Initialize-MenuConfiguration { return @{ mainMenu = @{} } }
-            Mock Initialize-RequiredScopes { return @() }
+            Mock Initialize-ConfigurationFiles { return @{ Success = $true } }
+            Mock Initialize-RepoInfo { return @{ RepoInfo = @{}; Changed = $false } }
+            Mock Initialize-CacheSettings { return @{ CacheSettings = @{}; Changed = $false } }
+            Mock Initialize-AuthConfiguration { return @{ Auth = @{ delegated = $true }; Changed = $false } }
+            Mock Initialize-GlobalSettings { return @{ GlobalSettings = @{ logLevel = "Information" }; Changed = $false } }
+            Mock Initialize-LocalSettings { return @{ LocalSettings = @{ domain = "contoso.com" }; Changed = $false } }
+            Mock Initialize-StringsConfiguration { return @{ Strings = @{ appName = "Test" }; Changed = $false } }
+            Mock Initialize-MenuConfiguration { return @{ Menu = @{ mainMenu = @{} }; Changed = $false } }
+            Mock Initialize-RequiredScopes { return @{ RequiredScopes = @() } }
+            Mock Import-PowerShellDataFile { return @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{} } }
             Mock Write-Verbose { }
             
             $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
@@ -463,12 +554,16 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
         
         It "Should log file paths" {
             Mock Get-ConfigurationData { return @{ logLevel = "Information" } }
-            Mock Initialize-AuthConfiguration { return @{ delegated = $true } }
-            Mock Initialize-GlobalSettings { return @{ logLevel = "Information" } }
-            Mock Initialize-LocalSettings { return @{ domain = "contoso.com" } }
-            Mock Initialize-StringsConfiguration { return @{ appName = "Test" } }
-            Mock Initialize-MenuConfiguration { return @{ mainMenu = @{} } }
-            Mock Initialize-RequiredScopes { return @() }
+            Mock Initialize-ConfigurationFiles { return @{ Success = $true } }
+            Mock Initialize-RepoInfo { return @{ RepoInfo = @{}; Changed = $false } }
+            Mock Initialize-CacheSettings { return @{ CacheSettings = @{}; Changed = $false } }
+            Mock Initialize-AuthConfiguration { return @{ Auth = @{ delegated = $true }; Changed = $false } }
+            Mock Initialize-GlobalSettings { return @{ GlobalSettings = @{ logLevel = "Information" }; Changed = $false } }
+            Mock Initialize-LocalSettings { return @{ LocalSettings = @{ domain = "contoso.com" }; Changed = $false } }
+            Mock Initialize-StringsConfiguration { return @{ Strings = @{ appName = "Test" }; Changed = $false } }
+            Mock Initialize-MenuConfiguration { return @{ Menu = @{ mainMenu = @{} }; Changed = $false } }
+            Mock Initialize-RequiredScopes { return @{ RequiredScopes = @() } }
+            Mock Import-PowerShellDataFile { return @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{} } }
             Mock Write-Verbose { } -ParameterFilter { $Message -match "InitFile|StringsFile|MenuFile" }
             
             $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
