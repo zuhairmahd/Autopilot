@@ -13,7 +13,7 @@
     Migrated from HasScope.Tests.ps1 as part of HasScope deprecation (Option 1)
     
 .NOTES
-    Test Category: Integration (tests composition of multiple functions)
+    Test Category: Unit (tests composition of multiple functions)
     Replaces: HasScope.Tests.ps1 (26 tests)
     Related Functions:
         - Get-RequiredScopesForEndpoints (endpoint mapping)
@@ -24,7 +24,7 @@
 Import-Module "$PSScriptRoot/../../Helpers/AutopilotTestHelpers.psm1" -Force
 Import-Module "$PSScriptRoot/../../Helpers/AutopilotGraphMocks.psm1" -Force
 
-Describe "Endpoint-Level Scope Validation (Composition Pattern)" -Tags 'Integration', 'GraphFunctions', 'Authorization' {
+Describe "Endpoint-Level Scope Validation (Composition Pattern)" -Tags 'Unit', 'GraphFunctions', 'Authorization' {
     BeforeAll {
         # Direct dot-sourcing for PS 5.1 compatibility
         $script:RepoRoot = (Get-Item $PSScriptRoot).Parent.Parent.Parent.FullName
