@@ -13,7 +13,7 @@ function Test-ScopeAvailability()
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Starting scope availability validation"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Starting scope availability validation" -logLevel "Information"
-    $requestedScopes = $AuthConfiguration.Scope
+    $RequestedScopes = if ($AuthConfiguration.delegated -eq $true) { $AuthConfiguration.requestedScopes } else { @() }               
     # Define scopes that should be excluded from validation for non-delegated (application) authentication
     # These are OAuth/OIDC protocol scopes, not Microsoft Graph API scopes
     $excludedScopesForApplication = @(

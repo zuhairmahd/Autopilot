@@ -743,8 +743,6 @@ $requiredScopes = $configResult.RequiredScopes
 Write-Verbose "[$scriptName] Merging global and local settings"
 $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
 
-#merge required scopes
-
 if ($settings.domain -ne $domain)
 {
     Write-Verbose "[$scriptName] Updating settings domain from $($settings.domain) to $domain"
@@ -1063,15 +1061,9 @@ if ($accessToken)
         {
             # Get the current requested scopes for delegated authentication
             Write-Log -logFile $LogFile -Module $scriptName -Message "Getting current requested scopes for delegated authentication" -LogLevel "Information"
-            $currentRequestedScopes = @()
-            if ($auth.Delegated -eq $true)
-            {
-                $currentRequestedScopes = $auth.scope | ForEach-Object { $_.Scope }
-                Write-Log -LogFile $LogFile -Module $scriptName -Message "Delegated authentication - using required scopes as requested scopes" -LogLevel "Information"
-            }
             # Perform scope validation
             Write-Log -LogFile $LogFile -Module $scriptName -Message "Performing scope validation..." -LogLevel "Information"
-            $scopeValidation = Test-ScopeAvailability -AccessToken $accessToken -RequiredScopes $requiredScopes -AuthConfiguration $auth -RequestedScopes $currentRequestedScopes
+            $scopeValidation = Test-ScopeAvailability -AccessToken $accessToken -RequiredScopes $requiredScopes -AuthConfiguration $auth
             if ($scopeValidation.HasAllRequiredScopes)
             {
                 Write-Log -LogFile $LogFile -Module $scriptName -Message "All required Microsoft Graph scopes are available" -LogLevel "Information"

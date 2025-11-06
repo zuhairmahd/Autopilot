@@ -3,8 +3,7 @@ function BuildAuthSplatTable()
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        $auth,
-        [switch]$includeAllScopes
+        $auth
     )
     
     $functionName = $MyInvocation.MyCommand.Name
