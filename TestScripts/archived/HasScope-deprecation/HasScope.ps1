@@ -9,7 +9,7 @@ function HasScope()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting scope validation for $($ResourcePath.Count) resource paths" -LogLevel "Verbose"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting scope validation for $($ResourcePath.Count) resource paths" -LogLevel "Verbose"
     
     # Get authorized scopes from the access token
     $tokenData = DecodeJwtToken -Token $accessToken
@@ -106,7 +106,7 @@ Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting scope val
         # Direct match
         if ($AuthorizedScopes -contains $RequiredScope)
         {
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "Direct scope match found for: $RequiredScope" -LogLevel "Verbose"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Direct scope match found for: $RequiredScope" -LogLevel "Verbose"
             return $true
         }
         
@@ -138,7 +138,7 @@ Write-Log -LogFile $LogFile -Module "$functionName" -Message "Direct scope match
             }
         }
         
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "No scope authorization found for: $RequiredScope" -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No scope authorization found for: $RequiredScope" -LogLevel "Verbose"
         return $false
     }
     
@@ -148,7 +148,7 @@ Write-Log -LogFile $LogFile -Module "$functionName" -Message "No scope authoriza
     
     foreach ($uri in $ResourcePath)
     {
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking resource path: $uri" -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking resource path: $uri" -LogLevel "Verbose"
         
         # Normalize $uri to relative path for endpoint comparison
         if ($uri -match 'https?://[^/]+/(v1\.0|beta)/(.+)')
@@ -230,7 +230,7 @@ Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking resource 
         }
         Write-Verbose "[$functionName] Number of matching scopes: $($matchingScopes.Count)"
         Write-Verbose "[$functionName] Matching required scopes: $($matchingScopes | Out-String) scopes."
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found $($matchingScopes.Count) matching scopes for endpoint: $relativeUri" -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found $($matchingScopes.Count) matching scopes for endpoint: $relativeUri" -LogLevel "Verbose"
         
         # For this URI to be authorized, we need at least one matching scope to be satisfied
         # If no scopes are defined for this endpoint, we'll consider it authorized (public endpoint)
