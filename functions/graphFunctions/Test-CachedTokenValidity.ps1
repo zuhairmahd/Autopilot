@@ -46,15 +46,7 @@ function Test-CachedTokenValidity()
                 }
                 
                 # Check if all requested scopes are present in granted scopes
-                $missingScopes = @()
-                foreach ($requestedScope in $requestedScopes)
-                {
-                    if ($grantedScopes -notcontains $requestedScope)
-                    {
-                        $missingScopes += $requestedScope
-                    }
-                }
-                
+                $missingScopes = $requestedScopes | Where-Object { $grantedScopes -notcontains $_ } 
                 if ($missingScopes.Count -gt 0)
                 {
                     Write-Verbose "[$functionName] Cached token is missing required scopes: $($missingScopes -join ', ')"
