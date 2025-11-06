@@ -126,6 +126,8 @@ function Initialize-ApplicationConfiguration()
             Auth           = @{}
             GlobalSettings = @{}
             LocalSettings  = @{}
+            RepoInfo       = @{}
+            CacheSettings  = @{}
             Strings        = @{}
             Menu           = @{}
             RequiredScopes = @()
@@ -181,7 +183,39 @@ function Initialize-ApplicationConfiguration()
                 Write-Log -logFile $logFile -module $functionName -Message "Successfully loaded configuration file" -logLevel "Verbose"
                 Write-Verbose "[$functionName] Successfully loaded configuration file"
                 
-                # Step 3: Process auth configuration
+                # Step 3a: Process repository information (repoInfo)
+                Write-Log -logFile $logFile -module $functionName -Message "Processing repository information (repoInfo)" -logLevel "Information"
+                Write-Verbose "[$functionName] Processing repository information (repoInfo)"
+                $loadedRepoInfo = if ($initFileContent.ContainsKey('repoInfo') -and $initFileContent.repoInfo)
+                {
+                    $initFileContent.repoInfo
+                }
+                else
+                {
+                    $null
+                }
+                $repoResult = Initialize-RepoInfo -RepoInfoData $loadedRepoInfo -BoundParameters $BoundParameters
+                $result['RepoInfo'] = $repoResult.RepoInfo
+                Write-Log -logFile $logFile -module $functionName -Message "Repository information processed (Changed: $($repoResult.Changed))" -logLevel "Verbose"
+                Write-Verbose "[$functionName] Repository information processed (Changed: $($repoResult.Changed))"
+
+                # Step 3b: Process cache settings (cacheSettings)
+                Write-Log -logFile $logFile -module $functionName -Message "Processing cache settings (cacheSettings)" -logLevel "Information"
+                Write-Verbose "[$functionName] Processing cache settings (cacheSettings)"
+                $loadedCache = if ($initFileContent.ContainsKey('cacheSettings'))
+                {
+                    $initFileContent.cacheSettings
+                }
+                else
+                {
+                    $null
+                }
+                $cacheResult = Initialize-CacheSettings -CacheSettingsData $loadedCache -BoundParameters $BoundParameters
+                $result['CacheSettings'] = $cacheResult.CacheSettings
+                Write-Log -logFile $logFile -module $functionName -Message "Cache settings processed (Changed: $($cacheResult.Changed))" -logLevel "Verbose"
+                Write-Verbose "[$functionName] Cache settings processed (Changed: $($cacheResult.Changed))"
+
+                # Step 3c: Process auth configuration
                 Write-Log -logFile $logFile -module $functionName -Message "Processing auth configuration" -logLevel "Information"
                 Write-Verbose "[$functionName] Processing auth configuration"
                 $authResult = Initialize-AuthConfiguration -AuthConfiguration $initFileContent.auth -BoundParameters $BoundParameters
@@ -227,7 +261,6 @@ function Initialize-ApplicationConfiguration()
                             {
                                 $initFileContent.auth = $authResult.Auth
                             }
-
                             # Create backup before saving
                             $backupFile = "$InitFile.backup.$(Get-Date -Format 'yyyyMMdd_HHmmss')"
                             Copy-Item -Path $InitFile -Destination $backupFile -Force
@@ -416,8 +449,18 @@ function Initialize-ApplicationConfiguration()
             $result.GlobalSettings = @{}
             $result.LocalSettings = @{}
             $result.RequiredScopes = @()
-            Write-Log -logFile $logFile -module $functionName -Message "Initialized empty settings collections" -logLevel "Verbose"
-            Write-Verbose "[$functionName] Initialized empty settings collections"
+            
+            # Initialize RepoInfo and CacheSettings using defaults when settings.psd1 missing
+            Write-Verbose "[$functionName] Initializing RepoInfo with defaults"
+            $repoResult = Initialize-RepoInfo -RepoInfoData $null -BoundParameters $BoundParameters
+            $result['RepoInfo'] = $repoResult.RepoInfo
+            
+            Write-Verbose "[$functionName] Initializing CacheSettings with defaults"
+            $cacheResult = Initialize-CacheSettings -CacheSettingsData $null -BoundParameters $BoundParameters
+            $result['CacheSettings'] = $cacheResult.CacheSettings
+            
+            Write-Log -logFile $logFile -module $functionName -Message "Initialized settings with defaults (RepoInfo, CacheSettings)" -logLevel "Verbose"
+            Write-Verbose "[$functionName] Initialized settings with defaults (RepoInfo, CacheSettings)"
             
             # Process strings configuration even without settings file
             Write-Log -logFile $logFile -module $functionName -Message "Processing strings configuration" -logLevel "Information"
