@@ -80,8 +80,8 @@ Describe "Endpoint-Level Scope Validation (Composition Pattern)" -Tags 'Integrat
         
         # Mock auth configuration for Test-ScopeAvailability
         $script:mockAuthConfig = @{
-            authType       = 'delegated'
-            tenantId       = 'test-tenant-id'
+            Delegated       = $true  # Capital D - used by Test-ScopeAvailability
+            tenantId        = 'test-tenant-id'
             graphResourceId = 'https://graph.microsoft.com'
         }
         
@@ -100,13 +100,14 @@ Describe "Endpoint-Level Scope Validation (Composition Pattern)" -Tags 'Integrat
                 -RequiredScopes $RequiredScopes
             
             # Step 2: Validate token has those scopes
-            if ($endpointScopes.Count -eq 0) {
+            if ($endpointScopes.Count -eq 0)
+            {
                 # Public endpoint - no scopes required
                 return @{
-                    IsAuthorized = $true
-                    Endpoints    = $Endpoints
+                    IsAuthorized   = $true
+                    Endpoints      = $Endpoints
                     RequiredScopes = @()
-                    TokenScopes  = @()
+                    TokenScopes    = @()
                 }
             }
             
@@ -116,9 +117,9 @@ Describe "Endpoint-Level Scope Validation (Composition Pattern)" -Tags 'Integrat
                 -AuthConfiguration $AuthConfig
             
             return @{
-                IsAuthorized    = $scopeCheck.HasAllRequiredScopes
-                Endpoints       = $Endpoints
-                RequiredScopes  = $endpointScopes
+                IsAuthorized     = $scopeCheck.HasAllRequiredScopes
+                Endpoints        = $Endpoints
+                RequiredScopes   = $endpointScopes
                 ScopeCheckResult = $scopeCheck
             }
         }
@@ -130,7 +131,7 @@ Describe "Endpoint-Level Scope Validation (Composition Pattern)" -Tags 'Integrat
     
     Context "When validating direct scope matches" {
         It "Should authorize endpoint when exact scope is present" {
-            $mockToken = New-MockGraphToken -Scopes @('User.Read.All')
+            $mockToken = New-MockGraphToken -Scopes @('User.Read.All') -Delegated
             
             $result = & $script:TestEndpointAuth -Endpoints @('users') `
                 -AccessToken $mockToken `
@@ -143,13 +144,14 @@ Describe "Endpoint-Level Scope Validation (Composition Pattern)" -Tags 'Integrat
         }
         
         It "Should authorize multiple endpoints when all scopes are present" {
-            $mockToken = New-MockGraphToken -Scopes @('User.Read.All', 'Group.Read.All', 'Device.Read.All')
+            $mockToken = New-MockGraphToken -Scopes @('User.Read.All', 'Group.Read.All', 'Device.Read.All') -Delegated
             
             # Check each endpoint individually (composition pattern checks one at a time)
             $endpoints = @('users', 'groups', 'devices')
             $results = @()
             
-            foreach ($endpoint in $endpoints) {
+            foreach ($endpoint in $endpoints)
+            {
                 $result = & $script:TestEndpointAuth -Endpoints @($endpoint) `
                     -AccessToken $mockToken `
                     -RequiredScopes $script:mockSettings.requiredScopes `
@@ -162,7 +164,7 @@ Describe "Endpoint-Level Scope Validation (Composition Pattern)" -Tags 'Integrat
         }
         
         It "Should deny access when exact scope is missing" {
-            $mockToken = New-MockGraphToken -Scopes @('Group.Read.All')
+            $mockToken = New-MockGraphToken -Scopes @('Group.Read.All') -Delegated
             
             $result = & $script:TestEndpointAuth -Endpoints @('users') `
                 -AccessToken $mockToken `
@@ -174,35 +176,35 @@ Describe "Endpoint-Level Scope Validation (Composition Pattern)" -Tags 'Integrat
     }
     
     Context "When validating hierarchical scope relationships" {
-        It "Should authorize with Directory.ReadWrite.All for User.Read.All requirement" -Skip {
-            # NOTE: Hierarchical scope validation requires passing full scope hierarchy configuration
-            # The composition pattern (Get-RequiredScopesForEndpoints + Test-ScopeAvailability) 
-            # doesn't automatically include hierarchical alternatives
-            # This is expected behavior - use Test-ScopeAvailability directly with full scope config for hierarchy
-            $mockToken = New-MockGraphToken -Scopes @('Directory.ReadWrite.All')
+        It "Should not authorize with Directory.ReadWrite.All for User.Read.All requirement (different resources)" {
+            # Test-ScopeHierarchy requires matching resource names
+            # Directory.ReadWrite.All (resource=Directory) != User.Read.All (resource=User)
+            # This tests that cross-resource scope hierarchies are NOT automatically satisfied
+            $mockToken = New-MockGraphToken -Scopes @('Directory.ReadWrite.All') -Delegated
             
             $result = & $script:TestEndpointAuth -Endpoints @('users') `
                 -AccessToken $mockToken `
                 -RequiredScopes $script:mockSettings.requiredScopes `
                 -AuthConfig $script:mockAuthConfig
             
-            $result.IsAuthorized | Should -Be $true
+            $result.IsAuthorized | Should -Be $false
         }
         
-        It "Should authorize with Directory.Read.All for User.Read.All requirement" -Skip {
-            # Skipped - same reason as above test
-            $mockToken = New-MockGraphToken -Scopes @('Directory.Read.All')
+        It "Should not authorize with Directory.Read.All for User.Read.All requirement (different resources)" {
+            # Test-ScopeHierarchy requires matching resource names
+            # Directory.Read.All (resource=Directory) != User.Read.All (resource=User)
+            $mockToken = New-MockGraphToken -Scopes @('Directory.Read.All') -Delegated
             
             $result = & $script:TestEndpointAuth -Endpoints @('users') `
                 -AccessToken $mockToken `
                 -RequiredScopes $script:mockSettings.requiredScopes `
                 -AuthConfig $script:mockAuthConfig
             
-            $result.IsAuthorized | Should -Be $true
+            $result.IsAuthorized | Should -Be $false
         }
         
         It "Should authorize with User.ReadWrite.All for User.Read.All requirement" {
-            $mockToken = New-MockGraphToken -Scopes @('User.ReadWrite.All')
+            $mockToken = New-MockGraphToken -Scopes @('User.ReadWrite.All') -Delegated
             
             $result = & $script:TestEndpointAuth -Endpoints @('users') `
                 -AccessToken $mockToken `
@@ -213,7 +215,7 @@ Describe "Endpoint-Level Scope Validation (Composition Pattern)" -Tags 'Integrat
         }
         
         It "Should authorize with Group.ReadWrite.All for Group.Read.All requirement" {
-            $mockToken = New-MockGraphToken -Scopes @('Group.ReadWrite.All')
+            $mockToken = New-MockGraphToken -Scopes @('Group.ReadWrite.All') -Delegated
             
             $result = & $script:TestEndpointAuth -Endpoints @('groups') `
                 -AccessToken $mockToken `
@@ -224,7 +226,7 @@ Describe "Endpoint-Level Scope Validation (Composition Pattern)" -Tags 'Integrat
         }
         
         It "Should not authorize narrower scope for broader requirement" {
-            $mockToken = New-MockGraphToken -Scopes @('User.ReadBasic.All')
+            $mockToken = New-MockGraphToken -Scopes @('User.ReadBasic.All') -Delegated
             
             $result = & $script:TestEndpointAuth -Endpoints @('users') `
                 -AccessToken $mockToken `
@@ -237,7 +239,7 @@ Describe "Endpoint-Level Scope Validation (Composition Pattern)" -Tags 'Integrat
     
     Context "When normalizing URIs with dynamic parameters" {
         It "Should match URI with GUID to pattern with {id}" {
-            $mockToken = New-MockGraphToken -Scopes @('User.Read.All')
+            $mockToken = New-MockGraphToken -Scopes @('User.Read.All') -Delegated
             $guidUri = 'users/12345678-1234-1234-1234-123456789abc'
             
             $result = & $script:TestEndpointAuth -Endpoints @($guidUri) `
@@ -249,7 +251,7 @@ Describe "Endpoint-Level Scope Validation (Composition Pattern)" -Tags 'Integrat
         }
         
         It "Should match full URL by extracting relative path" {
-            $mockToken = New-MockGraphToken -Scopes @('Group.Read.All')
+            $mockToken = New-MockGraphToken -Scopes @('Group.Read.All') -Delegated
             $fullUrl = 'https://graph.microsoft.com/v1.0/groups/12345678-1234-1234-1234-123456789abc'
             
             $result = & $script:TestEndpointAuth -Endpoints @($fullUrl) `
@@ -261,7 +263,7 @@ Describe "Endpoint-Level Scope Validation (Composition Pattern)" -Tags 'Integrat
         }
         
         It "Should strip query parameters from URI" {
-            $mockToken = New-MockGraphToken -Scopes @('User.Read.All')
+            $mockToken = New-MockGraphToken -Scopes @('User.Read.All') -Delegated
             $uriWithQuery = 'users?$filter=displayName eq ''John'''
             
             $result = & $script:TestEndpointAuth -Endpoints @($uriWithQuery) `
@@ -273,7 +275,7 @@ Describe "Endpoint-Level Scope Validation (Composition Pattern)" -Tags 'Integrat
         }
         
         It "Should normalize numeric IDs to {id} pattern" {
-            $mockToken = New-MockGraphToken -Scopes @('Device.Read.All')
+            $mockToken = New-MockGraphToken -Scopes @('Device.Read.All') -Delegated
             $numericIdUri = 'devices/123456789'
             
             $result = & $script:TestEndpointAuth -Endpoints @($numericIdUri) `
@@ -285,7 +287,7 @@ Describe "Endpoint-Level Scope Validation (Composition Pattern)" -Tags 'Integrat
         }
         
         It "Should normalize UPN (email) identifiers to {id} pattern" {
-            $mockToken = New-MockGraphToken -Scopes @('User.Read.All')
+            $mockToken = New-MockGraphToken -Scopes @('User.Read.All') -Delegated
             $upnUri = 'users/john.doe@contoso.com'
             
             $result = & $script:TestEndpointAuth -Endpoints @($upnUri) `
@@ -299,7 +301,7 @@ Describe "Endpoint-Level Scope Validation (Composition Pattern)" -Tags 'Integrat
     
     Context "When checking endpoints without defined scopes" {
         It "Should authorize public endpoints (no scope requirement)" {
-            $mockToken = New-MockGraphToken -Scopes @()
+            $mockToken = New-MockGraphToken -Scopes @() -Delegated
             $publicEndpoint = 'publicEndpointWithNoScopeRequirement'
             
             $result = & $script:TestEndpointAuth -Endpoints @($publicEndpoint) `
@@ -314,7 +316,7 @@ Describe "Endpoint-Level Scope Validation (Composition Pattern)" -Tags 'Integrat
     
     Context "When validating DeviceManagement scope hierarchy" {
         It "Should authorize DeviceManagement endpoint with exact scope" {
-            $mockToken = New-MockGraphToken -Scopes @('DeviceManagementManagedDevices.ReadWrite.All')
+            $mockToken = New-MockGraphToken -Scopes @('DeviceManagementManagedDevices.ReadWrite.All') -Delegated
             
             $result = & $script:TestEndpointAuth -Endpoints @('deviceManagement/managedDevices') `
                 -AccessToken $mockToken `
@@ -325,7 +327,7 @@ Describe "Endpoint-Level Scope Validation (Composition Pattern)" -Tags 'Integrat
         }
         
         It "Should deny DeviceManagement endpoint with read-only scope" {
-            $mockToken = New-MockGraphToken -Scopes @('DeviceManagementManagedDevices.Read.All')
+            $mockToken = New-MockGraphToken -Scopes @('DeviceManagementManagedDevices.Read.All') -Delegated
             
             $result = & $script:TestEndpointAuth -Endpoints @('deviceManagement/managedDevices') `
                 -AccessToken $mockToken `
@@ -338,7 +340,7 @@ Describe "Endpoint-Level Scope Validation (Composition Pattern)" -Tags 'Integrat
     
     Context "When handling nested resource paths" {
         It "Should authorize nested resource path with appropriate scope" {
-            $mockToken = New-MockGraphToken -Scopes @('Group.Read.All')
+            $mockToken = New-MockGraphToken -Scopes @('Group.Read.All') -Delegated
             
             $result = & $script:TestEndpointAuth -Endpoints @('groups/12345678-1234-1234-1234-123456789abc/members') `
                 -AccessToken $mockToken `
@@ -358,7 +360,7 @@ Describe "Endpoint-Level Scope Validation (Composition Pattern)" -Tags 'Integrat
                     Reason    = 'Test'
                 }
             )
-            $mockToken = New-MockGraphToken -Scopes @('User.Read.All')
+            $mockToken = New-MockGraphToken -Scopes @('User.Read.All') -Delegated
             
             $result = & $script:TestEndpointAuth -Endpoints @('users') `
                 -AccessToken $mockToken `
@@ -376,7 +378,7 @@ Describe "Endpoint-Level Scope Validation (Composition Pattern)" -Tags 'Integrat
                     Reason    = 'Test'
                 }
             )
-            $mockToken = New-MockGraphToken -Scopes @('User.Read.All')
+            $mockToken = New-MockGraphToken -Scopes @('User.Read.All') -Delegated
             
             $result = & $script:TestEndpointAuth -Endpoints @('users') `
                 -AccessToken $mockToken `
@@ -388,16 +390,18 @@ Describe "Endpoint-Level Scope Validation (Composition Pattern)" -Tags 'Integrat
     }
     
     Context "When validating complex scope combinations" {
-        It "Should authorize with Directory.ReadWrite.All for multiple endpoint types" -Skip {
-            # NOTE: Skipped - hierarchical scope checking requires full scope hierarchy configuration
-            # The composition pattern validates exact scope matches from Get-RequiredScopesForEndpoints
-            $mockToken = New-MockGraphToken -Scopes @('Directory.ReadWrite.All')
+        It "Should not authorize with Directory.ReadWrite.All for resource-specific endpoints (different resources)" {
+            # Test-ScopeAvailability validates hierarchical scopes via Test-ScopeHierarchy
+            # Directory.ReadWrite.All does NOT satisfy User.*, Group.*, or Device.* (different resources)
+            # Only Directory.* endpoints would be satisfied
+            $mockToken = New-MockGraphToken -Scopes @('Directory.ReadWrite.All') -Delegated
             
-            # Check multiple endpoints
-            $endpoints = @('users', 'groups', 'devices', 'organization')
+            # Check multiple endpoints with different resources
+            $endpoints = @('users', 'groups', 'devices')
             $results = @()
             
-            foreach ($endpoint in $endpoints) {
+            foreach ($endpoint in $endpoints)
+            {
                 $result = & $script:TestEndpointAuth -Endpoints @($endpoint) `
                     -AccessToken $mockToken `
                     -RequiredScopes $script:mockSettings.requiredScopes `
@@ -405,33 +409,37 @@ Describe "Endpoint-Level Scope Validation (Composition Pattern)" -Tags 'Integrat
                 $results += $result
             }
             
-            $results | Where-Object { -not $_.IsAuthorized } | Should -BeNullOrEmpty
-            $results.Count | Should -Be 4
+            # All should fail because resources don't match
+            $results | Where-Object { $_.IsAuthorized } | Should -BeNullOrEmpty
+            $results.Count | Should -Be 3
         }
     }
     
     Context "When checking multiple endpoints with partial authorization" {
-        It "Should identify which endpoints are unauthorized" -Skip {
-            # NOTE: This test expects hierarchical behavior but the composition pattern
-            # only validates exact scope matches. User.Read.All will match 'users' endpoint
-            # but won't hierarchically satisfy other endpoints.
-            # For full hierarchical validation, use Test-ScopeAvailability with complete scope config
-            $mockToken = New-MockGraphToken -Scopes @('User.Read.All')
+        It "Should identify which endpoints are unauthorized with partial scopes" {
+            # Test partial authorization: User.Read.All should only authorize 'users' endpoint
+            # Other endpoints (groups, devices) require their respective scopes
+            $mockToken = New-MockGraphToken -Scopes @('User.Read.All') -Delegated
             
             # Check multiple endpoints
             $endpoints = @('users', 'groups', 'devices')
-            $results = @()
+            $results = [System.Collections.ArrayList]::new()
             
-            foreach ($endpoint in $endpoints) {
+            foreach ($endpoint in $endpoints)
+            {
                 $result = & $script:TestEndpointAuth -Endpoints @($endpoint) `
                     -AccessToken $mockToken `
                     -RequiredScopes $script:mockSettings.requiredScopes `
                     -AuthConfig $script:mockAuthConfig
-                $results += $result
+                [void]$results.Add($result)
             }
             
-            ($results | Where-Object { $_.IsAuthorized }).Count | Should -Be 1
-            ($results | Where-Object { -not $_.IsAuthorized }).Count | Should -Be 2
+            # Only 'users' endpoint should be authorized
+            $authorizedResults = @($results | Where-Object { $_.IsAuthorized })
+            
+            $authorizedResults.Count | Should -Be 1
+            $authorizedResults[0].Endpoints[0] | Should -Be 'users'
+            @($results | Where-Object { -not $_.IsAuthorized }).Count | Should -Be 2
         }
     }
 }
