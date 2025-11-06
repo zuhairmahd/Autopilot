@@ -27,25 +27,6 @@
             repoName = 'Autopilot'
         }
         timeInSeconds = 60
-        cacheSettings = @{
-            maxCacheSize = 1000
-            defaultExpirationMinutes = 15
-            enabled = $true
-            cacheTypes = @{
-                Configuration = @{
-                    enabled = $true
-                    expirationMinutes = 60
-                }
-                DirectoryObjects = @{
-                    enabled = $true
-                    expirationMinutes = 15
-                }
-                Devices = @{
-                    enabled = $true
-                    expirationMinutes = 15
-                }
-            }
-        }
         maxUserMatchDisplay = 10
         maxWaitTime = 30
         appModes = @('full')
