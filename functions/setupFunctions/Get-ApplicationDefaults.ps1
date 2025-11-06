@@ -797,7 +797,25 @@ function Get-ApplicationDefaults()
                             'full',
                             'admin'
                         )
-                    }
+                    },
+                    @{
+                        description           = 'Edit repository information settings'
+                        name                  = 'Edit repository information'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin'
+                        )
+                    },
+                    @{
+                        description           = 'Edit cache settings'
+                        name                  = 'Edit cache settings'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin'
+                        )
+                    }            
                 )
                 type                  = 'static'
                 includeInDisplayModes = @(
