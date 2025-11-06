@@ -89,8 +89,6 @@ function Get-ApplicationDefaults()
             forceNewToken       = $false
             renewalLeadTime     = 5
             scope               = @(
-                "offline_access",
-                "openid",
                 "Device.ReadWrite.All",
                 "DeviceManagementApps.Read.All",
                 "DeviceManagementConfiguration.ReadWrite.All",
@@ -322,21 +320,6 @@ function Get-ApplicationDefaults()
                 endpoints = @(
                     "deviceManagement/deviceHealthScripts"
                 )
-            },
-            @{
-                Scope     = "openid"
-                Reason    = "Standard scope required for user sign -in with OpenID Connect."
-                Endpoints = @()
-            },
-            @{
-                Scope     = "profile"
-                Reason    = "Standard scope to get basic user profile information during sign -in ."
-                Endpoints = @()
-            },
-            @{
-                scope     = "offline_access"
-                reason    = "Standard scope that provides refresh tokens to maintain access when the user is not active."
-                endpoints = @()
             }
         )
         

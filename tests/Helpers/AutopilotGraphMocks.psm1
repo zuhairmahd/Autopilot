@@ -1055,7 +1055,8 @@ function New-MockGraphToken
     [CmdletBinding()]
     param(
         [string[]]$Scopes = @(),
-        [hashtable]$CustomPayload
+        [hashtable]$CustomPayload,
+        [switch]$Delegated
     )
     
     # Create payload
@@ -1066,14 +1067,25 @@ function New-MockGraphToken
     else
     {
         $payload = @{
-            roles = $Scopes
-            aud   = 'https://graph.microsoft.com'
-            iss   = 'https://sts.windows.net/test-tenant-id/'
-            exp   = ([DateTimeOffset]::UtcNow.AddHours(1).ToUnixTimeSeconds())
-            iat   = ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
-            nbf   = ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
-            tid   = 'test-tenant-id'
-            ver   = '2.0'
+            aud = 'https://graph.microsoft.com'
+            iss = 'https://sts.windows.net/test-tenant-id/'
+            exp = ([DateTimeOffset]::UtcNow.AddHours(1).ToUnixTimeSeconds())
+            iat = ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
+            nbf = ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
+            tid = 'test-tenant-id'
+            ver = '2.0'
+        }
+        
+        # Add scopes based on auth type
+        if ($Delegated)
+        {
+            # Delegated auth: scp claim (space-separated string)
+            $payload.scp = $Scopes -join ' '
+        }
+        else
+        {
+            # Application auth: roles claim (array)
+            $payload.roles = $Scopes
         }
     }
     

@@ -125,16 +125,6 @@
             Reason    = 'Required to read BitLocker recovery keys for all devices.'
         },
         @{
-            Scope     = 'openid'
-            Endpoints = @()
-            Reason    = 'Standard scope required for user sign-in with OpenID Connect.'
-        },
-        @{
-            Scope     = 'profile'
-            Endpoints = @()
-            Reason    = 'Standard scope to get basic user profile information during sign-in.'
-        },
-        @{
             scope     = 'DeviceManagementConfiguration.ReadWrite.All'
             endpoints = @(
                 'deviceManagement/deviceConfigurations'
@@ -154,11 +144,6 @@
                 'deviceManagement/managedDevices'
             )
             reason    = 'Required to create, update, and delete Intune managed device properties.'
-        },
-        @{
-            scope     = 'offline_access'
-            endpoints = @()
-            reason    = 'Standard scope that provides refresh tokens to maintain access when the user is not active.'
         }
     )
     auth           = @{
