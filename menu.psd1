@@ -412,6 +412,26 @@
                     'full',
                     'admin'
                 )
+            },
+            @{
+                menuName              = 'repoInfoEditMenu'
+                description           = 'Edit repository information settings'
+                name                  = 'Edit repository information'
+                blockType             = 'menu'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin'
+                )
+            },
+            @{
+                menuName              = 'cacheSettingsEditMenu'
+                description           = 'Edit cache settings'
+                name                  = 'Edit cache settings'
+                blockType             = 'menu'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin'
+                )
             }
         )
         type                  = 'static'
@@ -1008,6 +1028,136 @@
             @{
                 description           = 'View the current Autopilot profile settings'
                 name                  = 'View current Autopilot profile settings'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin'
+                )
+            }
+        )
+        type                  = 'static'
+        includeInDisplayModes = @(
+            'full',
+            'admin'
+        )
+    }
+    repoInfoEditMenu          = @{
+        Title                 = 'Repository Information Edit Menu'
+        Description           = 'Select which repository setting you want to modify:'
+        items                 = @(
+            @{
+                description           = 'Edit the repository name'
+                name                  = 'Edit repository name'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin'
+                )
+            },
+            @{
+                description           = 'Edit the base source URL for raw files'
+                name                  = 'Edit base source URL'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin'
+                )
+            },
+            @{
+                description           = 'Edit the base URL for the repository'
+                name                  = 'Edit base URL'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin'
+                )
+            },
+            @{
+                description           = 'Edit the repository path (organization or user)'
+                name                  = 'Edit repository path'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin'
+                )
+            },
+            @{
+                description           = 'View the current repository settings'
+                name                  = 'View current settings'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin'
+                )
+            }
+        )
+        type                  = 'static'
+        includeInDisplayModes = @(
+            'full',
+            'admin'
+        )
+    }
+    cacheSettingsEditMenu     = @{
+        Title                 = 'Cache Settings Edit Menu'
+        Description           = 'Select which cache setting you want to modify:'
+        items                 = @(
+            @{
+                description           = 'Toggle global cache enabled/disabled'
+                name                  = 'Toggle global cache enabled/disabled'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin'
+                )
+            },
+            @{
+                description           = 'Edit default expiration time in minutes'
+                name                  = 'Edit default expiration minutes'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin'
+                )
+            },
+            @{
+                description           = 'Edit maximum cache size (number of items)'
+                name                  = 'Edit max cache size'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin'
+                )
+            },
+            @{
+                description           = 'Configure Configuration cache type settings'
+                name                  = 'Edit Configuration cache type'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin'
+                )
+            },
+            @{
+                description           = 'Configure DirectoryObjects cache type settings'
+                name                  = 'Edit DirectoryObjects cache type'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin'
+                )
+            },
+            @{
+                description           = 'Configure Devices cache type settings'
+                name                  = 'Edit Devices cache type'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin'
+                )
+            },
+            @{
+                description           = 'View all current cache settings'
+                name                  = 'View current settings'
                 blockType             = 'action'
                 includeInDisplayModes = @(
                     'full',

@@ -2012,6 +2012,49 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings"
         return $null
     }
 }
+
+# Create repoInfo edit menu
+$repoInfoEditMenu = NewMenu -MenuName "repoInfoEditMenu"
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Edit repository information" -subMenu $repoInfoEditMenu
+$repoInfoEditMenu = AddMenuItem -menu $repoInfoEditMenu -Name "Edit repository name" -Action {
+    $result = Show-RepoInfoEditor -SettingsFile $InitFile
+    if ($result -eq "Back" -or $result -eq "back")
+    {
+        Write-Verbose "[$scriptName] User selected Back from repository info editor"
+        return $returnValues.backoutText
+    }
+    elseif ($result -eq "Main Menu" -or $result -eq "main menu")
+    {
+        Write-Verbose "[$scriptName] User selected Main Menu from repository info editor"
+        return $returnValues.mainMenuText
+    }
+    else
+    {
+        return $result
+    }
+} -ReturnsValue
+
+# Create cacheSettings edit menu
+$cacheSettingsEditMenu = NewMenu -MenuName "cacheSettingsEditMenu"
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Edit cache settings" -subMenu $cacheSettingsEditMenu
+$cacheSettingsEditMenu = AddMenuItem -menu $cacheSettingsEditMenu -Name "Toggle global cache enabled/disabled" -Action {
+    $result = Show-CacheSettingsEditor -SettingsFile $InitFile
+    if ($result -eq "Back" -or $result -eq "back")
+    {
+        Write-Verbose "[$scriptName] User selected Back from cache settings editor"
+        return $returnValues.backoutText
+    }
+    elseif ($result -eq "Main Menu" -or $result -eq "main menu")
+    {
+        Write-Verbose "[$scriptName] User selected Main Menu from cache settings editor"
+        return $returnValues.mainMenuText
+    }
+    else
+    {
+        return $result
+    }
+} -ReturnsValue
+
 #endregion Settings menu
 
 $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by Serial Number" -Submenu $serialNumberMenu
