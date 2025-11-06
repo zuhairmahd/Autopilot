@@ -45,16 +45,14 @@ Describe "GetGroupIdsByNames Function" -Tags 'Unit', 'DirectoryObject', 'GraphAP
         $global:maxJsonDepth = 10
         
         # Initialize cache settings
-        $global:settings = @{
-            cacheSettings = @{
-                enabled                  = $true
-                defaultExpirationMinutes = 15
-                maxCacheSize             = 1000
-                cacheTypes               = @{
-                    Configuration    = @{ enabled = $true; expirationMinutes = 60 }
-                    DirectoryObjects = @{ enabled = $true; expirationMinutes = 15 }
-                    Devices          = @{ enabled = $true; expirationMinutes = 15 }
-                }
+        $global:cacheSettings = @{
+            enabled                  = $true
+            defaultExpirationMinutes = 15
+            maxCacheSize             = 1000
+            cacheTypes               = @{
+                Configuration    = @{ enabled = $true; expirationMinutes = 60 }
+                DirectoryObjects = @{ enabled = $true; expirationMinutes = 15 }
+                Devices          = @{ enabled = $true; expirationMinutes = 15 }
             }
         }
         

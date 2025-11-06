@@ -70,7 +70,7 @@ function GetAutopilotProfile()
         
         # Check cache for GetAll (uses empty ProfileName)
         $getAllCacheKey = "autopilot:|False"
-        $cachedGetAll = Get-CachedData -CacheType 'Configuration' -Key $getAllCacheKey -Settings $global:settings
+        $cachedGetAll = Get-CachedData -CacheType 'Configuration' -Key $getAllCacheKey -CacheSettings $global:cacheSettings
         if ($null -ne $cachedGetAll)
         {
             Write-Verbose "[$functionName] Found cached GetAll result"
@@ -97,7 +97,7 @@ function GetAutopilotProfile()
                     SearchType   = 'GetAll'
                     ProfileCount = $Info.value.Count
                 }
-                $cached = Set-CachedData -CacheType 'Configuration' -Key $getAllCacheKey -Data $result -Metadata $metadata -Settings $global:settings
+                $cached = Set-CachedData -CacheType 'Configuration' -Key $getAllCacheKey -Data $result -Metadata $metadata -CacheSettings $global:cacheSettings
                 if ($cached)
                 {
                     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cached GetAll result" -LogLevel "Verbose"
@@ -123,7 +123,7 @@ function GetAutopilotProfile()
     $cacheKey = "autopilot:$ProfileName|$FindSimilar"
     
     # Check unified cache first
-    $cachedResult = Get-CachedData -CacheType 'Configuration' -Key $cacheKey -Settings $global:settings
+    $cachedResult = Get-CachedData -CacheType 'Configuration' -Key $cacheKey -CacheSettings $global:cacheSettings
     if ($null -ne $cachedResult)
     {
         Write-Verbose "[$functionName] Found cached result for Autopilot profile: $ProfileName (FindSimilar: $FindSimilar)"
@@ -168,7 +168,7 @@ function GetAutopilotProfile()
                 SearchType  = 'ExactMatch'
                 ProfileId   = $Info.value[0].id
             }
-            $cached = Set-CachedData -CacheType 'Configuration' -Key $cacheKey -Data $result -Metadata $metadata -Settings $global:settings
+            $cached = Set-CachedData -CacheType 'Configuration' -Key $cacheKey -Data $result -Metadata $metadata -CacheSettings $global:cacheSettings
             if ($cached)
             {
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cached result for Autopilot profile: $ProfileName" -LogLevel "Verbose"
@@ -324,7 +324,7 @@ function GetAutopilotProfile()
                     SearchType  = 'FuzzyMatch'
                     ResultCount = $filteredResponse.value.Count
                 }
-                $cached = Set-CachedData -CacheType 'Configuration' -Key $cacheKey -Data $result -Metadata $metadata -Settings $global:settings
+                $cached = Set-CachedData -CacheType 'Configuration' -Key $cacheKey -Data $result -Metadata $metadata -CacheSettings $global:cacheSettings
                 if ($cached)
                 {
                     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cached similarity search result for Autopilot profile: $ProfileName" -LogLevel "Verbose"
@@ -383,7 +383,7 @@ function GetAutopilotProfile()
                                 SearchType  = 'ClientSideFilter'
                                 ResultCount = $clientFilteredResponse.value.Count
                             }
-                            $cached = Set-CachedData -CacheType 'Configuration' -Key $cacheKey -Data $result -Metadata $metadata -Settings $global:settings
+                            $cached = Set-CachedData -CacheType 'Configuration' -Key $cacheKey -Data $result -Metadata $metadata -CacheSettings $global:cacheSettings
                             if ($cached)
                             {
                                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cached client-side filtered result" -LogLevel "Verbose"

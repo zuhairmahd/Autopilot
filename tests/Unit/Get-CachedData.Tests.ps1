@@ -9,22 +9,20 @@ BeforeAll {
     # We'll skip Invoke-CacheManagement for now and test just the cache functions
     # . "$script:RepoRoot/functions/utilityFunctions/Invoke-CacheManagement.ps1"
     
-    # Initialize test settings
-    $script:testSettings = @{
-        cacheSettings = @{
-            enabled                  = $true
-            defaultExpirationMinutes = 15
-            maxCacheSize             = 1000
-            cacheTypes               = @{
-                Configuration    = @{ enabled = $true; expirationMinutes = 60 }
-                DirectoryObjects = @{ enabled = $true; expirationMinutes = 15 }
-                Devices          = @{ enabled = $true; expirationMinutes = 15 }
-            }
+    # Initialize test cache settings
+    $script:testCacheSettings = @{
+        enabled                  = $true
+        defaultExpirationMinutes = 15
+        maxCacheSize             = 1000
+        cacheTypes               = @{
+            Configuration    = @{ enabled = $true; expirationMinutes = 60 }
+            DirectoryObjects = @{ enabled = $true; expirationMinutes = 15 }
+            Devices          = @{ enabled = $true; expirationMinutes = 15 }
         }
     }
     
-    # Set global settings for all tests
-    $global:settings = $script:testSettings
+    # Set global cache settings for all tests
+    $global:cacheSettings = $script:testCacheSettings
 }
 
 Describe "Unified Cache Management" -Tags 'Unit' {
@@ -50,17 +48,15 @@ Describe "Unified Cache Management" -Tags 'Unit' {
     
     Context "Get-CachedData" {
         BeforeEach {
-            # Create fresh copy of settings for each test
-            $global:settings = @{
-                cacheSettings = @{
-                    enabled                  = $true
-                    defaultExpirationMinutes = 15
-                    maxCacheSize             = 1000
-                    cacheTypes               = @{
-                        Configuration    = @{ enabled = $true; expirationMinutes = 60 }
-                        DirectoryObjects = @{ enabled = $true; expirationMinutes = 15 }
-                        Devices          = @{ enabled = $true; expirationMinutes = 15 }
-                    }
+            # Create fresh copy of cache settings for each test
+            $global:cacheSettings = @{
+                enabled                  = $true
+                defaultExpirationMinutes = 15
+                maxCacheSize             = 1000
+                cacheTypes               = @{
+                    Configuration    = @{ enabled = $true; expirationMinutes = 60 }
+                    DirectoryObjects = @{ enabled = $true; expirationMinutes = 15 }
+                    Devices          = @{ enabled = $true; expirationMinutes = 15 }
                 }
             }
             Initialize-UnifiedCache
@@ -72,14 +68,14 @@ Describe "Unified Cache Management" -Tags 'Unit' {
         }
         
         It "Returns null when caching is globally disabled" {
-            $global:settings.cacheSettings.enabled = $false
+            $global:cacheSettings.enabled = $false
             
             $result = Get-CachedData -CacheType 'Configuration' -Key 'test:key'
             $result | Should -BeNullOrEmpty
         }
         
         It "Returns null when specific cache type is disabled" {
-            $global:settings.cacheSettings.cacheTypes.Configuration.enabled = $false
+            $global:cacheSettings.cacheTypes.Configuration.enabled = $false
             
             $result = Get-CachedData -CacheType 'Configuration' -Key 'test:key'
             $result | Should -BeNullOrEmpty
@@ -96,7 +92,7 @@ Describe "Unified Cache Management" -Tags 'Unit' {
         
         It "Returns null for expired cache entries" {
             # Set data with short expiration
-            $global:settings.cacheSettings.cacheTypes.Configuration.expirationMinutes = 0.01  # ~0.6 seconds
+            $global:cacheSettings.cacheTypes.Configuration.expirationMinutes = 0.01  # ~0.6 seconds
             Set-CachedData -CacheType 'Configuration' -Key 'test:expire' -Data 'ExpireValue'
             
             # Wait for expiration
@@ -110,17 +106,15 @@ Describe "Unified Cache Management" -Tags 'Unit' {
     
     Context "Set-CachedData" {
         BeforeEach {
-            # Create fresh copy of settings for each test
-            $global:settings = @{
-                cacheSettings = @{
-                    enabled                  = $true
-                    defaultExpirationMinutes = 15
-                    maxCacheSize             = 1000
-                    cacheTypes               = @{
-                        Configuration    = @{ enabled = $true; expirationMinutes = 60 }
-                        DirectoryObjects = @{ enabled = $true; expirationMinutes = 15 }
-                        Devices          = @{ enabled = $true; expirationMinutes = 15 }
-                    }
+            # Create fresh copy of cache settings for each test
+            $global:cacheSettings = @{
+                enabled                  = $true
+                defaultExpirationMinutes = 15
+                maxCacheSize             = 1000
+                cacheTypes               = @{
+                    Configuration    = @{ enabled = $true; expirationMinutes = 60 }
+                    DirectoryObjects = @{ enabled = $true; expirationMinutes = 15 }
+                    Devices          = @{ enabled = $true; expirationMinutes = 15 }
                 }
             }
             Initialize-UnifiedCache
@@ -132,14 +126,14 @@ Describe "Unified Cache Management" -Tags 'Unit' {
         }
         
         It "Returns false when caching is globally disabled" {
-            $global:settings.cacheSettings.enabled = $false
+            $global:cacheSettings.enabled = $false
             
             $result = Set-CachedData -CacheType 'DirectoryObjects' -Key 'test:key' -Data 'TestValue'
             $result | Should -Be $false
         }
         
         It "Returns false when specific cache type is disabled" {
-            $global:settings.cacheSettings.cacheTypes.DirectoryObjects.enabled = $false
+            $global:cacheSettings.cacheTypes.DirectoryObjects.enabled = $false
             
             $result = Set-CachedData -CacheType 'DirectoryObjects' -Key 'test:key' -Data 'TestValue'
             $result | Should -Be $false
@@ -154,7 +148,7 @@ Describe "Unified Cache Management" -Tags 'Unit' {
         
         It "Respects cache size limits" {
             # Set small cache size
-            $global:settings.cacheSettings.maxCacheSize = 5
+            $global:cacheSettings.maxCacheSize = 5
             
             # Add more items than limit
             1..10 | ForEach-Object {
@@ -168,17 +162,15 @@ Describe "Unified Cache Management" -Tags 'Unit' {
     
     Context "Clear-UnifiedCache" {
         BeforeEach {
-            # Create fresh copy of settings for each test
-            $global:settings = @{
-                cacheSettings = @{
-                    enabled                  = $true
-                    defaultExpirationMinutes = 15
-                    maxCacheSize             = 1000
-                    cacheTypes               = @{
-                        Configuration    = @{ enabled = $true; expirationMinutes = 60 }
-                        DirectoryObjects = @{ enabled = $true; expirationMinutes = 15 }
-                        Devices          = @{ enabled = $true; expirationMinutes = 15 }
-                    }
+            # Create fresh copy of cache settings for each test
+            $global:cacheSettings = @{
+                enabled                  = $true
+                defaultExpirationMinutes = 15
+                maxCacheSize             = 1000
+                cacheTypes               = @{
+                    Configuration    = @{ enabled = $true; expirationMinutes = 60 }
+                    DirectoryObjects = @{ enabled = $true; expirationMinutes = 15 }
+                    Devices          = @{ enabled = $true; expirationMinutes = 15 }
                 }
             }
             Initialize-UnifiedCache
@@ -208,17 +200,15 @@ Describe "Unified Cache Management" -Tags 'Unit' {
     
     Context "Cache Expiration Helper" {
         BeforeEach {
-            # Create fresh copy of settings for each test
-            $global:settings = @{
-                cacheSettings = @{
-                    enabled                  = $true
-                    defaultExpirationMinutes = 15
-                    maxCacheSize             = 1000
-                    cacheTypes               = @{
-                        Configuration    = @{ enabled = $true; expirationMinutes = 60 }
-                        DirectoryObjects = @{ enabled = $true; expirationMinutes = 15 }
-                        Devices          = @{ enabled = $true; expirationMinutes = 15 }
-                    }
+            # Create fresh copy of cache settings for each test
+            $global:cacheSettings = @{
+                enabled                  = $true
+                defaultExpirationMinutes = 15
+                maxCacheSize             = 1000
+                cacheTypes               = @{
+                    Configuration    = @{ enabled = $true; expirationMinutes = 60 }
+                    DirectoryObjects = @{ enabled = $true; expirationMinutes = 15 }
+                    Devices          = @{ enabled = $true; expirationMinutes = 15 }
                 }
             }
         }
@@ -229,14 +219,14 @@ Describe "Unified Cache Management" -Tags 'Unit' {
         }
         
         It "Returns default expiration when type not configured" {
-            $global:settings.cacheSettings.cacheTypes.Remove('DirectoryObjects')
+            $global:cacheSettings.cacheTypes.Remove('DirectoryObjects')
             
             $result = Get-CacheExpirationMinutes -CacheType 'DirectoryObjects'
             $result | Should -Be 15  # Default from settings
         }
         
         It "Returns fallback when no settings provided" {
-            $result = Get-CacheExpirationMinutes -CacheType 'Configuration' -Settings $null
+            $result = Get-CacheExpirationMinutes -CacheType 'Configuration' -CacheSettings $null
             $result | Should -Be 15  # Hardcoded fallback
         }
     }

@@ -61,7 +61,7 @@ function Get-DeviceData()
     # Try to get cached data (unless RefreshCache is specified)
     if (-not $RefreshCache)
     {
-        $cachedData = Get-CachedData -CacheType 'Devices' -Key $cacheKey -Settings $global:settings
+        $cachedData = Get-CachedData -CacheType 'Devices' -Key $cacheKey -CacheSettings $global:cacheSettings
         
         if ($null -ne $cachedData)
         {
@@ -131,7 +131,7 @@ function Get-DeviceData()
         $metadata.Filter = $currentFilter
     }
         
-    $cached = Set-CachedData -CacheType 'Devices' -Key $cacheKey -Data $devices -Metadata $metadata -Settings $global:settings
+    $cached = Set-CachedData -CacheType 'Devices' -Key $cacheKey -Data $devices -Metadata $metadata -CacheSettings $global:cacheSettings
     if ($cached)
     {
         Write-Log -LogFile $LogFile -Module $functionName -Message "$DeviceType device data cached." -LogLevel "Verbose"

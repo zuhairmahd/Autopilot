@@ -14,8 +14,8 @@ function Get-CachedData()
     .PARAMETER Key
         The unique key for the cached item
     
-    .PARAMETER Settings
-        Settings object containing cache configuration. If not provided, uses $global:settings
+    .PARAMETER CacheSettings
+        Cache settings object. If not provided, uses $global:cacheSettings
     
     .OUTPUTS
         Returns cached data if valid, $null if not found or expired
@@ -40,22 +40,22 @@ function Get-CachedData()
         [Parameter(Mandatory = $true)]
         [string]$Key,
         [Parameter(Mandatory = $false)]
-        $Settings = $global:settings
+        $CacheSettings = $global:cacheSettings
     )
     
     $functionName = $MyInvocation.MyCommand.Name
     
     # Check if caching is enabled globally
-    if ($Settings -and $Settings.cacheSettings -and -not $Settings.cacheSettings.enabled)
+    if ($CacheSettings -and -not $CacheSettings.enabled)
     {
         Write-Verbose "[$functionName] Caching is disabled globally"
         return $null
     }
     
     # Check if this cache type is enabled
-    if ($Settings -and $Settings.cacheSettings -and $Settings.cacheSettings.cacheTypes -and 
-        $Settings.cacheSettings.cacheTypes.ContainsKey($CacheType) -and 
-        -not $Settings.cacheSettings.cacheTypes[$CacheType].enabled)
+    if ($CacheSettings -and $CacheSettings.cacheTypes -and 
+        $CacheSettings.cacheTypes.ContainsKey($CacheType) -and 
+        -not $CacheSettings.cacheTypes[$CacheType].enabled)
     {
         Write-Verbose "[$functionName] Caching is disabled for type: $CacheType"
         return $null
@@ -86,7 +86,7 @@ function Get-CachedData()
     # Check expiration
     if ($cacheEntry.Timestamp)
     {
-        $expirationMinutes = Get-CacheExpirationMinutes -CacheType $CacheType -Settings $Settings
+        $expirationMinutes = Get-CacheExpirationMinutes -CacheType $CacheType -CacheSettings $CacheSettings
         $age = (Get-Date) - $cacheEntry.Timestamp
         
         if ($age.TotalMinutes -gt $expirationMinutes)
@@ -124,8 +124,8 @@ function Set-CachedData()
     .PARAMETER Metadata
         Optional metadata to store with the cached data
     
-    .PARAMETER Settings
-        Settings object containing cache configuration. If not provided, uses $global:settings
+    .PARAMETER CacheSettings
+        Cache settings object. If not provided, uses $global:cacheSettings
     
     .OUTPUTS
         Returns $true if data was cached, $false otherwise
@@ -154,22 +154,22 @@ function Set-CachedData()
         [Parameter(Mandatory = $false)]
         $Metadata,
         [Parameter(Mandatory = $false)]
-        $Settings = $global:settings
+        $CacheSettings = $global:cacheSettings
     )
     
     $functionName = $MyInvocation.MyCommand.Name
     
     # Check if caching is enabled globally
-    if ($Settings -and $Settings.cacheSettings -and -not $Settings.cacheSettings.enabled)
+    if ($CacheSettings -and -not $CacheSettings.enabled)
     {
         Write-Verbose "[$functionName] Caching is disabled globally"
         return $false
     }
     
     # Check if this cache type is enabled
-    if ($Settings -and $Settings.cacheSettings -and $Settings.cacheSettings.cacheTypes -and 
-        $Settings.cacheSettings.cacheTypes.ContainsKey($CacheType) -and 
-        -not $Settings.cacheSettings.cacheTypes[$CacheType].enabled)
+    if ($CacheSettings -and $CacheSettings.cacheTypes -and 
+        $CacheSettings.cacheTypes.ContainsKey($CacheType) -and 
+        -not $CacheSettings.cacheTypes[$CacheType].enabled)
     {
         Write-Verbose "[$functionName] Caching is disabled for type: $CacheType"
         return $false
@@ -188,9 +188,9 @@ function Set-CachedData()
     }
     
     # Check cache size limit and trim if needed
-    $maxSize = if ($Settings -and $Settings.cacheSettings -and $Settings.cacheSettings.maxCacheSize)
+    $maxSize = if ($CacheSettings -and $CacheSettings.maxCacheSize)
     {
-        $Settings.cacheSettings.maxCacheSize
+        $CacheSettings.maxCacheSize
     }
     else
     {
@@ -267,8 +267,8 @@ function Get-CacheExpirationMinutes()
     .PARAMETER CacheType
         The cache type to get expiration for
     
-    .PARAMETER Settings
-        Settings object containing cache configuration
+    .PARAMETER CacheSettings
+        Cache settings object
     
     .OUTPUTS
         Integer - Number of minutes before cache expires
@@ -284,28 +284,28 @@ function Get-CacheExpirationMinutes()
         [string]$CacheType,
         
         [Parameter(Mandatory = $false)]
-        $Settings = $global:settings
+        $CacheSettings = $global:cacheSettings
     )
     
     $defaultExpiration = 15  # Default fallback
     
-    if (-not $Settings -or -not $Settings.cacheSettings)
+    if (-not $CacheSettings)
     {
         return $defaultExpiration
     }
     
     # Check for cache-type-specific expiration
-    if ($Settings.cacheSettings.cacheTypes -and 
-        $Settings.cacheSettings.cacheTypes.ContainsKey($CacheType) -and
-        $Settings.cacheSettings.cacheTypes[$CacheType].expirationMinutes)
+    if ($CacheSettings.cacheTypes -and 
+        $CacheSettings.cacheTypes.ContainsKey($CacheType) -and
+        $CacheSettings.cacheTypes[$CacheType].expirationMinutes)
     {
-        return $Settings.cacheSettings.cacheTypes[$CacheType].expirationMinutes
+        return $CacheSettings.cacheTypes[$CacheType].expirationMinutes
     }
     
     # Fall back to default expiration
-    if ($Settings.cacheSettings.defaultExpirationMinutes)
+    if ($CacheSettings.defaultExpirationMinutes)
     {
-        return $Settings.cacheSettings.defaultExpirationMinutes
+        return $CacheSettings.defaultExpirationMinutes
     }
     
     return $defaultExpiration

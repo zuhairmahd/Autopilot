@@ -14,18 +14,20 @@ Describe "Function: Get-DeviceData" -Tags 'Unit' {
         # Mock Write-Log
         Mock Write-Log {}
         
-        # Mock settings global variable with cache configuration
+        # Mock settings global variable
         $global:settings = @{
             deviceNamePrefix = 'TEST-'
-            cacheSettings    = @{
-                enabled                  = $true
-                defaultExpirationMinutes = 15
-                maxCacheSize             = 1000
-                cacheTypes               = @{
-                    Configuration    = @{ enabled = $true; expirationMinutes = 60 }
-                    DirectoryObjects = @{ enabled = $true; expirationMinutes = 15 }
-                    Devices          = @{ enabled = $true; expirationMinutes = 15 }
-                }
+        }
+        
+        # Mock cache settings global variable
+        $global:cacheSettings = @{
+            enabled                  = $true
+            defaultExpirationMinutes = 15
+            maxCacheSize             = 1000
+            cacheTypes               = @{
+                Configuration    = @{ enabled = $true; expirationMinutes = 60 }
+                DirectoryObjects = @{ enabled = $true; expirationMinutes = 15 }
+                Devices          = @{ enabled = $true; expirationMinutes = 15 }
             }
         }
         
@@ -294,7 +296,7 @@ Describe "Function: Get-DeviceData" -Tags 'Unit' {
             $firstTimestamp = $global:UnifiedCache.Devices['device:autopilot'].Timestamp
             
             # Modify settings to use very short expiration (0.01 minutes = ~0.6 seconds)
-            $global:settings.cacheSettings.cacheTypes.Devices.expirationMinutes = 0.01
+            $global:cacheSettings.cacheTypes.Devices.expirationMinutes = 0.01
             Start-Sleep -Seconds 2
             
             # Second call should refresh due to expired cache

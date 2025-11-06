@@ -41,7 +41,7 @@ function Get-CachedDeviceEnrollmentStatus()
     # Try to get cached data (unless flushCache is specified)
     if (-not $flushCache)
     {
-        $cachedState = Get-CachedData -CacheType 'Devices' -Key $cacheKey -Settings $Settings
+        $cachedState = Get-CachedData -CacheType 'Devices' -Key $cacheKey -CacheSettings $Settings
         
         if ($null -ne $cachedState)
         {
@@ -61,7 +61,7 @@ function Get-CachedDeviceEnrollmentStatus()
         $metadata = @{
             SerialNumber = $SerialNumber
         }
-        $cached = Set-CachedData -CacheType 'Devices' -Key $cacheKey -Data $enrollmentState -Metadata $metadata -Settings $Settings
+        $cached = Set-CachedData -CacheType 'Devices' -Key $cacheKey -Data $enrollmentState -Metadata $metadata -CacheSettings $Settings
         if ($cached)
         {
             Write-Verbose "[$functionName] Cached enrollment state for serial number: $SerialNumber."

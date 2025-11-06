@@ -79,7 +79,7 @@ function Update-Setting()
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [ValidateSet('Global', 'Domain', 'Auth')]
+        [ValidateSet('Global', 'Domain', 'Auth', 'cacheSettings', 'repoInfo')]
         [string]$SettingType,
         [string]$SettingsFile = "settings.psd1",
         [string]$SettingName,
@@ -148,6 +148,26 @@ function Update-Setting()
             Write-Verbose "[$functionName] Updating settings for domain '$DomainName', merge mode: $MergeSettings"
             Write-Log -LogFile $logFile -Message "Updating settings for domain '$DomainName', merge mode: $MergeSettings" -Module $functionName
         }
+        'cacheSettings'
+        {
+            if (-not (Test-SettingNameAndValue -SettingName $SettingName -SettingValue $SettingValue -settingType 'cacheSettings'))
+            {
+                Write-Log -LogFile $logFile -Message "Invalid parameters for cacheSettings setting type" -Module $functionName -LogLevel "Error"
+                return $false
+            }
+            Write-Verbose "[$functionName] Updating cache setting '$SettingName' to '$SettingValue'"
+            Write-Log -LogFile $logFile -Message "Updating cache setting '$SettingName' to '$SettingValue'" -Module $functionName
+        }
+        'repoInfo'
+        {
+            if (-not (Test-SettingNameAndValue -SettingName $SettingName -SettingValue $SettingValue -settingType 'repoInfo'))
+            {
+                Write-Log -LogFile $logFile -Message "Invalid parameters for repoInfo setting type" -Module $functionName -LogLevel "Error"
+                return $false
+            }
+            Write-Verbose "[$functionName] Updating repository info setting '$SettingName' to '$SettingValue'"
+            Write-Log -LogFile $logFile -Message "Updating repository info setting '$SettingName' to '$SettingValue'" -Module $functionName
+        }
     }
     
     try
@@ -201,6 +221,18 @@ function Update-Setting()
                 Write-Verbose "[$functionName] Validating structure for domains"
                 Write-Log -LogFile $logFile -Message "Validating structure for domains" -Module $functionName
                 'domains' 
+            }
+            'cacheSettings'
+            {
+                Write-Verbose "[$functionName] Validating structure for cacheSettings"
+                Write-Log -LogFile $logFile -Message "Validating structure for cacheSettings" -Module $functionName
+                'cacheSettings' 
+            }
+            'repoInfo'
+            {
+                Write-Verbose "[$functionName] Validating structure for repoInfo"
+                Write-Log -LogFile $logFile -Message "Validating structure for repoInfo" -Module $functionName
+                'repoInfo' 
             }
         }
         
@@ -297,6 +329,32 @@ function Update-Setting()
                 
                 Write-Verbose "[$functionName] Successfully updated domain configuration file for: $DomainName"
                 Write-Log -LogFile $logFile -Message "Successfully updated domain configuration file for: $DomainName" -Module $functionName
+            }
+            'cacheSettings'
+            {
+                # Ensure cacheSettings is a hashtable using optimized utility
+                $cacheSettingsHash = Test-IsHashtableOrConvert -InputObject $settingsHash['cacheSettings']
+                
+                # Update the specific setting
+                Write-Verbose "[$functionName] Updating cacheSettings.$SettingName = $SettingValue"
+                Write-Log -LogFile $logFile -Message "Updating cacheSettings.$SettingName = $SettingValue" -Module $functionName
+                $cacheSettingsHash[$SettingName] = $SettingValue
+                $settingsHash['cacheSettings'] = $cacheSettingsHash
+                Write-Verbose "[$functionName] Updated cacheSettings.$SettingName = $SettingValue"
+                Write-Log -LogFile $logFile -Message "Updated cacheSettings.$SettingName = $SettingValue" -Module $functionName
+            }
+            'repoInfo'
+            {
+                # Ensure repoInfo is a hashtable using optimized utility
+                $repoInfoHash = Test-IsHashtableOrConvert -InputObject $settingsHash['repoInfo']
+                
+                # Update the specific setting
+                Write-Verbose "[$functionName] Updating repoInfo.$SettingName = $SettingValue"
+                Write-Log -LogFile $logFile -Message "Updating repoInfo.$SettingName = $SettingValue" -Module $functionName
+                $repoInfoHash[$SettingName] = $SettingValue
+                $settingsHash['repoInfo'] = $repoInfoHash
+                Write-Verbose "[$functionName] Updated repoInfo.$SettingName = $SettingValue"
+                Write-Log -LogFile $logFile -Message "Updated repoInfo.$SettingName = $SettingValue" -Module $functionName
             }
         }
         
@@ -462,6 +520,60 @@ function Update-Setting()
                 {
                     Write-Warning "[$functionName] Failed to verify domain settings - configuration file not found"
                     Write-Log -LogFile $logFile -Message "Failed to verify domain settings - configuration file not found for '$DomainName'" -Module $functionName -LogLevel "Verbose"
+                    $false
+                }
+            }
+            'cacheSettings'
+            {
+                if ($verifySettingsHash['cacheSettings'] -and $verifySettingsHash['cacheSettings'].ContainsKey($SettingName))
+                {
+                    $actualValue = $verifySettingsHash['cacheSettings'][$SettingName]
+                    
+                    if ($actualValue -eq $SettingValue)
+                    {
+                        Write-Verbose "[$functionName] Successfully updated and verified cache setting"
+                        Write-Log -LogFile $logFile -Message "Successfully updated and verified cache setting '$SettingName'" -Module $functionName
+                        $true
+                    }
+                    else
+                    {
+                        Write-Warning "[$functionName] Cache setting value does not match after update"
+                        Write-Verbose "[$functionName] Expected: '$SettingValue' | Actual: '$actualValue'"
+                        Write-Log -LogFile $logFile -Message "Cache setting value mismatch for '$SettingName' | Expected: '$SettingValue' | Actual: '$actualValue'" -Module $functionName -LogLevel "Warning"
+                        $false
+                    }
+                }
+                else
+                {
+                    Write-Warning "[$functionName] Failed to verify cache setting update - property not found"
+                    Write-Log -LogFile $logFile -Message "Failed to verify cache setting update - property '$SettingName' not found" -Module $functionName -LogLevel "Warning"
+                    $false
+                }
+            }
+            'repoInfo'
+            {
+                if ($verifySettingsHash['repoInfo'] -and $verifySettingsHash['repoInfo'].ContainsKey($SettingName))
+                {
+                    $actualValue = $verifySettingsHash['repoInfo'][$SettingName]
+                    
+                    if ($actualValue -eq $SettingValue)
+                    {
+                        Write-Verbose "[$functionName] Successfully updated and verified repository info setting"
+                        Write-Log -LogFile $logFile -Message "Successfully updated and verified repository info setting '$SettingName'" -Module $functionName
+                        $true
+                    }
+                    else
+                    {
+                        Write-Warning "[$functionName] Repository info setting value does not match after update"
+                        Write-Verbose "[$functionName] Expected: '$SettingValue' | Actual: '$actualValue'"
+                        Write-Log -LogFile $logFile -Message "Repository info setting value mismatch for '$SettingName' | Expected: '$SettingValue' | Actual: '$actualValue'" -Module $functionName -LogLevel "Warning"
+                        $false
+                    }
+                }
+                else
+                {
+                    Write-Warning "[$functionName] Failed to verify repository info setting update - property not found"
+                    Write-Log -LogFile $logFile -Message "Failed to verify repository info setting update - property '$SettingName' not found" -Module $functionName -LogLevel "Warning"
                     $false
                 }
             }

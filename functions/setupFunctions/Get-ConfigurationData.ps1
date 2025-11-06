@@ -150,7 +150,7 @@ function Get-ConfigurationData()
             $cacheKey = "config:$psd1Path"
             
             # Try to get from unified cache
-            $cachedEntry = Get-CachedData -CacheType 'Configuration' -Key $cacheKey -Settings $global:settings
+            $cachedEntry = Get-CachedData -CacheType 'Configuration' -Key $cacheKey -CacheSettings $global:cacheSettings
             
             if ($null -ne $cachedEntry)
             {
@@ -199,7 +199,7 @@ function Get-ConfigurationData()
                 FileTimestamp = $fileTimestamp
             }
             
-            $cached = Set-CachedData -CacheType 'Configuration' -Key $cacheKey -Data $cacheData -Metadata $metadata -Settings $global:settings
+            $cached = Set-CachedData -CacheType 'Configuration' -Key $cacheKey -Data $cacheData -Metadata $metadata -CacheSettings $global:cacheSettings
             if ($cached)
             {
                 Write-Verbose "[$functionName] Cached configuration for: $psd1Path"
