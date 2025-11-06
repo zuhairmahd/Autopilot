@@ -147,7 +147,7 @@ Describe "GetGroupIdsByNames Function" -Tags 'Unit', 'DirectoryObject', 'GraphAP
             $result1 | Should -Not -BeNullOrEmpty
             
             # Verify cache contains the mapping
-            $cachedId = Get-CachedData -CacheType 'DirectoryObjects' -Key "group:name:$testGroupName1" -Settings $global:settings
+            $cachedId = Get-CachedData -CacheType 'DirectoryObjects' -Key "group:name:$testGroupName1" -CacheSettings $global:cacheSettings
             $cachedId | Should -Be $testGroupId1
         }
         
@@ -190,7 +190,7 @@ Describe "GetGroupIdsByNames Function" -Tags 'Unit', 'DirectoryObject', 'GraphAP
             $result1 | Should -Not -BeNullOrEmpty
             
             # Verify cache contains the mapping
-            $cachedName = Get-CachedData -CacheType 'DirectoryObjects' -Key "group:id:$testGroupId1" -Settings $global:settings
+            $cachedName = Get-CachedData -CacheType 'DirectoryObjects' -Key "group:id:$testGroupId1" -CacheSettings $global:cacheSettings
             $cachedName | Should -Be $testGroupName1
         }
         
@@ -214,8 +214,8 @@ Describe "GetGroupIdsByNames Function" -Tags 'Unit', 'DirectoryObject', 'GraphAP
             $null = GetGroupIdsByNames -AccessToken $mockAccessToken -GroupNames @($testGroupName1)
             
             # Verify both cache entries exist
-            $cachedId = Get-CachedData -CacheType 'DirectoryObjects' -Key "group:name:$testGroupName1" -Settings $global:settings
-            $cachedName = Get-CachedData -CacheType 'DirectoryObjects' -Key "group:id:$testGroupId1" -Settings $global:settings
+            $cachedId = Get-CachedData -CacheType 'DirectoryObjects' -Key "group:name:$testGroupName1" -CacheSettings $global:cacheSettings
+            $cachedName = Get-CachedData -CacheType 'DirectoryObjects' -Key "group:id:$testGroupId1" -CacheSettings $global:cacheSettings
             
             $cachedId | Should -Be $testGroupId1
             $cachedName | Should -Be $testGroupName1

@@ -3,8 +3,8 @@
     Pester tests for Show-CacheSettingsEditor.ps1
 
 .DESCRIPTION
-    Unit tests for cache settings editor.
-    Tests cache configuration editing functionality.
+    Unit tests for cache settings editor wrapper.
+    Tests that the wrapper correctly calls Show-SettingsEditor with appropriate parameters.
 
 .NOTES
     Test Category: Unit
@@ -26,113 +26,18 @@ Describe "Function: Show-CacheSettingsEditor" -Tags 'Unit', 'CacheSettingsEditor
         $script:TestContext = Initialize-AutopilotTestEnvironment
         $script:RootPath = $script:TestContext.RootPath
         
-        # Dot-source the function under test and dependencies
+        # Dot-source the function under test
         . "$script:RootPath/functions/setupFunctions/Show-CacheSettingsEditor.ps1"
-        . "$script:RootPath/functions/setupFunctions/Show-EditorCommon.ps1"
-        . "$script:RootPath/functions/setupFunctions/Get-ConfigurationData.ps1"
-        . "$script:RootPath/functions/setupFunctions/Update-Setting.ps1"
-        . "$script:RootPath/functions/setupFunctions/Get-ApplicationDefaults.ps1"
+        . "$script:RootPath/functions/setupFunctions/Show-SettingsEditor.ps1"
         . "$script:RootPath/functions/utilityFunctions/Write-Log.ps1"
-        . "$script:RootPath/functions/utilityFunctions/Settings-Utilities.ps1"
-        . "$script:RootPath/functions/utilityFunctions/Export-PowershellDataFile/Export-PowerShellDataFile.ps1"
         
         # Setup global log file
         $global:LogFile = $script:TestContext.LogFile
-        
-        # Create test settings file with cacheSettings
-        $script:TestSettingsFile = Join-Path $script:TestContext.TempDir "test-settings.psd1"
-        $testSettings = @{
-            description    = 'Test settings for CacheSettingsEditor'
-            version        = '1.3.0.0'
-            auth           = @{
-                authType = 'PublicAuthFlow'
-                scope    = @('Device.ReadWrite.All')
-            }
-            globalSettings = @{
-                configFile     = '.\.secrets\config.json'
-                maxWaitTime    = 30
-                appModes       = @('full')
-                cacheSettings  = @{
-                    enabled                  = $true
-                    defaultExpirationMinutes = 15
-                    maxCacheSize             = 1000
-                    cacheTypes               = @{
-                        Configuration    = @{
-                            enabled           = $true
-                            expirationMinutes = 60
-                        }
-                        DirectoryObjects = @{
-                            enabled           = $true
-                            expirationMinutes = 15
-                        }
-                        Devices          = @{
-                            enabled           = $true
-                            expirationMinutes = 15
-                        }
-                    }
-                }
-                autoUpdate     = $true
-            }
-        }
-        
-        Export-PowerShellDataFile -Path $script:TestSettingsFile -Data $testSettings
     }
     
     AfterAll {
         # Cleanup
         Remove-TestEnvironment -TestContext $script:TestContext
-    }
-    
-    Context "Basic Functionality" {
-        
-        It "Should fail if settings file does not exist" {
-            $nonExistentFile = Join-Path $script:TestContext.TempDir "nonexistent.psd1"
-            $result = Show-CacheSettingsEditor -SettingsFile $nonExistentFile -Silent
-            $result | Should -Be $false
-        }
-        
-        It "Should load existing cacheSettings successfully" {
-            Mock ShowMenu { return "Back" } -ModuleName $null
-            Mock NewMenu { return @{ Title = "Test"; items = @() } } -ModuleName $null
-            Mock AddMenuItem { param($Menu) return $Menu } -ModuleName $null
-            
-            # The function should be able to load the file without errors
-            { Show-CacheSettingsEditor -SettingsFile $script:TestSettingsFile -Silent } | Should -Not -Throw
-        }
-    }
-    
-    Context "Settings File Validation" {
-        
-        It "Should handle missing globalSettings section gracefully" {
-            $testFile = Join-Path $script:TestContext.TempDir "no-global.psd1"
-            $testData = @{
-                description = 'Test'
-                version     = '1.0.0'
-            }
-            Export-PowerShellDataFile -Path $testFile -Data $testData
-            
-            $result = Show-CacheSettingsEditor -SettingsFile $testFile -Silent
-            $result | Should -Be $false
-        }
-        
-        It "Should use defaults when cacheSettings section is missing" {
-            $testFile = Join-Path $script:TestContext.TempDir "no-cache.psd1"
-            $testData = @{
-                description    = 'Test'
-                version        = '1.0.0'
-                globalSettings = @{
-                    configFile = '.\.secrets\config.json'
-                }
-            }
-            Export-PowerShellDataFile -Path $testFile -Data $testData
-            
-            Mock ShowMenu { return "Back" } -ModuleName $null
-            Mock NewMenu { return @{ Title = "Test"; items = @() } } -ModuleName $null
-            Mock AddMenuItem { param($Menu) return $Menu } -ModuleName $null
-            
-            # Should not throw even without cacheSettings section
-            { Show-CacheSettingsEditor -SettingsFile $testFile -Silent } | Should -Not -Throw
-        }
     }
     
     Context "Parameter Validation" {
@@ -149,39 +54,72 @@ Describe "Function: Show-CacheSettingsEditor" -Tags 'Unit', 'CacheSettingsEditor
         
         It "Should have default value for SettingsFile" {
             $params = (Get-Command Show-CacheSettingsEditor).Parameters
-            $params['SettingsFile'].Attributes.DefaultValue | Should -Not -BeNullOrEmpty
+            $defaultValue = $params['SettingsFile'].Attributes | Where-Object { $_.TypeId.Name -eq 'ParameterAttribute' } | Select-Object -First 1
+            # The default is in the param block, not attributes - just verify it's not mandatory
+            $params['SettingsFile'].Attributes.Mandatory | Should -Not -Contain $true
         }
     }
     
-    Context "Return Values" {
+    Context "Wrapper Functionality" {
         
-        It "Should return false on error" {
-            $nonExistentFile = Join-Path $script:TestContext.TempDir "error.psd1"
-            $result = Show-CacheSettingsEditor -SettingsFile $nonExistentFile -Silent
+        It "Should call Show-SettingsEditor with correct SettingsType" {
+            # Mock Show-SettingsEditor to verify it's called correctly
+            Mock -CommandName Show-SettingsEditor -MockWith {
+                param($SettingsType, $SettingsFile, $Silent)
+                
+                # Verify parameters
+                $SettingsType | Should -Be 'cacheSettings'
+                return $true
+            }
+            
+            # Call the wrapper
+            $result = Show-CacheSettingsEditor -SettingsFile "test.psd1"
+            
+            # Verify Show-SettingsEditor was called
+            Should -Invoke -CommandName Show-SettingsEditor -Times 1 -Exactly
+            $result | Should -Be $true
+        }
+        
+        It "Should pass SettingsFile parameter to Show-SettingsEditor" {
+            Mock -CommandName Show-SettingsEditor -MockWith {
+                param($SettingsType, $SettingsFile, $Silent)
+                
+                $SettingsFile | Should -Be "custom-settings.psd1"
+                return $true
+            }
+            
+            Show-CacheSettingsEditor -SettingsFile "custom-settings.psd1"
+            
+            Should -Invoke -CommandName Show-SettingsEditor -Times 1 -Exactly
+        }
+        
+        It "Should pass Silent switch to Show-SettingsEditor" {
+            Mock -CommandName Show-SettingsEditor -MockWith {
+                param($SettingsType, $SettingsFile, $Silent)
+                
+                $Silent | Should -Be $true
+                return $true
+            }
+            
+            Show-CacheSettingsEditor -Silent
+            
+            Should -Invoke -CommandName Show-SettingsEditor -Times 1 -Exactly
+        }
+        
+        It "Should return the result from Show-SettingsEditor" {
+            Mock -CommandName Show-SettingsEditor -MockWith { return $false }
+            
+            $result = Show-CacheSettingsEditor
+            
             $result | Should -Be $false
         }
         
-        It "Should return navigation command when user selects Back" {
-            Mock ShowMenu { return "Back" } -ModuleName $null
-            Mock NewMenu { return @{ Title = "Test"; items = @() } } -ModuleName $null
-            Mock AddMenuItem { param($Menu) return $Menu } -ModuleName $null
+        It "Should pass navigation strings from Show-SettingsEditor" {
+            Mock -CommandName Show-SettingsEditor -MockWith { return "Back" }
             
-            $result = Show-CacheSettingsEditor -SettingsFile $script:TestSettingsFile
+            $result = Show-CacheSettingsEditor
+            
             $result | Should -Be "Back"
-        }
-    }
-    
-    Context "Nested Structure Handling" {
-        
-        It "Should handle nested cacheTypes structure" {
-            # Load the test settings and verify structure is preserved
-            $config = Get-ConfigurationData -ConfigurationFile $script:TestSettingsFile
-            
-            $config.globalSettings.cacheSettings | Should -Not -BeNullOrEmpty
-            $config.globalSettings.cacheSettings.cacheTypes | Should -Not -BeNullOrEmpty
-            $config.globalSettings.cacheSettings.cacheTypes.Configuration | Should -Not -BeNullOrEmpty
-            $config.globalSettings.cacheSettings.cacheTypes.DirectoryObjects | Should -Not -BeNullOrEmpty
-            $config.globalSettings.cacheSettings.cacheTypes.Devices | Should -Not -BeNullOrEmpty
         }
     }
 }

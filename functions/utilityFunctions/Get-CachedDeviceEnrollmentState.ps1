@@ -30,7 +30,6 @@ function Get-CachedDeviceEnrollmentStatus()
         [string]$SerialNumber,
         [Parameter(Mandatory = $true)]
         [string]$AccessToken,
-        $Settings = $global:settings,
         [switch]$flushCache
     )
     $functionName = $MyInvocation.MyCommand.Name
@@ -41,7 +40,7 @@ function Get-CachedDeviceEnrollmentStatus()
     # Try to get cached data (unless flushCache is specified)
     if (-not $flushCache)
     {
-        $cachedState = Get-CachedData -CacheType 'Devices' -Key $cacheKey -CacheSettings $Settings
+        $cachedState = Get-CachedData -CacheType 'Devices' -Key $cacheKey -CacheSettings $global:cacheSettings
         
         if ($null -ne $cachedState)
         {
@@ -53,7 +52,7 @@ function Get-CachedDeviceEnrollmentStatus()
     
     # Cache miss or refresh requested - fetch from API
     Write-Verbose "[$functionName] Cache miss for serial number: $SerialNumber. Fetching from API."
-    $enrollmentState = Get-DeviceEnrollmentStatus -serialNumber $SerialNumber -AccessToken $AccessToken -Settings $Settings
+    $enrollmentState = Get-DeviceEnrollmentStatus -serialNumber $SerialNumber -AccessToken $AccessToken
     
     if ($enrollmentState)
     {
@@ -61,7 +60,7 @@ function Get-CachedDeviceEnrollmentStatus()
         $metadata = @{
             SerialNumber = $SerialNumber
         }
-        $cached = Set-CachedData -CacheType 'Devices' -Key $cacheKey -Data $enrollmentState -Metadata $metadata -CacheSettings $Settings
+        $cached = Set-CachedData -CacheType 'Devices' -Key $cacheKey -Data $enrollmentState -Metadata $metadata -CacheSettings $global:cacheSettings
         if ($cached)
         {
             Write-Verbose "[$functionName] Cached enrollment state for serial number: $SerialNumber."
