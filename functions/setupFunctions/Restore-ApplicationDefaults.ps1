@@ -92,27 +92,28 @@ function Restore-ApplicationDefaults()
         Write-Host "  - $fileName" -ForegroundColor Gray
     }
     Write-Host "`nThis operation cannot be undone. Do you want to continue? (Y/N)" -ForegroundColor Yellow
-    
-    $confirmation = Read-Host -Prompt "Enter Y to continue or N to cancel"              
-    Write-Verbose "[$functionName] User confirmation received: $confirmation"
-    Write-Log -LogFile $logFile -Module $functionName -Message "User confirmation received: $confirmation"
-    
-    while ($confirmation -notin @('Y', 'y', 'N', 'n'))
-    {
-        Write-Host "Invalid input. Please enter Y to continue or N to cancel." -ForegroundColor Red
-        $confirmation = Read-Host -Prompt "Enter Y to continue or N to cancel"              
-        Write-Log -LogFile $logFile -Module $functionName -Message "User provided invalid input. Prompting again."
-        [console]::beep(1000, 300)                               
-    }                                       
-    
-    if ($confirmation -in @('N', 'n'))
-    {
-        $cancelMessage = "Operation cancelled by user."
-        Write-Host $cancelMessage -ForegroundColor Yellow
+    $confirmation = ’Y’ 
+    if (-not $Silent) 
+    { 
+        $confirmation = Read-Host -Prompt "Enter Y to continue or N to cancel" 
+        Write-Verbose "[$functionName] User confirmation received: $confirmation" 
+        Write-Log -LogFile $logFile -Module $functionName -Message "User confirmation received: $confirmation" 
+        while ($confirmation -notin @(’Y’, ’y’, ’N’, ’n’)) 
+        { 
+            Write-Host "Invalid input. Please enter Y to continue or N to cancel." -ForegroundColor Red 
+            $confirmation = Read-Host -Prompt "Enter Y to continue or N to cancel" 
+            Write-Log -LogFile $logFile -Module $functionName -Message "User provided invalid input. Prompting again." 
+            [console]::beep(1000, 300) 
+        } 
+    } 
+    if ($confirmation -in @(’N’, ’n’)) 
+    { 
+        $cancelMessage = "Operation cancelled by user." 
+        Write-Host $cancelMessage -ForegroundColor Yellow 
         Write-Log -LogFile $logFile -Module $functionName -Message $cancelMessage 
-        $returnObject.Message = $cancelMessage
-        $returnObject.UserCancelled = $true
-        return $returnObject
+        $returnObject.Message = $cancelMessage 
+        $returnObject.UserCancelled = $true 
+        return $returnObject 
     }
     # Process file deletions
     Write-Verbose "[$functionName] Beginning file deletion process."            
@@ -140,7 +141,7 @@ function Restore-ApplicationDefaults()
                 $returnObject.MissingFileCount++
                 $fileName = Split-Path -Leaf $file
                 Write-Verbose "[$functionName] Not found: $fileName"                  
-                write-log -LogFile $logFile -Module $functionName -Message "Not found: $fileName" -LogLevel "Warning"                           
+                Write-Log -LogFile $logFile -Module $functionName -Message "Not found: $fileName" -LogLevel "Warning"                           
             }                                                       
         }
         catch
@@ -153,7 +154,7 @@ function Restore-ApplicationDefaults()
             $returnObject.ErrorMessages += $errorMsg
             $fileName = Split-Path -Leaf $file
             Write-Verbose "[$functionName] Failed: $fileName - $($_.Exception.Message)"
-            write-log -LogFile $logFile -Module $functionName -Message "Failed: $fileName - $($_.Exception.Message)" -LogLevel "Error"       
+            Write-Log -LogFile $logFile -Module $functionName -Message "Failed: $fileName - $($_.Exception.Message)" -LogLevel "Error"       
         }
     }
     
