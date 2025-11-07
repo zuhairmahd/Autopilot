@@ -133,7 +133,7 @@ function Restore-ApplicationDefaults()
                 $returnObject.RemovedFileCount++
                 
                 $fileName = Split-Path -Leaf $file
-                Write-Host "  ✓ Deleted: $fileName" -ForegroundColor Green
+                Write-Host "  Deleted: $fileName" -ForegroundColor Green
             }
             else
             {
@@ -156,7 +156,7 @@ function Restore-ApplicationDefaults()
             $returnObject.ErrorMessages += $errorMsg
             
             $fileName = Split-Path -Leaf $file
-            Write-Host "  ✗ Failed: $fileName - $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "  Failed: $fileName - $($_.Exception.Message)" -ForegroundColor Red
         }
     }
     

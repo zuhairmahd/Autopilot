@@ -2057,7 +2057,6 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change cache settings" -A
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Restore application defaults" -Action {
     Write-Host "Restoring application default settings..." -ForegroundColor Cyan
     $restoreResult = Restore-ApplicationDefaults -FilesToDelete @($InitFile, $stringsFile, $menuFile) -Domain $domain -ScriptPath $scriptPath
-    
     if ($restoreResult.UserCancelled)
     {
         Write-Host "`nRestore operation cancelled by user." -ForegroundColor Yellow
@@ -2074,370 +2073,362 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Restore application defau
                 $fileName = Split-Path -Leaf $file
                 Write-Host "  ✓ $fileName" -ForegroundColor Gray
             }
+            Write-Host "`nThe application will now exit. Please restart to use default settings." -ForegroundColor Cyan
+            Write-Host "Press any key to exit..." -ForegroundColor Yellow
+            $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+            return "EXIT_APPLICATION"
         }
-        Write-Host "`nThe application will now exit. Please restart to use default settings." -ForegroundColor Cyan
-        Write-Host "Press any key to exit..." -ForegroundColor Yellow
-        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-        return "EXIT_APPLICATION"
+        elseif ($restoreResult.RemovedFileCount -gt 0)
+        {
+            # Partial success - some files were deleted
+            Write-Host "`n$($restoreResult.Message)" -ForegroundColor Yellow
+            if ($restoreResult.RemovedFiles.Count -gt 0)
+            {
+                Write-Host "`nFiles successfully removed:" -ForegroundColor Green
+                foreach ($file in $restoreResult.RemovedFiles)
+                {
+                    $fileName = Split-Path -Leaf $file
+                    Write-Host "  ✓ $fileName" -ForegroundColor Gray
+                }
+            }
+            if ($restoreResult.UndeletedFiles.Count -gt 0)
+            {
+                Write-Host "`nFiles that could not be deleted:" -ForegroundColor Red
+                foreach ($file in $restoreResult.UndeletedFiles)
+                {
+                    $fileName = Split-Path -Leaf $file
+                    Write-Host "  ✗ $fileName" -ForegroundColor Gray
+                }
+                Write-Host "`nYou may need to delete these files manually or run as administrator." -ForegroundColor Yellow
+            }
+            Write-Host "`nSome settings have been reset. The application will now exit." -ForegroundColor Cyan
+            Write-Host "Press any key to exit..." -ForegroundColor Yellow
+            $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+            return "EXIT_APPLICATION"
+        }
+        else
+        {
+            # Complete failure
+            Write-Host "`n$($restoreResult.Message)" -ForegroundColor Red
+            if ($restoreResult.UndeletedFiles.Count -gt 0)
+            {
+                Write-Host "`nFiles that could not be deleted:" -ForegroundColor Red
+                foreach ($file in $restoreResult.UndeletedFiles)
+                {
+                    $fileName = Split-Path -Leaf $file
+                    Write-Host "  ✗ $fileName" -ForegroundColor Gray
+                }
+            }
+            if ($restoreResult.MissingFiles.Count -gt 0)
+            {
+                Write-Host "`nFiles that were already missing:" -ForegroundColor Yellow
+                foreach ($file in $restoreResult.MissingFiles)
+                {
+                    $fileName = Split-Path -Leaf $file
+                    Write-Host "  ! $fileName" -ForegroundColor Gray
+                }
+            }
+            if ($restoreResult.ErrorMessages.Count -gt 0)
+            {
+                Write-Host "`nDetailed error information:" -ForegroundColor Red
+                foreach ($errorMsg in $restoreResult.ErrorMessages)
+                {
+                    Write-Host "  $errorMsg" -ForegroundColor Gray
+                }
+            }
+            Write-Host "`nNo files were removed. Please check file permissions or run as administrator." -ForegroundColor Red
+            return $returnValues.backoutText
+        }
     }
-    elseif ($restoreResult.RemovedFileCount -gt 0)
-    {
-        # Partial success - some files were deleted
-        Write-Host "`n$($restoreResult.Message)" -ForegroundColor Yellow
-        
-        if ($restoreResult.RemovedFiles.Count -gt 0)
-        {
-            Write-Host "`nFiles successfully removed:" -ForegroundColor Green
-            foreach ($file in $restoreResult.RemovedFiles)
-            {
-                $fileName = Split-Path -Leaf $file
-                Write-Host "  ✓ $fileName" -ForegroundColor Gray
-            }
-        }
-        
-        if ($restoreResult.UndeletedFiles.Count -gt 0)
-        {
-            Write-Host "`nFiles that could not be deleted:" -ForegroundColor Red
-            foreach ($file in $restoreResult.UndeletedFiles)
-            {
-                $fileName = Split-Path -Leaf $file
-                Write-Host "  ✗ $fileName" -ForegroundColor Gray
-            }
-            Write-Host "`nYou may need to delete these files manually or run as administrator." -ForegroundColor Yellow
-        }
-        
-        Write-Host "`nSome settings have been reset. The application will now exit." -ForegroundColor Cyan
-        Write-Host "Press any key to exit..." -ForegroundColor Yellow
-        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-        return "EXIT_APPLICATION"
-    }
-    else
-    {
-        # Complete failure
-        Write-Host "`n$($restoreResult.Message)" -ForegroundColor Red
-        
-        if ($restoreResult.UndeletedFiles.Count -gt 0)
-        {
-            Write-Host "`nFiles that could not be deleted:" -ForegroundColor Red
-            foreach ($file in $restoreResult.UndeletedFiles)
-            {
-                $fileName = Split-Path -Leaf $file
-                Write-Host "  ✗ $fileName" -ForegroundColor Gray
-            }
-        }
-        
-        if ($restoreResult.MissingFiles.Count -gt 0)
-        {
-            Write-Host "`nFiles that were already missing:" -ForegroundColor Yellow
-            foreach ($file in $restoreResult.MissingFiles)
-            {
-                $fileName = Split-Path -Leaf $file
-                Write-Host "  ! $fileName" -ForegroundColor Gray
-            }
-        }
-        
-        if ($restoreResult.ErrorMessages.Count -gt 0)
-        {
-            Write-Host "`nDetailed error information:" -ForegroundColor Red
-            foreach ($errorMsg in $restoreResult.ErrorMessages)
-            {
-                Write-Host "  $errorMsg" -ForegroundColor Gray
-            }
-        }
-        
-        Write-Host "`nNo files were removed. Please check file permissions or run as administrator." -ForegroundColor Red
-        return $returnValues.backoutText
-    }
-}
-#endregion Settings menu
+    #endregion Settings menu
 
-$CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by Serial Number" -Submenu $serialNumberMenu
-$CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action {
-    $userName = GetUserInput -Message "Enter the username (Email address) of the user whose device you want to look up." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
-    if ($null -eq $userName)
-    {
-        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.backoutText)."
-        return $returnValues.backoutText
-    }
-    Write-Verbose "[$scriptName] Got user name: $userName"
-    
-    #region Resolve user with matching support
-    $userName = Resolve-DirectoryObject -EntityName $userName -AccessToken $accessToken -Settings $settings -ReturnValues $returnValues -EntityType "User"
-    # Check if user resolution returned a navigation command
-    if ($userName -in $returnValues.Values -or $userName -in @("Main Menu", "EXIT_APPLICATION"))
-    {
-        Write-Verbose "[$scriptName] User resolution returned navigation command: $userName"
-        return $userName
-    }
-    #endregion Resolve user with matching support
-    
-    # Call GetDeviceByUser to find devices for the specified user
-    Write-Verbose "[$scriptName] Calling GetDeviceByUser for user: $userName"
-    $serialNumber = GetDeviceByUser -UserName $userName -OperatingSystem 'Windows' -AccessToken $accessToken
-    Write-Verbose "[$scriptName] GetDeviceByUser returned: $serialNumber"
-    
-    #region Handle navigation responses from GetDeviceByUser
-    if ($serialNumber -eq "Back" -or $serialNumber -eq "back")
-    {
-        Write-Verbose "[$scriptName] User selected Back from device selection, returning to previous menu"
-        return $returnValues.backoutText
-    }
-    elseif ($serialNumber -eq "Main Menu" -or $serialNumber -eq "main menu")
-    {
-        Write-Verbose "[$scriptName] User selected Main Menu from device selection"
-        return "EXIT_APPLICATION"
-    }
-    elseif ([string]::IsNullOrWhiteSpace($SerialNumber) -or $null -eq $serialNumber -or $serialNumber -eq 0 -or $serialNumber -eq "0")
-    {
-        Write-Verbose "[$scriptName] User requested application exit from device selection."
-        return "EXIT_APPLICATION"
-    }
-    else
-    {
-        Write-Verbose "[$scriptName] Continuing script..."
-    }
-    #endregion Handle navigation responses from GetDeviceByUser
-    
-    Write-Host "Found device for user $userName with serial number: $serialNumber"
-    do
-    {
-        $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
-        Write-Verbose "[$scriptName] Result: $result"
-        Write-Verbose "[$scriptName] ProcessSerialNumber returned: $result"
-        if ($null -ne $result)
+    $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by Serial Number" -Submenu $serialNumberMenu
+    $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action {
+        $userName = GetUserInput -Message "Enter the username (Email address) of the user whose device you want to look up." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
+        if ($null -eq $userName)
         {
+            Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.backoutText)."
+            return $returnValues.backoutText
+        }
+        Write-Verbose "[$scriptName] Got user name: $userName"
+    
+        #region Resolve user with matching support
+        $userName = Resolve-DirectoryObject -EntityName $userName -AccessToken $accessToken -Settings $settings -ReturnValues $returnValues -EntityType "User"
+        # Check if user resolution returned a navigation command
+        if ($userName -in $returnValues.Values -or $userName -in @("Main Menu", "EXIT_APPLICATION"))
+        {
+            Write-Verbose "[$scriptName] User resolution returned navigation command: $userName"
+            return $userName
+        }
+        #endregion Resolve user with matching support
+    
+        # Call GetDeviceByUser to find devices for the specified user
+        Write-Verbose "[$scriptName] Calling GetDeviceByUser for user: $userName"
+        $serialNumber = GetDeviceByUser -UserName $userName -OperatingSystem 'Windows' -AccessToken $accessToken
+        Write-Verbose "[$scriptName] GetDeviceByUser returned: $serialNumber"
+    
+        #region Handle navigation responses from GetDeviceByUser
+        if ($serialNumber -eq "Back" -or $serialNumber -eq "back")
+        {
+            Write-Verbose "[$scriptName] User selected Back from device selection, returning to previous menu"
+            return $returnValues.backoutText
+        }
+        elseif ($serialNumber -eq "Main Menu" -or $serialNumber -eq "main menu")
+        {
+            Write-Verbose "[$scriptName] User selected Main Menu from device selection"
+            return "EXIT_APPLICATION"
+        }
+        elseif ([string]::IsNullOrWhiteSpace($SerialNumber) -or $null -eq $serialNumber -or $serialNumber -eq 0 -or $serialNumber -eq "0")
+        {
+            Write-Verbose "[$scriptName] User requested application exit from device selection."
+            return "EXIT_APPLICATION"
+        }
+        else
+        {
+            Write-Verbose "[$scriptName] Continuing script..."
+        }
+        #endregion Handle navigation responses from GetDeviceByUser
+    
+        Write-Host "Found device for user $userName with serial number: $serialNumber"
+        do
+        {
+            $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
             Write-Verbose "[$scriptName] Result: $result"
-            $serialNumber = $result
-        }
-        else 
-        {
-            Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
-            $result = "EXIT_APPLICATION"
-        }
-    } until ($result -in $returnValues.values -or $result -eq "EXIT_APPLICATION" -or $result -eq "Back" -or $result -eq "back" -or $result -eq "Main Menu" -or $result -eq "main menu" -or [string]::IsNullOrWhiteSpace($result))
-    return $result
-}
+            Write-Verbose "[$scriptName] ProcessSerialNumber returned: $result"
+            if ($null -ne $result)
+            {
+                Write-Verbose "[$scriptName] Result: $result"
+                $serialNumber = $result
+            }
+            else 
+            {
+                Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
+                $result = "EXIT_APPLICATION"
+            }
+        } until ($result -in $returnValues.values -or $result -eq "EXIT_APPLICATION" -or $result -eq "Back" -or $result -eq "back" -or $result -eq "Main Menu" -or $result -eq "main menu" -or [string]::IsNullOrWhiteSpace($result))
+        return $result
+    }
 
-$mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
-    $username = GetUserInput -Message "Enter the username (Email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
-    # Check if user entered 'back'
-    if ($null -eq $username)
-    {
-        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.backoutText)."
-        return $returnValues.backoutText # Return to the previous menu
-    }
-    
-    #region Resolve user with matching support
-    $userName = Resolve-DirectoryObject -EntityName $userName -AccessToken $accessToken -Settings $settings -ReturnValues $returnValues -EntityType "User"
-    
-    # Check if user resolution returned a navigation command
-    if ($userName -in $returnValues.Values -or $userName -in @("Main Menu", "EXIT_APPLICATION"))
-    {
-        Write-Verbose "[$scriptName] User resolution returned navigation command: $userName"
-        return $userName
-    }
-    #endregion Resolve user with matching support
-    
-    # Perform comprehensive readiness checks
-    Write-Verbose "[$scriptName] Starting comprehensive user readiness checks for: $userName"
-    Write-Log -LogFile $LogFile -Module $scriptName -Message "Starting comprehensive user readiness checks for: $userName" -LogLevel Information
-    $readinessResult = Test-UserReadiness -UserName $userName -AccessToken $accessToken -GroupsToInclude $groupsToInclude -GroupsToExclude $groupsToExclude -Settings $settings
-    # Display the readiness report
-    Show-UserReadinessReport -ReadinessResult $readinessResult
-    # Proceed to device check if user is ready
-    if ($readinessResult.IsReady)
-    {
-        Write-Host "Enter the device's serial number." -ForegroundColor Cyan
-        Write-Host "This would be the device you plan to give to the user." -ForegroundColor Cyan
-        $serialNumber = GetUserInput -Message "Enter the serial number of the device." -Prompt 'Please enter the serial number' -InputType 'serialNumber' -settings $settings
+    $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
+        $username = GetUserInput -Message "Enter the username (Email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
         # Check if user entered 'back'
-        if ($null -eq $serialNumber)
+        if ($null -eq $username)
         {
             Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.backoutText)."
             return $returnValues.backoutText # Return to the previous menu
         }
-        else # Process only if a serial number was entered
+    
+        #region Resolve user with matching support
+        $userName = Resolve-DirectoryObject -EntityName $userName -AccessToken $accessToken -Settings $settings -ReturnValues $returnValues -EntityType "User"
+    
+        # Check if user resolution returned a navigation command
+        if ($userName -in $returnValues.Values -or $userName -in @("Main Menu", "EXIT_APPLICATION"))
         {
-            $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -CheckUserReadiness
-            # Check if ProcessSerialNumber returned an exit signal
-            if ($null -eq $result)
+            Write-Verbose "[$scriptName] User resolution returned navigation command: $userName"
+            return $userName
+        }
+        #endregion Resolve user with matching support
+    
+        # Perform comprehensive readiness checks
+        Write-Verbose "[$scriptName] Starting comprehensive user readiness checks for: $userName"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Starting comprehensive user readiness checks for: $userName" -LogLevel Information
+        $readinessResult = Test-UserReadiness -UserName $userName -AccessToken $accessToken -GroupsToInclude $groupsToInclude -GroupsToExclude $groupsToExclude -Settings $settings
+        # Display the readiness report
+        Show-UserReadinessReport -ReadinessResult $readinessResult
+        # Proceed to device check if user is ready
+        if ($readinessResult.IsReady)
+        {
+            Write-Host "Enter the device's serial number." -ForegroundColor Cyan
+            Write-Host "This would be the device you plan to give to the user." -ForegroundColor Cyan
+            $serialNumber = GetUserInput -Message "Enter the serial number of the device." -Prompt 'Please enter the serial number' -InputType 'serialNumber' -settings $settings
+            # Check if user entered 'back'
+            if ($null -eq $serialNumber)
             {
-                Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
-                return "EXIT_APPLICATION"
+                Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.backoutText)."
+                return $returnValues.backoutText # Return to the previous menu
+            }
+            else # Process only if a serial number was entered
+            {
+                $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -CheckUserReadiness
+                # Check if ProcessSerialNumber returned an exit signal
+                if ($null -eq $result)
+                {
+                    Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
+                    return "EXIT_APPLICATION"
+                }
+            }
+        }
+        else
+        {
+            Write-Verbose "[$scriptName] User $userName is not ready. Readiness check failed with $($readinessResult.IssueCount) issues."
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "User $userName is not ready. Issues: $($readinessResult.IssueCount), Warnings: $($readinessResult.WarningCount)" -LogLevel Warning
+        }
+    }
+    $mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status" -Submenu $CheckMenu
+    $mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopilotMenu
+    $mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
+    $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
+        Write-Host "Checking for script updates..."
+        # Intentionally omitting -noConfirmation here to allow user confirmation before updating
+        $updateResult = Get-Updates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -filesToUpdate @($stringsFile, $menuFile)
+        Write-Verbose "[$scriptName] Update result: $updateResult"
+        switch ($updateResult)
+        {
+            $returnValues.UpdateSuccessMessage
+            {
+                Write-Host 'The script has been updated.' -ForegroundColor Green
+                Write-Host 'Please restart the script.' -ForegroundColor Green
+                exit 0
+            }
+            $returnValues.UpdateFailedMessage
+            {
+                Write-Host 'The script update failed.' -ForegroundColor Red
+            }
+            $returnValues.UpdateNotNeededMessage
+            {
+                Write-Host 'The script is up to date.' -ForegroundColor Green
+            }
+            default
+            {
+                Write-Host "An error has occurred:"
+                Write-Host "Error message: $($updateResult.Content)"
+                Write-Host "Status Code: $($updateResult.StatusCode)"
             }
         }
     }
-    else
-    {
-        Write-Verbose "[$scriptName] User $userName is not ready. Readiness check failed with $($readinessResult.IssueCount) issues."
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "User $userName is not ready. Issues: $($readinessResult.IssueCount), Warnings: $($readinessResult.WarningCount)" -LogLevel Warning
-    }
-}
-$mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status" -Submenu $CheckMenu
-$mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopilotMenu
-$mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
-$mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
-    Write-Host "Checking for script updates..."
-    # Intentionally omitting -noConfirmation here to allow user confirmation before updating
-    $updateResult = Get-Updates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -filesToUpdate @($stringsFile, $menuFile)
-    Write-Verbose "[$scriptName] Update result: $updateResult"
-    switch ($updateResult)
-    {
-        $returnValues.UpdateSuccessMessage
+    $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
+        Write-Host 'Restarting the device...'
+        if (-not (RestartDevice))
         {
-            Write-Host 'The script has been updated.' -ForegroundColor Green
-            Write-Host 'Please restart the script.' -ForegroundColor Green
-            exit 0
-        }
-        $returnValues.UpdateFailedMessage
-        {
-            Write-Host 'The script update failed.' -ForegroundColor Red
-        }
-        $returnValues.UpdateNotNeededMessage
-        {
-            Write-Host 'The script is up to date.' -ForegroundColor Green
-        }
-        default
-        {
-            Write-Host "An error has occurred:"
-            Write-Host "Error message: $($updateResult.Content)"
-            Write-Host "Status Code: $($updateResult.StatusCode)"
+            Write-Verbose "[$scriptName] RestartDevice function failed."
+            return $returnValues.backoutText
         }
     }
-}
-$mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
-    Write-Host 'Restarting the device...'
-    if (-not (RestartDevice))
-    {
-        Write-Verbose "[$scriptName] RestartDevice function failed."
-        return $returnValues.backoutText
+    $mainMenu = AddMenuItem -menu $mainMenu -name "Shutdown the device" -action {
+        Write-Host 'Shutting down the device...'
+        if (-not (RestartDevice -Question 'Do you want to shut down the device now? (Y/N)' -action 'shutdown' -bootMessage 'Shutting down the device...'))
+        {
+            Write-Verbose "[$scriptName] RestartDevice function failed."
+            return $returnValues.backoutText
+        }
     }
-}
-$mainMenu = AddMenuItem -menu $mainMenu -name "Shutdown the device" -action {
-    Write-Host 'Shutting down the device...'
-    if (-not (RestartDevice -Question 'Do you want to shut down the device now? (Y/N)' -action 'shutdown' -bootMessage 'Shutting down the device...'))
-    {
-        Write-Verbose "[$scriptName] RestartDevice function failed."
-        return $returnValues.backoutText
-    }
-}
-$mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
-    $groupName = GetUserInput -Message "Enter the name of the group whose assignments you want to view." -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
-    if ($null -eq $groupName)
-    {
-        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
-        return $returnValues.backoutText
-    }
-    Write-Verbose "[$scriptName] Got group name: $groupName"
+    $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
+        $groupName = GetUserInput -Message "Enter the name of the group whose assignments you want to view." -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
+        if ($null -eq $groupName)
+        {
+            Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
+            return $returnValues.backoutText
+        }
+        Write-Verbose "[$scriptName] Got group name: $groupName"
     
-    #region Resolve group using unified Resolve-DirectoryObject with entity return
-    $selectedGroup = Resolve-DirectoryObject -EntityName $groupName -AccessToken $accessToken -Settings $settings -ReturnValues $returnValues -EntityType "Group" -ReturnEntity
+        #region Resolve group using unified Resolve-DirectoryObject with entity return
+        $selectedGroup = Resolve-DirectoryObject -EntityName $groupName -AccessToken $accessToken -Settings $settings -ReturnValues $returnValues -EntityType "Group" -ReturnEntity
     
-    # Handle navigation commands - check these FIRST before trying to use as group object
-    if ($selectedGroup -eq "EXIT_APPLICATION")
-    {
-        Write-Verbose "[$scriptName] User requested application exit from group resolution"
-        return "EXIT_APPLICATION"
-    }
-    elseif ($selectedGroup -eq "Main Menu")
-    {
-        Write-Verbose "[$scriptName] User selected Main Menu from group resolution"
-        return "Main Menu"
-    }
-    elseif ($selectedGroup -in $returnValues.Values)
-    {
-        Write-Verbose "[$scriptName] Resolve-DirectoryObject returned navigation command: $selectedGroup"
-        return $selectedGroup
-    }
+        # Handle navigation commands - check these FIRST before trying to use as group object
+        if ($selectedGroup -eq "EXIT_APPLICATION")
+        {
+            Write-Verbose "[$scriptName] User requested application exit from group resolution"
+            return "EXIT_APPLICATION"
+        }
+        elseif ($selectedGroup -eq "Main Menu")
+        {
+            Write-Verbose "[$scriptName] User selected Main Menu from group resolution"
+            return "Main Menu"
+        }
+        elseif ($selectedGroup -in $returnValues.Values)
+        {
+            Write-Verbose "[$scriptName] Resolve-DirectoryObject returned navigation command: $selectedGroup"
+            return $selectedGroup
+        }
     
-    # Validate we got a valid group object
-    if ($null -eq $selectedGroup -or -not $selectedGroup.id -or -not $selectedGroup.displayName)
-    {
-        Write-Verbose "[$scriptName] Invalid group object returned from Resolve-DirectoryObject"
-        Write-Host "No group found for the specified group name." -ForegroundColor Red
-        return $returnValues.noGroupFoundMessage
-    }
+        # Validate we got a valid group object
+        if ($null -eq $selectedGroup -or -not $selectedGroup.id -or -not $selectedGroup.displayName)
+        {
+            Write-Verbose "[$scriptName] Invalid group object returned from Resolve-DirectoryObject"
+            Write-Host "No group found for the specified group name." -ForegroundColor Red
+            return $returnValues.noGroupFoundMessage
+        }
     
-    Write-Verbose "[$scriptName] Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))"
-    #endregion Resolve group using unified Resolve-DirectoryObject with entity return
+        Write-Verbose "[$scriptName] Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))"
+        #endregion Resolve group using unified Resolve-DirectoryObject with entity return
     
-    # Call ShowGroupAssignments to display the group's assignments
-    Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName)"
-    $ShowGroupAssignmentsResponse = ShowGroupAssignments -AccessToken $accessToken -Group $selectedGroup
-    #region Handle navigation responses from GetDeviceByUser
-    if ($ShowGroupAssignmentsResponse -eq "Back" -or $ShowGroupAssignmentsResponse -eq "back")
-    {
-        Write-Verbose "[$scriptName] User selected Back from group assignment selection, returning to previous menu"
-        return $returnValues.backoutText
+        # Call ShowGroupAssignments to display the group's assignments
+        Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName)"
+        $ShowGroupAssignmentsResponse = ShowGroupAssignments -AccessToken $accessToken -Group $selectedGroup
+        #region Handle navigation responses from GetDeviceByUser
+        if ($ShowGroupAssignmentsResponse -eq "Back" -or $ShowGroupAssignmentsResponse -eq "back")
+        {
+            Write-Verbose "[$scriptName] User selected Back from group assignment selection, returning to previous menu"
+            return $returnValues.backoutText
+        }
+        elseif ($ShowGroupAssignmentsResponse -eq "Main Menu" -or $ShowGroupAssignmentsResponse -eq "main menu")
+        {
+            Write-Verbose "[$scriptName] User selected Main Menu from group assignment selection"
+            return "EXIT_APPLICATION"
+        }
+        elseif ([string]::IsNullOrWhiteSpace($ShowGroupAssignmentsResponse) -or $null -eq $ShowGroupAssignmentsResponse)
+        {
+            Write-Verbose "[$scriptName] User requested application exit from group assignment selection."
+            return "EXIT_APPLICATION"
+        }
+        else
+        {
+            return $result
+        }
     }
-    elseif ($ShowGroupAssignmentsResponse -eq "Main Menu" -or $ShowGroupAssignmentsResponse -eq "main menu")
-    {
-        Write-Verbose "[$scriptName] User selected Main Menu from group assignment selection"
-        return "EXIT_APPLICATION"
+    $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
+    $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
+        $null = Show-AboutApplication -accessToken $accessToken -Release $latestRelease -appId $appId -tenantId $tenantId -name $name -updateAvailable $updateAvailable
     }
-    elseif ([string]::IsNullOrWhiteSpace($ShowGroupAssignmentsResponse) -or $null -eq $ShowGroupAssignmentsResponse)
+    #region show menus
+    # Add the main menu to both history arrays for proper stack synchronization
+    try
     {
-        Write-Verbose "[$scriptName] User requested application exit from group assignment selection."
-        return "EXIT_APPLICATION"
+        Write-Verbose "[$scriptName] Adding main menu to both history arrays using newer powershell functions."
+        [void]$global:History.Add("Main Menu")
+        [void]$global:MenuHistory.Add($mainMenu)
+    }
+    catch
+    {
+        # Fallback for older PowerShell versions
+        Write-Verbose "[$scriptName] Adding main menu to both history arrays using older powershell functions."
+        $global:MainMenuHistory += "Main Menu"
+        $global:MainMenuHistory_Menu += $mainMenu
+    }
+
+    # Only show menu if not in test mode
+    if ($testMode)
+    {
+        Write-Host "Test mode: $($testMode). No menu will be shown." -ForegroundColor Yellow
+        Write-Host "You can run the script in test mode to validate functionality without showing the menu."
     }
     else
     {
-        return $result
-    }
-}
-$mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
-$mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
-    $null = Show-AboutApplication -accessToken $accessToken -Release $latestRelease -appId $appId -tenantId $tenantId -name $name -updateAvailable $updateAvailable
-}
-#region show menus
-# Add the main menu to both history arrays for proper stack synchronization
-try
-{
-    Write-Verbose "[$scriptName] Adding main menu to both history arrays using newer powershell functions."
-    [void]$global:History.Add("Main Menu")
-    [void]$global:MenuHistory.Add($mainMenu)
-}
-catch
-{
-    # Fallback for older PowerShell versions
-    Write-Verbose "[$scriptName] Adding main menu to both history arrays using older powershell functions."
-    $global:MainMenuHistory += "Main Menu"
-    $global:MainMenuHistory_Menu += $mainMenu
-}
-
-# Only show menu if not in test mode
-if ($testMode)
-{
-    Write-Host "Test mode: $($testMode). No menu will be shown." -ForegroundColor Yellow
-    Write-Host "You can run the script in test mode to validate functionality without showing the menu."
-}
-else
-{
-    Write-Verbose "Test mode: $($testMode)"
-    if ($null -ne $mainMenu)
-    {
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Showing main menu." -LogLevel "Information"
-        $result = ShowMenu -Menu $mainMenu
-        if ($null -eq $result)
+        Write-Verbose "Test mode: $($testMode)"
+        if ($null -ne $mainMenu)
         {
-            Write-Host "`nThank you for using the Intune Helpdesk menu. Goodbye!" -ForegroundColor Green
+            Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Showing main menu." -LogLevel "Information"
+            $result = ShowMenu -Menu $mainMenu
+            if ($null -eq $result)
+            {
+                Write-Host "`nThank you for using the Intune Helpdesk menu. Goodbye!" -ForegroundColor Green
+            }
         }
     }
-}
-#endregion show menus
+    #endregion show menus
 
-#region Cleanup
-# Clear sensitive data from memory before exiting
-Clear-SecureMemory -ClearScriptVariables
+    #region Cleanup
+    # Clear sensitive data from memory before exiting
+    Clear-SecureMemory -ClearScriptVariables
 
-# Cleanup temporary files
-$filesCleaned = cleanupTempFiles
-if ($filesCleaned.AllRemoved)
-{
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
-}
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
-# Finish logging
-Write-Log -LogFile $LogFile -FinishLogging
-#endregion Cleanup
+    # Cleanup temporary files
+    $filesCleaned = cleanupTempFiles
+    if ($filesCleaned.AllRemoved)
+    {
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
+    }
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
+    # Finish logging
+    Write-Log -LogFile $LogFile -FinishLogging
+    #endregion Cleanup
