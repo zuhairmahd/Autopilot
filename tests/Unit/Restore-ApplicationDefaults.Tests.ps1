@@ -24,7 +24,8 @@ Describe "Function: Restore-ApplicationDefaults" -Tags 'Unit' {
     }
     
     AfterAll {
-        if ($script:TestEnv -and $script:TestEnv.TestFolder) {
+        if ($script:TestEnv -and $script:TestEnv.TestFolder)
+        {
             Remove-Item $script:TestEnv.TestFolder -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
@@ -32,7 +33,8 @@ Describe "Function: Restore-ApplicationDefaults" -Tags 'Unit' {
     BeforeEach {
         # Clean up any existing test files
         $script:TestFiles + $script:DomainFile | ForEach-Object {
-            if (Test-Path $_) {
+            if (Test-Path $_)
+            {
                 Remove-Item $_ -Force -ErrorAction SilentlyContinue
             }
         }
@@ -95,7 +97,8 @@ Describe "Function: Restore-ApplicationDefaults" -Tags 'Unit' {
                 if (-not $script:ReadHostCallCount) { $script:ReadHostCallCount = 0 }
                 $script:ReadHostCallCount++
                 
-                switch ($script:ReadHostCallCount) {
+                switch ($script:ReadHostCallCount)
+                {
                     1 { return "invalid" }
                     2 { return "maybe" }
                     default { return "Y" }
@@ -227,7 +230,8 @@ Describe "Function: Restore-ApplicationDefaults" -Tags 'Unit' {
             # Mock Remove-Item to fail for one specific file
             $failingFile = $script:TestFiles[1]
             Mock Remove-Item {
-                if ($Path -eq $failingFile) {
+                if ($Path -eq $failingFile)
+                {
                     throw "File in use"
                 }
                 # Call original for other files
@@ -309,15 +313,18 @@ Describe "Function: Restore-ApplicationDefaults" -Tags 'Unit' {
         
         It "Should handle very long file paths" {
             $longPath = Join-Path $script:TestEnv.TestFolder ("very_long_filename_" + ("x" * 100) + ".psd1")
-            try {
+            try
+            {
                 New-Item $longPath -ItemType File -Force | Out-Null
                 $fileCreated = $true
             }
-            catch {
+            catch
+            {
                 $fileCreated = $false
             }
             
-            if ($fileCreated) {
+            if ($fileCreated)
+            {
                 $result = Restore-ApplicationDefaults -FilesToDelete @($longPath) -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder
                 
                 $result.Success | Should -Be $true
