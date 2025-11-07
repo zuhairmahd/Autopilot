@@ -46,7 +46,7 @@ function Restore-ApplicationDefaults()
     if ($null -eq $FilesToDelete -or $FilesToDelete.Count -eq 0)
     {
         Write-Verbose "[$functionName] No files specified for deletion."
-        write-log -LogFile $logFile -Module $functionName -Message "No files specified for deletion." -LogLevel "Error"         
+        Write-Log -LogFile $logFile -Module $functionName -Message "No files specified for deletion." -LogLevel "Error"         
         return $returnObject            
     }
     
