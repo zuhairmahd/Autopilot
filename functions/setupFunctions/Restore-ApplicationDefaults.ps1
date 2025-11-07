@@ -218,7 +218,6 @@ function Show-RestoreApplicationDefaultsResults()
     $functionName = $MyInvocation.MyCommand.Name                        
     
     $restoreResult = Restore-ApplicationDefaults -FilesToDelete $FilesToDelete -Domain $Domain -ScriptPath $ScriptPath -Silent:$Silent
-    $global:r = $restoreResult  # For debugging purposes                            
     Write-Verbose "[$functionName] Restore operation result: $($restoreResult | Out-String)"                    
     Write-Log -LogFile $logFile -Module $functionName -Message "Restore operation result: $($restoreResult | Out-String)" -LogLevel "Verbose"                                                   
     if ($restoreResult.UserCancelled)
