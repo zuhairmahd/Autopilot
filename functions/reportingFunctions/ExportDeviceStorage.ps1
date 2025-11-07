@@ -46,7 +46,7 @@ function ExportDeviceStorage()
         if ($null -eq $deviceListResponse -or $null -eq $deviceListResponse.value -or $deviceListResponse.value.count -eq 0)
         {
             Write-Host "No devices found." -ForegroundColor Red
-            write-log -LogFile $LogFile -Module "$functionName" -Message "- No devices found with the specified filter." -LogLevel "Warning"                            
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "- No devices found with the specified filter." -LogLevel "Warning"                            
             return $false
         }
         
