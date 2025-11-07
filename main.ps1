@@ -2016,7 +2016,6 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings"
         return $null
     }
 }
-
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change repository information" -Action {
     Write-Host "Launching repository information editor..." -ForegroundColor Cyan
     Write-Host "These settings control repository URLs and paths used for updates." -ForegroundColor Gray
@@ -2036,7 +2035,6 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change repository informa
         return $result
     }
 }
-
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change cache settings" -Action {
     Write-Host "Launching cache settings editor..." -ForegroundColor Cyan
     Write-Host "These settings control caching behavior, expiration times, and size limits." -ForegroundColor Gray
@@ -2056,7 +2054,101 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change cache settings" -A
         return $result
     }
 }
-
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Restore application defaults" -Action {
+    Write-Host "Restoring application default settings..." -ForegroundColor Cyan
+    $restoreResult = Restore-ApplicationDefaults -FilesToDelete @($InitFile, $stringsFile, $menuFile) -Domain $domain -ScriptPath $scriptPath
+    
+    if ($restoreResult.UserCancelled)
+    {
+        Write-Host "`nRestore operation cancelled by user." -ForegroundColor Yellow
+        return $returnValues.backoutText
+    }
+    elseif ($restoreResult.Success)
+    {
+        Write-Host "`n$($restoreResult.Message)" -ForegroundColor Green
+        if ($restoreResult.RemovedFileCount -gt 0)
+        {
+            Write-Host "Files successfully removed:" -ForegroundColor Green
+            foreach ($file in $restoreResult.RemovedFiles)
+            {
+                $fileName = Split-Path -Leaf $file
+                Write-Host "  ✓ $fileName" -ForegroundColor Gray
+            }
+        }
+        Write-Host "`nThe application will now exit. Please restart to use default settings." -ForegroundColor Cyan
+        Write-Host "Press any key to exit..." -ForegroundColor Yellow
+        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        return "EXIT_APPLICATION"
+    }
+    elseif ($restoreResult.RemovedFileCount -gt 0)
+    {
+        # Partial success - some files were deleted
+        Write-Host "`n$($restoreResult.Message)" -ForegroundColor Yellow
+        
+        if ($restoreResult.RemovedFiles.Count -gt 0)
+        {
+            Write-Host "`nFiles successfully removed:" -ForegroundColor Green
+            foreach ($file in $restoreResult.RemovedFiles)
+            {
+                $fileName = Split-Path -Leaf $file
+                Write-Host "  ✓ $fileName" -ForegroundColor Gray
+            }
+        }
+        
+        if ($restoreResult.UndeletedFiles.Count -gt 0)
+        {
+            Write-Host "`nFiles that could not be deleted:" -ForegroundColor Red
+            foreach ($file in $restoreResult.UndeletedFiles)
+            {
+                $fileName = Split-Path -Leaf $file
+                Write-Host "  ✗ $fileName" -ForegroundColor Gray
+            }
+            Write-Host "`nYou may need to delete these files manually or run as administrator." -ForegroundColor Yellow
+        }
+        
+        Write-Host "`nSome settings have been reset. The application will now exit." -ForegroundColor Cyan
+        Write-Host "Press any key to exit..." -ForegroundColor Yellow
+        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        return "EXIT_APPLICATION"
+    }
+    else
+    {
+        # Complete failure
+        Write-Host "`n$($restoreResult.Message)" -ForegroundColor Red
+        
+        if ($restoreResult.UndeletedFiles.Count -gt 0)
+        {
+            Write-Host "`nFiles that could not be deleted:" -ForegroundColor Red
+            foreach ($file in $restoreResult.UndeletedFiles)
+            {
+                $fileName = Split-Path -Leaf $file
+                Write-Host "  ✗ $fileName" -ForegroundColor Gray
+            }
+        }
+        
+        if ($restoreResult.MissingFiles.Count -gt 0)
+        {
+            Write-Host "`nFiles that were already missing:" -ForegroundColor Yellow
+            foreach ($file in $restoreResult.MissingFiles)
+            {
+                $fileName = Split-Path -Leaf $file
+                Write-Host "  ! $fileName" -ForegroundColor Gray
+            }
+        }
+        
+        if ($restoreResult.ErrorMessages.Count -gt 0)
+        {
+            Write-Host "`nDetailed error information:" -ForegroundColor Red
+            foreach ($errorMsg in $restoreResult.ErrorMessages)
+            {
+                Write-Host "  $errorMsg" -ForegroundColor Gray
+            }
+        }
+        
+        Write-Host "`nNo files were removed. Please check file permissions or run as administrator." -ForegroundColor Red
+        return $returnValues.backoutText
+    }
+}
 #endregion Settings menu
 
 $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by Serial Number" -Submenu $serialNumberMenu

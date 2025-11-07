@@ -844,7 +844,17 @@ function Get-ApplicationDefaults()
                             'full',
                             'admin'
                         )
-                    }            
+                    },
+                    @{
+                        description           = 'Restore all application defaults including menus, local and global settings'
+                        name                  = 'Restore application defaults'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced'
+                        )               
+                    }
                 )
                 type                  = 'static'
                 includeInDisplayModes = @(
