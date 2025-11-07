@@ -43,7 +43,6 @@ function ExportDeviceStorage()
     {
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Getting device list from Graph API" -LogLevel "Information"
         $deviceListResponse = CallGraphApi -ResourcePath $managedDeviceUri -accessToken $AccessToken -Filter $managedDeviceFilter -consistencyLevel -extraParameters "top=999"
-        $global:r = $deviceListResponse             
         if ($null -eq $deviceListResponse -or $null -eq $deviceListResponse.value -or $deviceListResponse.value.count -eq 0)
         {
             Write-Host "No devices found." -ForegroundColor Red
