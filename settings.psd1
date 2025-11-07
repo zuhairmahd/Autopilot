@@ -1,29 +1,8 @@
 ﻿@{
-    description = 'This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.'
-    version = '1.3.0.0'
-    auth = @{
-        changePwOnNextStart = $false
-        authType = 'PublicAuthFlow'
-        noSaveRefreshToken = $false
-        forceNewToken = $false
-        renewalLeadTime = 5
-        scope = @(
-            'Device.ReadWrite.All',
-            'DeviceManagementApps.Read.All',
-            'DeviceManagementConfiguration.ReadWrite.All',
-            'DeviceManagementScripts.Read.All',
-            'DeviceManagementManagedDevices.PrivilegedOperations.All',
-            'DeviceManagementManagedDevices.ReadWrite.All',
-            'DeviceManagementServiceConfig.ReadWrite.All'
-        )
-        cacheType = 'Memory'
-        secureString = $false
-        delegated = $true
-    }
     cacheSettings = @{
-        enabled = $true
-        defaultExpirationMinutes = 15
         maxCacheSize = 1000
+        defaultExpirationMinutes = 15
+        enabled = $true
         cacheTypes = @{
             Configuration = @{
                 enabled = $true
@@ -39,11 +18,55 @@
             }
         }
     }
+    globalSettings = @{
+        operatingSystem = 'Windows'
+        repoInfo = @{
+            repoPath = 'zuhairmahd'
+            baseURL = 'https://www.github.com'
+            baseSourceURL = 'https://raw.githubusercontent.com'
+            repoName = 'Autopilot'
+        }
+        timeInSeconds = 60
+        cacheSettings = @{
+            maxCacheSize = 1000
+            defaultExpirationMinutes = 15
+            enabled = $true
+            cacheTypes = @{
+                Configuration = @{
+                    enabled = $true
+                    expirationMinutes = 60
+                }
+                DirectoryObjects = @{
+                    enabled = $true
+                    expirationMinutes = 15
+                }
+                Devices = @{
+                    enabled = $true
+                    expirationMinutes = 15
+                }
+            }
+        }
+        maxUserMatchDisplay = 10
+        maxWaitTime = 30
+        appModes = @('full')
+        showLicenseBanner = $true
+        autoUpdate = $false
+        strongMappingOptional = $true
+        validateScopes = $true
+        maxGroupMatchDisplay = 10
+        maxMenuItemsPerPage = 15
+        release = 'auto'
+        checkStrongMapping = $false
+        configFile = '.\.secrets\config.json'
+        deviceContactThresholdInDays = 30
+    }
+    description = 'This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.'
+    version = '1.3.0.0'
     repoInfo = @{
-        repoName = 'Autopilot'
-        baseSourceURL = 'https://raw.githubusercontent.com'
-        baseURL = 'https://www.github.com'
         repoPath = 'zuhairmahd'
+        baseURL = 'https://www.github.com'
+        baseSourceURL = 'https://raw.githubusercontent.com'
+        repoName = 'Autopilot'
     }
     requiredScopes = @(
         @{
@@ -127,46 +150,23 @@
             reason = 'Required to create, update, and delete Intune device management scripts.'
         }
     )
-    globalSettings = @{
-        configFile = '.\.secrets\config.json'
-        maxWaitTime = 30
-        showLicenseBanner = $true
-        validateScopes = $true
-        deviceContactThresholdInDays = 30
-        appModes = @('full')
-        timeInSeconds = 60
-        maxUserMatchDisplay = 10
-        checkStrongMapping = $false
-        strongMappingOptional = $true
-        maxGroupMatchDisplay = 10
-        maxMenuItemsPerPage = 15
-        release = 'auto'
-        cacheSettings = @{
-            enabled = $true
-            defaultExpirationMinutes = 15
-            maxCacheSize = 1000
-            cacheTypes = @{
-                Configuration = @{
-                    enabled = $true
-                    expirationMinutes = 60
-                }
-                DirectoryObjects = @{
-                    enabled = $true
-                    expirationMinutes = 15
-                }
-                Devices = @{
-                    enabled = $true
-                    expirationMinutes = 15
-                }
-            }
-        }
-        repoInfo = @{
-            repoName = 'Autopilot'
-            baseSourceURL = 'https://raw.githubusercontent.com'
-            baseURL = 'https://www.github.com'
-            repoPath = 'zuhairmahd'
-        }
-        operatingSystem = 'Windows'
-        autoUpdate = $true
+    auth = @{
+        noSaveRefreshToken = $false
+        changePwOnNextStart = $false
+        authType = 'PublicAuthFlow'
+        delegated = $false
+        forceNewToken = $false
+        scope = @(
+            'Device.ReadWrite.All',
+            'DeviceManagementApps.Read.All',
+            'DeviceManagementConfiguration.ReadWrite.All',
+            'DeviceManagementScripts.Read.All',
+            'DeviceManagementManagedDevices.PrivilegedOperations.All',
+            'DeviceManagementManagedDevices.ReadWrite.All',
+            'DeviceManagementServiceConfig.ReadWrite.All'
+        )
+        cacheType = 'Memory'
+        secureString = $false
+        renewalLeadTime = 5
     }
 }

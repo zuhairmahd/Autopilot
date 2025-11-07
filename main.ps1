@@ -1380,7 +1380,7 @@ $exportMenu = AddMenuItem -menu $exportMenu -name "Export Unmanaged Windows Devi
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export device storage report" -Action {
     $dateTime = Get-Date -Format "yyyyMMdd_HHmm"
     $storageOutputFileName = "DeviceStorageReport-$dateTime.csv"
-    if (ExportDeviceStorage -AccessToken $accessToken -OutputFile $storageOutputFileName -IncludeStorageInfo)
+    if (ExportDeviceStorage -AccessToken $accessToken -OutputFile $storageOutputFileName)
     {
         Write-Host "Exported device storage report to $($storageOutputFileName)." -ForegroundColor Green
     }
