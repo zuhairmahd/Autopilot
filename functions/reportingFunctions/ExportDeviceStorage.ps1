@@ -13,7 +13,7 @@ function ExportDeviceStorage()
     $managedDeviceUri = "deviceManagement/managedDevices"
     if ([string]::IsNullOrWhiteSpace($settings.deviceNamePrefix))
     {
-        write-Log -LogFile $LogFile -Module "$functionName" -Message "- No device name prefix set in settings, proceeding without prefix filter" -LogLevel "Information"            
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "- No device name prefix set in settings, proceeding without prefix filter" -LogLevel "Information"            
         $managedDeviceFilter = "operatingSystem eq 'Windows'"
     }
     else 
