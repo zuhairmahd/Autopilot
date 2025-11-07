@@ -1,3 +1,4 @@
+#requires -version 7.0
 <#
 .SYNOPSIS
     Executes Pester tests for Autopilot project
