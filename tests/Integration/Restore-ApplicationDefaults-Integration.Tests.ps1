@@ -12,6 +12,10 @@ Describe "Integration: Restore-ApplicationDefaults with Main.ps1" -Tags 'Integra
         # Set up global log file variable (required by Write-Log)
         $global:logFile = Join-Path $env:TEMP "test-autopilot-integration.log"
         
+        # Mock Write-Log and Write-Error to prevent actual logging/error output during tests
+        Mock Write-Log { }
+        Mock Write-Error { }
+        
         # Create test environment
         $script:TestEnv = Initialize-AutopilotTestEnvironment
         $script:TestDomain = "contoso.com"
@@ -26,7 +30,8 @@ Describe "Integration: Restore-ApplicationDefaults with Main.ps1" -Tags 'Integra
     }
     
     AfterAll {
-        if ($script:TestEnv -and $script:TestEnv.TestFolder) {
+        if ($script:TestEnv -and $script:TestEnv.TestFolder)
+        {
             Remove-Item $script:TestEnv.TestFolder -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
@@ -34,7 +39,8 @@ Describe "Integration: Restore-ApplicationDefaults with Main.ps1" -Tags 'Integra
     BeforeEach {
         # Clean up any existing test files
         @($script:InitFile, $script:StringsFile, $script:MenuFile) | ForEach-Object {
-            if (Test-Path $_) {
+            if (Test-Path $_)
+            {
                 Remove-Item $_ -Force -ErrorAction SilentlyContinue
             }
         }
@@ -55,16 +61,20 @@ Describe "Integration: Restore-ApplicationDefaults with Main.ps1" -Tags 'Integra
             
             # Simulate main.ps1 logic
             $mainResult = $null
-            if ($restoreResult.UserCancelled) {
+            if ($restoreResult.UserCancelled)
+            {
                 $mainResult = $script:returnValues.backoutText
             }
-            elseif ($restoreResult.Success) {
+            elseif ($restoreResult.Success)
+            {
                 $mainResult = "EXIT_APPLICATION"
             }
-            elseif ($restoreResult.RemovedFileCount -gt 0) {
+            elseif ($restoreResult.RemovedFileCount -gt 0)
+            {
                 $mainResult = "EXIT_APPLICATION"
             }
-            else {
+            else
+            {
                 $mainResult = $script:returnValues.backoutText
             }
             
@@ -84,37 +94,31 @@ Describe "Integration: Restore-ApplicationDefaults with Main.ps1" -Tags 'Integra
             
             # Mock Remove-Item to simulate one file failing to delete
             Mock Remove-Item {
-                param($Path, $Force, $ErrorAction)
-                if ($Path -eq $script:MenuFile) {
+                if ($Path -eq $script:MenuFile)
+                {
                     throw "Access denied"
                 }
-                # For successful deletions, just do nothing (file will appear to be deleted)
-            }
-            
-            # Mock Test-Path to simulate the state after deletion attempts
-            Mock Test-Path {
-                param($Path)
-                if ($Path -eq $script:MenuFile) {
-                    return $true  # File still exists (deletion failed)
-                }
-                return $false  # Other files were successfully "deleted"
             } -ParameterFilter { $Path -in @($script:InitFile, $script:StringsFile, $script:MenuFile) }
             
             $restoreResult = Restore-ApplicationDefaults -FilesToDelete @($script:InitFile, $script:StringsFile, $script:MenuFile) -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder
             
             # Simulate main.ps1 logic for partial success
             $mainResult = $null
-            if ($restoreResult.UserCancelled) {
+            if ($restoreResult.UserCancelled)
+            {
                 $mainResult = $script:returnValues.backoutText
             }
-            elseif ($restoreResult.Success) {
+            elseif ($restoreResult.Success)
+            {
                 $mainResult = "EXIT_APPLICATION"
             }
-            elseif ($restoreResult.RemovedFileCount -gt 0) {
+            elseif ($restoreResult.RemovedFileCount -gt 0)
+            {
                 # Partial success should still exit
                 $mainResult = "EXIT_APPLICATION"
             }
-            else {
+            else
+            {
                 $mainResult = $script:returnValues.backoutText
             }
             
@@ -131,16 +135,20 @@ Describe "Integration: Restore-ApplicationDefaults with Main.ps1" -Tags 'Integra
             
             # Simulate main.ps1 logic for user cancellation
             $mainResult = $null
-            if ($restoreResult.UserCancelled) {
+            if ($restoreResult.UserCancelled)
+            {
                 $mainResult = $script:returnValues.backoutText
             }
-            elseif ($restoreResult.Success) {
+            elseif ($restoreResult.Success)
+            {
                 $mainResult = "EXIT_APPLICATION"
             }
-            elseif ($restoreResult.RemovedFileCount -gt 0) {
+            elseif ($restoreResult.RemovedFileCount -gt 0)
+            {
                 $mainResult = "EXIT_APPLICATION"
             }
-            else {
+            else
+            {
                 $mainResult = $script:returnValues.backoutText
             }
             
@@ -159,22 +167,26 @@ Describe "Integration: Restore-ApplicationDefaults with Main.ps1" -Tags 'Integra
             # Mock all file deletions to fail
             Mock Remove-Item { 
                 throw "All access denied"
-            }
+            } -ParameterFilter { $Path -in @($script:InitFile, $script:StringsFile, $script:MenuFile) }
             
             $restoreResult = Restore-ApplicationDefaults -FilesToDelete @($script:InitFile, $script:StringsFile, $script:MenuFile) -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder
             
             # Simulate main.ps1 logic for complete failure
             $mainResult = $null
-            if ($restoreResult.UserCancelled) {
+            if ($restoreResult.UserCancelled)
+            {
                 $mainResult = $script:returnValues.backoutText
             }
-            elseif ($restoreResult.Success) {
+            elseif ($restoreResult.Success)
+            {
                 $mainResult = "EXIT_APPLICATION"
             }
-            elseif ($restoreResult.RemovedFileCount -gt 0) {
+            elseif ($restoreResult.RemovedFileCount -gt 0)
+            {
                 $mainResult = "EXIT_APPLICATION"
             }
-            else {
+            else
+            {
                 $mainResult = $script:returnValues.backoutText
             }
             
@@ -195,7 +207,7 @@ Describe "Integration: Restore-ApplicationDefaults with Main.ps1" -Tags 'Integra
             Mock Read-Host { return "Y" } -ParameterFilter { $Prompt -eq "Enter Y to continue or N to cancel" }
             Mock Remove-Item { 
                 throw "Detailed error message"
-            }
+            } -ParameterFilter { $Path -in @($script:InitFile, $script:StringsFile, $script:MenuFile) }
             
             $restoreResult = Restore-ApplicationDefaults -FilesToDelete @($script:InitFile, $script:StringsFile, $script:MenuFile) -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder
             
@@ -232,6 +244,129 @@ Describe "Integration: Restore-ApplicationDefaults with Main.ps1" -Tags 'Integra
             $restoreResult.RemovedFileCount | Should -Be 3
             $restoreResult.MissingFileCount | Should -Be 1
             $restoreResult.UndeletedFileCount | Should -Be 0
+        }
+    }
+    
+    Context "Domain File Handling" {
+        It "Should include domain file in deletion when it exists" {
+            # Create test files including domain file
+            @($script:InitFile, $script:StringsFile, $script:MenuFile) | ForEach-Object {
+                New-Item $_ -ItemType File -Force | Out-Null
+            }
+            $domainFile = Join-Path $script:TestEnv.TestFolder "$script:TestDomain.psd1"
+            New-Item $domainFile -ItemType File -Force | Out-Null
+            
+            Mock Read-Host { return "Y" } -ParameterFilter { $Prompt -eq "Enter Y to continue or N to cancel" }
+            
+            $restoreResult = Restore-ApplicationDefaults -FilesToDelete @($script:InitFile, $script:StringsFile, $script:MenuFile) -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder
+            
+            # Verify domain file was included in processing
+            $restoreResult.ProcessedFiles | Should -Contain $domainFile
+            $restoreResult.RemovedFiles | Should -Contain $domainFile
+            $restoreResult.RemovedFileCount | Should -Be 4  # 3 config files + 1 domain file
+        }
+        
+        It "Should handle case when domain file does not exist" {
+            # Create test files but NOT domain file
+            @($script:InitFile, $script:StringsFile, $script:MenuFile) | ForEach-Object {
+                New-Item $_ -ItemType File -Force | Out-Null
+            }
+            # Don't create domain file
+            
+            Mock Read-Host { return "Y" } -ParameterFilter { $Prompt -eq "Enter Y to continue or N to cancel" }
+            
+            $restoreResult = Restore-ApplicationDefaults -FilesToDelete @($script:InitFile, $script:StringsFile, $script:MenuFile) -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder
+            
+            # Domain file should NOT be in ProcessedFiles when it doesn't exist
+            $domainFile = Join-Path $script:TestEnv.TestFolder "$script:TestDomain.psd1"
+            $restoreResult.ProcessedFiles | Should -Not -Contain $domainFile
+            $restoreResult.RemovedFileCount | Should -Be 3  # Only 3 config files
+        }
+    }
+    
+    Context "Invalid Input Handling" {
+        It "Should handle invalid user input then accept valid input" {
+            # Create test files
+            @($script:InitFile, $script:StringsFile, $script:MenuFile) | ForEach-Object {
+                New-Item $_ -ItemType File -Force | Out-Null
+            }
+            
+            # Mock sequence of invalid then valid responses
+            $script:CallCount = 0
+            Mock Read-Host {
+                $script:CallCount++
+                switch ($script:CallCount)
+                {
+                    1 { return "maybe" }
+                    2 { return "x" }
+                    default { return "Y" }
+                }
+            } -ParameterFilter { $Prompt -eq "Enter Y to continue or N to cancel" }
+            
+            $restoreResult = Restore-ApplicationDefaults -FilesToDelete @($script:InitFile, $script:StringsFile, $script:MenuFile) -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder
+            
+            # Should eventually succeed after invalid inputs
+            $restoreResult.UserCancelled | Should -Be $false
+            $restoreResult.Success | Should -Be $true
+            $restoreResult.RemovedFileCount | Should -Be 3
+        }
+    }
+    
+    Context "All Files Missing Scenario" {
+        It "Should handle case where all files are already missing" {
+            # Don't create any files
+            
+            Mock Read-Host { return "Y" } -ParameterFilter { $Prompt -eq "Enter Y to continue or N to cancel" }
+            
+            $restoreResult = Restore-ApplicationDefaults -FilesToDelete @($script:InitFile, $script:StringsFile, $script:MenuFile) -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder
+            
+            # Should still succeed (files are already gone)
+            $restoreResult.Success | Should -Be $true
+            $restoreResult.RemovedFileCount | Should -Be 0
+            $restoreResult.MissingFileCount | Should -Be 3
+            $restoreResult.Message | Should -Match "already missing"
+            
+            # Main.ps1 should still get EXIT_APPLICATION
+            $mainResult = $null
+            if ($restoreResult.UserCancelled)
+            {
+                $mainResult = $script:returnValues.backoutText
+            }
+            elseif ($restoreResult.Success)
+            {
+                $mainResult = "EXIT_APPLICATION"
+            }
+            else
+            {
+                $mainResult = $script:returnValues.backoutText
+            }
+            $mainResult | Should -Be "EXIT_APPLICATION"
+        }
+    }
+    
+    Context "Return Object Completeness" {
+        It "Should provide all necessary data for main.ps1 decision making" {
+            # Create test files
+            @($script:InitFile, $script:StringsFile, $script:MenuFile) | ForEach-Object {
+                New-Item $_ -ItemType File -Force | Out-Null
+            }
+            
+            Mock Read-Host { return "Y" } -ParameterFilter { $Prompt -eq "Enter Y to continue or N to cancel" }
+            
+            $restoreResult = Restore-ApplicationDefaults -FilesToDelete @($script:InitFile, $script:StringsFile, $script:MenuFile) -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder
+            
+            # Verify all required properties exist for main.ps1
+            $restoreResult.Keys | Should -Contain "Success"
+            $restoreResult.Keys | Should -Contain "UserCancelled"
+            $restoreResult.Keys | Should -Contain "RemovedFileCount"
+            $restoreResult.Keys | Should -Contain "UndeletedFileCount"
+            $restoreResult.Keys | Should -Contain "MissingFileCount"
+            $restoreResult.Keys | Should -Contain "Message"
+            $restoreResult.Keys | Should -Contain "ErrorMessages"
+            $restoreResult.Keys | Should -Contain "ProcessedFiles"
+            $restoreResult.Keys | Should -Contain "RemovedFiles"
+            $restoreResult.Keys | Should -Contain "UndeletedFiles"
+            $restoreResult.Keys | Should -Contain "MissingFiles"
         }
     }
 }
