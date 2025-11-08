@@ -97,7 +97,7 @@ function Restore-ApplicationDefaults()
         $confirmation = Read-Host -Prompt "Enter Y to continue or N to cancel" 
         Write-Verbose "[$functionName] User confirmation received: $confirmation" 
         Write-Log -LogFile $logFile -Module $functionName -Message "User confirmation received: $confirmation" 
-        while ($confirmation -notin @(’Y’, ’y’, ’N’, ’n’)) 
+        while ($confirmation -notin @("Y", "y", "N", "n")) 
         { 
             Write-Host "Invalid input. Please enter Y to continue or N to cancel." -ForegroundColor Red 
             $confirmation = Read-Host -Prompt "Enter Y to continue or N to cancel" 
@@ -111,7 +111,7 @@ function Restore-ApplicationDefaults()
         Write-Verbose "[$functionName] Silent mode enabled. Automatically proceeding with operation." 
         Write-Log -LogFile $logFile -Module $functionName -Message "Silent mode enabled. Automatically proceeding with operation." 
     }               
-    if ($confirmation -in @(’N’, ’n’)) 
+    if ($confirmation -in @("N", "n")) 
     { 
         $cancelMessage = "Operation cancelled by user." 
         Write-Host $cancelMessage -ForegroundColor Yellow 
