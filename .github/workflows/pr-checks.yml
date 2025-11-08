@@ -108,18 +108,18 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: unit-test-results
+          name: comprehensive-test-results
           path: |
             TestResults*.xml
             coverage.xml
           retention-days: 7
 
-      - name: Publish Unit Test Results
+      - name: Publish Comprehensive Test Results
         uses: EnricoMi/publish-unit-test-result-action/windows@v2
         if: always()
         with:
           files: TestResults*.xml
-          check_name: Unit Test Results
+          check_name: Comprehensive Test Results
           comment_mode: off
 
   code-quality:
