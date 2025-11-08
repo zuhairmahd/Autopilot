@@ -7,15 +7,23 @@ function ExportDeviceStorage()
         [Parameter(Mandatory = $true)]
         [string]$OutputFile,
         [Parameter(Mandatory = $false)]
-        [string]$Filter = $null,
-        [Parameter(Mandatory = $false)]
-        [int]$BatchSize = 20,
-        [Parameter(Mandatory = $false)]
-        [switch]$IncludeStorageInfo
+        [string]$Filter = $null
     )
     $functionName = $MyInvocation.MyCommand.Name
     $managedDeviceUri = "deviceManagement/managedDevices"
-    $managedDeviceFilter = "operatingSystem eq 'Windows'"
+    if ([string]::IsNullOrWhiteSpace($settings.deviceNamePrefix))
+    {
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "- No device name prefix set in settings, proceeding without prefix filter" -LogLevel "Information"            
+        $managedDeviceFilter = "operatingSystem eq 'Windows'"
+    }
+    else 
+    {
+        write-Log -LogFile $LogFile -Module "$functionName" -Message "- Using device name prefix '$($settings.deviceNamePrefix)' from settings for filtering" -LogLevel "Information"
+        # Escape single quotes in prefix for OData filter
+        $escapedPrefix = $settings.deviceNamePrefix -replace "'", "''"
+        $managedDeviceFilter = "operatingSystem eq 'Windows' and startswith(deviceName,'$escapedPrefix')"
+    }
+    
     $success = $false
     if ($filter)
     {
@@ -26,8 +34,7 @@ function ExportDeviceStorage()
     {
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "- No filter provided, using default filter: $managedDeviceFilter" -LogLevel "Information"
     }
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Starting device memory export process" -LogLevel "Verbose"
-    Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Using batch size of $BatchSize for API requests" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Starting device storage export process" -LogLevel "Verbose"
     
     # Store all devices in an array
     $allDevices = [System.Collections.ArrayList]@()
@@ -36,10 +43,10 @@ Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Starting device 
     {
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Getting device list from Graph API" -LogLevel "Information"
         $deviceListResponse = CallGraphApi -ResourcePath $managedDeviceUri -accessToken $AccessToken -Filter $managedDeviceFilter -consistencyLevel -extraParameters "top=999"
-        
         if ($null -eq $deviceListResponse -or $null -eq $deviceListResponse.value -or $deviceListResponse.value.count -eq 0)
         {
             Write-Host "No devices found." -ForegroundColor Red
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "- No devices found with the specified filter." -LogLevel "Warning"                            
             return $false
         }
         
@@ -51,135 +58,119 @@ Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Starting device 
         # Create CSV object to store the results
         $CSVObject = [System.Collections.ArrayList]@()
         
-        # Process devices in batches to reduce API calls
-        for ($batchIndex = 0; $batchIndex -lt $allDevices.Count; $batchIndex += $BatchSize)
+        # Build array of resource paths for batch processing
+        $resourcePaths = @()
+        foreach ($device in $allDevices)
         {
-            $batch = $allDevices | Select-Object -Skip $batchIndex -First $BatchSize
-            
-            # Create batch request
-            $batchRequestBody = @{
-                requests = @()
-            }
-            
-            foreach ($device in $batch)
+            if ($null -ne $device.id)
             {
-                $deviceId = $device.id
-                if ($null -eq $deviceId)
-                {
-                    continue 
-                }
-                
-                $batchRequestBody.requests += @{
-                    id     = $deviceId
-                    method = "GET"
-                    url    = "/deviceManagement/managedDevices/$deviceId`?`$select=id,hardwareInformation,physicalMemoryInBytes,totalStorageSpaceInBytes,freeStorageSpaceInBytes"
-                }
-            }
+                $resourcePaths += "deviceManagement/managedDevices/$($device.id)?`$select=id,serialNumber,deviceName,manufacturer,model,userPrincipalName,userDisplayName,operatingSystem,osVersion,lastSyncDateTime,physicalMemoryInBytes,totalStorageSpaceInBytes,freeStorageSpaceInBytes,joinType,complianceState"
+            }   
+        }
+        
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Fetching detailed information for $($resourcePaths.Count) devices using native batching" -LogLevel "Information"
+        
+        # Use CallGraphAPI's native batching (handles up to 20 requests per batch automatically)
+        $batchResponse = CallGraphApi -ResourcePath $resourcePaths -accessToken $AccessToken -Method "GET"
+        
+        # Process batch responses
+        if ($null -ne $batchResponse -and $batchResponse.batchProcessed -eq $true)
+        {
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Successfully retrieved details for $($batchResponse.successCount) devices, failed: $($batchResponse.failureCount)" -LogLevel "Information"
             
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Sending batch request for devices $batchIndex to $($batchIndex + $batch.Count)" -LogLevel "Debug"
-            $batchResponse = CallGraphApi -ResourcePath "`$batch" -accessToken $AccessToken -Method "POST" -Body ($batchRequestBody | ConvertTo-Json -Depth $maxJSONDepth)
-            
-            # Process batch responses
-            if ($null -ne $batchResponse -and $null -ne $batchResponse.responses)
+            foreach ($deviceDetail in $batchResponse.value)
             {
-                foreach ($response in $batchResponse.responses)
+                if ($null -ne $deviceDetail)
                 {
-                    if ($response.status -eq 200)
+                    $memoryGB = if ($deviceDetail.physicalMemoryInBytes)
                     {
-                        $deviceDetail = $response.body
-                        $deviceBasic = $batch | Where-Object { $_.id -eq $response.id } | Select-Object -First 1
-                        
-                        if ($null -ne $deviceBasic)
-                        {
-                            $memoryGB = if ($deviceDetail.physicalMemoryInBytes)
-                            {
-                                [math]::Round($deviceDetail.physicalMemoryInBytes / 1GB, 2)
-                            }
-                            else
-                            {
-                                0 
-                            }
-                            
-                            $totalStorageGB = if ($deviceDetail.totalStorageSpaceInBytes)
-                            {
-                                [math]::Round($deviceDetail.totalStorageSpaceInBytes / 1GB, 2)
-                            }
-                            else
-                            {
-                                0 
-                            }
-                            
-                            $freeStorageGB = if ($deviceDetail.freeStorageSpaceInBytes)
-                            {
-                                [math]::Round($deviceDetail.freeStorageSpaceInBytes / 1GB, 2)
-                            }
-                            else
-                            {
-                                0 
-                            }
-                            
-                            $usedStorageGB = if ($totalStorageGB -gt 0 -and $freeStorageGB -gt 0)
-                            {
-                                [math]::Round($totalStorageGB - $freeStorageGB, 2)
-                            }
-                            else
-                            {
-                                0 
-                            }
-                            
-                            $usedStoragePercent = if ($totalStorageGB -gt 0)
-                            {
-                                [math]::Round(($usedStorageGB / $totalStorageGB) * 100, 2)
-                            }
-                            else
-                            {
-                                0 
-                            }
-                            
-                            $osVersion = if ($deviceBasic.operatingSystem -match "Windows")
-                            {
-                                "$($deviceBasic.operatingSystem) $($deviceBasic.osVersion)"
-                            }
-                            else
-                            {
-                                $deviceBasic.operatingSystem 
-                            }
-                            
-                            # Create export object with expanded properties
-                            $exportObject = [PSCustomObject]@{
-                                DeviceId              = $deviceBasic.id
-                                SerialNumber          = $deviceBasic.serialNumber
-                                DeviceName            = $deviceBasic.deviceName
-                                Manufacturer          = $deviceBasic.manufacturer
-                                Model                 = $deviceBasic.model
-                                SystemFamily          = $deviceBasic.systemFamily
-                                UserPrincipalName     = $deviceBasic.userPrincipalName
-                                UserDisplayName       = $deviceBasic.userDisplayName
-                                OperatingSystem       = $osVersion
-                                LastSyncDateTime      = $deviceBasic.lastSyncDateTime
-                                MemoryGB              = $memoryGB
-                                TotalStorageGB        = $totalStorageGB
-                                FreeStorageGB         = $freeStorageGB
-                                UsedStorageGB         = $usedStorageGB
-                                UsedStoragePercent    = $usedStoragePercent
-                                EnrollmentProfileName = $deviceBasic.enrollmentProfileName
-                                JoinType              = $deviceBasic.joinType
-                                ComplianceState       = $deviceBasic.complianceState
-                            }
-                            
-                            Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Processed device: $($deviceBasic.deviceName) (Memory: $memoryGB GB, Storage: $totalStorageGB GB)" -LogLevel "Information"
-                            $null = $CSVObject.Add($exportObject)
-                        }
+                        [math]::Round($deviceDetail.physicalMemoryInBytes / 1GB, 2)
                     }
                     else
                     {
-                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Failed to get details for device ID $($response.id). Status: $($response.status)" -LogLevel "Error"
+                        0 
                     }
+                    
+                    $totalStorageGB = if ($deviceDetail.totalStorageSpaceInBytes)
+                    {
+                        [math]::Round($deviceDetail.totalStorageSpaceInBytes / 1GB, 2)
+                    }
+                    else
+                    {
+                        0 
+                    }
+                    
+                    $freeStorageGB = if ($deviceDetail.freeStorageSpaceInBytes)
+                    {
+                        [math]::Round($deviceDetail.freeStorageSpaceInBytes / 1GB, 2)
+                    }
+                    else
+                    {
+                        0 
+                    }
+                    
+                    $usedStorageGB = if ($totalStorageGB -gt 0 -and $freeStorageGB -gt 0)
+                    {
+                        [math]::Round($totalStorageGB - $freeStorageGB, 2)
+                    }
+                    else
+                    {
+                        0 
+                    }
+                    
+                    $usedStoragePercent = if ($totalStorageGB -gt 0)
+                    {
+                        [math]::Round(($usedStorageGB / $totalStorageGB) * 100, 2)
+                    }
+                    else
+                    {
+                        0 
+                    }
+                    
+                    $osVersion = if ($deviceDetail.operatingSystem -match "Windows")
+                    {
+                        "$($deviceDetail.operatingSystem) $($deviceDetail.osVersion)"
+                    }
+                    else
+                    {
+                        $deviceDetail.operatingSystem 
+                    }
+                    $userPrincipalName = if ($deviceDetail.userPrincipalName)
+                    {
+                        $deviceDetail.userPrincipalName
+                    }
+                    else
+                    {
+                        "Not assigned"
+                    }               
+                    
+                    # Create export object with expanded properties
+                    $exportObject = [PSCustomObject]@{
+                        SerialNumber       = $deviceDetail.serialNumber
+                        DeviceName         = $deviceDetail.deviceName
+                        Manufacturer       = $deviceDetail.manufacturer
+                        Model              = $deviceDetail.model
+                        UserPrincipalName  = $userPrincipalName
+                        UserDisplayName    = $deviceDetail.userDisplayName
+                        OperatingSystem    = $osVersion
+                        LastSyncDateTime   = $deviceDetail.lastSyncDateTime
+                        MemoryGB           = $memoryGB
+                        TotalStorageGB     = $totalStorageGB
+                        FreeStorageGB      = $freeStorageGB
+                        UsedStorageGB      = $usedStorageGB
+                        UsedStoragePercent = "$usedStoragePercent%"
+                        JoinType           = $deviceDetail.joinType
+                        ComplianceState    = $deviceDetail.complianceState
+                    }
+                    
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Processed device: $($deviceDetail.deviceName) (Memory: $memoryGB GB, Storage: $totalStorageGB GB)" -LogLevel "Verbose"
+                    $null = $CSVObject.Add($exportObject)
                 }
             }
-            
-            # Add a slight delay to prevent throttling
-            Start-Sleep -Milliseconds 900
+        }
+        else
+        {
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Batch processing did not complete successfully" -LogLevel "Warning"
         }
         
         # Export results to CSV

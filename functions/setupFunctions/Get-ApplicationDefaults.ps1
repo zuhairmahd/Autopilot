@@ -371,6 +371,7 @@ function Get-ApplicationDefaults()
                 deviceRestartSuccessMessage    = "The device was restarted successfully."
                 deviceNotAssignedMessage       = "The device is not assigned to a deployment profile."
                 manufacturerNotAllowed         = 'You are not allowed to import this device using this script.  Please contact your system administrator.'
+                exitString                     = "EXIT_APPLICATION"
                 deviceIsInIntuneMessage        = 'The device is in Intune. Delete the device and try again.'
                 userCanceledMessage            = "Operation canceled by user"
                 noUserDeviceFoundMessage       = "No user or device found."
@@ -844,7 +845,17 @@ function Get-ApplicationDefaults()
                             'full',
                             'admin'
                         )
-                    }            
+                    },
+                    @{
+                        description           = 'Restore all application defaults including menus, local and global settings'
+                        name                  = 'Restore application defaults'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced'
+                        )               
+                    }
                 )
                 type                  = 'static'
                 includeInDisplayModes = @(

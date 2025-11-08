@@ -1380,7 +1380,7 @@ $exportMenu = AddMenuItem -menu $exportMenu -name "Export Unmanaged Windows Devi
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export device storage report" -Action {
     $dateTime = Get-Date -Format "yyyyMMdd_HHmm"
     $storageOutputFileName = "DeviceStorageReport-$dateTime.csv"
-    if (ExportDeviceStorage -AccessToken $accessToken -OutputFile $storageOutputFileName -IncludeStorageInfo)
+    if (ExportDeviceStorage -AccessToken $accessToken -OutputFile $storageOutputFileName)
     {
         Write-Host "Exported device storage report to $($storageOutputFileName)." -ForegroundColor Green
     }
@@ -2016,7 +2016,6 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings"
         return $null
     }
 }
-
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change repository information" -Action {
     Write-Host "Launching repository information editor..." -ForegroundColor Cyan
     Write-Host "These settings control repository URLs and paths used for updates." -ForegroundColor Gray
@@ -2036,7 +2035,6 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change repository informa
         return $result
     }
 }
-
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change cache settings" -Action {
     Write-Host "Launching cache settings editor..." -ForegroundColor Cyan
     Write-Host "These settings control caching behavior, expiration times, and size limits." -ForegroundColor Gray
@@ -2056,7 +2054,18 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change cache settings" -A
         return $result
     }
 }
-
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Restore application defaults" -Action {
+    Write-Host "Restoring application default settings..." -ForegroundColor Cyan
+    $restoreResult = Show-RestoreApplicationDefaultsResults -FilesToDelete @($InitFile, $stringsFile, $menuFile) -Domain $domain -ScriptPath $scriptPath
+    if ($restoreResult -in $returnValues.Values)
+    {
+        return $restoreResult
+    }                                           
+    else
+    {
+        Write-Host $restoreResult
+    }
+}
 #endregion Settings menu
 
 $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by Serial Number" -Submenu $serialNumberMenu
