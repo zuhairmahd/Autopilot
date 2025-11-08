@@ -240,10 +240,7 @@ function GetGroupIndirectAssignments()
         $intents = @()
         $resourceAccessProfiles = @()
         $configurationPolicies = @()
-        "healthScripts" { $healthScripts = $response.body.value }
-        # The 'configurationPolicies' resource does not include a 'displayName' property in its API response,
-        # but other resources do. To ensure consistent downstream processing, we copy the 'name' property
-        # to a new 'displayName' property for each configuration policy object.
+        $groupPolicyConfigs = @()
         $policySets = @()
         $wipPolicies = @()
         $mdmWipPolicies = @()

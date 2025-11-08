@@ -15,6 +15,7 @@ BeforeAll {
     # Load required functions
     . "$script:RepoRoot/functions/graphFunctions/CallGraphAPI.ps1"
     . "$script:RepoRoot/functions/UserAndGroupFunctions/GetGroupDirectAssignments.ps1"
+    . "$script:RepoRoot/functions/UserAndGroupFunctions/GetGroupIndirectAssignments.ps1"
     . "$script:RepoRoot/functions/utilityFunctions/Write-Log.ps1"
     
     # Set up global variables required by functions
@@ -366,6 +367,223 @@ Describe "Function: GetGroupDirectAssignments" -Tags 'Unit' {
             Mock CallGraphAPI { throw "API Error" }
             
             { GetGroupDirectAssignments -AccessToken $TestAccessToken -GroupName $TestGroup } | Should -Not -Throw
+        }
+    }
+    
+    Context "Indirect Assignments Integration" {
+        It "Should not call GetGroupIndirectAssignments when IncludeIndirectAssignments not specified" {
+            Mock CallGraphAPI { return @{ responses = @() } }
+            Mock GetGroupIndirectAssignments { }
+            
+            GetGroupDirectAssignments -AccessToken $TestAccessToken -GroupName $TestGroup
+            
+            Assert-MockCalled GetGroupIndirectAssignments -Times 0
+        }
+        
+        It "Should call GetGroupIndirectAssignments when IncludeIndirectAssignments specified" {
+            Mock CallGraphAPI { return @{ responses = @() } }
+            Mock GetGroupIndirectAssignments {
+                return @{
+                    AppAssignments                          = @()
+                    ConfigurationAssignments                = @()
+                    ComplianceAssignments                   = @()
+                    AutopilotAssignments                    = @()
+                    ScriptAssignments                       = @()
+                    HealthScriptAssignments                 = @()
+                    AppProtectionAssignments                = @()
+                    IntentAssignments                       = @()
+                    ResourceAccessAssignments               = @()
+                    ConfigurationPolicyAssignments          = @()
+                    GroupPolicyAssignments                  = @()
+                    WindowsInformationProtectionAssignments = @()
+                    PolicySetAssignments                    = @()
+                    AllAssignments                          = @()
+                }
+            }
+            
+            GetGroupDirectAssignments -AccessToken $TestAccessToken -GroupName $TestGroup -IncludeIndirectAssignments
+            
+            Assert-MockCalled GetGroupIndirectAssignments -Times 1
+        }
+        
+        It "Should pass IncludeBeta parameter to GetGroupIndirectAssignments" {
+            Mock CallGraphAPI { return @{ responses = @() } }
+            Mock GetGroupIndirectAssignments {
+                return @{
+                    AllAssignments = @()
+                }
+            }
+            
+            GetGroupDirectAssignments -AccessToken $TestAccessToken -GroupName $TestGroup -IncludeIndirectAssignments -IncludeBeta
+            
+            Assert-MockCalled GetGroupIndirectAssignments -ParameterFilter { 
+                $IncludeBeta -eq $true 
+            }
+        }
+        
+        It "Should merge indirect assignments with direct assignments" {
+            # Setup direct assignments
+            $testApp = @{
+                id = "app-1"
+                displayName = "Direct App"
+                description = "Direct assignment"
+            }
+            
+            Mock CallGraphAPI { 
+                param($ResourcePath)
+                if ($ResourcePath -eq '$batch') {
+                    return @{
+                        responses = @(
+                            @{ id = "mobileApps"; status = 200; body = @{ value = @($testApp) } }
+                        )
+                    }
+                }
+                elseif ($ResourcePath -is [array]) {
+                    return @{
+                        value = @(
+                            @{
+                                value = @(
+                                    @{
+                                        target = @{
+                                            '@odata.type' = '#microsoft.graph.groupAssignmentTarget'
+                                            groupId = $TestGroupId
+                                        }
+                                        intent = "required"
+                                    }
+                                )
+                            }
+                        )
+                    }
+                }
+                return @{ value = @() }
+            }
+            
+            # Setup indirect assignments
+            Mock GetGroupIndirectAssignments {
+                return @{
+                    AppAssignments                          = @(
+                        @{
+                            Type            = "Application"
+                            Name            = "Indirect App"
+                            Description     = "All Users assignment"
+                            Id              = "app-2"
+                            AssignmentScope = "All Users"
+                        }
+                    )
+                    ConfigurationAssignments                = @()
+                    ComplianceAssignments                   = @()
+                    AutopilotAssignments                    = @()
+                    ScriptAssignments                       = @()
+                    HealthScriptAssignments                 = @()
+                    AppProtectionAssignments                = @()
+                    IntentAssignments                       = @()
+                    ResourceAccessAssignments               = @()
+                    ConfigurationPolicyAssignments          = @()
+                    GroupPolicyAssignments                  = @()
+                    WindowsInformationProtectionAssignments = @()
+                    PolicySetAssignments                    = @()
+                    AllAssignments                          = @(
+                        @{
+                            Type            = "Application"
+                            Name            = "Indirect App"
+                            Description     = "All Users assignment"
+                            Id              = "app-2"
+                            AssignmentScope = "All Users"
+                        }
+                    )
+                }
+            }
+            
+            $result = GetGroupDirectAssignments -AccessToken $TestAccessToken -GroupName $TestGroup -IncludeIndirectAssignments
+            
+            # Should have both direct and indirect assignments
+            $result.AppAssignments.Count | Should -Be 2
+            $result.AllAssignments.Count | Should -Be 2
+            
+            # Verify both types are present
+            $result.AppAssignments[0].Name | Should -Be "Direct App"
+            $result.AppAssignments[1].Name | Should -Be "Indirect App"
+            $result.AppAssignments[1].AssignmentScope | Should -Be "All Users"
+        }
+        
+        It "Should handle empty indirect assignments gracefully" {
+            Mock CallGraphAPI { return @{ responses = @() } }
+            Mock GetGroupIndirectAssignments {
+                return @{
+                    AllAssignments = @()
+                }
+            }
+            
+            $result = GetGroupDirectAssignments -AccessToken $TestAccessToken -GroupName $TestGroup -IncludeIndirectAssignments
+            
+            $result.AllAssignments.Count | Should -Be 0
+        }
+        
+        It "Should update summary title when indirect assignments included" {
+            Mock CallGraphAPI { return @{ responses = @() } }
+            Mock GetGroupIndirectAssignments {
+                return @{
+                    AllAssignments = @()
+                }
+            }
+            Mock Write-Host { }
+            
+            GetGroupDirectAssignments -AccessToken $TestAccessToken -GroupName $TestGroup -IncludeIndirectAssignments -ShowSummary
+            
+            Assert-MockCalled Write-Host -ParameterFilter { 
+                $Object -match "Group Direct and Indirect Assignments Summary" 
+            }
+        }
+        
+        It "Should handle GetGroupIndirectAssignments errors without failing" {
+            Mock CallGraphAPI { return @{ responses = @() } }
+            Mock GetGroupIndirectAssignments { throw "Indirect API Error" }
+            
+            { GetGroupDirectAssignments -AccessToken $TestAccessToken -GroupName $TestGroup -IncludeIndirectAssignments } | Should -Not -Throw
+        }
+        
+        It "Should merge multiple indirect assignment types correctly" {
+            Mock CallGraphAPI { return @{ responses = @() } }
+            
+            Mock GetGroupIndirectAssignments {
+                return @{
+                    AppAssignments           = @(
+                        @{ Type = "Application"; Name = "App1"; AssignmentScope = "All Users" }
+                    )
+                    ConfigurationAssignments = @(
+                        @{ Type = "Configuration"; Name = "Config1"; AssignmentScope = "All Devices" }
+                    )
+                    ComplianceAssignments    = @(
+                        @{ Type = "Compliance"; Name = "Compliance1"; AssignmentScope = "All Users" }
+                    )
+                    AutopilotAssignments                    = @()
+                    ScriptAssignments                       = @()
+                    HealthScriptAssignments                 = @()
+                    AppProtectionAssignments                = @()
+                    IntentAssignments                       = @()
+                    ResourceAccessAssignments               = @()
+                    ConfigurationPolicyAssignments          = @()
+                    GroupPolicyAssignments                  = @()
+                    WindowsInformationProtectionAssignments = @()
+                    PolicySetAssignments                    = @()
+                    AllAssignments           = @(
+                        @{ Type = "Application"; Name = "App1"; AssignmentScope = "All Users" }
+                        @{ Type = "Configuration"; Name = "Config1"; AssignmentScope = "All Devices" }
+                        @{ Type = "Compliance"; Name = "Compliance1"; AssignmentScope = "All Users" }
+                    )
+                }
+            }
+            
+            $result = GetGroupDirectAssignments -AccessToken $TestAccessToken -GroupName $TestGroup -IncludeIndirectAssignments
+            
+            $result.AppAssignments.Count | Should -Be 1
+            $result.ConfigurationAssignments.Count | Should -Be 1
+            $result.ComplianceAssignments.Count | Should -Be 1
+            $result.AllAssignments.Count | Should -Be 3
+            
+            # Verify assignment scopes are preserved
+            $result.AppAssignments[0].AssignmentScope | Should -Be "All Users"
+            $result.ConfigurationAssignments[0].AssignmentScope | Should -Be "All Devices"
         }
     }
 }

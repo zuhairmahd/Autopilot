@@ -15,6 +15,7 @@ BeforeAll {
     # Load required functions
     . "$script:RepoRoot/functions/UserAndGroupFunctions/ShowGroupAssignments.ps1"
     . "$script:RepoRoot/functions/UserAndGroupFunctions/GetGroupDirectAssignments.ps1"
+    . "$script:RepoRoot/functions/UserAndGroupFunctions/GetGroupIndirectAssignments.ps1"
     . "$script:RepoRoot/functions/menuFunctions/NewMenu.ps1"
     . "$script:RepoRoot/functions/menuFunctions/AddMenuItem.ps1"
     . "$script:RepoRoot/functions/menuFunctions/ShowMenu.ps1"
@@ -346,6 +347,352 @@ Describe "Function: ShowGroupAssignments" -Tags 'Unit' {
             $result = ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken
             
             $result | Should -Be "Back"
+        }
+    }
+    
+    Context "Indirect Assignments Display" {
+        It "Should pass ShowIndirectAssignments switch to GetGroupDirectAssignments" {
+            Mock GetGroupDirectAssignments { 
+                return @{ AllAssignments = @() }
+            }
+            Mock Write-Host { }
+            
+            ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken -ShowIndirectAssignments
+            
+            Assert-MockCalled GetGroupDirectAssignments -ParameterFilter { 
+                $IncludeIndirectAssignments -eq $true 
+            }
+        }
+        
+        It "Should not include indirect assignments by default" {
+            Mock GetGroupDirectAssignments { 
+                return @{ AllAssignments = @() }
+            }
+            Mock Write-Host { }
+            
+            ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken
+            
+            Assert-MockCalled GetGroupDirectAssignments -ParameterFilter { 
+                $IncludeIndirectAssignments -ne $true 
+            }
+        }
+        
+        It "Should display assignment scope for indirect assignments" {
+            $mockAssignments = @{
+                AllAssignments                          = @(
+                    @{
+                        Type            = "Application"
+                        Name            = "Test App"
+                        Description     = "Test Description"
+                        Id              = "app-1"
+                        AssignmentScope = "All Users"
+                    }
+                )
+                AppAssignments                          = @(
+                    @{
+                        Type            = "Application"
+                        Name            = "Test App"
+                        Description     = "Test Description"
+                        Id              = "app-1"
+                        AssignmentScope = "All Users"
+                    }
+                )
+                ConfigurationAssignments                = @()
+                ComplianceAssignments                   = @()
+                ScriptAssignments                       = @()
+                AppProtectionAssignments                = @()
+                IntentAssignments                       = @()
+                ResourceAccessAssignments               = @()
+                AutopilotAssignments                    = @()
+                HealthScriptAssignments                 = @()
+                ConfigurationPolicyAssignments          = @()
+                GroupPolicyAssignments                  = @()
+                WindowsInformationProtectionAssignments = @()
+                PolicySetAssignments                    = @()
+            }
+            
+            Mock GetGroupDirectAssignments { return $mockAssignments }
+            
+            # Set up sequential ShowMenu calls: first returns Application, second returns Back
+            $script:showMenuCallCount = 0
+            Mock ShowMenu { 
+                $script:showMenuCallCount++
+                if ($script:showMenuCallCount -eq 1)
+                {
+                    return "Application"
+                }
+                else
+                {
+                    return "Back"
+                }
+            }
+            Mock Write-Host { }
+            Mock AddMenuItem { 
+                param($menu)
+                return $menu
+            }
+            
+            ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken -ShowIndirectAssignments
+            
+            # Verify that AssignmentScope is displayed
+            Assert-MockCalled Write-Host -ParameterFilter { 
+                $Object -match "Assignment Scope: All Users" 
+            }
+        }
+        
+        It "Should display 'All Devices' scope correctly" {
+            $mockAssignments = @{
+                AllAssignments                          = @(
+                    @{
+                        Type            = "Configuration"
+                        Name            = "Test Config"
+                        Description     = ""
+                        Id              = "config-1"
+                        AssignmentScope = "All Devices"
+                    }
+                )
+                AppAssignments                          = @()
+                ConfigurationAssignments                = @(
+                    @{
+                        Type            = "Configuration"
+                        Name            = "Test Config"
+                        Description     = ""
+                        Id              = "config-1"
+                        AssignmentScope = "All Devices"
+                    }
+                )
+                ComplianceAssignments                   = @()
+                ScriptAssignments                       = @()
+                AppProtectionAssignments                = @()
+                IntentAssignments                       = @()
+                ResourceAccessAssignments               = @()
+                AutopilotAssignments                    = @()
+                HealthScriptAssignments                 = @()
+                ConfigurationPolicyAssignments          = @()
+                GroupPolicyAssignments                  = @()
+                WindowsInformationProtectionAssignments = @()
+                PolicySetAssignments                    = @()
+            }
+            
+            Mock GetGroupDirectAssignments { return $mockAssignments }
+            
+            # Set up sequential ShowMenu calls
+            $script:showMenuCallCount = 0
+            Mock ShowMenu { 
+                $script:showMenuCallCount++
+                if ($script:showMenuCallCount -eq 1)
+                {
+                    return "Configuration"
+                }
+                else
+                {
+                    return "Back"
+                }
+            }
+            Mock Write-Host { }
+            Mock AddMenuItem { param($menu); return $menu }
+            
+            ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken -ShowIndirectAssignments
+            
+            Assert-MockCalled Write-Host -ParameterFilter { 
+                $Object -match "Assignment Scope: All Devices" 
+            }
+        }
+        
+        It "Should not display assignment scope when ShowIndirectAssignments not specified" {
+            $mockAssignments = @{
+                AllAssignments                          = @(
+                    @{
+                        Type        = "Application"
+                        Name        = "Test App"
+                        Description = ""
+                        Id          = "app-1"
+                    }
+                )
+                AppAssignments                          = @(
+                    @{
+                        Type        = "Application"
+                        Name        = "Test App"
+                        Description = ""
+                        Id          = "app-1"
+                    }
+                )
+                ConfigurationAssignments                = @()
+                ComplianceAssignments                   = @()
+                ScriptAssignments                       = @()
+                AppProtectionAssignments                = @()
+                IntentAssignments                       = @()
+                ResourceAccessAssignments               = @()
+                AutopilotAssignments                    = @()
+                HealthScriptAssignments                 = @()
+                ConfigurationPolicyAssignments          = @()
+                GroupPolicyAssignments                  = @()
+                WindowsInformationProtectionAssignments = @()
+                PolicySetAssignments                    = @()
+            }
+            
+            Mock GetGroupDirectAssignments { return $mockAssignments }
+            
+            $script:showMenuCallCount = 0
+            Mock ShowMenu { 
+                $script:showMenuCallCount++
+                if ($script:showMenuCallCount -eq 1)
+                {
+                    return "Application"
+                }
+                else
+                {
+                    return "Back"
+                }
+            }
+            Mock Write-Host { }
+            Mock AddMenuItem { param($menu); return $menu }
+            
+            ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken
+            
+            # Should not display Assignment Scope line
+            Assert-MockCalled Write-Host -Times 0 -ParameterFilter { 
+                $Object -match "Assignment Scope:" 
+            }
+        }
+        
+        It "Should display message when including indirect assignments" {
+            Mock GetGroupDirectAssignments { 
+                return @{ AllAssignments = @() }
+            }
+            Mock Write-Host { }
+            
+            ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken -ShowIndirectAssignments
+            
+            Assert-MockCalled Write-Host -ParameterFilter { 
+                $Object -match "Including indirect assignments.*All Users and All Devices" 
+            }
+        }
+        
+        It "Should handle mixed direct and indirect assignments" {
+            $mockAssignments = @{
+                AllAssignments                          = @(
+                    @{
+                        Type        = "Application"
+                        Name        = "Direct App"
+                        Description = "Direct assignment"
+                        Id          = "app-1"
+                        # No AssignmentScope = direct assignment
+                    }
+                    @{
+                        Type            = "Application"
+                        Name            = "Indirect App"
+                        Description     = "Indirect assignment"
+                        Id              = "app-2"
+                        AssignmentScope = "All Users"
+                    }
+                )
+                AppAssignments                          = @(
+                    @{
+                        Type        = "Application"
+                        Name        = "Direct App"
+                        Description = "Direct assignment"
+                        Id          = "app-1"
+                    }
+                    @{
+                        Type            = "Application"
+                        Name            = "Indirect App"
+                        Description     = "Indirect assignment"
+                        Id              = "app-2"
+                        AssignmentScope = "All Users"
+                    }
+                )
+                ConfigurationAssignments                = @()
+                ComplianceAssignments                   = @()
+                ScriptAssignments                       = @()
+                AppProtectionAssignments                = @()
+                IntentAssignments                       = @()
+                ResourceAccessAssignments               = @()
+                AutopilotAssignments                    = @()
+                HealthScriptAssignments                 = @()
+                ConfigurationPolicyAssignments          = @()
+                GroupPolicyAssignments                  = @()
+                WindowsInformationProtectionAssignments = @()
+                PolicySetAssignments                    = @()
+            }
+            
+            Mock GetGroupDirectAssignments { return $mockAssignments }
+            
+            $script:showMenuCallCount = 0
+            Mock ShowMenu { 
+                $script:showMenuCallCount++
+                if ($script:showMenuCallCount -eq 1)
+                {
+                    return "Application"
+                }
+                else
+                {
+                    return "Back"
+                }
+            }
+            Mock Write-Host { }
+            Mock AddMenuItem { param($menu); return $menu }
+            
+            ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken -ShowIndirectAssignments
+            
+            # Should display 2 app names
+            Assert-MockCalled Write-Host -ParameterFilter { $Object -match "Name: Direct App" }
+            Assert-MockCalled Write-Host -ParameterFilter { $Object -match "Name: Indirect App" }
+            
+            # Should only display scope for the indirect assignment
+            Assert-MockCalled Write-Host -Times 1 -ParameterFilter { 
+                $Object -match "Assignment Scope: All Users" 
+            }
+        }
+        
+        It "Should export indirect assignments with AssignmentScope column" {
+            $mockAssignments = @{
+                AllAssignments                          = @(
+                    @{
+                        Type            = "Application"
+                        Name            = "Test App"
+                        Description     = ""
+                        Id              = "app-1"
+                        AssignmentScope = "All Users"
+                    }
+                )
+                AppAssignments                          = @()
+                ConfigurationAssignments                = @()
+                ComplianceAssignments                   = @()
+                ScriptAssignments                       = @()
+                AppProtectionAssignments                = @()
+                IntentAssignments                       = @()
+                ResourceAccessAssignments               = @()
+                AutopilotAssignments                    = @()
+                HealthScriptAssignments                 = @()
+                ConfigurationPolicyAssignments          = @()
+                GroupPolicyAssignments                  = @()
+                WindowsInformationProtectionAssignments = @()
+                PolicySetAssignments                    = @()
+            }
+            
+            Mock GetGroupDirectAssignments { return $mockAssignments }
+            
+            $script:showMenuCallCount = 0
+            Mock ShowMenu { 
+                $script:showMenuCallCount++
+                if ($script:showMenuCallCount -eq 1)
+                {
+                    return "All"
+                }
+                else
+                {
+                    return "Back"
+                }
+            }
+            Mock Write-Host { }
+            Mock Export-Csv { }
+            Mock AddMenuItem { param($menu); return $menu }
+            
+            ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken -ShowIndirectAssignments
+            
+            # Verify Export-Csv was called
+            Assert-MockCalled Export-Csv -Times 1
         }
     }
 }
