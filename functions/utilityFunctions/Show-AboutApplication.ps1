@@ -32,17 +32,6 @@ function Show-AboutApplication()
         Write-Host "File checksum: $($updateAvailable.Hash)"
         write-log -logFile $LogFile -Module "$FunctionName" -Message "- Last updated on $($updateAvailable.ReleaseDate | FormatDateWithTimeZone)" -LogLevel "Information"
         write-log -logFile $LogFile -Module "$FunctionName" -Message "- File checksum: $($updateAvailable.Hash)" -LogLevel "Information"                        
-        if ($version.hash -eq $updateAvailable.hash)
-        {
-            Write-Host "Checksums match: You are running a genuine copy of the script." -ForegroundColor Green
-            write-log -logFile $LogFile -Module "$FunctionName" -Message "- Checksums match: Genuine copy of the script." -LogLevel "Information"                   
-        }
-        else
-        {
-            Write-Host "Checksums do not match: The script may have been tampered with. We recommend you stop using the script immediately." -ForegroundColor Yellow
-            
-            write-log -logFile $LogFile -Module "$FunctionName" -Message "- Checksums do not match: The script may have been tampered with." -LogLevel "Warning"    
-        }
         if ($updateAvailable.version -gt $version.version)
         {
             Write-Host "An update is available to version $($updateAvailable.version.major).$($updateAvailable.version.minor).$($updateAvailable.version.build) (revision $($updateAvailable.version.revision))" -ForegroundColor Yellow
@@ -50,6 +39,19 @@ function Show-AboutApplication()
             Write-Host "Go to 'Check For Script Updates' to download the latest version." -ForegroundColor Yellow
             write-log -logFile $LogFile -Module "$FunctionName" -Message "- An update is available to version $($updateAvailable.version.major).$($updateAvailable.version.minor).$($updateAvailable.version.build) (revision $($updateAvailable.version.revision))" -LogLevel "Information"                   
             write-log -logFile $LogFile -Module "$FunctionName" -Message "- Release date: $($updateAvailable.ReleaseDate)" -LogLevel "Information"                   
+        }
+        else 
+        {
+            if ($version.hash -eq $updateAvailable.hash)
+            {
+                Write-Host "Checksums match: You are running a genuine copy of the script." -ForegroundColor Green
+                write-log -logFile $LogFile -Module "$FunctionName" -Message "- Checksums match: Genuine copy of the script." -LogLevel "Information"                   
+            }
+            else
+            {
+                Write-Host "Checksums do not match: The script may have been tampered with. We recommend you stop using the script immediately." -ForegroundColor Yellow
+                write-log -logFile $LogFile -Module "$FunctionName" -Message "- Checksums do not match: The script may have been tampered with." -LogLevel "Warning"    
+            }
         }
     }
     Write-Host "==========================================================`n"
