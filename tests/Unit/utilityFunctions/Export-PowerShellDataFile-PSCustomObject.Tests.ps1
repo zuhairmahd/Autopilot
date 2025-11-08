@@ -27,7 +27,7 @@ Describe "Function: Export-PowerShellDataFile - PSCustomObject Array Handling" -
         . "$script:RepoRoot/functions/utilityFunctions/Export-PowershellDataFile/Export-PowerShellDataFile.ps1"
         . "$script:RepoRoot/functions/utilityFunctions/Export-PowershellDataFile/ConvertTo-Psd1String.ps1"
         . "$script:RepoRoot/functions/utilityFunctions/Export-PowershellDataFile/ConvertTo-HashtableFromPSCustomObject.ps1"
-        
+        . "$script:RepoRoot/functions/utilityFunctions/Write-Log.ps1"
         # Create test directory
         $script:TestOutputDir = Join-Path $TestDrive "export-tests"
         New-Item -Path $script:TestOutputDir -ItemType Directory -Force | Out-Null
@@ -82,8 +82,8 @@ Describe "Function: Export-PowerShellDataFile - PSCustomObject Array Handling" -
                     [PSCustomObject]@{ id = 'guid1'; name = 'Profile 1' },
                     [PSCustomObject]@{ id = 'guid2'; name = 'Profile 2' }
                 )
-                appModes = @('full', 'registration')
-                groupsToInclude = @(
+                appModes                   = @('full', 'registration')
+                groupsToInclude            = @(
                     [PSCustomObject]@{ id = 'group1'; name = 'Group 1' }
                 )
             }
@@ -117,11 +117,11 @@ Describe "Function: Export-PowerShellDataFile - PSCustomObject Array Handling" -
             $originalData = @{
                 autopilotProfilesToInclude = @(
                     [PSCustomObject]@{
-                        id = 'edaca6f4-58e4-4a55-a985-52c8f74fb6c4'
+                        id   = 'edaca6f4-58e4-4a55-a985-52c8f74fb6c4'
                         name = 'windowsCloudConfig Autopilot profile'
                     }
                 )
-                appModes = @('full')
+                appModes                   = @('full')
             }
             
             # First save
@@ -148,23 +148,23 @@ Describe "Function: Export-PowerShellDataFile - PSCustomObject Array Handling" -
 
         It "Should handle real-world domain config scenario" {
             $domainConfig = @{
-                domain = 'test.com'
+                domain                     = 'test.com'
                 autopilotProfilesToInclude = @(
                     [PSCustomObject]@{
-                        id = 'edaca6f4-58e4-4a55-a985-52c8f74fb6c4'
+                        id   = 'edaca6f4-58e4-4a55-a985-52c8f74fb6c4'
                         name = 'windowsCloudConfig Autopilot profile'
                     }
                 )
-                appModes = @('full', 'registration')
-                groupsToInclude = @(
+                appModes                   = @('full', 'registration')
+                groupsToInclude            = @(
                     [PSCustomObject]@{
-                        id = 'f1752bdb-7abd-438c-a54e-7faca7cecf61'
+                        id   = 'f1752bdb-7abd-438c-a54e-7faca7cecf61'
                         name = 'Cloud Managed PC User'
                     }
                 )
-                groupsToExclude = @(
+                groupsToExclude            = @(
                     [PSCustomObject]@{
-                        id = 'a0138743-e4fe-45db-a231-737b10a2615d'
+                        id   = 'a0138743-e4fe-45db-a231-737b10a2615d'
                         name = 'autoPilot-device-preparation-user'
                     }
                 )
@@ -313,12 +313,12 @@ Describe "Function: Export-PowerShellDataFile - PSCustomObject Array Handling" -
     Context "Mixed Array Types in Single Configuration" {
         It "Should handle realistic domain configuration with mixed array types" {
             $testData = @{
-                userPatternsToExclude = @('-test', 'onmicrosoft.com')
+                userPatternsToExclude         = @('-test', 'onmicrosoft.com')
                 autopilotDeviceAllowedVendors = @('Dell')
-                groupsToInclude = @(
+                groupsToInclude               = @(
                     @{ id = 'group1-id'; name = 'Group 1' }
                 )
-                autopilotProfilesToInclude = @(
+                autopilotProfilesToInclude    = @(
                     @{ id = 'profile1-id'; name = 'Profile 1' },
                     @{ id = 'profile2-id'; name = 'Profile 2' }
                 )

@@ -101,6 +101,8 @@ function Get-Updates()
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Response: $fileMetaData" -LogLevel "Information"
         Write-Verbose "[$functionName] Metadata content: $($fileMetaData.Content)"
         $remoteVersion = $fileMetaData.version
+        #convert $fileMetaData.date to a datetime object in local time.
+        $fileMetaData.date = [datetime]::Parse($fileMetaData.date).ToLocalTime()
     }
     catch 
     {
@@ -119,8 +121,6 @@ function Get-Updates()
         Write-Host "An update is available." -ForegroundColor Yellow
         Write-Host "Current version: $localVersion" -ForegroundColor Cyan
         Write-Host "New version: $remoteVersion" -ForegroundColor Cyan
-        #convert $fileMetaData.date to a datetime object in local time.
-        $fileMetaData.date = [datetime]::Parse($fileMetaData.date).ToLocalTime()
         Write-Host "Release date: $($fileMetaData.date | FormatDateWithTimeZone)" -ForegroundColor Cyan
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Current version: $localVersion, New version: $remoteVersion" -LogLevel "Information"
         if ($noConfirmation)
