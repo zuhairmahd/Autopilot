@@ -3,7 +3,8 @@ function ShowGroupAssignments()
     [CmdletBinding()]
     param (
         $Group,
-        [string]$accessToken
+        [string]$accessToken,
+        [switch]$ShowIndirectAssignments
     )
 
     $functionName = $MyInvocation.MyCommand.Name
@@ -39,17 +40,21 @@ function ShowGroupAssignments()
         Write-Log -logFile $LogFile -Module $functionName -Message "Access token is present."
     }
     Write-Host "Getting group assignments for '$groupName'..."
+    if ($ShowIndirectAssignments.IsPresent)
+    {
+        Write-Host "Including indirect assignments (All Users and All Devices)..."
+    }
     Write-Host "This may take a while..."
     # Get group assignments (fetch once and reuse)
-    $assignments = GetGroupDirectAssignments -accessToken $accessToken -GroupName $Group -includeBeta
+    $assignments = GetGroupDirectAssignments -accessToken $accessToken -GroupName $Group -includeBeta -IncludeIndirectAssignments:$ShowIndirectAssignments
     if ($assignments -eq 'noGroup')
     {
-Write-Log -logFile $LogFile -Module $functionName -Message "No group found for name '$groupName'." -LogLevel "Verbose"
+        Write-Log -logFile $LogFile -Module $functionName -Message "No group found for name '$groupName'." -LogLevel "Verbose"
         return $returnValues.noGroupFoundMessage
     }   
     if ($null -eq $assignments -or $assignments.AllAssignments.count -eq 0)
     {
-Write-Log -logFile $LogFile -Module $functionName -Message "No assignments found for group '$groupName'." -LogLevel "Verbose"
+        Write-Log -logFile $LogFile -Module $functionName -Message "No assignments found for group '$groupName'." -LogLevel "Verbose"
         return $returnValues.noGroupAssignmentsFoundMessage
     }
     # Cache all assignments to avoid re-query per selection
@@ -57,10 +62,13 @@ Write-Log -logFile $LogFile -Module $functionName -Message "No assignments found
 
     # Create Assignments menu from configuration
     $groupAssignmentsMenu = NewMenu -MenuName "groupAssignmentsMenu"
-    if (-not $groupAssignmentsMenu) {
+    if (-not $groupAssignmentsMenu)
+    {
         # Fallback to manual creation if config not found
         $groupAssignmentsMenu = NewMenu -Title "Group Assignments for $groupName" -Description "What type of assignments would you like to see?"
-    } else {
+    }
+    else
+    {
         # Update title with actual group name
         $groupAssignmentsMenu.Title = $groupAssignmentsMenu.Title -replace '\$groupName', $groupName
     }
@@ -108,6 +116,14 @@ Write-Log -logFile $LogFile -Module $functionName -Message "No assignments found
         Write-Host "Selected Assignment Type: GroupPolicy"
         return 'GroupPolicy'
     } -returnsValue
+    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show Windows Information Protection Policies ($($assignments.WindowsInformationProtectionAssignments.count))" -Action {
+        Write-Host "Selected Assignment Type: WindowsInformationProtection"
+        return 'WindowsInformationProtection'
+    } -returnsValue
+    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show Policy Sets ($($assignments.PolicySetAssignments.count))" -Action {
+        Write-Host "Selected Assignment Type: PolicySet"
+        return 'PolicySet'
+    } -returnsValue
     $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Export All Assignments ($($assignments.AllAssignments.count))" -Action {
         Write-Host "Displaying all assignments"
         return 'All'
@@ -137,17 +153,19 @@ Write-Log -logFile $LogFile -Module $functionName -Message "No assignments found
         {
             # Map display type names to internal property names
             $typePropertyMap = @{
-                'Application'         = 'Application'
-                'Configuration'       = 'Configuration'
-                'Compliance'          = 'Compliance'
-                'Script'              = 'Script'
-                'AppProtection'       = 'AppProtection'
-                'Intent'              = 'Intent'
-                'ResourceAccess'      = 'ResourceAccess'
-                'AutopilotProfile'    = 'AutopilotProfile'
-                'HealthScript'        = 'HealthScript'
-                'ConfigurationPolicy' = 'ConfigurationPolicy'
-                'GroupPolicy'         = 'GroupPolicy'
+                'Application'                  = 'Application'
+                'Configuration'                = 'Configuration'
+                'Compliance'                   = 'Compliance'
+                'Script'                       = 'Script'
+                'AppProtection'                = 'AppProtection'
+                'Intent'                       = 'Intent'
+                'ResourceAccess'               = 'ResourceAccess'
+                'AutopilotProfile'             = 'AutopilotProfile'
+                'HealthScript'                 = 'HealthScript'
+                'ConfigurationPolicy'          = 'ConfigurationPolicy'
+                'GroupPolicy'                  = 'GroupPolicy'
+                'WindowsInformationProtection' = 'WindowsInformationProtection'
+                'PolicySet'                    = 'PolicySet'
             }
             
             $internalType = $typePropertyMap[$assignmentType]
@@ -175,10 +193,20 @@ Write-Log -logFile $LogFile -Module $functionName -Message "No assignments found
                 Write-Host "Assignment Type: $($_.Type)"
             }
             Write-Host "Name: $($_.Name)"
+            if ($_.Description)
+            {
+                Write-Host "Description: $($_.Description)"
+                Write-Log -logFile $LogFile -Module $functionName -Message "Displaying Description: $($_.Description)"
+            }
             if ($null -ne $_.Intent)
             {
                 Write-Log -logFile $LogFile -Module $functionName -Message "Displaying Intent $($_.Intent)"
                 Write-Host "Intent: $($_.Intent)"
+            }
+            if ($ShowIndirectAssignments.IsPresent -and $_.AssignmentScope)
+            {
+                Write-Host "Assignment Scope: $($_.AssignmentScope)" -ForegroundColor Cyan
+                Write-Log -logFile $LogFile -Module $functionName -Message "Assignment Scope: $($_.AssignmentScope)"
             }
         }
         if ($assignmentType -eq 'All')

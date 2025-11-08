@@ -600,9 +600,10 @@ function Get-ApplicationDefaults()
                         )
                     },
                     @{
-                        description           = 'Show the group assignments for the device'
+                        menuName              = 'getGroupAssignmentsMenu'
+                        description           = 'Show group assignments for a group'
                         name                  = 'Show Group Assignments'
-                        blockType             = 'action'
+                        blockType             = 'menu'
                         includeInDisplayModes = @(
                             'full',
                             'admin',
@@ -1281,6 +1282,38 @@ function Get-ApplicationDefaults()
                 includeInDisplayModes = @(
                     'full',
                     'admin'
+                )
+            }
+            getGroupAssignmentsMenu   = @{
+                Title                 = 'Show Group Assignments Menu'
+                Description           = 'Choose the type of assignments you want to view'
+                items                 = @(
+                    @{
+                        description           = 'View direct group assignments'
+                        name                  = 'View direct group assignments'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced'
+                        )
+                    },
+                    @{
+                        description           = 'View indirect group assignments'
+                        name                  = 'View indirect group assignments (All Users/All Devices)'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced'
+                        )
+                    }
+                )
+                type                  = 'static'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin',
+                    'advanced'
                 )
             }
             groupAssignmentsMenu      = @{

@@ -894,7 +894,7 @@ else
 }
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/lastrun.json"
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
-$updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL
+$updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL -localVersion $version
 $groupsToInclude = $settings.groupsToInclude
 Write-Verbose "[$scriptName] Groups to include: $($groupsToInclude | Out-String)"
 $groupsToExclude = $settings.groupsToExclude
@@ -951,7 +951,7 @@ if ($settings.showLicenseBanner)
     Write-Host "Use at your own risk. The author is not responsible for any damage or data loss." -ForegroundColor Red
     Write-Host "==========================================================`n" -ForegroundColor White
 }
-if ($updateAvailable.success -eq $true -and $updateAvailable.version -gt $version)
+if ($updateAvailable.success -and $updateAvailable.updateAvailable)
 {
     Write-Verbose "[$scriptName] An update is available: $($updateAvailable.version.major).$($updateAvailable.version.minor).$($updateAvailable.version.build) ($($updateAvailable.version.revision))"
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "An update is available: $($updateAvailable.version.major).$($updateAvailable.version.minor).$($updateAvailable.version.build) (revision $($updateAvailable.version.revision))"
@@ -1329,6 +1329,7 @@ $autopilotMenu = NewMenu -MenuName "autopilotMenu"
 $environmentMenu = NewMenu -MenuName "environmentMenu"
 $inclusionExclusionMenu = NewMenu -MenuName "inclusionExclusionMenu"
 $deviceReportsMenu = NewMenu -MenuName "deviceReportsMenu"
+$getGroupAssignmentsMenu = NewMenu -MenuName "getGroupAssignmentsMenu"
 #endregion Create menus
 
 #region export menu
@@ -2068,6 +2069,7 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Restore application defau
 }
 #endregion Settings menu
 
+#region Check menu
 $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by Serial Number" -Submenu $serialNumberMenu
 $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action {
     $userName = GetUserInput -Message "Enter the username (Email address) of the user whose device you want to look up." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
@@ -2134,6 +2136,101 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
     } until ($result -in $returnValues.values -or $result -eq "EXIT_APPLICATION" -or $result -eq "Back" -or $result -eq "back" -or $result -eq "Main Menu" -or $result -eq "main menu" -or [string]::IsNullOrWhiteSpace($result))
     return $result
 }
+#endregion Check menu
+
+#region Show Group Assignments menu
+<#
+    This script-scoped variable defines a reusable script block for showing group assignments in the Intune Helpdesk Menu.
+    It is defined at script scope to allow sharing between multiple menu items (e.g., direct and indirect assignment views),
+    avoiding code duplication and ensuring consistent behavior. The script block encapsulates the logic for prompting the user
+    for a group name, resolving the group, and handling navigation commands, and is invoked by different menu actions as needed.
+#>
+# Helper scriptblock to avoid duplication between direct and indirect assignment menu items
+$script:ShowGroupAssignmentsAction = {
+    param([bool]$IncludeIndirectAssignments)
+    
+    $assignmentScope = if ($IncludeIndirectAssignments) { "indirect (All Users/All Devices)" } else { "direct" }
+    $groupName = GetUserInput -Message "Enter the name of the group whose $assignmentScope assignments you want to view." -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
+    if ($null -eq $groupName)
+    {
+        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
+        return $returnValues.backoutText
+    }
+    Write-Verbose "[$scriptName] Got group name: $groupName"
+    
+    #region Resolve group using unified Resolve-DirectoryObject with entity return
+    $selectedGroup = Resolve-DirectoryObject -EntityName $groupName -AccessToken $accessToken -Settings $settings -ReturnValues $returnValues -EntityType "Group" -ReturnEntity
+    
+    # Handle navigation commands - check these FIRST before trying to use as group object
+    if ($selectedGroup -eq "EXIT_APPLICATION")
+    {
+        Write-Verbose "[$scriptName] User requested application exit from group resolution"
+        return "EXIT_APPLICATION"
+    }
+    elseif ($selectedGroup -eq "Main Menu")
+    {
+        Write-Verbose "[$scriptName] User selected Main Menu from group resolution"
+        return "Main Menu"
+    }
+    elseif ($selectedGroup -in $returnValues.Values)
+    {
+        Write-Verbose "[$scriptName] Resolve-DirectoryObject returned navigation command: $selectedGroup"
+        return $selectedGroup
+    }
+    
+    # Validate we got a valid group object
+    if ($null -eq $selectedGroup -or -not $selectedGroup.id -or -not $selectedGroup.displayName)
+    {
+        Write-Verbose "[$scriptName] Invalid group object returned from Resolve-DirectoryObject"
+        Write-Host "No group found for the specified group name." -ForegroundColor Red
+        return $returnValues.noGroupFoundMessage
+    }
+    
+    Write-Verbose "[$scriptName] Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))"
+    #endregion Resolve group using unified Resolve-DirectoryObject with entity return
+    
+    # Call ShowGroupAssignments to display the group's assignments
+    Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName) with IncludeIndirect=$IncludeIndirectAssignments"
+    $showGroupAssignmentsSplat = @{
+        AccessToken = $accessToken
+        Group       = $selectedGroup
+    }
+    if ($IncludeIndirectAssignments)
+    {
+        $showGroupAssignmentsSplat['ShowIndirectAssignments'] = $true
+    }
+    $ShowGroupAssignmentsResponse = ShowGroupAssignments @showGroupAssignmentsSplat
+    
+    #region Handle navigation responses from ShowGroupAssignments
+    if ($ShowGroupAssignmentsResponse -eq "Back" -or $ShowGroupAssignmentsResponse -eq "back")
+    {
+        Write-Verbose "[$scriptName] User selected Back from group assignment selection, returning to previous menu"
+        return $returnValues.backoutText
+    }
+    elseif ($ShowGroupAssignmentsResponse -eq "Main Menu" -or $ShowGroupAssignmentsResponse -eq "main menu")
+    {
+        Write-Verbose "[$scriptName] User selected Main Menu from group assignment selection"
+        return "EXIT_APPLICATION"
+    }
+    elseif ([string]::IsNullOrWhiteSpace($ShowGroupAssignmentsResponse) -or $null -eq $ShowGroupAssignmentsResponse)
+    {
+        Write-Verbose "[$scriptName] User requested application exit from group assignment selection."
+        return "EXIT_APPLICATION"
+    }
+    else
+    {
+        return $ShowGroupAssignmentsResponse
+    }
+    #endregion Handle navigation responses from ShowGroupAssignments
+}
+
+$getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "View direct group assignments" -Action {
+    & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $false
+}
+$getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "View indirect group assignments (All Users/All Devices)" -Action {
+    & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $true
+}
+#endregion Show Group Assignments menu
 
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
     $username = GetUserInput -Message "Enter the username (Email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
@@ -2238,70 +2335,7 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Shutdown the device" -action {
         return $returnValues.backoutText
     }
 }
-$mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
-    $groupName = GetUserInput -Message "Enter the name of the group whose assignments you want to view." -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
-    if ($null -eq $groupName)
-    {
-        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
-        return $returnValues.backoutText
-    }
-    Write-Verbose "[$scriptName] Got group name: $groupName"
-    
-    #region Resolve group using unified Resolve-DirectoryObject with entity return
-    $selectedGroup = Resolve-DirectoryObject -EntityName $groupName -AccessToken $accessToken -Settings $settings -ReturnValues $returnValues -EntityType "Group" -ReturnEntity
-    
-    # Handle navigation commands - check these FIRST before trying to use as group object
-    if ($selectedGroup -eq "EXIT_APPLICATION")
-    {
-        Write-Verbose "[$scriptName] User requested application exit from group resolution"
-        return "EXIT_APPLICATION"
-    }
-    elseif ($selectedGroup -eq "Main Menu")
-    {
-        Write-Verbose "[$scriptName] User selected Main Menu from group resolution"
-        return "Main Menu"
-    }
-    elseif ($selectedGroup -in $returnValues.Values)
-    {
-        Write-Verbose "[$scriptName] Resolve-DirectoryObject returned navigation command: $selectedGroup"
-        return $selectedGroup
-    }
-    
-    # Validate we got a valid group object
-    if ($null -eq $selectedGroup -or -not $selectedGroup.id -or -not $selectedGroup.displayName)
-    {
-        Write-Verbose "[$scriptName] Invalid group object returned from Resolve-DirectoryObject"
-        Write-Host "No group found for the specified group name." -ForegroundColor Red
-        return $returnValues.noGroupFoundMessage
-    }
-    
-    Write-Verbose "[$scriptName] Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))"
-    #endregion Resolve group using unified Resolve-DirectoryObject with entity return
-    
-    # Call ShowGroupAssignments to display the group's assignments
-    Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName)"
-    $ShowGroupAssignmentsResponse = ShowGroupAssignments -AccessToken $accessToken -Group $selectedGroup
-    #region Handle navigation responses from GetDeviceByUser
-    if ($ShowGroupAssignmentsResponse -eq "Back" -or $ShowGroupAssignmentsResponse -eq "back")
-    {
-        Write-Verbose "[$scriptName] User selected Back from group assignment selection, returning to previous menu"
-        return $returnValues.backoutText
-    }
-    elseif ($ShowGroupAssignmentsResponse -eq "Main Menu" -or $ShowGroupAssignmentsResponse -eq "main menu")
-    {
-        Write-Verbose "[$scriptName] User selected Main Menu from group assignment selection"
-        return "EXIT_APPLICATION"
-    }
-    elseif ([string]::IsNullOrWhiteSpace($ShowGroupAssignmentsResponse) -or $null -eq $ShowGroupAssignmentsResponse)
-    {
-        Write-Verbose "[$scriptName] User requested application exit from group assignment selection."
-        return "EXIT_APPLICATION"
-    }
-    else
-    {
-        return $result
-    }
-}
+$mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -Submenu $getGroupAssignmentsMenu
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
     $null = Show-AboutApplication -accessToken $accessToken -Release $latestRelease -appId $appId -tenantId $tenantId -name $name -updateAvailable $updateAvailable

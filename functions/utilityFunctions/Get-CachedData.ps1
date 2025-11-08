@@ -54,7 +54,7 @@ function Get-CachedData()
     
     # Check if this cache type is enabled
     if ($CacheSettings -and $CacheSettings.cacheTypes -and 
-        $CacheSettings.cacheTypes.ContainsKey($CacheType) -and 
+        ($CacheSettings.cacheTypes.Keys -contains $CacheType) -and 
         -not $CacheSettings.cacheTypes[$CacheType].enabled)
     {
         Write-Verbose "[$functionName] Caching is disabled for type: $CacheType"
@@ -68,14 +68,14 @@ function Get-CachedData()
     }
     
     # Check if cache type exists
-    if (-not $global:UnifiedCache.ContainsKey($CacheType))
+    if (-not ($global:UnifiedCache.Keys -contains $CacheType))
     {
         Write-Verbose "[$functionName] Cache type not initialized: $CacheType"
         return $null
     }
     
     # Check if key exists
-    if (-not $global:UnifiedCache[$CacheType].ContainsKey($Key))
+    if (-not ($global:UnifiedCache[$CacheType].Keys -contains $Key))
     {
         Write-Verbose "[$functionName] Cache miss for key: $Key in type: $CacheType"
         return $null
@@ -168,7 +168,7 @@ function Set-CachedData()
     
     # Check if this cache type is enabled
     if ($CacheSettings -and $CacheSettings.cacheTypes -and 
-        $CacheSettings.cacheTypes.ContainsKey($CacheType) -and 
+        ($CacheSettings.cacheTypes.Keys -contains $CacheType) -and 
         -not $CacheSettings.cacheTypes[$CacheType].enabled)
     {
         Write-Verbose "[$functionName] Caching is disabled for type: $CacheType"
@@ -182,7 +182,7 @@ function Set-CachedData()
     }
     
     # Ensure cache type exists
-    if (-not $global:UnifiedCache.ContainsKey($CacheType))
+    if (-not ($global:UnifiedCache.Keys -contains $CacheType))
     {
         $global:UnifiedCache[$CacheType] = @{}
     }
@@ -296,7 +296,7 @@ function Get-CacheExpirationMinutes()
     
     # Check for cache-type-specific expiration
     if ($CacheSettings.cacheTypes -and 
-        $CacheSettings.cacheTypes.ContainsKey($CacheType) -and
+        ($CacheSettings.cacheTypes.Keys -contains $CacheType) -and
         $CacheSettings.cacheTypes[$CacheType].expirationMinutes)
     {
         return $CacheSettings.cacheTypes[$CacheType].expirationMinutes
@@ -351,7 +351,7 @@ function Clear-UnifiedCache()
     
     if ($CacheType)
     {
-        if ($global:UnifiedCache.ContainsKey($CacheType))
+        if ($global:UnifiedCache.Keys -contains $CacheType)
         {
             $count = $global:UnifiedCache[$CacheType].Count
             $global:UnifiedCache[$CacheType].Clear()
