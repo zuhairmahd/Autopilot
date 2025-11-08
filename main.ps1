@@ -2150,7 +2150,11 @@ $script:ShowGroupAssignmentsAction = {
     param([bool]$IncludeIndirectAssignments)
     
     $assignmentScope = if ($IncludeIndirectAssignments) { "indirect (All Users/All Devices)" } else { "direct" }
-    $groupName = GetUserInput -Message "Enter the name of the group whose $assignmentScope assignments you want to view." -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
+    $specialGroups = @("*", "?")    
+    $messageText = if ($IncludeIndirectAssignments) { "Enter the name of the group whose indirect (All Users/All Devices) assignments you want to view. Enter any of $specialGroups             for all assignments" } else { "Enter the name of the group whose direct assignments you want to view." }                                                                
+    $groupName = GetUserInput -Message $messageText -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
+    $needsResolution = if ($IncludeIndirectAssignments -and $groupName -in $specialGroups                                                           ) { $false } else { $true }                                     
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "GroupName: $groupName, IncludeIndirectAssignments: $IncludeIndirectAssignments, AssignmentScope: $assignmentScope, SpecialGroups: $specialGroups, NeedsResolution: $needsResolution"
     if ($null -eq $groupName)
     {
         Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
@@ -2159,34 +2163,42 @@ $script:ShowGroupAssignmentsAction = {
     Write-Verbose "[$scriptName] Got group name: $groupName"
     
     #region Resolve group using unified Resolve-DirectoryObject with entity return
-    $selectedGroup = Resolve-DirectoryObject -EntityName $groupName -AccessToken $accessToken -Settings $settings -ReturnValues $returnValues -EntityType "Group" -ReturnEntity
+    if ($needsResolution)
+    {
+        $selectedGroup = Resolve-DirectoryObject -EntityName $groupName -AccessToken $accessToken -Settings $settings -ReturnValues $returnValues -EntityType "Group" -ReturnEntity
     
-    # Handle navigation commands - check these FIRST before trying to use as group object
-    if ($selectedGroup -eq "EXIT_APPLICATION")
-    {
-        Write-Verbose "[$scriptName] User requested application exit from group resolution"
-        return "EXIT_APPLICATION"
-    }
-    elseif ($selectedGroup -eq "Main Menu")
-    {
-        Write-Verbose "[$scriptName] User selected Main Menu from group resolution"
-        return "Main Menu"
-    }
-    elseif ($selectedGroup -in $returnValues.Values)
-    {
-        Write-Verbose "[$scriptName] Resolve-DirectoryObject returned navigation command: $selectedGroup"
-        return $selectedGroup
-    }
+        # Handle navigation commands - check these FIRST before trying to use as group object
+        if ($selectedGroup -eq "EXIT_APPLICATION")
+        {
+            Write-Verbose "[$scriptName] User requested application exit from group resolution"
+            return "EXIT_APPLICATION"
+        }
+        elseif ($selectedGroup -eq "Main Menu")
+        {
+            Write-Verbose "[$scriptName] User selected Main Menu from group resolution"
+            return "Main Menu"
+        }
+        elseif ($selectedGroup -in $returnValues.Values)
+        {
+            Write-Verbose "[$scriptName] Resolve-DirectoryObject returned navigation command: $selectedGroup"
+            return $selectedGroup
+        }
     
-    # Validate we got a valid group object
-    if ($null -eq $selectedGroup -or -not $selectedGroup.id -or -not $selectedGroup.displayName)
-    {
-        Write-Verbose "[$scriptName] Invalid group object returned from Resolve-DirectoryObject"
-        Write-Host "No group found for the specified group name." -ForegroundColor Red
-        return $returnValues.noGroupFoundMessage
+        # Validate we got a valid group object
+        if ($null -eq $selectedGroup -or -not $selectedGroup.id -or -not $selectedGroup.displayName)
+        {
+            Write-Verbose "[$scriptName] Invalid group object returned from Resolve-DirectoryObject"
+            Write-Host "No group found for the specified group name." -ForegroundColor Red
+            return $returnValues.noGroupFoundMessage
+        }
+        Write-Verbose "[$scriptName] Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))"
     }
-    
-    Write-Verbose "[$scriptName] Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))"
+    else
+    {
+        Write-Verbose "[$scriptName] Special group selected, skipping resolution: $groupName"                                                               
+        write-log -logFile $LogFile -Module $scriptName -Message "Special group selected, skipping resolution: $groupName" -LogLevel "Information"                                          
+        $selectedGroup = $groupName                         
+    }
     #endregion Resolve group using unified Resolve-DirectoryObject with entity return
     
     # Call ShowGroupAssignments to display the group's assignments
@@ -2198,6 +2210,7 @@ $script:ShowGroupAssignmentsAction = {
     if ($IncludeIndirectAssignments)
     {
         $showGroupAssignmentsSplat['ShowIndirectAssignments'] = $true
+        $showGroupAssignmentsSplat['SpecialGroups'] = $specialGroups 
     }
     $ShowGroupAssignmentsResponse = ShowGroupAssignments @showGroupAssignmentsSplat
     

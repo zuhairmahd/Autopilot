@@ -4,6 +4,7 @@ function ShowGroupAssignments()
     param (
         $Group,
         [string]$accessToken,
+        [string[]]$specialGroups,
         [switch]$ShowIndirectAssignments
     )
 
@@ -27,7 +28,7 @@ function ShowGroupAssignments()
         "Unknown" 
     }
     
-    Write-Log -logFile $LogFile -Module $functionName -Message "Retrieving group assignments for '$groupName'..." -logLevel "Information"
+    # Validate access token
     if (-not $accessToken)
     {
         Write-Error "Access token is required."
@@ -39,23 +40,50 @@ function ShowGroupAssignments()
         Write-Verbose "[$functionName] Access token is present."
         Write-Log -logFile $LogFile -Module $functionName -Message "Access token is present."
     }
-    Write-Host "Getting group assignments for '$groupName'..."
-    if ($ShowIndirectAssignments.IsPresent)
+    
+    # Handle special case for group assignments when ShowIndirectAssignments is specified                    
+    if ($ShowIndirectAssignments.IsPresent -and $groupName -in $specialGroups                                               )
     {
-        Write-Host "Including indirect assignments (All Users and All Devices)..."
+        Write-Log -logFile $LogFile -Module $functionName -Message "Retrieving all indirect assignments (All Users and All Devices) without group filter" -logLevel "Information"
+        Write-Host "Getting all indirect assignments (All Users and All Devices)..."
+        Write-Host "This may take a while..."
+        
+        # Get only indirect assignments
+        $assignments = GetGroupIndirectAssignments -AccessToken $accessToken -IncludeBeta
+        
+        if ($null -eq $assignments -or $assignments.AllAssignments.count -eq 0)
+        {
+            Write-Log -logFile $LogFile -Module $functionName -Message "No indirect assignments found." -LogLevel "Verbose"
+            Write-Host "No indirect assignments found." -ForegroundColor Yellow
+            return $returnValues.noGroupAssignmentsFoundMessage
+        }
+        
+        $groupName = "All Users/All Devices"
     }
-    Write-Host "This may take a while..."
-    # Get group assignments (fetch once and reuse)
-    $assignments = GetGroupDirectAssignments -accessToken $accessToken -GroupName $Group -includeBeta -IncludeIndirectAssignments:$ShowIndirectAssignments
-    if ($assignments -eq 'noGroup')
+    else
     {
-        Write-Log -logFile $LogFile -Module $functionName -Message "No group found for name '$groupName'." -LogLevel "Verbose"
-        return $returnValues.noGroupFoundMessage
-    }   
-    if ($null -eq $assignments -or $assignments.AllAssignments.count -eq 0)
-    {
-        Write-Log -logFile $LogFile -Module $functionName -Message "No assignments found for group '$groupName'." -LogLevel "Verbose"
-        return $returnValues.noGroupAssignmentsFoundMessage
+        # Normal flow: get assignments for specific group
+        Write-Log -logFile $LogFile -Module $functionName -Message "Retrieving group assignments for '$groupName'..." -logLevel "Information"
+        Write-Host "Getting group assignments for '$groupName'..."
+        if ($ShowIndirectAssignments.IsPresent)
+        {
+            Write-Host "Including indirect assignments (All Users and All Devices)..."
+        }
+        Write-Host "This may take a while..."
+        
+        # Get group assignments (fetch once and reuse)
+        $assignments = GetGroupDirectAssignments -accessToken $accessToken -GroupName $Group -includeBeta -IncludeIndirectAssignments:$ShowIndirectAssignments
+        
+        if ($assignments -eq 'noGroup')
+        {
+            Write-Log -logFile $LogFile -Module $functionName -Message "No group found for name '$groupName'." -LogLevel "Verbose"
+            return $returnValues.noGroupFoundMessage
+        }   
+        if ($null -eq $assignments -or $assignments.AllAssignments.count -eq 0)
+        {
+            Write-Log -logFile $LogFile -Module $functionName -Message "No assignments found for group '$groupName'." -LogLevel "Verbose"
+            return $returnValues.noGroupAssignmentsFoundMessage
+        }
     }
     # Cache all assignments to avoid re-query per selection
     $allAssignments = @($assignments.allAssignments)
@@ -209,9 +237,53 @@ function ShowGroupAssignments()
                     Write-Host "  Intent: $($assignment.Intent)" -ForegroundColor Yellow
                 }
                 
-                if ($ShowIndirectAssignments.IsPresent -and $assignment.AssignmentScope)
+                # Determine and display assignment scope when ShowIndirectAssignments is used
+                if ($ShowIndirectAssignments.IsPresent)
                 {
-                    Write-Host "  Assignment Scope: $($assignment.AssignmentScope)" -ForegroundColor Cyan
+                    $scopeDisplay = "Direct"
+                    $scopeColor = "Green"
+                    
+                    # Check if this is an indirect assignment (has AssignmentScope property)
+                    if ($assignment.AssignmentScope)
+                    {
+                        # This assignment came from All Users or All Devices
+                        # Check if there's also a direct assignment by looking for duplicate in allAssignments
+                        $directMatch = $allAssignments | Where-Object {
+                            $_.Name -eq $assignment.Name -and 
+                            $_.Type -eq $assignment.Type -and 
+                            -not $_.AssignmentScope
+                        }
+                        
+                        if ($directMatch)
+                        {
+                            $scopeDisplay = "Both (Direct + $($assignment.AssignmentScope))"
+                            $scopeColor = "Yellow"
+                        }
+                        else
+                        {
+                            $scopeDisplay = "Indirect ($($assignment.AssignmentScope))"
+                            $scopeColor = "Cyan"
+                        }
+                    }
+                    else
+                    {
+                        # No AssignmentScope means this is a direct assignment
+                        # Check if there's also an indirect assignment
+                        $indirectMatch = $allAssignments | Where-Object {
+                            $_.Name -eq $assignment.Name -and 
+                            $_.Type -eq $assignment.Type -and 
+                            $_.AssignmentScope
+                        }
+                        
+                        if ($indirectMatch)
+                        {
+                            $indirectScopes = ($indirectMatch | Select-Object -ExpandProperty AssignmentScope -Unique) -join ", "
+                            $scopeDisplay = "Both (Direct + $indirectScopes)"
+                            $scopeColor = "Yellow"
+                        }
+                    }
+                    
+                    Write-Host "  Assignment Scope: $scopeDisplay" -ForegroundColor $scopeColor
                 }
                 
                 Write-Host ""  # Blank line between assignments

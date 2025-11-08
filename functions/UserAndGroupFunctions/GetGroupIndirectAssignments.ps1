@@ -183,22 +183,53 @@ function GetGroupIndirectAssignments()
         # Get all resource lists using batch API
         Write-Log -logFile $LogFile -module $functionName -Message "Getting all resource lists for indirect assignments using batch API" -logLevel "Information"
         
-        # Create batch request for all resource lists
-        $batchRequestBody = @{
-            requests = @()
-        }
+        # Check cache for resource lists first
+        $apiVersionKey = if ($IncludeBeta.IsPresent) { "beta" } else { "v1.0" }
+        $resourceListCacheKey = "IndirectResourceLists_${apiVersionKey}"
+        $cachedResourceLists = Get-CachedData -CacheType 'Configuration' -Key $resourceListCacheKey
         
-        # Define resource endpoints
-        $resourceEndpoints = @(
-            @{ id = "mobileApps"; url = "deviceAppManagement/mobileApps"; extraParams = "select=id,displayName,description" }
-            @{ id = "deviceConfigs"; url = "deviceManagement/deviceConfigurations"; extraParams = "select=id,displayName,description" }
-            @{ id = "compliancePolicies"; url = "deviceManagement/deviceCompliancePolicies"; extraParams = "select=id,displayName,description" }
-            @{ id = "deviceScripts"; url = "deviceManagement/deviceManagementScripts"; extraParams = "select=id,displayName,description" }
-            @{ id = "appProtectionPolicies"; url = "deviceAppManagement/managedAppPolicies"; extraParams = "select=id,displayName,description" }
-            @{ id = "intents"; url = "deviceManagement/intents"; extraParams = "select=id,displayName,description" }
-            @{ id = "resourceAccessProfiles"; url = "deviceManagement/resourceAccessProfiles"; extraParams = "select=id,displayName,description" }
-            @{ id = "policySets"; url = "deviceAppManagement/policySets"; extraParams = "select=id,displayName,description" }
-        )
+        if ($cachedResourceLists)
+        {
+            Write-Log -logFile $LogFile -module $functionName -Message "Using cached resource lists for indirect assignments (API: $apiVersionKey)" -logLevel "Verbose"
+            Write-Verbose "[$functionName] Cache hit for indirect resource lists"
+            
+            # Extract cached resources
+            $mobileApps = $cachedResourceLists.mobileApps
+            $deviceConfigs = $cachedResourceLists.deviceConfigs
+            $compliancePolicies = $cachedResourceLists.compliancePolicies
+            $autopilotProfiles = $cachedResourceLists.autopilotProfiles
+            $deviceScripts = $cachedResourceLists.deviceScripts
+            $healthScripts = $cachedResourceLists.healthScripts
+            $appProtectionPolicies = $cachedResourceLists.appProtectionPolicies
+            $intents = $cachedResourceLists.intents
+            $resourceAccessProfiles = $cachedResourceLists.resourceAccessProfiles
+            $configurationPolicies = $cachedResourceLists.configurationPolicies
+            $groupPolicyConfigs = $cachedResourceLists.groupPolicyConfigs
+            $policySets = $cachedResourceLists.policySets
+            $wipPolicies = $cachedResourceLists.wipPolicies
+            $mdmWipPolicies = $cachedResourceLists.mdmWipPolicies
+        }
+        else
+        {
+            Write-Log -logFile $LogFile -module $functionName -Message "Cache miss - fetching resource lists from Graph API for indirect assignments" -logLevel "Verbose"
+            Write-Verbose "[$functionName] No cached indirect resource lists found, fetching from API"
+            
+            # Create batch request for all resource lists
+            $batchRequestBody = @{
+                requests = @()
+            }
+            
+            # Define resource endpoints
+            $resourceEndpoints = @(
+                @{ id = "mobileApps"; url = "deviceAppManagement/mobileApps"; extraParams = "select=id,displayName,description" }
+                @{ id = "deviceConfigs"; url = "deviceManagement/deviceConfigurations"; extraParams = "select=id,displayName,description" }
+                @{ id = "compliancePolicies"; url = "deviceManagement/deviceCompliancePolicies"; extraParams = "select=id,displayName,description" }
+                @{ id = "deviceScripts"; url = "deviceManagement/deviceManagementScripts"; extraParams = "select=id,displayName,description" }
+                @{ id = "appProtectionPolicies"; url = "deviceAppManagement/managedAppPolicies"; extraParams = "select=id,displayName,description" }
+                @{ id = "intents"; url = "deviceManagement/intents"; extraParams = "select=id,displayName,description" }
+                @{ id = "resourceAccessProfiles"; url = "deviceManagement/resourceAccessProfiles"; extraParams = "select=id,displayName,description" }
+                @{ id = "policySets"; url = "deviceAppManagement/policySets"; extraParams = "select=id,displayName,description" }
+            )
         
         # Add beta endpoints if IncludeBeta is specified
         if ($IncludeBeta.IsPresent)
@@ -285,6 +316,31 @@ function GetGroupIndirectAssignments()
         }
         
         Write-Log -logFile $LogFile -module $functionName -Message "Retrieved resource counts via batch for indirect assignments" -logLevel "Information"
+            
+            # Cache the resource lists for future use
+            $resourceListsToCache = @{
+                mobileApps              = $mobileApps
+                deviceConfigs           = $deviceConfigs
+                compliancePolicies      = $compliancePolicies
+                autopilotProfiles       = $autopilotProfiles
+                deviceScripts           = $deviceScripts
+                healthScripts           = $healthScripts
+                appProtectionPolicies   = $appProtectionPolicies
+                intents                 = $intents
+                resourceAccessProfiles  = $resourceAccessProfiles
+                configurationPolicies   = $configurationPolicies
+                groupPolicyConfigs      = $groupPolicyConfigs
+                policySets              = $policySets
+                wipPolicies             = $wipPolicies
+                mdmWipPolicies          = $mdmWipPolicies
+            }
+            
+            $cached = Set-CachedData -CacheType 'Configuration' -Key $resourceListCacheKey -Data $resourceListsToCache -Metadata @{ApiVersion=$apiVersionKey; FetchedAt=Get-Date; Type='IndirectResources'}
+            if ($cached)
+            {
+                Write-Log -logFile $LogFile -module $functionName -Message "Successfully cached resource lists for indirect assignments (API: $apiVersionKey)" -logLevel "Verbose"
+            }
+        }
         
         # Process indirect assignments for each resource type
         Get-IndirectResourceAssignments -Resources $mobileApps -ResourceType "Mobile Apps" -BaseUri "deviceAppManagement/mobileApps" -AssignmentCategory "Application"
@@ -308,6 +364,34 @@ function GetGroupIndirectAssignments()
         
         $totalIndirectAssignments = $indirectAssignments.AllAssignments.Count
         Write-Log -logFile $LogFile -module $functionName -Message "Total indirect assignments found (All Users/All Devices): $totalIndirectAssignments" -LogLevel "Information"
+        
+        # Cache the indirect assignments results
+        if ($totalIndirectAssignments -gt 0)
+        {
+            $indirectAssignmentsCacheKey = "AllIndirectAssignments_${apiVersionKey}"
+            $indirectAssignmentsData = @{
+                AppAssignments                          = $indirectAssignments.AppAssignments
+                ConfigurationAssignments                = $indirectAssignments.ConfigurationAssignments
+                ComplianceAssignments                   = $indirectAssignments.ComplianceAssignments
+                AutopilotAssignments                    = $indirectAssignments.AutopilotAssignments
+                ScriptAssignments                       = $indirectAssignments.ScriptAssignments
+                HealthScriptAssignments                 = $indirectAssignments.HealthScriptAssignments
+                AppProtectionAssignments                = $indirectAssignments.AppProtectionAssignments
+                IntentAssignments                       = $indirectAssignments.IntentAssignments
+                ResourceAccessAssignments               = $indirectAssignments.ResourceAccessAssignments
+                ConfigurationPolicyAssignments          = $indirectAssignments.ConfigurationPolicyAssignments
+                GroupPolicyAssignments                  = $indirectAssignments.GroupPolicyAssignments
+                WindowsInformationProtectionAssignments = $indirectAssignments.WindowsInformationProtectionAssignments
+                PolicySetAssignments                    = $indirectAssignments.PolicySetAssignments
+                AllAssignments                          = $indirectAssignments.AllAssignments
+            }
+            
+            $cached = Set-CachedData -CacheType 'Configuration' -Key $indirectAssignmentsCacheKey -Data $indirectAssignmentsData -Metadata @{ApiVersion=$apiVersionKey; FetchedAt=Get-Date; Type='IndirectAssignments'; Scope='AllUsers_AllDevices'}
+            if ($cached)
+            {
+                Write-Log -logFile $LogFile -module $functionName -Message "Successfully cached indirect assignments (All Users/All Devices)" -logLevel "Verbose"
+            }
+        }
     }
     catch
     {

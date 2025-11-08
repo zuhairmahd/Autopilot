@@ -168,148 +168,204 @@ function GetGroupDirectAssignments()
         # Get all resource lists using a single batch API call for better performance
         Write-Log -logFile $LogFile -module $functionName -Message "Getting all resource lists for assignments using batch API" -logLevel "Information"
         
-        # Create batch request for all resource lists
-        $batchRequestBody = @{
-            requests = @()
-        }
+        # Check cache for resource lists first
+        $apiVersionKey = if ($IncludeBeta.IsPresent) { "beta" } else { "v1.0" }
+        $resourceListCacheKey = "ResourceLists_${apiVersionKey}"
+        $cachedResourceLists = Get-CachedData -CacheType 'Configuration' -Key $resourceListCacheKey
         
-        # Define resource endpoints and their IDs (including description field)
-        $resourceEndpoints = @(
-            @{ id = "mobileApps"; url = "deviceAppManagement/mobileApps"; extraParams = "select=id,displayName,description" }
-            @{ id = "deviceConfigs"; url = "deviceManagement/deviceConfigurations"; extraParams = "select=id,displayName,description" }
-            @{ id = "compliancePolicies"; url = "deviceManagement/deviceCompliancePolicies"; extraParams = "select=id,displayName,description" }
-            @{ id = "deviceScripts"; url = "deviceManagement/deviceManagementScripts"; extraParams = "select=id,displayName,description" }
-            @{ id = "appProtectionPolicies"; url = "deviceAppManagement/managedAppPolicies"; extraParams = "select=id,displayName,description" }
-            @{ id = "intents"; url = "deviceManagement/intents"; extraParams = "select=id,displayName,description" }
-            @{ id = "resourceAccessProfiles"; url = "deviceManagement/resourceAccessProfiles"; extraParams = "select=id,displayName,description" }
-            @{ id = "policySets"; url = "deviceAppManagement/policySets"; extraParams = "select=id,displayName,description" }
-        )
-        
-        # Add beta endpoints if IncludeBeta is specified
-        if ($IncludeBeta.IsPresent)
+        if ($cachedResourceLists)
         {
-            $resourceEndpoints += @(
-                @{ id = "autopilotProfiles"; url = "deviceManagement/windowsAutopilotDeploymentProfiles"; extraParams = "select=id,displayName,description" }
-                @{ id = "healthScripts"; url = "deviceManagement/deviceHealthScripts"; extraParams = "select=id,displayName,description" }
-                @{ id = "configurationPolicies"; url = "deviceManagement/configurationPolicies"; extraParams = "select=id,name,description" }
-                @{ id = "groupPolicyConfigs"; url = "deviceManagement/groupPolicyConfigurations"; extraParams = "select=id,displayName,description" }
-                @{ id = "wipPolicies"; url = "deviceAppManagement/windowsInformationProtectionPolicies"; extraParams = "select=id,displayName,description" }
-                @{ id = "mdmWipPolicies"; url = "deviceAppManagement/mdmWindowsInformationProtectionPolicies"; extraParams = "select=id,displayName,description" }
-            )
-        }
-        
-        # Build batch request
-        foreach ($endpoint in $resourceEndpoints)
-        {
-            $requestUrl = "$($endpoint.url)?`$$($endpoint.extraParams)"
-            $batchRequestBody.requests += @{
-                id     = $endpoint.id
-                method = "GET"
-                url    = $requestUrl
-            }
-        }
-        
-        Write-Log -logFile $LogFile -module $functionName -Message "Sending batch request for $($resourceEndpoints.Count) resource lists" -logLevel "Information"
-        
-        # Send batch request
-        $batchResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath "`$batch" -APIVersion $apiVersion -Method "POST" -Body ($batchRequestBody | ConvertTo-Json -Depth $global:maxJSONDepth)
-        
-        # Initialize variables for all resource types
-        $mobileApps = @()
-        $deviceConfigs = @()
-        $compliancePolicies = @()
-        $autopilotProfiles = @()
-        $deviceScripts = @()
-        $healthScripts = @()
-        $appProtectionPolicies = @()
-        $intents = @()
-        $resourceAccessProfiles = @()
-        $configurationPolicies = @()
-        $groupPolicyConfigs = @()
-        $policySets = @()
-        $wipPolicies = @()
-        $mdmWipPolicies = @()
-        
-        # Process batch response
-        if ($batchResponse -and $batchResponse.responses)
-        {
-            Write-Log -logFile $LogFile -module $functionName -Message "Processing batch response for resource lists" -LogLevel "Verbose"
+            Write-Log -logFile $LogFile -module $functionName -Message "Using cached resource lists (API: $apiVersionKey)" -logLevel "Verbose"
+            Write-Verbose "[$functionName] Cache hit for resource lists"
             
-            foreach ($response in $batchResponse.responses)
+            # Extract cached resources
+            $mobileApps = $cachedResourceLists.mobileApps
+            $deviceConfigs = $cachedResourceLists.deviceConfigs
+            $compliancePolicies = $cachedResourceLists.compliancePolicies
+            $autopilotProfiles = $cachedResourceLists.autopilotProfiles
+            $deviceScripts = $cachedResourceLists.deviceScripts
+            $healthScripts = $cachedResourceLists.healthScripts
+            $appProtectionPolicies = $cachedResourceLists.appProtectionPolicies
+            $intents = $cachedResourceLists.intents
+            $resourceAccessProfiles = $cachedResourceLists.resourceAccessProfiles
+            $configurationPolicies = $cachedResourceLists.configurationPolicies
+            $groupPolicyConfigs = $cachedResourceLists.groupPolicyConfigs
+            $policySets = $cachedResourceLists.policySets
+            $wipPolicies = $cachedResourceLists.wipPolicies
+            $mdmWipPolicies = $cachedResourceLists.mdmWipPolicies
+        }
+        else
+        {
+            Write-Log -logFile $LogFile -module $functionName -Message "Cache miss - fetching resource lists from Graph API" -logLevel "Verbose"
+            Write-Verbose "[$functionName] No cached resource lists found, fetching from API"
+            
+            # Create batch request for all resource lists
+            $batchRequestBody = @{
+                requests = @()
+            }
+            
+            # Define resource endpoints and their IDs (including description field)
+            $resourceEndpoints = @(
+                @{ id = "mobileApps"; url = "deviceAppManagement/mobileApps"; extraParams = "select=id,displayName,description" }
+                @{ id = "deviceConfigs"; url = "deviceManagement/deviceConfigurations"; extraParams = "select=id,displayName,description" }
+                @{ id = "compliancePolicies"; url = "deviceManagement/deviceCompliancePolicies"; extraParams = "select=id,displayName,description" }
+                @{ id = "deviceScripts"; url = "deviceManagement/deviceManagementScripts"; extraParams = "select=id,displayName,description" }
+                @{ id = "appProtectionPolicies"; url = "deviceAppManagement/managedAppPolicies"; extraParams = "select=id,displayName,description" }
+                @{ id = "intents"; url = "deviceManagement/intents"; extraParams = "select=id,displayName,description" }
+                @{ id = "resourceAccessProfiles"; url = "deviceManagement/resourceAccessProfiles"; extraParams = "select=id,displayName,description" }
+                @{ id = "policySets"; url = "deviceAppManagement/policySets"; extraParams = "select=id,displayName,description" }
+            )
+        
+            # Add beta endpoints if IncludeBeta is specified
+            if ($IncludeBeta.IsPresent)
             {
-                if ($response.status -eq 200 -and $response.body -and $response.body.value)
+                $resourceEndpoints += @(
+                    @{ id = "autopilotProfiles"; url = "deviceManagement/windowsAutopilotDeploymentProfiles"; extraParams = "select=id,displayName,description" }
+                    @{ id = "healthScripts"; url = "deviceManagement/deviceHealthScripts"; extraParams = "select=id,displayName,description" }
+                    @{ id = "configurationPolicies"; url = "deviceManagement/configurationPolicies"; extraParams = "select=id,name,description" }
+                    @{ id = "groupPolicyConfigs"; url = "deviceManagement/groupPolicyConfigurations"; extraParams = "select=id,displayName,description" }
+                    @{ id = "wipPolicies"; url = "deviceAppManagement/windowsInformationProtectionPolicies"; extraParams = "select=id,displayName,description" }
+                    @{ id = "mdmWipPolicies"; url = "deviceAppManagement/mdmWindowsInformationProtectionPolicies"; extraParams = "select=id,displayName,description" }
+                )
+            }
+        
+            # Build batch request
+            foreach ($endpoint in $resourceEndpoints)
+            {
+                $requestUrl = "$($endpoint.url)?`$$($endpoint.extraParams)"
+                $batchRequestBody.requests += @{
+                    id     = $endpoint.id
+                    method = "GET"
+                    url    = $requestUrl
+                }
+            }
+        
+            Write-Log -logFile $LogFile -module $functionName -Message "Sending batch request for $($resourceEndpoints.Count) resource lists" -logLevel "Information"
+        
+            # Send batch request
+            $batchResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath "`$batch" -APIVersion $apiVersion -Method "POST" -Body ($batchRequestBody | ConvertTo-Json -Depth $global:maxJSONDepth)
+        
+            # Initialize variables for all resource types
+            $mobileApps = @()
+            $deviceConfigs = @()
+            $compliancePolicies = @()
+            $autopilotProfiles = @()
+            $deviceScripts = @()
+            $healthScripts = @()
+            $appProtectionPolicies = @()
+            $intents = @()
+            $resourceAccessProfiles = @()
+            $configurationPolicies = @()
+            $groupPolicyConfigs = @()
+            $policySets = @()
+            $wipPolicies = @()
+            $mdmWipPolicies = @()
+        
+            # Process batch response
+            if ($batchResponse -and $batchResponse.responses)
+            {
+                Write-Log -logFile $LogFile -module $functionName -Message "Processing batch response for resource lists" -LogLevel "Verbose"
+            
+                foreach ($response in $batchResponse.responses)
                 {
-                    switch ($response.id)
+                    if ($response.status -eq 200 -and $response.body -and $response.body.value)
                     {
-                        "mobileApps"
+                        switch ($response.id)
                         {
-                            $mobileApps = $response.body.value 
-                        }
-                        "deviceConfigs"
-                        {
-                            $deviceConfigs = $response.body.value 
-                        }
-                        "compliancePolicies"
-                        {
-                            $compliancePolicies = $response.body.value 
-                        }
-                        "deviceScripts"
-                        {
-                            $deviceScripts = $response.body.value 
-                        }
-                        "appProtectionPolicies"
-                        {
-                            $appProtectionPolicies = $response.body.value 
-                        }
-                        "intents"
-                        {
-                            $intents = $response.body.value 
-                        }
-                        "resourceAccessProfiles"
-                        {
-                            $resourceAccessProfiles = $response.body.value 
-                        }
-                        "autopilotProfiles"
-                        {
-                            $autopilotProfiles = $response.body.value 
-                        }
-                        "healthScripts"
-                        {
-                            $healthScripts = $response.body.value 
-                        }
-                        "configurationPolicies"
-                        { 
-                            # Configuration policies use 'name' instead of 'displayName', so we normalize it
-                            $configurationPolicies = $response.body.value | ForEach-Object { 
-                                $_ | Add-Member -NotePropertyName 'displayName' -NotePropertyValue $_.name -Force -PassThru
+                            "mobileApps"
+                            {
+                                $mobileApps = $response.body.value 
+                            }
+                            "deviceConfigs"
+                            {
+                                $deviceConfigs = $response.body.value 
+                            }
+                            "compliancePolicies"
+                            {
+                                $compliancePolicies = $response.body.value 
+                            }
+                            "deviceScripts"
+                            {
+                                $deviceScripts = $response.body.value 
+                            }
+                            "appProtectionPolicies"
+                            {
+                                $appProtectionPolicies = $response.body.value 
+                            }
+                            "intents"
+                            {
+                                $intents = $response.body.value 
+                            }
+                            "resourceAccessProfiles"
+                            {
+                                $resourceAccessProfiles = $response.body.value 
+                            }
+                            "autopilotProfiles"
+                            {
+                                $autopilotProfiles = $response.body.value 
+                            }
+                            "healthScripts"
+                            {
+                                $healthScripts = $response.body.value 
+                            }
+                            "configurationPolicies"
+                            { 
+                                # Configuration policies use 'name' instead of 'displayName', so we normalize it
+                                $configurationPolicies = $response.body.value | ForEach-Object { 
+                                    $_ | Add-Member -NotePropertyName 'displayName' -NotePropertyValue $_.name -Force -PassThru
+                                }
+                            }
+                            "groupPolicyConfigs"
+                            {
+                                $groupPolicyConfigs = $response.body.value 
+                            }
+                            "policySets"
+                            {
+                                $policySets = $response.body.value
+                            }
+                            "wipPolicies"
+                            {
+                                $wipPolicies = $response.body.value
+                            }
+                            "mdmWipPolicies"
+                            {
+                                $mdmWipPolicies = $response.body.value
                             }
                         }
-                        "groupPolicyConfigs"
-                        {
-                            $groupPolicyConfigs = $response.body.value 
-                        }
-                        "policySets"
-                        {
-                            $policySets = $response.body.value
-                        }
-                        "wipPolicies"
-                        {
-                            $wipPolicies = $response.body.value
-                        }
-                        "mdmWipPolicies"
-                        {
-                            $mdmWipPolicies = $response.body.value
-                        }
+                    }
+                    elseif ($response.status -ne 200)
+                    {
+                        Write-Log -logFile $LogFile -module $functionName -Message "Failed to get resource list for $($response.id). Status: $($response.status)" -logLevel "Warning"
                     }
                 }
-                elseif ($response.status -ne 200)
-                {
-                    Write-Log -logFile $LogFile -module $functionName -Message "Failed to get resource list for $($response.id). Status: $($response.status)" -logLevel "Warning"
-                }
+            }
+        
+            Write-Log -logFile $LogFile -module $functionName -Message "Retrieved resource counts via batch - Apps: $($mobileApps.Count), Configs: $($deviceConfigs.Count), Compliance: $($compliancePolicies.Count), Autopilot: $($autopilotProfiles.Count), Scripts: $($deviceScripts.Count), HealthScripts: $($healthScripts.Count), AppProtection: $($appProtectionPolicies.Count), Intents: $($intents.Count), ResourceAccess: $($resourceAccessProfiles.Count), ConfigPolicies: $($configurationPolicies.Count), GroupPolicy: $($groupPolicyConfigs.Count), PolicySets: $($policySets.Count), WIP: $($wipPolicies.Count), MDMWIP: $($mdmWipPolicies.Count)" -logLevel "Information"
+            
+            # Cache the resource lists for future use
+            $resourceListsToCache = @{
+                mobileApps             = $mobileApps
+                deviceConfigs          = $deviceConfigs
+                compliancePolicies     = $compliancePolicies
+                autopilotProfiles      = $autopilotProfiles
+                deviceScripts          = $deviceScripts
+                healthScripts          = $healthScripts
+                appProtectionPolicies  = $appProtectionPolicies
+                intents                = $intents
+                resourceAccessProfiles = $resourceAccessProfiles
+                configurationPolicies  = $configurationPolicies
+                groupPolicyConfigs     = $groupPolicyConfigs
+                policySets             = $policySets
+                wipPolicies            = $wipPolicies
+                mdmWipPolicies         = $mdmWipPolicies
+            }
+            
+            $cached = Set-CachedData -CacheType 'Configuration' -Key $resourceListCacheKey -Data $resourceListsToCache -Metadata @{ApiVersion = $apiVersionKey; FetchedAt = Get-Date}
+            if ($cached)
+            {
+                Write-Log -logFile $LogFile -module $functionName -Message "Successfully cached resource lists for API version: $apiVersionKey" -logLevel "Verbose"
             }
         }
-        
-        Write-Log -logFile $LogFile -module $functionName -Message "Retrieved resource counts via batch - Apps: $($mobileApps.Count), Configs: $($deviceConfigs.Count), Compliance: $($compliancePolicies.Count), Autopilot: $($autopilotProfiles.Count), Scripts: $($deviceScripts.Count), HealthScripts: $($healthScripts.Count), AppProtection: $($appProtectionPolicies.Count), Intents: $($intents.Count), ResourceAccess: $($resourceAccessProfiles.Count), ConfigPolicies: $($configurationPolicies.Count), GroupPolicy: $($groupPolicyConfigs.Count), PolicySets: $($policySets.Count), WIP: $($wipPolicies.Count), MDMWIP: $($mdmWipPolicies.Count)" -logLevel "Information"
         
         # Process assignments using CallGraphAPI's built-in batch support for each resource type
         Get-ResourceAssignments -Resources $mobileApps -ResourceType "Mobile Apps" -BaseUri "deviceAppManagement/mobileApps" -AssignmentCategory "Application"
@@ -332,6 +388,36 @@ function GetGroupDirectAssignments()
         }
         
         Write-Log -logFile $LogFile -module $functionName -Message "Batch processing complete. Found assignments - Apps: $($assignments.AppAssignments.Count), Configs: $($assignments.ConfigurationAssignments.Count), Compliance: $($assignments.ComplianceAssignments.Count), Autopilot: $($assignments.AutopilotAssignments.Count), Scripts: $($assignments.ScriptAssignments.Count), HealthScripts: $($assignments.HealthScriptAssignments.Count), AppProtection: $($assignments.AppProtectionAssignments.Count), Intents: $($assignments.IntentAssignments.Count), ResourceAccess: $($assignments.ResourceAccessAssignments.Count), ConfigPolicies: $($assignments.ConfigurationPolicyAssignments.Count), GroupPolicy: $($assignments.GroupPolicyAssignments.Count), WIP: $($assignments.WindowsInformationProtectionAssignments.Count), PolicySets: $($assignments.PolicySetAssignments.Count)" -LogLevel "Verbose"
+        
+        # Cache the direct assignments for this group (before merging with indirect)
+        if ($groupIdValue -and $assignments.AllAssignments.Count -gt 0)
+        {
+            $directAssignmentsCacheKey = "GroupDirectAssignments_${groupIdValue}_${apiVersionKey}"
+            $directAssignmentsData = @{
+                GroupName                               = $assignments.GroupName
+                GroupId                                 = $assignments.GroupId
+                AppAssignments                          = $assignments.AppAssignments
+                ConfigurationAssignments                = $assignments.ConfigurationAssignments
+                ComplianceAssignments                   = $assignments.ComplianceAssignments
+                AutopilotAssignments                    = $assignments.AutopilotAssignments
+                ScriptAssignments                       = $assignments.ScriptAssignments
+                HealthScriptAssignments                 = $assignments.HealthScriptAssignments
+                AppProtectionAssignments                = $assignments.AppProtectionAssignments
+                IntentAssignments                       = $assignments.IntentAssignments
+                ResourceAccessAssignments               = $assignments.ResourceAccessAssignments
+                ConfigurationPolicyAssignments          = $assignments.ConfigurationPolicyAssignments
+                GroupPolicyAssignments                  = $assignments.GroupPolicyAssignments
+                WindowsInformationProtectionAssignments = $assignments.WindowsInformationProtectionAssignments
+                PolicySetAssignments                    = $assignments.PolicySetAssignments
+                AllAssignments                          = $assignments.AllAssignments
+            }
+            
+            $cached = Set-CachedData -CacheType 'DirectoryObjects' -Key $directAssignmentsCacheKey -Data $directAssignmentsData -Metadata @{GroupId = $groupIdValue; ApiVersion = $apiVersionKey; FetchedAt = Get-Date; Type = 'DirectAssignments'}
+            if ($cached)
+            {
+                Write-Log -logFile $LogFile -module $functionName -Message "Successfully cached direct assignments for group: $($assignments.GroupName)" -logLevel "Verbose"
+            }
+        }
     }
     catch
     {
