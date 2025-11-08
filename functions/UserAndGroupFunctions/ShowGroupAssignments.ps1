@@ -184,45 +184,85 @@ function ShowGroupAssignments()
             $selectedAssignments = $allAssignments
             Write-Host "Found $($selectedAssignments.Count) assignments"
         }
-        # Display assignments
-        $selectedAssignments | ForEach-Object {
-            if ($assignmentType -eq 'All')
-            {
-                Write-Verbose "[$functionName] Displaying the Assignment Type since the AssignmentType is 'All'"
-                Write-Log -logFile $LogFile -Module $functionName -Message "Displaying the Assignment Type since the AssignmentType is 'All'"
-                Write-Host "Assignment Type: $($_.Type)"
-            }
-            Write-Host "Name: $($_.Name)"
-            if ($_.Description)
-            {
-                Write-Host "Description: $($_.Description)"
-                Write-Log -logFile $LogFile -Module $functionName -Message "Displaying Description: $($_.Description)"
-            }
-            if ($null -ne $_.Intent)
-            {
-                Write-Log -logFile $LogFile -Module $functionName -Message "Displaying Intent $($_.Intent)"
-                Write-Host "Intent: $($_.Intent)"
-            }
-            if ($ShowIndirectAssignments.IsPresent -and $_.AssignmentScope)
-            {
-                Write-Host "Assignment Scope: $($_.AssignmentScope)" -ForegroundColor Cyan
-                Write-Log -logFile $LogFile -Module $functionName -Message "Assignment Scope: $($_.AssignmentScope)"
-            }
-        }
-        if ($assignmentType -eq 'All')
+        # Display assignments using Show-PagedContent for large datasets
+        if ($selectedAssignments.Count -gt 0)
         {
-            #export the assignments to a csv file.
+            # Create display scriptblock for formatting each assignment
+            $displayScript = {
+                param($assignment)
+                
+                # Display assignment type if showing all assignments
+                if ($assignmentType -eq 'All')
+                {
+                    Write-Host "Assignment Type: $($assignment.Type)" -ForegroundColor Magenta
+                }
+                
+                Write-Host "Name: $($assignment.Name)" -ForegroundColor White
+                
+                if ($assignment.Description)
+                {
+                    Write-Host "  Description: $($assignment.Description)" -ForegroundColor Gray
+                }
+                
+                if ($null -ne $assignment.Intent)
+                {
+                    Write-Host "  Intent: $($assignment.Intent)" -ForegroundColor Yellow
+                }
+                
+                if ($ShowIndirectAssignments.IsPresent -and $assignment.AssignmentScope)
+                {
+                    Write-Host "  Assignment Scope: $($assignment.AssignmentScope)" -ForegroundColor Cyan
+                }
+                
+                Write-Host ""  # Blank line between assignments
+            }
+            
+            # Determine page title
+            $pageTitle = if ($assignmentType -eq 'All')
+            {
+                "All Assignments for '$groupName' ($($selectedAssignments.Count) total)"
+            }
+            else
+            {
+                "$assignmentType Assignments for '$groupName' ($($selectedAssignments.Count) total)"
+            }
+            
+            Write-Log -logFile $LogFile -Module $functionName -Message "Displaying $($selectedAssignments.Count) assignments with paging" -LogLevel "Information"
+            
+            # Use Show-PagedContent for display
+            $pagingResult = Show-PagedContent -Content $selectedAssignments `
+                -DisplayScriptBlock $displayScript `
+                -Title $pageTitle `
+                -PageSize 10 `
+                -ShowPageInfo $true
+            
+            Write-Log -logFile $LogFile -Module $functionName -Message "Paging completed with result: $pagingResult" -LogLevel "Verbose"
+        }
+        else
+        {
+            Write-Host "No assignments found for the selected type." -ForegroundColor Yellow
+            Write-Log -logFile $LogFile -Module $functionName -Message "No assignments found for type: $assignmentType" -LogLevel "Information"
+            Write-Host ""
+            Write-Host "Press any key to continue..."
+            [void][System.Console]::ReadKey($true)
+        }
+        
+        # Export to CSV if showing all assignments
+        if ($assignmentType -eq 'All' -and $selectedAssignments.Count -gt 0)
+        {
             Write-Verbose "[$functionName] Exporting assignments to CSV"
             Write-Log -logFile $LogFile -Module $functionName -Message "Exporting assignments to CSV"
             $dateString = (Get-Date -Format "yyyyMMdd")
             $safeGroupName = $groupName -replace '[\\/:*?"<>|]', '_'
             $csvPath = "$pwd\${safeGroupName}-$dateString.csv"
             $selectedAssignments | Export-Csv -Path $csvPath -NoTypeInformation
-            Write-Host "Exported assignments to $csvPath"
+            Write-Host ""
+            Write-Host "Exported assignments to $csvPath" -ForegroundColor Green
             Write-Log -logFile $LogFile -Module $functionName -Message "Exported assignments to $csvPath" -logLevel "Information"
+            Write-Host ""
+            Write-Host "Press any key to continue..."
+            [void][System.Console]::ReadKey($true)
         }
-        Write-Host "Press any key to continue..."
-        [void][System.Console]::ReadKey($true)
         # Loop continues to re-show the assignment type menu
     }
     return $returnValues.backoutText
