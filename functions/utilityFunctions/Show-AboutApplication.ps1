@@ -132,7 +132,7 @@ function Show-ApplicationInfo()
         [string]$appId,
         [string]$tenantId
     )
-    $Function:Name = $MyInvocation.MyCommand.Name
+    $FunctionName = $MyInvocation.MyCommand.Name
     write-log -logFile $LogFile -Module "$FunctionName" -Message "- Displaying application information" -LogLevel "Information"
     if ($registeredAppName -ne $name)
     {
