@@ -768,6 +768,8 @@ function Get-SettingDescription()
         'userPatternsToExclude'           = 'Username patterns to exclude from operations'
         'desiredAutopilotProfiles'        = 'Autopilot profiles to assign to devices'
         'changePwOnNextStart'             = 'Force password change on next application start'
+        migrateLegacyConfiguration        = 'Migrate settings from the JSON legacy configuration file format'
+        maxMenuItemsPerPage               = 'Maximum number of menu items to display per page in interactive mode'     
         'authType'                        = 'Authentication method (PublicAuthFlow, PrivateAuthFlow, etc.)'
         'noSaveRefreshToken'              = 'Prevent saving refresh tokens to disk'
         'forceNewToken'                   = 'Force acquisition of new authentication token'

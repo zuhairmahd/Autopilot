@@ -145,6 +145,7 @@ function Get-ApplicationDefaults()
                 repoPath      = "zuhairmahd"
             }
             operatingSystem              = "Windows"
+            migrateLegacyConfiguration   = $true
             autoUpdate                   = $true
         }
 
