@@ -3,7 +3,8 @@ function ShowGroupAssignments()
     [CmdletBinding()]
     param (
         $Group,
-        [string]$accessToken
+        [string]$accessToken,
+        [switch]$ShowIndirectAssignments
     )
 
     $functionName = $MyInvocation.MyCommand.Name
@@ -39,9 +40,13 @@ function ShowGroupAssignments()
         Write-Log -logFile $LogFile -Module $functionName -Message "Access token is present."
     }
     Write-Host "Getting group assignments for '$groupName'..."
+    if ($ShowIndirectAssignments.IsPresent)
+    {
+        Write-Host "Including indirect assignments (All Users and All Devices)..."
+    }
     Write-Host "This may take a while..."
     # Get group assignments (fetch once and reuse)
-    $assignments = GetGroupDirectAssignments -accessToken $accessToken -GroupName $Group -includeBeta
+    $assignments = GetGroupDirectAssignments -accessToken $accessToken -GroupName $Group -includeBeta -IncludeIndirectAssignments:$ShowIndirectAssignments
     if ($assignments -eq 'noGroup')
     {
         Write-Log -logFile $LogFile -Module $functionName -Message "No group found for name '$groupName'." -LogLevel "Verbose"
@@ -197,6 +202,11 @@ function ShowGroupAssignments()
             {
                 Write-Log -logFile $LogFile -Module $functionName -Message "Displaying Intent $($_.Intent)"
                 Write-Host "Intent: $($_.Intent)"
+            }
+            if ($ShowIndirectAssignments.IsPresent -and $_.AssignmentScope)
+            {
+                Write-Host "Assignment Scope: $($_.AssignmentScope)" -ForegroundColor Cyan
+                Write-Log -logFile $LogFile -Module $functionName -Message "Assignment Scope: $($_.AssignmentScope)"
             }
         }
         if ($assignmentType -eq 'All')

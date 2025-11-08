@@ -9,6 +9,7 @@ function GetGroupDirectAssignments()
         [Parameter(Mandatory = $false)]
         [switch] $IncludeBeta,
         [switch]$ShowSummary,
+        [switch]$IncludeIndirectAssignments,
         [Parameter(Mandatory = $false)]
         [int] $BatchSize = 20
     )
@@ -25,12 +26,14 @@ function GetGroupDirectAssignments()
     Write-Verbose "[$functionName] GroupName: $GroupName"
     Write-Verbose "[$functionName] IncludeBeta: $IncludeBeta"
     Write-Verbose "[$functionName] ShowSummary: $ShowSummary"
+    Write-Verbose "[$functionName] IncludeIndirectAssignments: $IncludeIndirectAssignments"
     Write-Verbose "[$functionName] BatchSize: $BatchSize"
     #now write-log them.
     Write-Log -logFile $LogFile -module $functionName -Message "Incoming parameters:" -logLevel "Information"
     Write-Log -logFile $LogFile -module $functionName -Message "GroupName: $GroupName" -logLevel "Information"
     Write-Log -logFile $LogFile -module $functionName -Message "IncludeBeta: $IncludeBeta" -logLevel "Information"
     Write-Log -logFile $LogFile -module $functionName -Message "ShowSummary: $ShowSummary" -LogLevel "Verbose"
+    Write-Log -logFile $LogFile -module $functionName -Message "IncludeIndirectAssignments: $IncludeIndirectAssignments" -logLevel "Information"
     Write-Log -logFile $LogFile -module $functionName -Message "BatchSize: $BatchSize" -logLevel "Information"
     $groupIds = $GroupName
     $groupIdArray = @($groupIds)
@@ -335,12 +338,57 @@ function GetGroupDirectAssignments()
         Write-Log -logFile $LogFile -module $functionName -Message "Error in batch assignment processing: $($_.Exception.Message)" -LogLevel "Verbose"
     }
     
+    # Get indirect assignments if requested (All Users and All Devices)
+    if ($IncludeIndirectAssignments.IsPresent)
+    {
+        Write-Log -logFile $LogFile -module $functionName -Message "Retrieving indirect assignments (All Users and All Devices)" -logLevel "Information"
+        Write-Verbose "[$functionName] Retrieving indirect assignments"
+        
+        try
+        {
+            $indirectAssignments = GetGroupIndirectAssignments -AccessToken $AccessToken -IncludeBeta:$IncludeBeta -BatchSize $BatchSize
+            
+            if ($indirectAssignments -and $indirectAssignments.AllAssignments.Count -gt 0)
+            {
+                Write-Log -logFile $LogFile -module $functionName -Message "Found $($indirectAssignments.AllAssignments.Count) indirect assignments" -logLevel "Information"
+                
+                # Merge indirect assignments with direct assignments
+                $assignments.AppAssignments += $indirectAssignments.AppAssignments
+                $assignments.ConfigurationAssignments += $indirectAssignments.ConfigurationAssignments
+                $assignments.ComplianceAssignments += $indirectAssignments.ComplianceAssignments
+                $assignments.AutopilotAssignments += $indirectAssignments.AutopilotAssignments
+                $assignments.ScriptAssignments += $indirectAssignments.ScriptAssignments
+                $assignments.HealthScriptAssignments += $indirectAssignments.HealthScriptAssignments
+                $assignments.AppProtectionAssignments += $indirectAssignments.AppProtectionAssignments
+                $assignments.IntentAssignments += $indirectAssignments.IntentAssignments
+                $assignments.ResourceAccessAssignments += $indirectAssignments.ResourceAccessAssignments
+                $assignments.ConfigurationPolicyAssignments += $indirectAssignments.ConfigurationPolicyAssignments
+                $assignments.GroupPolicyAssignments += $indirectAssignments.GroupPolicyAssignments
+                $assignments.WindowsInformationProtectionAssignments += $indirectAssignments.WindowsInformationProtectionAssignments
+                $assignments.PolicySetAssignments += $indirectAssignments.PolicySetAssignments
+                $assignments.AllAssignments += $indirectAssignments.AllAssignments
+                
+                Write-Log -logFile $LogFile -module $functionName -Message "Merged indirect assignments with direct assignments" -logLevel "Information"
+            }
+            else
+            {
+                Write-Log -logFile $LogFile -module $functionName -Message "No indirect assignments found" -logLevel "Information"
+            }
+        }
+        catch
+        {
+            Write-Log -logFile $LogFile -module $functionName -Message "Error retrieving indirect assignments: $($_.Exception.Message)" -LogLevel "Warning"
+            Write-Verbose "[$functionName] Error retrieving indirect assignments: $($_.Exception.Message)"
+        }
+    }
+    
     # Summary
     $totalAssignments = $assignments.AllAssignments.Count
+    $summaryTitle = if ($IncludeIndirectAssignments.IsPresent) { "Group Direct and Indirect Assignments Summary" } else { "Group Direct Assignments Summary" }
     Write-Log -logFile $LogFile -module $functionName -Message "Total assignments found for group '$($groupId.displayName)': $totalAssignments" -LogLevel "Verbose"
     if ($ShowSummary)
     {
-        Write-Host "Group Direct Assignments Summary for '$($groupId.displayName)':" -ForegroundColor Green
+        Write-Host "$summaryTitle for '$($groupId.displayName)':" -ForegroundColor Green
         Write-Host "  Apps: $($assignments.AppAssignments.Count)" -ForegroundColor Yellow
         Write-Host "  Configurations: $($assignments.ConfigurationAssignments.Count)" -ForegroundColor Yellow
         Write-Host "  Compliance Policies: $($assignments.ComplianceAssignments.Count)" -ForegroundColor Yellow
