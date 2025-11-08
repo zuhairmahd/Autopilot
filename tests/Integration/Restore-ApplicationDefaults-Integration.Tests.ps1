@@ -104,7 +104,7 @@ Describe "Integration: Show-RestoreApplicationDefaultsResults with Main.ps1" -Ta
         It "Should return BACK when user cancels" {
             Mock Read-Host { return "N" } -ParameterFilter { $Prompt -eq "Enter Y to continue or N to cancel" }
             
-            $result = Show-RestoreApplicationDefaultsResults -FilesToDelete @($script:InitFile, $script:StringsFile, $script:MenuFile) -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder -Silent
+            $result = Show-RestoreApplicationDefaultsResults -FilesToDelete @($script:InitFile, $script:StringsFile, $script:MenuFile) -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder
             
             $result | Should -Be "BACK"
         }
@@ -199,7 +199,7 @@ Describe "Integration: Show-RestoreApplicationDefaultsResults with Main.ps1" -Ta
             Mock Read-Host { return "N" } -ParameterFilter { $Prompt -eq "Enter Y to continue or N to cancel" }
             Mock Write-Host { }
             
-            $result = Show-RestoreApplicationDefaultsResults -FilesToDelete @($script:InitFile, $script:StringsFile, $script:MenuFile) -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder -Silent
+            $result = Show-RestoreApplicationDefaultsResults -FilesToDelete @($script:InitFile, $script:StringsFile, $script:MenuFile) -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder
             
             Should -Invoke Write-Host -ParameterFilter { $Object -like "*cancelled*" }
             $result | Should -Be "BACK"
@@ -344,7 +344,7 @@ Describe "Integration: Restore-ApplicationDefaults Core Function" -Tags 'Integra
         It "Should return complete object for user cancellation" {
             Mock Read-Host { return "N" } -ParameterFilter { $Prompt -eq "Enter Y to continue or N to cancel" }
             
-            $result = Restore-ApplicationDefaults -FilesToDelete @($script:InitFile, $script:StringsFile, $script:MenuFile) -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder -Silent
+            $result = Restore-ApplicationDefaults -FilesToDelete @($script:InitFile, $script:StringsFile, $script:MenuFile) -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder
             
             $result.UserCancelled | Should -Be $true
             $result.Success | Should -Be $false

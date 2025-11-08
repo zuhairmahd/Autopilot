@@ -92,7 +92,6 @@ function Restore-ApplicationDefaults()
         Write-Host "  - $fileName" -ForegroundColor Gray
     }
     Write-Host "`nThis operation cannot be undone. Do you want to continue? (Y/N)" -ForegroundColor Yellow
-    $confirmation = ’Y’ 
     if (-not $Silent) 
     { 
         $confirmation = Read-Host -Prompt "Enter Y to continue or N to cancel" 
@@ -106,6 +105,12 @@ function Restore-ApplicationDefaults()
             [console]::beep(1000, 300) 
         } 
     } 
+    else 
+    { 
+        $confirmation = 'Y' 
+        Write-Verbose "[$functionName] Silent mode enabled. Automatically proceeding with operation." 
+        Write-Log -LogFile $logFile -Module $functionName -Message "Silent mode enabled. Automatically proceeding with operation." 
+    }               
     if ($confirmation -in @(’N’, ’n’)) 
     { 
         $cancelMessage = "Operation cancelled by user." 

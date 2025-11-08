@@ -64,7 +64,7 @@ Describe "Function: Restore-ApplicationDefaults" -Tags 'Unit' {
         It "Should return UserCancelled=true when user selects 'N'" {
             Mock Read-Host { return "N" } -ParameterFilter { $Prompt -eq "Enter Y to continue or N to cancel" }
             
-            $result = Restore-ApplicationDefaults -FilesToDelete $script:TestFiles -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder -Silent
+            $result = Restore-ApplicationDefaults -FilesToDelete $script:TestFiles -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder
             
             $result.UserCancelled | Should -Be $true
             $result.Success | Should -Be $false
@@ -74,7 +74,7 @@ Describe "Function: Restore-ApplicationDefaults" -Tags 'Unit' {
         It "Should return UserCancelled=true when user selects 'n'" {
             Mock Read-Host { return "n" } -ParameterFilter { $Prompt -eq "Enter Y to continue or N to cancel" }
             
-            $result = Restore-ApplicationDefaults -FilesToDelete $script:TestFiles -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder -Silent
+            $result = Restore-ApplicationDefaults -FilesToDelete $script:TestFiles -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder
             
             $result.UserCancelled | Should -Be $true
             $result.Success | Should -Be $false
@@ -104,7 +104,7 @@ Describe "Function: Restore-ApplicationDefaults" -Tags 'Unit' {
                 New-Item $_ -ItemType File -Force | Out-Null
             }
             
-            $result = Restore-ApplicationDefaults -FilesToDelete $script:TestFiles -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder -Silent
+            $result = Restore-ApplicationDefaults -FilesToDelete $script:TestFiles -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder
             
             $result.UserCancelled | Should -Be $false
             $result.Success | Should -Be $true
@@ -378,7 +378,7 @@ Describe "Function: Show-RestoreApplicationDefaultsResults" -Tags 'Unit' {
         # Mock returnValues (used by the function)
         $global:returnValues = @{
             backoutText = "BACK"
-            exitString = "EXIT_APPLICATION"
+            exitString  = "EXIT_APPLICATION"
         }
         
         # Create test environment
@@ -426,7 +426,7 @@ Describe "Function: Show-RestoreApplicationDefaultsResults" -Tags 'Unit' {
         It "Should return backoutText when user cancels" {
             Mock Read-Host { return "N" } -ParameterFilter { $Prompt -eq "Enter Y to continue or N to cancel" }
             
-            $result = Show-RestoreApplicationDefaultsResults -FilesToDelete $script:TestFiles -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder -Silent
+            $result = Show-RestoreApplicationDefaultsResults -FilesToDelete $script:TestFiles -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder
             
             $result | Should -Be "BACK"
         }
@@ -434,7 +434,7 @@ Describe "Function: Show-RestoreApplicationDefaultsResults" -Tags 'Unit' {
         It "Should return backoutText when user enters 'n'" {
             Mock Read-Host { return "n" } -ParameterFilter { $Prompt -eq "Enter Y to continue or N to cancel" }
             
-            $result = Show-RestoreApplicationDefaultsResults -FilesToDelete $script:TestFiles -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder -Silent
+            $result = Show-RestoreApplicationDefaultsResults -FilesToDelete $script:TestFiles -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder
             
             $result | Should -Be "BACK"
         }
@@ -525,7 +525,7 @@ Describe "Function: Show-RestoreApplicationDefaultsResults" -Tags 'Unit' {
             Mock Read-Host { return "N" } -ParameterFilter { $Prompt -eq "Enter Y to continue or N to cancel" }
             Mock Write-Host { }
             
-            $result = Show-RestoreApplicationDefaultsResults -FilesToDelete $script:TestFiles -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder -Silent
+            $result = Show-RestoreApplicationDefaultsResults -FilesToDelete $script:TestFiles -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder
             
             Should -Invoke Write-Host -ParameterFilter { $Object -like "*cancelled*" }
         }
@@ -565,7 +565,7 @@ Describe "Function: Show-RestoreApplicationDefaultsResults" -Tags 'Unit' {
         It "Should return correct value for each scenario" {
             # User cancellation
             Mock Read-Host { return "N" } -ParameterFilter { $Prompt -eq "Enter Y to continue or N to cancel" }
-            $result1 = Show-RestoreApplicationDefaultsResults -FilesToDelete $script:TestFiles -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder -Silent
+            $result1 = Show-RestoreApplicationDefaultsResults -FilesToDelete $script:TestFiles -Domain $script:TestDomain -ScriptPath $script:TestEnv.TestFolder
             $result1 | Should -Be "BACK"
             
             # Complete failure (no files to delete)
