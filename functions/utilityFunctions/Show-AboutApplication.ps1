@@ -26,6 +26,8 @@ function Show-AboutApplication()
     }
     Write-Host "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))"
     Write-Host "Copyright (c) $((Get-Date).Year) $($appMetaData.companyName)" -ForegroundColor Cyan
+    Write-Verbose "[$functionName] Update available: $($updateAvailable | Out-String)"              
+    write-log -logFile $LogFile -Module "$FunctionName" -Message "- Update available: $($updateAvailable | Out-String)" -LogLevel "Information" 
     if ($updateAvailable.success -eq $true)
     {
         Write-Host "Last updated on $($updateAvailable.ReleaseDate | FormatDateWithTimeZone)"
