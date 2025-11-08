@@ -333,7 +333,7 @@ function Invoke-MockGraphAPI
     [CmdletBinding()]
     param(
         [string]$accessToken,
-        [string]$ResourcePath,
+        [object]$ResourcePath,  # Can be string or array for batch processing
         [string]$Filter,
         [string]$ExtraParameters,
         [switch]$consistencyLevel,
@@ -343,9 +343,33 @@ function Invoke-MockGraphAPI
     )
     
     Write-Verbose "[MockGraphAPI] Method: $Method"
-    Write-Verbose "[MockGraphAPI] ResourcePath: $ResourcePath"
+    Write-Verbose "[MockGraphAPI] ResourcePath: $ResourcePath ($(if ($ResourcePath -is [array]) {'array'} else {'string'}))"
     Write-Verbose "[MockGraphAPI] Filter: $Filter"
     Write-Verbose "[MockGraphAPI] ExtraParameters: $ExtraParameters"
+    
+    # Handle array input for batch processing
+    # When called with an array, simulate what CallGraphAPI's batch processing would return
+    # CallGraphAPI returns: @{ value = [array of response bodies] }
+    if ($ResourcePath -is [array] -and $ResourcePath.Count -gt 1)
+    {
+        Write-Verbose "[MockGraphAPI] Processing array request with $($ResourcePath.Count) paths (simulating CallGraphAPI batch result format)"
+        $allResults = @()
+        for ($i = 0; $i -lt $ResourcePath.Count; $i++)
+        {
+            # Recursively call for each path and collect the result
+            $result = Invoke-MockGraphAPI -accessToken $accessToken -ResourcePath $ResourcePath[$i] `
+                -Filter $Filter -ExtraParameters $ExtraParameters -consistencyLevel:$consistencyLevel `
+                -Method $Method -Body $Body -apiVersion $apiVersion
+            
+            # Add result to collection (even if it's 404 or other error)
+            $allResults += $result
+        }
+        # Return in the format that CallGraphAPI would return after processing a batch
+        return @{
+            value          = $allResults
+            batchProcessed = $true
+        }
+    }
     
     # User exact match: users/{upn}
     if ($ResourcePath -like "users/*")
@@ -523,12 +547,9 @@ function Invoke-MockGraphAPI
     {
         $profileId = ($ResourcePath -split '/')[-2]
         $assignments = @()
-        foreach ($assignment in $script:MockProfileAssignments.GetEnumerator())
+        if ($script:MockProfileAssignments.ContainsKey($profileId))
         {
-            if ($assignment.Name -eq $profileId)
-            {
-                $assignments += $assignment.Value
-            }
+            $assignments += $script:MockProfileAssignments[$profileId]
         }
         return @{ value = $assignments }
     }
@@ -992,6 +1013,20 @@ function Clear-MockProfileAssignments
     $script:MockProfileAssignments.Clear()
 }
 
+<#
+.SYNOPSIS
+    Gets debug information about mock state.
+#>
+function Get-MockState
+{
+    return @{
+        MockProfiles           = $script:MockProfiles
+        MockProfileAssignments = $script:MockProfileAssignments
+        MockUsers              = $script:MockUsers
+        MockGroups             = $script:MockGroups
+    }
+}
+
 #endregion
 
 #region Authentication Token Mocks
@@ -1139,6 +1174,7 @@ Export-ModuleMember -Function @(
     'Clear-MockDeviceAssignments',
     'Add-MockProfileAssignment',
     'Get-MockProfileAssignments',
-    'Clear-MockProfileAssignments'
+    'Clear-MockProfileAssignments',
+    'Get-MockState'
 )
 

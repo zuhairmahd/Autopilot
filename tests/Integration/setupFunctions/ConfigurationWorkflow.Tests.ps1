@@ -53,6 +53,9 @@ Describe "Integration: Configuration Workflow" -Tags 'Integration', 'setupFuncti
         $script:SettingsFile = Join-Path $script:TestFolder "settings.psd1"
         $script:StringsFile = Join-Path $script:TestFolder "strings.psd1"
         $script:MenuFile = Join-Path $script:TestFolder "menu.psd1"
+        
+        # Set global logFile to prevent empty path errors
+        $global:logFile = Join-Path $script:TestFolder "test.log"
     }
     
     AfterEach {
@@ -109,6 +112,23 @@ Describe "Integration: Configuration Workflow" -Tags 'Integration', 'setupFuncti
             $result | Should -Not -BeNullOrEmpty
             # RequiredScopes may be array or hashtable depending on implementation
         }
+
+        It "should initialize repoInfo correctly" {
+            $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
+                -StringsFile $script:StringsFile -menuFile $script:MenuFile -Domain "contoso.com"
+            
+            $result.RepoInfo | Should -Not -BeNullOrEmpty
+            $result.RepoInfo.baseURL | Should -Match "github\.com"
+        }
+
+        It "should initialize caching settings correctly" {
+            $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
+                -StringsFile $script:StringsFile -menuFile $script:MenuFile -Domain "contoso.com"
+            
+            $result.GlobalSettings.cacheSettings | Should -Not -BeNullOrEmpty
+            $result.GlobalSettings.cacheSettings.enabled | Should -Be $true
+            $result.GlobalSettings.cacheSettings.cacheTypes.Configuration.enabled | Should -Be $true
+        }                   
     }
     
     Context "Settings Merge Workflow" {

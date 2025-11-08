@@ -23,16 +23,14 @@ Describe "Profile Assignment Integration" -Tags 'Integration', 'Profile', 'Assig
         $script:TestContext = Initialize-AutopilotTestEnvironment
         $script:RepoRoot = $TestContext.RootPath
 
-        # Load the function to be tested
-        . (Join-Path $script:RepoRoot "functions/UserAndGroupFunctions/GetGroupDirectAssignments.ps1")
+        # Initialize global variables needed by functions
+        $global:logFile = Join-Path $script:TestContext.TestFolder "test.log"
+        $global:maxJSONDepth = 10
 
-        Initialize-GraphMockEnvironment -ClearCache
+        # Load utility functions first
+        . (Join-Path $script:RepoRoot "functions/utilityFunctions/Write-Log.ps1")
 
-        # Add mock data for tests
-        Add-MockAutopilotProfile -DisplayName "Test-Profile-1" -Id "profile-test-01"
-        Add-MockGroup -DisplayName "Test-Group-1" -Id "group-test-01"
-
-        # Mock the global CallGraphAPI function to use our enhanced mock
+        # Define mock CallGraphAPI BEFORE loading functions that depend on it
         function global:CallGraphAPI {
             param($accessToken, $ResourcePath, $Filter, $ExtraParameters, [switch]$consistencyLevel, [string]$Method = 'GET', $Body = $null, [string]$apiVersion = 'v1.0')
             
@@ -40,6 +38,16 @@ Describe "Profile Assignment Integration" -Tags 'Integration', 'Profile', 'Assig
                 -Filter $Filter -ExtraParameters $ExtraParameters -consistencyLevel:$consistencyLevel `
                 -Method $Method -Body $Body -apiVersion $apiVersion
         }
+
+        # Now load functions that will use the mocked CallGraphAPI
+        . (Join-Path $script:RepoRoot "functions/UserAndGroupFunctions/GetGroupDirectAssignments.ps1")
+        . (Join-Path $script:RepoRoot "functions/UserAndGroupFunctions/GetGroupIndirectAssignments.ps1")
+
+        Initialize-GraphMockEnvironment -ClearCache
+
+        # Add mock data for tests
+        Add-MockAutopilotProfile -DisplayName "Test-Profile-1" -Id "profile-test-01"
+        Add-MockGroup -DisplayName "Test-Group-1" -Id "group-test-01"
 
         $script:token = New-MockAuthToken
         $script:testGroup = @{ 
