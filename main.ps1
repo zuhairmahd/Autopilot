@@ -1305,8 +1305,8 @@ if ($testMode -and $script:testModeOptions.exitAfter)
 
 #region Create menus
 # Clear menu configuration cache to ensure fresh menu loading
-Write-Verbose "[$scriptName] Clearing menu configuration cache"
-Invoke-CacheManagement -Action ClearSpecific -CacheType Menu 
+# Write-Verbose "[$scriptName] Clearing menu configuration cache"
+# Invoke-CacheManagement -Action ClearSpecific -CacheType Menu 
 #Now load the menu configuration            
 $menuConfig = $configResult.menu
 if ($menuConfig)

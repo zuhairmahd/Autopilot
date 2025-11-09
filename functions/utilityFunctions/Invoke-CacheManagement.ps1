@@ -90,23 +90,14 @@ function Invoke-CacheManagement()
         [Parameter(Mandatory = $true)]
         [ValidateSet('Clear', 'ClearSpecific', 'Get', 'Set', 'GetStatistics', 'ListCaches', 'Monitor', 'GetMenuConfiguration', 'SetMenuConfiguration')]
         [string]$Action,
-        
         [string]$CacheType,
-        
         [string]$Key,
-        
         $Data,
-        
         $Metadata,
-        
         [switch]$ShowDetails,
-        
         [string]$MenuName,
-        
         [string]$MenuConfigFile = "$pwd\menu",
-        
         [switch]$ForceReload,
-        
         [PSCustomObject]$MenuConfiguration
     )
     
