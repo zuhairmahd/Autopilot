@@ -104,6 +104,42 @@ function ShowGroupAssignments()
             return $returnValues.noGroupAssignmentsFoundMessage
         }
     }
+    # Check for failed resources and notify user
+    if ($assignments.FailedResources -and $assignments.FailedResources.Count -gt 0)
+    {
+        # Filter out known backend service issues that consistently fail with HTTP 400
+        # resourceAccessProfiles: Returns 400 from Microsoft's StatelessRAPolicyService backend (not a code issue)
+        $knownBackendIssues = if ($null -ne $settings.knownProblemGraphEndpoints)
+        {
+            $settings.knownProblemGraphEndpoints
+        }
+        else
+        {
+            @()
+        }                                       
+        
+        $displayableFailures = $assignments.FailedResources | Where-Object { $_.ResourceType -notin $knownBackendIssues }
+        
+        if ($displayableFailures -and $displayableFailures.Count -gt 0)
+        {
+            $failedResourceTypes = ($displayableFailures | Select-Object -ExpandProperty ResourceType -Unique) -join ', '
+            Write-Host "Warning: Some resources could not be fetched: $failedResourceTypes" -ForegroundColor Yellow
+            Write-Log -logFile $LogFile -Module $functionName -Message "Failed to fetch $($displayableFailures.Count) resource type(s)" -logLevel "Warning"
+            
+            foreach ($failedResource in $displayableFailures)
+            {
+                Write-Log -logFile $LogFile -Module $functionName -Message "Failed Resource - Type: $($failedResource.ResourceType), Status: $($failedResource.StatusCode), API Version: $($failedResource.ApiVersion), Error: $($failedResource.ErrorMessage)" -logLevel "Error"
+            }
+        }
+        
+        # Still log known backend issues but don't display warning to user
+        $knownIssueFailures = $assignments.FailedResources | Where-Object { $_.ResourceType -in $knownBackendIssues }
+        foreach ($failedResource in $knownIssueFailures)
+        {
+            Write-Log -logFile $LogFile -Module $functionName -Message "Known Backend Issue - Type: $($failedResource.ResourceType), Status: $($failedResource.StatusCode), API Version: $($failedResource.ApiVersion), Error: $($failedResource.ErrorMessage) (suppressed from user display)" -logLevel "Verbose"
+        }
+    }
+    
     # Cache all assignments to avoid re-query per selection
     $allAssignments = @($assignments.allAssignments)
     

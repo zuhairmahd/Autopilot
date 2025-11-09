@@ -178,6 +178,7 @@ function Get-ApplicationDefaults()
         # Domain template defaults - single source of truth for domain structure
         Domain         = [ordered]@{
             groupsToInclude                 = @()
+            knownProblemGraphEndpoints      = @()
             groupsToExclude                 = @()
             autopilotProfilesToInclude      = @()
             autopilotDeviceAllowedVendors   = @(

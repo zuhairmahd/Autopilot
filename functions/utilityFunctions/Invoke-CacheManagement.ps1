@@ -167,7 +167,6 @@ function Invoke-CacheManagement()
             
             return $result
         }
-        
         'Set'
         {
             if (-not $CacheType)
@@ -213,13 +212,11 @@ function Invoke-CacheManagement()
                 Timestamp = Get-Date
             }
         }
-        
         'Clear'
         {
             Write-Log -LogFile $LogFile -Module $functionName -Message "Starting comprehensive cache clearing operation (legacy + unified)" -LogLevel "Verbose"
             $clearedCaches = 0
             $cacheDetails = @()
-            
             # Clear menu configuration cache
             if ($script:menuConfigCache)
             {
@@ -276,7 +273,6 @@ function Invoke-CacheManagement()
             
             return @{ Action = 'Clear'; CachesCleared = $clearedCaches; Details = $cacheDetails; Timestamp = Get-Date }
         }
-        
         'ClearSpecific'
         {
             if (-not $CacheType)
@@ -346,7 +342,6 @@ function Invoke-CacheManagement()
                 return @{ Action = 'ClearSpecific'; CacheType = $CacheType; Cleared = $false; Timestamp = Get-Date }
             }
         }
-        
         'GetStatistics'
         {
             Write-Verbose "[$functionName] Gathering cache statistics"
@@ -410,7 +405,6 @@ function Invoke-CacheManagement()
             
             return $stats
         }
-        
         'ListCaches'
         {
             Write-Verbose "[$functionName] Listing available caches"
@@ -436,7 +430,6 @@ function Invoke-CacheManagement()
             
             return @{ Action = 'ListCaches'; Caches = $cacheList; Timestamp = Get-Date }
         }
-        
         'Monitor'
         {
             Write-Verbose "[$functionName] Displaying cache monitoring information"
@@ -508,7 +501,6 @@ function Invoke-CacheManagement()
             
             return $stats
         }
-        
         'GetMenuConfiguration'
         {
             Write-Log -LogFile $LogFile -Module $functionName -Message "Getting cached menu configuration for file: $MenuConfigFile" -LogLevel "Debug"
@@ -595,7 +587,6 @@ function Invoke-CacheManagement()
                 return $null
             }
         }
-        
         'SetMenuConfiguration'
         {
             Write-Log -LogFile $LogFile -Module $functionName -Message "Setting menu configuration in cache for file: $MenuConfigFile" -LogLevel "Debug"

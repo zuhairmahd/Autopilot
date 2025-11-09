@@ -186,6 +186,7 @@ param(
     [String] $GroupTag,
     [switch]$showLicenseBanner,
     [switch]$showAuth,
+    [switch]$clearCache,                    
     [switch]$showVersion,
     [switch]$showSettings,
     [switch]$OverwriteLogs,
@@ -512,7 +513,23 @@ else
     Write-Verbose "[$scriptName] No migration needed."
     Write-Log -LogFile $LogFile -Module $scriptName -Message "No migration needed." -LogLevel "Information" 
 }
+
+#clear cache if requested
+if ($clearCache)
+{
+    $clearedCache = Invoke-CacheManagement -Action Clear -ShowDetails
+    if ($clearedCache.Action -eq 'Clear' -and $clearedCache.CachesCleared -ge 0)
+    {
+        Write-Host "Cache cleared." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "No cache files to clear." -ForegroundColor Yellow                           
+    }
+}
 #endregion  Initialize script parameters
+
+
 
 #region Process login
 Write-Verbose "[$scriptName] Checking configuration file: $configFile"
@@ -523,11 +540,9 @@ if (-not (Test-Path $secretsDir))
     Write-Verbose "[$scriptName] Creating secrets directory: $secretsDir"
     New-Item -Path $secretsDir -ItemType Directory -Force | Out-Null
 }
-
 # Initialize variables for encryption handling
 $configContent = $null
 $script:maxRetries = 6
-
 # Skip config loading entirely if testMode and config flag is false
 if ($testMode -and -not $script:testModeOptions.config)
 {
