@@ -245,7 +245,7 @@ function Show-SettingsEditor()
         # Process each setting in the template - with support for nested objects
         # Exclude GroupsToInclude, GroupsToExclude, autopilotProfilesToInclude, appMode and appModes as they have dedicated editors
         # Note: cacheSettings and repoInfo are now top-level sections, not nested in globalSettings
-        $excludeSettings = @('groupsToInclude', 'groupsToExclude', 'GroupsToInclude', 'GroupsToExclude', 'autopilotProfilesToInclude', 'appMode', 'appModes')
+        $excludeSettings = @('groupsToInclude', 'groupsToExclude', 'GroupsToInclude', 'GroupsToExclude', 'autopilotProfilesToInclude', 'appMode', 'appModes', 'cacheSettings', 'repoInfo', 'assignedUser')
         $processedSettings = Get-FlattenedSettingsForProcessing -SettingsTemplate $settingsTemplate -CurrentValues $currentValues -ExcludeSettings $excludeSettings
         
         foreach ($settingInfo in $processedSettings)
