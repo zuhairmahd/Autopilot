@@ -1301,14 +1301,13 @@ if ($testMode -and $script:testModeOptions.exitAfter)
     Write-Log -LogFile $LogFile -FinishLogging
     exit 0
 }
-
 #endregion initialization block with access token
 
 #region Create menus
 # Clear menu configuration cache to ensure fresh menu loading
 Write-Verbose "[$scriptName] Clearing menu configuration cache"
 Invoke-CacheManagement -Action ClearSpecific -CacheType Menu 
-
+#Now load the menu configuration            
 $menuConfig = $configResult.menu
 if ($menuConfig)
 {
