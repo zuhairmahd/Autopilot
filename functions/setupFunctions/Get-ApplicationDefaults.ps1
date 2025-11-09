@@ -51,10 +51,8 @@ function Get-ApplicationDefaults()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    
     # Initialize script-level cache if not exists
     $script:defaultsCache = New-Object 'System.Collections.Concurrent.ConcurrentDictionary[string,object]'
-    
     # Use global version if available, otherwise default
     if (-not $Version)
     {
@@ -67,7 +65,6 @@ function Get-ApplicationDefaults()
             "1.3.0.0"
         }
     }
-    
     # Create cache key based on parameters
     $cacheKey = "$DefaultType-$DomainName-$Version"
     if ($script:defaultsCache.ContainsKey($cacheKey))
@@ -601,8 +598,8 @@ function Get-ApplicationDefaults()
                     },
                     @{
                         menuName              = 'getGroupAssignmentsMenu'
-                        description           = 'Show group assignments for a group'
-                        name                  = 'Show Group Assignments'
+                        description           = 'View or export various     group assignment reports'
+                        name                  = 'Group Assignments Menu'
                         blockType             = 'menu'
                         includeInDisplayModes = @(
                             'full',
@@ -1285,8 +1282,8 @@ function Get-ApplicationDefaults()
                 )
             }
             getGroupAssignmentsMenu   = @{
-                Title                 = 'Show Group Assignments Menu'
-                Description           = 'Choose the type of assignments you want to view'
+                Title                 = 'Group Assignments Menu'
+                Description           = 'View or export various     group assignment reports'
                 items                 = @(
                     @{
                         description           = 'View direct group assignments'
@@ -1307,6 +1304,26 @@ function Get-ApplicationDefaults()
                             'admin',
                             'advanced'
                         )
+                    },
+                    @{
+                        description           = 'Export direct group assignments to a CSV file'
+                        name                  = 'Export direct group assignments'        
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced'
+                        )                       
+                    },
+                    @{
+                        description           = 'Export indirect group assignments to a CSV file'
+                        name                  = 'Export indirect group assignments (All Users/All Devices)'        
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced'
+                        )                                           
                     }
                 )
                 type                  = 'static'

@@ -1305,6 +1305,10 @@ if ($testMode -and $script:testModeOptions.exitAfter)
 #endregion initialization block with access token
 
 #region Create menus
+# Clear menu configuration cache to ensure fresh menu loading
+Write-Verbose "[$scriptName] Clearing menu configuration cache"
+Invoke-CacheManagement -Action ClearSpecific -CacheType Menu 
+
 $menuConfig = $configResult.menu
 if ($menuConfig)
 {
@@ -2138,7 +2142,7 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
 }
 #endregion Check menu
 
-#region Show Group Assignments menu
+#region Group Assignments menu
 <#
     This script-scoped variable defines a reusable script block for showing group assignments in the Intune Helpdesk Menu.
     It is defined at script scope to allow sharing between multiple menu items (e.g., direct and indirect assignment views),
@@ -2147,7 +2151,10 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
 #>
 # Helper scriptblock to avoid duplication between direct and indirect assignment menu items
 $script:ShowGroupAssignmentsAction = {
-    param([bool]$IncludeIndirectAssignments)
+    param(
+        [bool]$IncludeIndirectAssignments,
+        [bool]$exportInstead
+    )
     
     $assignmentScope = if ($IncludeIndirectAssignments) { "indirect (All Users/All Devices)" } else { "direct" }
     $specialGroups = @("*", "?")    
@@ -2206,12 +2213,17 @@ $script:ShowGroupAssignmentsAction = {
     $showGroupAssignmentsSplat = @{
         AccessToken = $accessToken
         Group       = $selectedGroup
+        Settings    = $global:settings
     }
     if ($IncludeIndirectAssignments)
     {
         $showGroupAssignmentsSplat['ShowIndirectAssignments'] = $true
         $showGroupAssignmentsSplat['SpecialGroups'] = $specialGroups 
     }
+    if ($exportInstead)
+    {
+        $showGroupAssignmentsSplat['exportInstead'] = $true
+    }                       
     $ShowGroupAssignmentsResponse = ShowGroupAssignments @showGroupAssignmentsSplat
     
     #region Handle navigation responses from ShowGroupAssignments
@@ -2238,10 +2250,16 @@ $script:ShowGroupAssignmentsAction = {
 }
 
 $getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "View direct group assignments" -Action {
-    & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $false
+    & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $false -exportInstead $false                       
 }
 $getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "View indirect group assignments (All Users/All Devices)" -Action {
-    & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $true
+    & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $true -exportInstead $false
+}
+$getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Export direct group assignments" -Action {
+    & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $false -exportInstead $true                            
+}
+$getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Export indirect group assignments (All Users/All Devices)" -Action {
+    & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $true -exportInstead $true                 
 }
 #endregion Show Group Assignments menu
 
@@ -2348,11 +2366,12 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Shutdown the device" -action {
         return $returnValues.backoutText
     }
 }
-$mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -Submenu $getGroupAssignmentsMenu
+$mainMenu = AddMenuItem -menu $mainMenu -name "Group Assignments Menu" -Submenu $getGroupAssignmentsMenu
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
     $null = Show-AboutApplication -accessToken $accessToken -Release $latestRelease -appId $appId -tenantId $tenantId -name $name -updateAvailable $updateAvailable
 }
+
 #region show menus
 # Add the main menu to both history arrays for proper stack synchronization
 try

@@ -377,6 +377,183 @@ Describe "Function: ShowGroupAssignments" -Tags 'Unit' {
             }
         }
     }
+    
+    Context "Assignment Consolidation" {
+        It "Should consolidate duplicate assignments with multiple scopes" {
+            # Create test assignments with duplicates across different scopes
+            $mockAssignments = @{
+                AllAssignments = @(
+                    # Direct assignment
+                    [PSCustomObject]@{
+                        Type        = "Application"
+                        Name        = "App1"
+                        Description = "Test App"
+                        Id          = "app-guid-123"
+                        Intent      = $null
+                        Target      = @{}
+                        Settings    = @{}
+                    }
+                    # Indirect assignment - All Users
+                    [PSCustomObject]@{
+                        Type            = "Application"
+                        Name            = "App1"
+                        Description     = "Test App"
+                        Id              = "app-guid-123"
+                        Intent          = $null
+                        Target          = @{}
+                        Settings        = @{}
+                        AssignmentScope = "All Users"
+                    }
+                    # Indirect assignment - All Devices
+                    [PSCustomObject]@{
+                        Type            = "Application"
+                        Name            = "App1"
+                        Description     = "Test App"
+                        Id              = "app-guid-123"
+                        Intent          = $null
+                        Target          = @{}
+                        Settings        = @{}
+                        AssignmentScope = "All Devices"
+                    }
+                    # Another app with single assignment
+                    [PSCustomObject]@{
+                        Type        = "Configuration"
+                        Name        = "Config1"
+                        Description = "Test Config"
+                        Id          = "config-guid-456"
+                        Intent      = $null
+                        Target      = @{}
+                        Settings    = @{}
+                    }
+                )
+                AppAssignments           = @()
+                ConfigurationAssignments = @()
+                ComplianceAssignments    = @()
+                ScriptAssignments        = @()
+                AppProtectionAssignments = @()
+                IntentAssignments        = @()
+                ResourceAccessAssignments = @()
+                AutopilotAssignments     = @()
+                HealthScriptAssignments  = @()
+                ConfigurationPolicyAssignments = @()
+                GroupPolicyAssignments   = @()
+                WindowsInformationProtectionAssignments = @()
+                PolicySetAssignments     = @()
+            }
+            
+            Mock GetGroupDirectAssignments { return $mockAssignments }
+            Mock ShowMenu { return "Back" }
+            Mock Write-Host { }
+            Mock Write-Log { }
+            
+            # Call the function
+            $result = ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken -ShowIndirectAssignments
+            
+            # Verify Write-Log was called with consolidation messages
+            Assert-MockCalled Write-Log -ParameterFilter {
+                $Message -match "Consolidating duplicate assignments.*before: 4"
+            }
+            
+            Assert-MockCalled Write-Log -ParameterFilter {
+                $Message -match "Consolidation complete.*after: 2"
+            }
+        }
+        
+        It "Should create AssignmentScope array for single direct assignment" {
+            $mockAssignments = @{
+                AllAssignments = @(
+                    [PSCustomObject]@{
+                        Type        = "Application"
+                        Name        = "SingleApp"
+                        Description = "Single Direct Assignment"
+                        Id          = "app-single-123"
+                        Intent      = $null
+                        Target      = @{}
+                        Settings    = @{}
+                    }
+                )
+                AppAssignments = @()
+                ConfigurationAssignments = @()
+                ComplianceAssignments = @()
+                ScriptAssignments = @()
+                AppProtectionAssignments = @()
+                IntentAssignments = @()
+                ResourceAccessAssignments = @()
+                AutopilotAssignments = @()
+                HealthScriptAssignments = @()
+                ConfigurationPolicyAssignments = @()
+                GroupPolicyAssignments = @()
+                WindowsInformationProtectionAssignments = @()
+                PolicySetAssignments = @()
+            }
+            
+            Mock GetGroupDirectAssignments { return $mockAssignments }
+            Mock ShowMenu { return "Back" }
+            Mock Write-Host { }
+            Mock Write-Log { }
+            
+            ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken
+            
+            # Should consolidate 1 entry to 1 entry with proper scope
+            Assert-MockCalled Write-Log -ParameterFilter {
+                $Message -match "Consolidation complete.*after: 1"
+            }
+        }
+        
+        It "Should combine multiple indirect scopes correctly" {
+            $mockAssignments = @{
+                AllAssignments = @(
+                    # All Users assignment
+                    [PSCustomObject]@{
+                        Type            = "Compliance"
+                        Name            = "Policy1"
+                        Description     = "Test Policy"
+                        Id              = "policy-guid-789"
+                        Intent          = $null
+                        Target          = @{}
+                        Settings        = @{}
+                        AssignmentScope = "All Users"
+                    }
+                    # All Devices assignment (duplicate)
+                    [PSCustomObject]@{
+                        Type            = "Compliance"
+                        Name            = "Policy1"
+                        Description     = "Test Policy"
+                        Id              = "policy-guid-789"
+                        Intent          = $null
+                        Target          = @{}
+                        Settings        = @{}
+                        AssignmentScope = "All Devices"
+                    }
+                )
+                AppAssignments = @()
+                ConfigurationAssignments = @()
+                ComplianceAssignments = @()
+                ScriptAssignments = @()
+                AppProtectionAssignments = @()
+                IntentAssignments = @()
+                ResourceAccessAssignments = @()
+                AutopilotAssignments = @()
+                HealthScriptAssignments = @()
+                ConfigurationPolicyAssignments = @()
+                GroupPolicyAssignments = @()
+                WindowsInformationProtectionAssignments = @()
+                PolicySetAssignments = @()
+            }
+            
+            Mock GetGroupDirectAssignments { return $mockAssignments }
+            Mock ShowMenu { return "Back" }
+            Mock Write-Host { }
+            Mock Write-Log { }
+            
+            ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken -ShowIndirectAssignments
+            
+            # Should consolidate 2 entries to 1 entry
+            Assert-MockCalled Write-Log -ParameterFilter {
+                $Message -match "Consolidation complete.*after: 1"
+            }
+        }
+    }
 }
 
 AfterAll {

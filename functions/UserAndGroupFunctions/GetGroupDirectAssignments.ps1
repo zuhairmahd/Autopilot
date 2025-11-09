@@ -11,7 +11,9 @@ function GetGroupDirectAssignments()
         [switch]$ShowSummary,
         [switch]$IncludeIndirectAssignments,
         [Parameter(Mandatory = $false)]
-        [int] $BatchSize = 20
+        [int] $BatchSize = 20,
+        [Parameter(Mandatory = $false)]
+        [hashtable] $Settings
     )
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -28,6 +30,8 @@ function GetGroupDirectAssignments()
     Write-Verbose "[$functionName] ShowSummary: $ShowSummary"
     Write-Verbose "[$functionName] IncludeIndirectAssignments: $IncludeIndirectAssignments"
     Write-Verbose "[$functionName] BatchSize: $BatchSize"
+    Write-Verbose "[$functionName] Settings provided: $($null -ne $Settings)"
+    if ($Settings) { Write-Verbose "[$functionName] Settings.operatingSystem: $($Settings.operatingSystem)" }
     #now write-log them.
     Write-Log -logFile $LogFile -module $functionName -Message "Incoming parameters:" -logLevel "Information"
     Write-Log -logFile $LogFile -module $functionName -Message "GroupName: $GroupName" -logLevel "Information"
@@ -35,6 +39,11 @@ function GetGroupDirectAssignments()
     Write-Log -logFile $LogFile -module $functionName -Message "ShowSummary: $ShowSummary" -LogLevel "Verbose"
     Write-Log -logFile $LogFile -module $functionName -Message "IncludeIndirectAssignments: $IncludeIndirectAssignments" -logLevel "Information"
     Write-Log -logFile $LogFile -module $functionName -Message "BatchSize: $BatchSize" -logLevel "Information"
+    Write-Log -logFile $LogFile -module $functionName -Message "Settings provided: $($null -ne $Settings)" -logLevel "Information"
+    if ($Settings -and $Settings.operatingSystem)
+    {
+        Write-Log -logFile $LogFile -module $functionName -Message "Settings.operatingSystem: $($Settings.operatingSystem)" -logLevel "Information"
+    }
     $groupIds = $GroupName
     $groupIdArray = @($groupIds)
     $groupId = $groupIdArray[0]
@@ -342,6 +351,30 @@ function GetGroupDirectAssignments()
         
             Write-Log -logFile $LogFile -module $functionName -Message "Retrieved resource counts via batch - Apps: $($mobileApps.Count), Configs: $($deviceConfigs.Count), Compliance: $($compliancePolicies.Count), Autopilot: $($autopilotProfiles.Count), Scripts: $($deviceScripts.Count), HealthScripts: $($healthScripts.Count), AppProtection: $($appProtectionPolicies.Count), Intents: $($intents.Count), ResourceAccess: $($resourceAccessProfiles.Count), ConfigPolicies: $($configurationPolicies.Count), GroupPolicy: $($groupPolicyConfigs.Count), PolicySets: $($policySets.Count), WIP: $($wipPolicies.Count), MDMWIP: $($mdmWipPolicies.Count)" -logLevel "Information"
             
+            # Apply platform filtering if Settings.operatingSystem is specified
+            if ($Settings -and $Settings.operatingSystem)
+            {
+                $targetOS = $Settings.operatingSystem
+                Write-Log -logFile $LogFile -module $functionName -Message "Filtering resources for operating system: $targetOS" -logLevel "Information"
+                
+                $mobileApps = @($mobileApps | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+                $deviceConfigs = @($deviceConfigs | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+                $compliancePolicies = @($compliancePolicies | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+                $autopilotProfiles = @($autopilotProfiles | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+                $deviceScripts = @($deviceScripts | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+                $healthScripts = @($healthScripts | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+                $appProtectionPolicies = @($appProtectionPolicies | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+                $intents = @($intents | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+                $resourceAccessProfiles = @($resourceAccessProfiles | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+                $configurationPolicies = @($configurationPolicies | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+                $groupPolicyConfigs = @($groupPolicyConfigs | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+                $policySets = @($policySets | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+                $wipPolicies = @($wipPolicies | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+                $mdmWipPolicies = @($mdmWipPolicies | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+                
+                Write-Log -logFile $LogFile -module $functionName -Message "After filtering for $targetOS - Apps: $($mobileApps.Count), Configs: $($deviceConfigs.Count), Compliance: $($compliancePolicies.Count), Autopilot: $($autopilotProfiles.Count), Scripts: $($deviceScripts.Count), HealthScripts: $($healthScripts.Count), AppProtection: $($appProtectionPolicies.Count), Intents: $($intents.Count), ResourceAccess: $($resourceAccessProfiles.Count), ConfigPolicies: $($configurationPolicies.Count), GroupPolicy: $($groupPolicyConfigs.Count), PolicySets: $($policySets.Count), WIP: $($wipPolicies.Count), MDMWIP: $($mdmWipPolicies.Count)" -logLevel "Information"
+            }
+            
             # Cache the resource lists for future use
             $resourceListsToCache = @{
                 mobileApps             = $mobileApps
@@ -432,7 +465,7 @@ function GetGroupDirectAssignments()
         
         try
         {
-            $indirectAssignments = GetGroupIndirectAssignments -AccessToken $AccessToken -IncludeBeta:$IncludeBeta -BatchSize $BatchSize
+            $indirectAssignments = GetGroupIndirectAssignments -AccessToken $AccessToken -IncludeBeta:$IncludeBeta -BatchSize $BatchSize -Settings $Settings
             
             if ($indirectAssignments -and $indirectAssignments.AllAssignments.Count -gt 0)
             {

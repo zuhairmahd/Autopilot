@@ -186,9 +186,9 @@
                     'advanced'
                 )
                 blockType             = 'menu'
-                name                  = 'Show Group Assignments'
+                name                  = 'Group Assignments Menu'
                 menuName              = 'getGroupAssignmentsMenu'
-                description           = 'Show group assignments for a group'
+                description           = 'View or export various     group assignment reports'
             },
             @{
                 includeInDisplayModes = @(
@@ -866,8 +866,8 @@
         Description           = '$menuDescription'
     }
     getGroupAssignmentsMenu   = @{
-        Title                 = 'Show Group Assignments Menu'
-        Description           = 'Choose the type of assignments you want to view'
+        Title                 = 'Group Assignments Menu'
+        Description           = 'View or export various group assignment reports'
         items                 = @(
             @{
                 description           = 'View direct group assignments'
@@ -888,6 +888,26 @@
                     'admin',
                     'advanced'
                 )
+            },
+            @{
+                description           = 'Export direct group assignments to a CSV file'
+                name                  = 'Export direct group assignments'        
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin',
+                    'advanced'
+                )                       
+            },
+            @{
+                description           = 'Export indirect group assignments to a CSV file'
+                name                  = 'Export indirect group assignments (All Users/All Devices)'        
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin',
+                    'advanced'
+                )                                           
             }
         )
         type                  = 'static'
