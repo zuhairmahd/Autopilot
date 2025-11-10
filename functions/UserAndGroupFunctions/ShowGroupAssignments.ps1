@@ -362,6 +362,9 @@ function ShowGroupAssignments()
         $assignments.GroupPolicyAssignments = @($allAssignments | Where-Object { $_.Type -eq 'GroupPolicy' })
         $assignments.WindowsInformationProtectionAssignments = @($allAssignments | Where-Object { $_.Type -eq 'WindowsInformationProtection' })
         $assignments.PolicySetAssignments = @($allAssignments | Where-Object { $_.Type -eq 'PolicySet' })
+        $assignments.WindowsFeatureUpdateAssignments = @($allAssignments | Where-Object { $_.Type -eq 'WindowsFeatureUpdate' })
+        $assignments.WindowsQualityUpdateAssignments = @($allAssignments | Where-Object { $_.Type -eq 'WindowsQualityUpdate' })
+        $assignments.WindowsDriverUpdateAssignments = @($allAssignments | Where-Object { $_.Type -eq 'WindowsDriverUpdate' })
     }  # End of else block for consolidation
     #endregion                  
     

@@ -27,6 +27,9 @@ function Initialize-AssignmentResultObject()
         [Parameter(Mandatory = $false)]
         [string]$GroupId
     )
+
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -logFile $LogFile -module $functionName -Message "Initializing assignment result object (GroupName: '$GroupName', GroupId: '$GroupId')" -logLevel "Verbose"
     
     $resultObject = [PSCustomObject]@{
         AppAssignments                          = @()
@@ -42,6 +45,9 @@ function Initialize-AssignmentResultObject()
         GroupPolicyAssignments                  = @()
         WindowsInformationProtectionAssignments = @()
         PolicySetAssignments                    = @()
+        WindowsFeatureUpdateAssignments         = @()
+        WindowsQualityUpdateAssignments         = @()
+        WindowsDriverUpdateAssignments          = @()
         AllAssignments                          = @()
         FailedResources                         = @()
     }
@@ -56,6 +62,7 @@ function Initialize-AssignmentResultObject()
         $resultObject | Add-Member -NotePropertyName 'GroupId' -NotePropertyValue $GroupId -Force
     }
     
+    Write-Log -logFile $LogFile -module $functionName -Message "Assignment result object initialized successfully with 17 category arrays" -logLevel "Verbose"
     return $resultObject
 }
 
@@ -83,9 +90,13 @@ function Test-IsAllUsersAllDevicesAssignment()
         [PSCustomObject]$Assignment
     )
     
+    $functionName = $MyInvocation.MyCommand.Name
     $targetType = $Assignment.target.'@odata.type'
-    return ($targetType -eq '#microsoft.graph.allDevicesAssignmentTarget' -or 
+    $isAllUsersOrDevices = ($targetType -eq '#microsoft.graph.allDevicesAssignmentTarget' -or 
         $targetType -eq '#microsoft.graph.allLicensedUsersAssignmentTarget')
+    
+    Write-Log -logFile $LogFile -module $functionName -Message "Testing assignment target type: '$targetType' - IsAllUsersOrDevices: $isAllUsersOrDevices" -logLevel "Debug"
+    return $isAllUsersOrDevices
 }
 
 function Test-IsGroupAssignment()
@@ -112,7 +123,12 @@ function Test-IsGroupAssignment()
         [PSCustomObject]$Assignment
     )
     
-    return ($Assignment.target.'@odata.type' -eq '#microsoft.graph.groupAssignmentTarget')
+    $functionName = $MyInvocation.MyCommand.Name
+    $targetType = $Assignment.target.'@odata.type'
+    $isGroup = ($targetType -eq '#microsoft.graph.groupAssignmentTarget')
+    
+    Write-Log -logFile $LogFile -module $functionName -Message "Testing assignment target type: '$targetType' - IsGroup: $isGroup" -logLevel "Debug"
+    return $isGroup
 }
 
 function Test-HasRealAssignment()
@@ -231,8 +247,12 @@ function Test-HasGroupAndIndirectAssignment()
         [string]$GroupId
     )
     
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -logFile $LogFile -module $functionName -Message "Testing for BOTH group '$GroupId' AND All Users/All Devices assignments (Total assignments: $($Assignments.Count))" -logLevel "Verbose"
+    
     if (-not $Assignments -or $Assignments.Count -eq 0)
     {
+        Write-Log -logFile $LogFile -module $functionName -Message "No assignments provided, returning false" -logLevel "Debug"
         return $false
     }
     
@@ -259,11 +279,14 @@ function Test-HasGroupAndIndirectAssignment()
         # Early exit if we found both
         if ($hasGroupAssignment -and $hasAllUsersOrAllDevices)
         {
+            Write-Log -logFile $LogFile -module $functionName -Message "Found BOTH group assignment AND All Users/All Devices - returning true" -logLevel "Information"
             return $true
         }
     }
     
-    return ($hasGroupAssignment -and $hasAllUsersOrAllDevices)
+    $result = ($hasGroupAssignment -and $hasAllUsersOrAllDevices)
+    Write-Log -logFile $LogFile -module $functionName -Message "Result: HasGroup=$hasGroupAssignment, HasIndirect=$hasAllUsersOrAllDevices, Final=$result" -logLevel "Verbose"
+    return $result
 }
 
 function Get-ResourceListEndpoints()
@@ -287,6 +310,9 @@ function Get-ResourceListEndpoints()
         [Parameter(Mandatory = $false)]
         [switch]$IncludeBeta
     )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -logFile $LogFile -module $functionName -Message "Getting resource list endpoints (IncludeBeta: $($IncludeBeta.IsPresent))" -logLevel "Verbose"
     
     # Standard v1.0 endpoints
     $resourceEndpoints = @(
@@ -320,6 +346,7 @@ function Get-ResourceListEndpoints()
     # These are under deviceConfigurations but have @odata.type = windowsUpdateForBusinessConfiguration
     # They are already included in deviceConfigs endpoint above
     
+    Write-Log -logFile $LogFile -module $functionName -Message "Returning $($resourceEndpoints.Count) resource endpoints" -logLevel "Verbose"
     return $resourceEndpoints
 }
 
@@ -365,6 +392,10 @@ function Add-FailedResourceError()
         [string]$ApiVersion
     )
     
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -logFile $LogFile -module $functionName -Message "Adding failed resource error: Type='$ResourceType', Status=$StatusCode, API=$ApiVersion" -logLevel "Warning"
+    Write-Log -logFile $LogFile -module $functionName -Message "Error message: $ErrorMessage" -logLevel "Verbose"
+    
     $errorObject = [PSCustomObject]@{
         ResourceType = $ResourceType
         ErrorMessage = $ErrorMessage
@@ -373,6 +404,7 @@ function Add-FailedResourceError()
     }
     
     $ResultObject.FailedResources += $errorObject
+    Write-Log -logFile $LogFile -module $functionName -Message "Failed resource added to result object. Total failed resources: $($ResultObject.FailedResources.Count)" -logLevel "Verbose"
 }
 
 function Apply-PlatformFilter()
@@ -419,13 +451,19 @@ function Apply-PlatformFilter()
             {
                 Write-Log -logFile $LogFile -module $functionName -Message "Filtered $key from $originalCount to $filteredCount resources for OS: $TargetOS" -logLevel "Verbose"
             }
+            else
+            {
+                Write-Log -logFile $LogFile -module $functionName -Message "$($key): All $originalCount resources match OS: $TargetOS" -logLevel "Debug"
+            }
         }
         else
         {
             $filtered[$key] = @()
+            Write-Log -logFile $LogFile -module $functionName -Message "$($key): No resources to filter" -logLevel "Debug"
         }
     }
     
+    Write-Log -logFile $LogFile -module $functionName -Message "Platform filtering complete for OS: $TargetOS" -logLevel "Verbose"
     return $filtered
 }
 
@@ -486,6 +524,9 @@ function New-AssignmentObject()
         $AssignmentScope
     )
     
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -logFile $LogFile -module $functionName -Message "Creating assignment object: Type='$Type', Name='$Name', Scope='$AssignmentScope', Intent='$Intent'" -logLevel "Debug"
+    
     return [PSCustomObject]@{
         Type            = $Type
         Name            = $Name
@@ -530,6 +571,9 @@ function Add-AssignmentToCategory()
         [string]$AssignmentCategory
     )
     
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -logFile $LogFile -module $functionName -Message "Adding assignment to category '$AssignmentCategory': Name='$($Assignment.Name)', Type='$($Assignment.Type)'" -logLevel "Debug"
+    
     switch ($AssignmentCategory)
     {
         "Application" { $ResultObject.AppAssignments += $Assignment }
@@ -545,27 +589,105 @@ function Add-AssignmentToCategory()
         "GroupPolicy" { $ResultObject.GroupPolicyAssignments += $Assignment }
         "WindowsInformationProtection" { $ResultObject.WindowsInformationProtectionAssignments += $Assignment }
         "PolicySet" { $ResultObject.PolicySetAssignments += $Assignment }
+        "WindowsFeatureUpdate" { $ResultObject.WindowsFeatureUpdateAssignments += $Assignment }
+        "WindowsQualityUpdate" { $ResultObject.WindowsQualityUpdateAssignments += $Assignment }
+        "WindowsDriverUpdate" { $ResultObject.WindowsDriverUpdateAssignments += $Assignment }
     }
     
     $ResultObject.AllAssignments += $Assignment
+    Write-Log -logFile $LogFile -module $functionName -Message "Assignment added successfully. Total assignments in AllAssignments: $($ResultObject.AllAssignments.Count)" -logLevel "Debug"
 }
 
-function Get-IndirectResourceAssignments()
+function Invoke-AssignmentBatchRequest()
 {
     <#
     .SYNOPSIS
-    Processes a set of resources to retrieve their indirect assignments via virtual groups.
+    Executes a batch API request for assignments with standardized error handling.
     
     .DESCRIPTION
-    This helper function iterates over a collection of resources (such as apps, configurations, etc.)
-    and retrieves assignments that are indirectly assigned through the "All Users" or "All Devices" virtual groups.
-    It is called by the parent function for each resource type and assignment category.
+    Centralized function for making batch API calls to retrieve resource assignments.
+    Provides consistent error handling, logging, and error categorization across all assignment functions.
     
-    Unlike the parent function, which orchestrates the overall retrieval and aggregation of indirect assignments,
-    this helper focuses on processing a specific resource type and category, making API calls and updating the result object.
+    .PARAMETER AccessToken
+    The access token for Microsoft Graph API authentication.
+    
+    .PARAMETER AssignmentPaths
+    Array of assignment endpoint paths to request.
+    
+    .PARAMETER ApiVersion
+    API version to use (v1.0 or beta).
+    
+    .PARAMETER ResourceType
+    The type of resource being processed (for logging/error reporting).
+    
+    .RETURNS
+    Hashtable with Success (bool), Result (API response), and ErrorInfo (if failed).
+    
+    .EXAMPLE
+    $batchResult = Invoke-AssignmentBatchRequest -AccessToken $token -AssignmentPaths $paths -ApiVersion 'v1.0' -ResourceType 'Mobile Apps'
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$AccessToken,
+        [Parameter(Mandatory = $true)]
+        [array]$AssignmentPaths,
+        [Parameter(Mandatory = $true)]
+        [string]$ApiVersion,
+        [Parameter(Mandatory = $true)]
+        [string]$ResourceType
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    
+    try
+    {
+        $batchResult = CallGraphAPI -accessToken $AccessToken -ResourcePath $AssignmentPaths -APIVersion $ApiVersion -Method "GET"
+        
+        return @{
+            Success = $true
+            Result  = $batchResult
+        }
+    }
+    catch
+    {
+        $errorMessage = "Failed to fetch assignments for ${ResourceType}: $($_.Exception.Message)"
+        $errorCode = $_.Exception.GetType().Name
+        
+        # Categorize error using common helper
+        $errorCategory = Get-ErrorCategory -ErrorCode $errorCode -ErrorMessage $errorMessage -ResourceType $ResourceType -ODataType ""
+        $remediationGuidance = Get-RemediationGuidance -ErrorCategory $errorCategory -ErrorCode $errorCode -ResourceType $ResourceType -ODataType ""
+        
+        Write-Log -logFile $LogFile -module $functionName -Message "$errorMessage (Category: $errorCategory)" -LogLevel "Error"
+        Write-Log -logFile $LogFile -module $functionName -Message "Remediation guidance: $remediationGuidance" -logLevel "Information"
+        
+        return @{
+            Success   = $false
+            ErrorInfo = @{
+                Message     = $errorMessage
+                Code        = $errorCode
+                Category    = $errorCategory
+                Remediation = $remediationGuidance
+            }
+        }
+    }
+}
+
+function Get-ResourceAssignments()
+{
+    <#
+    .SYNOPSIS
+    Unified function to retrieve and process resource assignments for both direct and indirect assignments.
+    
+    .DESCRIPTION
+    This function processes a set of resources to retrieve their assignments using batch API calls.
+    It supports three modes:
+    - Direct: Retrieves assignments for a specific group
+    - Indirect: Retrieves All Users/All Devices assignments
+    - IndirectFiltered: Retrieves resources with BOTH specific group AND All Users/All Devices assignments
     
     .PARAMETER ResultObject
-    The result object to update with assignments and errors. This ensures proper pass-by-reference behavior.
+    The result object to update with assignments and errors.
     
     .PARAMETER AccessToken
     The access token for Microsoft Graph API authentication.
@@ -574,10 +696,10 @@ function Get-IndirectResourceAssignments()
     API version to use (v1.0 or beta).
     
     .PARAMETER Resources
-    The array of resources to process for indirect assignments.
+    The array of resources to process for assignments.
     
     .PARAMETER ResourceType
-    The type of resource being processed (e.g., App, Configuration).
+    The type of resource being processed (e.g., "Mobile Apps", "Device Configurations").
     
     .PARAMETER BaseUri
     The base URI for the Microsoft Graph API endpoint for the resource type.
@@ -585,10 +707,29 @@ function Get-IndirectResourceAssignments()
     .PARAMETER EndpointId
     The endpoint identifier used for dynamic categorization via Get-ResourceCategory.
     
-    .PARAMETER GroupId
-    Optional. When specified, only returns resources that have assignments to BOTH this group
-    AND All Users/All Devices (requirement #2). When not specified, returns ALL resources with
-    All Users/All Devices assignments (requirement #3).
+    .PARAMETER AssignmentMode
+    The assignment mode: 'Direct', 'Indirect', or 'IndirectFiltered'.
+    
+    .PARAMETER GroupIdValue
+    Required for Direct and IndirectFiltered modes. The group ID to filter assignments.
+    
+    .EXAMPLE
+    # Direct assignments for a specific group
+    Get-ResourceAssignments -ResultObject $assignments -AccessToken $token -ApiVersion 'v1.0' `
+        -Resources $apps -ResourceType "Mobile Apps" -BaseUri "deviceAppManagement/mobileApps" `
+        -EndpointId "mobileApps" -AssignmentMode "Direct" -GroupIdValue "abc-123"
+    
+    .EXAMPLE
+    # All Users/All Devices assignments (no group filter)
+    Get-ResourceAssignments -ResultObject $assignments -AccessToken $token -ApiVersion 'v1.0' `
+        -Resources $apps -ResourceType "Mobile Apps" -BaseUri "deviceAppManagement/mobileApps" `
+        -EndpointId "mobileApps" -AssignmentMode "Indirect"
+    
+    .EXAMPLE
+    # Resources with BOTH group and All Users/All Devices assignments
+    Get-ResourceAssignments -ResultObject $assignments -AccessToken $token -ApiVersion 'v1.0' `
+        -Resources $apps -ResourceType "Mobile Apps" -BaseUri "deviceAppManagement/mobileApps" `
+        -EndpointId "mobileApps" -AssignmentMode "IndirectFiltered" -GroupIdValue "abc-123"
     #>
     [CmdletBinding()]
     param(
@@ -602,18 +743,43 @@ function Get-IndirectResourceAssignments()
         [string]$ResourceType,
         [string]$BaseUri,
         [string]$EndpointId,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('Direct', 'Indirect', 'IndirectFiltered')]
+        [string]$AssignmentMode,
         [Parameter(Mandatory = $false)]
-        [string]$GroupId
+        [string]$GroupIdValue
     )
         
     $functionName = $MyInvocation.MyCommand.Name
+    
+    # Validate parameters based on mode
+    if ($AssignmentMode -eq 'Direct' -and -not $GroupIdValue)
+    {
+        Write-Log -logFile $LogFile -module $functionName -Message "AssignmentMode 'Direct' requires GroupIdValue parameter" -LogLevel "Error"
+        return
+    }
+    
+    if ($AssignmentMode -eq 'IndirectFiltered' -and -not $GroupIdValue)
+    {
+        Write-Log -logFile $LogFile -module $functionName -Message "AssignmentMode 'IndirectFiltered' requires GroupIdValue parameter" -LogLevel "Error"
+        return
+    }
+    
     if (-not $Resources -or $Resources.Count -eq 0)
     {
         Write-Log -logFile $LogFile -module $functionName -Message "No ${ResourceType} resources to process" -logLevel "Verbose"
         return
     }
-        
-    Write-Log -logFile $LogFile -module $functionName -Message "Processing $($Resources.Count) ${ResourceType} resources for indirect assignments" -LogLevel "Verbose"
+    
+    $modeDescription = switch ($AssignmentMode)
+    {
+        'Direct' { "direct assignments for group '$GroupIdValue'" }
+        'Indirect' { "All Users/All Devices assignments" }
+        'IndirectFiltered' { "resources with BOTH group '$GroupIdValue' AND All Users/All Devices" }
+    }
+    
+    Write-Log -logFile $LogFile -module $functionName -Message "Processing $($Resources.Count) ${ResourceType} resources for ${modeDescription}" -LogLevel "Verbose"
+    
     # Build array of assignment endpoint paths
     $assignmentPaths = @()
     foreach ($resource in $Resources)
@@ -621,28 +787,57 @@ function Get-IndirectResourceAssignments()
         $assignmentPaths += "$BaseUri/$($resource.id)/assignments"
     }
         
-    # Use CallGraphAPI's native batch support with error handling
-    try
+    # Use centralized batch request function with error handling
+    $batchResponse = Invoke-AssignmentBatchRequest -AccessToken $AccessToken -AssignmentPaths $assignmentPaths -ApiVersion $ApiVersion -ResourceType $ResourceType
+    
+    if (-not $batchResponse.Success)
     {
-        $batchResult = CallGraphAPI -accessToken $AccessToken -ResourcePath $assignmentPaths -APIVersion $apiVersion -Method "GET"
-    }
-    catch
-    {
-        $errorMessage = $_.Exception.Message
-        Write-Log -logFile $LogFile -module $functionName -Message "Error calling batch API for ${ResourceType}: $errorMessage" -LogLevel "Error"
-        
-        # Add to failed resources
-        Add-FailedResourceError -ResultObject $ResultObject -ResourceType $ResourceType -ErrorMessage $errorMessage -StatusCode "N/A" -ApiVersion $ApiVersion
+        # Add to failed resources using error info from batch request
+        Add-FailedResourceError -ResultObject $ResultObject -ResourceType $ResourceType `
+            -ErrorMessage $batchResponse.ErrorInfo.Message -StatusCode "N/A" -ApiVersion $ApiVersion
         return
     }
-        
-    if ($batchResult -and $batchResult.value)
+    
+    $batchResult = $batchResponse.Result
+    
+    # CRITICAL FIX: CallGraphAPI returns a hashtable, not PSCustomObject
+    # Check for hashtable keys OR PSCustomObject properties to handle both cases
+    $hasValueProperty = $false
+    if ($batchResult)
+    {
+        if ($batchResult -is [hashtable])
+        {
+            $hasValueProperty = $batchResult.ContainsKey('value')
+            Write-Log -logFile $LogFile -module $functionName -Message "Batch result is hashtable, has 'value' key: $hasValueProperty (Count: $($batchResult.value.Count))" -logLevel "Verbose"
+        }
+        elseif ($batchResult.PSObject.Properties['value'])
+        {
+            $hasValueProperty = $true
+            Write-Log -logFile $LogFile -module $functionName -Message "Batch result is PSCustomObject, has 'value' property (Count: $($batchResult.value.Count))" -logLevel "Verbose"
+        }
+    }
+    
+    if ($batchResult -and $hasValueProperty -and $batchResult.value)
     {
         Write-Log -logFile $LogFile -module $functionName -Message "Processing $($batchResult.value.Count) batch responses for ${ResourceType}" -LogLevel "Verbose"
+        
         for ($i = 0; $i -lt $batchResult.value.Count; $i++)
         {
-            $responseData = $batchResult.value[$i]
+            $batchResponse = $batchResult.value[$i]
             $resource = $Resources[$i]
+            
+            # CRITICAL FIX: CallGraphAPI batch responses have structure: { id, status, body }
+            # The actual assignment data is in the 'body' property, not directly in 'value'
+            $responseData = if ($batchResponse -and $batchResponse.body) { $batchResponse.body } else { $null }
+            
+            # Check for batch request failures (non-2xx status codes)
+            $batchRequestFailed = $batchResponse -and $batchResponse.status -and ($batchResponse.status -lt 200 -or $batchResponse.status -ge 300)
+            
+            if ($batchRequestFailed)
+            {
+                Write-Log -logFile $LogFile -module $functionName -Message "Batch request failed for '$($resource.displayName)' - Status: $($batchResponse.status)" -logLevel "Warning"
+                continue
+            }
                 
             if ($responseData -and $responseData.value)
             {
@@ -656,48 +851,73 @@ function Get-IndirectResourceAssignments()
                     Write-Log -logFile $LogFile -module $functionName -Message "  Assignment #$($j+1) for '$($resource.displayName)': TargetType='$($assign.target.'@odata.type')', Intent='$($assign.intent)'" -logLevel "Debug"
                 }
                 
-                # Check if GroupId filtering is required (requirement #2)
-                if ($GroupId)
+                # Filter assignments based on mode
+                $relevantAssignments = @()
+                
+                switch ($AssignmentMode)
                 {
-                    # Mode: Show only resources with BOTH group assignment AND All Users/All Devices
-                    Write-Log -logFile $LogFile -module $functionName -Message "Checking if '$($resource.displayName)' has BOTH GroupId '$GroupId' AND All Users/All Devices" -logLevel "Debug"
-                    $hasGroupAndIndirect = Test-HasGroupAndIndirectAssignment -Assignments $responseData.value -GroupId $GroupId
-                    
-                    if (-not $hasGroupAndIndirect)
+                    'Direct'
                     {
-                        # Skip this resource - it doesn't have both
-                        Write-Log -logFile $LogFile -module $functionName -Message "Skipping '$($resource.displayName)' - does NOT have both GroupId and All Users/All Devices" -logLevel "Debug"
-                        continue
-                    }
-                    Write-Log -logFile $LogFile -module $functionName -Message "Including '$($resource.displayName)' - HAS both GroupId and All Users/All Devices" -logLevel "Information"
-                }
-                
-                # Filter for All Users and All Devices assignments
-                $indirectAssignmentTargets = $responseData.value | Where-Object { 
-                    $_.target.'@odata.type' -eq '#microsoft.graph.allLicensedUsersAssignmentTarget' -or 
-                    $_.target.'@odata.type' -eq '#microsoft.graph.allDevicesAssignmentTarget'
-                }
-                
-                # Log the count of indirect assignments found
-                Write-Log -logFile $LogFile -module $functionName -Message "Found $($indirectAssignmentTargets.Count) All Users/All Devices assignment(s) for '$($resource.displayName)'" -logLevel "Debug"
-                
-                # Skip if no indirect assignments found (shouldn't happen, but defensive)
-                if (-not $indirectAssignmentTargets -or $indirectAssignmentTargets.Count -eq 0)
-                {
-                    continue
-                }
-                    
-                foreach ($assignment in $indirectAssignmentTargets)
-                {
-                    # Determine assignment scope
-                    $assignmentScope = switch ($assignment.target.'@odata.type')
-                    {
-                        '#microsoft.graph.allLicensedUsersAssignmentTarget' { 'All Users' }
-                        '#microsoft.graph.allDevicesAssignmentTarget' { 'All Devices' }
-                        default { 'Unknown' }
+                        # Filter for specific group assignments only
+                        $relevantAssignments = $responseData.value | Where-Object { 
+                            $_.target.'@odata.type' -eq '#microsoft.graph.groupAssignmentTarget' -and 
+                            $_.target.groupId -eq $GroupIdValue 
+                        }
+                        Write-Log -logFile $LogFile -module $functionName -Message "Found $($relevantAssignments.Count) direct group assignment(s) for '$($resource.displayName)'" -logLevel "Debug"
                     }
                     
-                    # Use Get-ResourceCategory to determine the correct category based on @odata.type
+                    'IndirectFiltered'
+                    {
+                        # Check if resource has BOTH group assignment AND All Users/All Devices
+                        Write-Log -logFile $LogFile -module $functionName -Message "Checking if '$($resource.displayName)' has BOTH GroupId '$GroupIdValue' AND All Users/All Devices" -logLevel "Debug"
+                        $hasGroupAndIndirect = Test-HasGroupAndIndirectAssignment -Assignments $responseData.value -GroupId $GroupIdValue
+                        
+                        if (-not $hasGroupAndIndirect)
+                        {
+                            Write-Log -logFile $LogFile -module $functionName -Message "Skipping '$($resource.displayName)' - does NOT have both GroupId and All Users/All Devices" -logLevel "Debug"
+                            continue
+                        }
+                        
+                        Write-Log -logFile $LogFile -module $functionName -Message "Including '$($resource.displayName)' - HAS both GroupId and All Users/All Devices" -logLevel "Information"
+                        
+                        # Get the All Users/All Devices assignments
+                        $relevantAssignments = $responseData.value | Where-Object { 
+                            $_.target.'@odata.type' -eq '#microsoft.graph.allLicensedUsersAssignmentTarget' -or 
+                            $_.target.'@odata.type' -eq '#microsoft.graph.allDevicesAssignmentTarget'
+                        }
+                        Write-Log -logFile $LogFile -module $functionName -Message "Found $($relevantAssignments.Count) All Users/All Devices assignment(s) for '$($resource.displayName)'" -logLevel "Debug"
+                    }
+                    
+                    'Indirect'
+                    {
+                        # Get all All Users/All Devices assignments (no group filtering)
+                        $relevantAssignments = $responseData.value | Where-Object { 
+                            $_.target.'@odata.type' -eq '#microsoft.graph.allLicensedUsersAssignmentTarget' -or 
+                            $_.target.'@odata.type' -eq '#microsoft.graph.allDevicesAssignmentTarget'
+                        }
+                        Write-Log -logFile $LogFile -module $functionName -Message "Found $($relevantAssignments.Count) All Users/All Devices assignment(s) for '$($resource.displayName)'" -logLevel "Debug"
+                    }
+                }
+                
+                # Process relevant assignments
+                foreach ($assignment in $relevantAssignments)
+                {
+                    # Determine assignment scope based on mode and target type
+                    $assignmentScope = if ($AssignmentMode -eq 'Direct')
+                    {
+                        'Direct'
+                    }
+                    else
+                    {
+                        switch ($assignment.target.'@odata.type')
+                        {
+                            '#microsoft.graph.allLicensedUsersAssignmentTarget' { 'All Users' }
+                            '#microsoft.graph.allDevicesAssignmentTarget' { 'All Devices' }
+                            default { 'Unknown' }
+                        }
+                    }
+                    
+                    # Use Get-ResourceCategory to determine the correct category
                     $category = Get-ResourceCategory -Resource $resource -EndpointId $EndpointId
                         
                     $assignmentObject = New-AssignmentObject -Type $category `
@@ -714,6 +934,48 @@ function Get-IndirectResourceAssignments()
             }
         }
     }
+}
+
+# Legacy function - kept for backward compatibility, redirects to unified Get-ResourceAssignments
+function Get-IndirectResourceAssignments()
+{
+    <#
+    .SYNOPSIS
+    [DEPRECATED] Legacy function for backward compatibility. Use Get-ResourceAssignments instead.
+    
+    .DESCRIPTION
+    This function is maintained for backward compatibility but redirects to the unified
+    Get-ResourceAssignments function. New code should call Get-ResourceAssignments directly.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [PSCustomObject]$ResultObject,
+        [Parameter(Mandatory = $true)]
+        [string]$AccessToken,
+        [Parameter(Mandatory = $true)]
+        [string]$ApiVersion,
+        [array]$Resources,
+        [string]$ResourceType,
+        [string]$BaseUri,
+        [string]$EndpointId,
+        [Parameter(Mandatory = $false)]
+        [string]$GroupId
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -logFile $LogFile -module $functionName -Message "[DEPRECATED] Legacy wrapper called - redirecting to Get-ResourceAssignments" -logLevel "Warning"
+    Write-Log -logFile $LogFile -module $functionName -Message "Parameters: ResourceType='$ResourceType', EndpointId='$EndpointId', GroupId='$GroupId', Resources=$($Resources.Count)" -logLevel "Verbose"
+    
+    # Redirect to unified function
+    $assignmentMode = if ($GroupId) { 'IndirectFiltered' } else { 'Indirect' }
+    Write-Log -logFile $LogFile -module $functionName -Message "Using assignment mode: $assignmentMode" -logLevel "Verbose"
+    
+    Get-ResourceAssignments -ResultObject $ResultObject -AccessToken $AccessToken -ApiVersion $ApiVersion `
+        -Resources $Resources -ResourceType $ResourceType -BaseUri $BaseUri -EndpointId $EndpointId `
+        -AssignmentMode $assignmentMode -GroupIdValue $GroupId
+    
+    Write-Log -logFile $LogFile -module $functionName -Message "Completed redirect to Get-ResourceAssignments" -logLevel "Verbose"
 }
     
 function Get-ResourceCategory()
@@ -744,7 +1006,9 @@ function Get-ResourceCategory()
         [string]$EndpointId
     )
     
+    $functionName = $MyInvocation.MyCommand.Name
     $odataType = if ($Resource.'@odata.type') { $Resource.'@odata.type'.ToLower() } else { '' }
+    Write-Log -logFile $LogFile -module $functionName -Message "Determining category for resource (ODataType: '$odataType', EndpointId: '$EndpointId')" -logLevel "Debug"
     
     # First, check @odata.type for specific categorization
     if ($odataType)
@@ -829,6 +1093,8 @@ function Get-ResourceCategory()
     }
     
     # Fallback to endpoint-based categorization
+    Write-Log -logFile $LogFile -module $functionName -Message "No ODataType match found, using EndpointId fallback for: '$EndpointId'" -logLevel "Debug"
+    
     switch ($EndpointId)
     {
         'mobileApps' { return 'Application' }
@@ -848,7 +1114,11 @@ function Get-ResourceCategory()
         'windowsFeatureUpdates' { return 'WindowsFeatureUpdate' }
         'windowsQualityUpdates' { return 'WindowsQualityUpdate' }
         'windowsDriverUpdates' { return 'WindowsDriverUpdate' }
-        default { return 'Unknown' }
+        default
+        { 
+            Write-Log -logFile $LogFile -module $functionName -Message "Unknown EndpointId '$EndpointId' - returning 'Unknown'" -logLevel "Warning"
+            return 'Unknown'
+        }
     }
 }
 
@@ -1203,12 +1473,13 @@ function Get-CorrectBaseUriForResource()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -logFile $LogFile -module $functionName -Message "Determining base URI for resource (ResourceId: $($Resource.id))" -logLevel "Debug"
     
     # Special handling for managed app protection IDs with T_ or A_ prefixes
     # These are targetedManagedAppConfiguration and managed app protection policies
     if ($Resource.id -and ($Resource.id -match '^[TA]_'))
     {
-        Write-Log -logFile $LogFile -module $functionName -Message "Detected managed app protection ID prefix: $($Resource.id)" -logLevel "Verbose"
+        Write-Log -logFile $LogFile -module $functionName -Message "Detected managed app protection ID prefix: $($Resource.id), using deviceAppManagement/managedAppPolicies" -logLevel "Verbose"
         return "deviceAppManagement/managedAppPolicies"
     }
     
@@ -1222,20 +1493,25 @@ function Get-CorrectBaseUriForResource()
     }
     else
     { 
+        Write-Log -logFile $LogFile -module $functionName -Message "No @odata.type found for resource $($Resource.id)" -logLevel "Warning"
         return $null 
     }
+    
+    Write-Log -logFile $LogFile -module $functionName -Message "OData type: $odataType" -logLevel "Debug"
     
     # Mobile Apps - all app types go to deviceAppManagement/mobileApps
     if ($odataType -match 'win32lobapp|ioslobapp|androidlobapp|iosvppapp|androidmanagedstoreapp|managediosstore|' +
         'webapp|microsoftstoreforbusinessapp|wingetapp|macoslobapp|macosvppapp|macospkgapp|windowsmobilemsi|' +
         'iosstoreapp|officesuiteapp|managedapp')
     {
+        Write-Log -logFile $LogFile -module $functionName -Message "Matched mobile app type, using deviceAppManagement/mobileApps" -logLevel "Verbose"
         return "deviceAppManagement/mobileApps"
     }
     
     # Compliance Policies
     if ($odataType -match 'compliancepolicy')
     {
+        Write-Log -logFile $LogFile -module $functionName -Message "Matched compliance policy type, using deviceManagement/deviceCompliancePolicies" -logLevel "Verbose"
         return "deviceManagement/deviceCompliancePolicies"
     }
     
@@ -1244,30 +1520,35 @@ function Get-CorrectBaseUriForResource()
         'iosgeneraldeviceconfiguration|ioscustomconfiguration|androidgeneraldeviceconfiguration|androidcustomconfiguration|' +
         'macosgeneraldeviceconfiguration|macoscustomconfiguration|windowsupdateforbusinessconfiguration')
     {
+        Write-Log -logFile $LogFile -module $functionName -Message "Matched device configuration type, using deviceManagement/deviceConfigurations" -logLevel "Verbose"
         return "deviceManagement/deviceConfigurations"
     }
     
     # Configuration Policies (Settings Catalog)
     if ($odataType -match '#microsoft\.graph\.configurationpolicy')
     {
+        Write-Log -logFile $LogFile -module $functionName -Message "Matched configuration policy (Settings Catalog) type, using deviceManagement/configurationPolicies" -logLevel "Verbose"
         return "deviceManagement/configurationPolicies"
     }
     
     # Group Policy Configurations
     if ($odataType -match 'grouppolicyconfiguration')
     {
+        Write-Log -logFile $LogFile -module $functionName -Message "Matched group policy configuration type, using deviceManagement/groupPolicyConfigurations" -logLevel "Verbose"
         return "deviceManagement/groupPolicyConfigurations"
     }
     
     # Scripts
     if ($odataType -match 'devicemanagementscript' -and $odataType -notmatch 'health')
     {
+        Write-Log -logFile $LogFile -module $functionName -Message "Matched device management script type, using deviceManagement/deviceManagementScripts" -logLevel "Verbose"
         return "deviceManagement/deviceManagementScripts"
     }
     
     # Health Scripts
     if ($odataType -match 'devicehealthscript')
     {
+        Write-Log -logFile $LogFile -module $functionName -Message "Matched health script type, using deviceManagement/deviceHealthScripts" -logLevel "Verbose"
         return "deviceManagement/deviceHealthScripts"
     }
     
@@ -1275,62 +1556,73 @@ function Get-CorrectBaseUriForResource()
     if ($odataType -match 'managedapppolicy|managedappprotection|iosmanagedappprotection|androidmanagedappprotection|' +
         'targetedmanagedappconfiguration|windowsinformationprotectionpolicy|mdmwindowsinformationprotectionpolicy')
     {
+        Write-Log -logFile $LogFile -module $functionName -Message "Matched managed app policy type, using deviceAppManagement/managedAppPolicies" -logLevel "Verbose"
         return "deviceAppManagement/managedAppPolicies"
     }
     
     # Windows Information Protection (specific endpoints)
     if ($odataType -match '#microsoft\.graph\.windowsinformationprotectionpolicy$')
     {
+        Write-Log -logFile $LogFile -module $functionName -Message "Matched Windows Information Protection policy type, using deviceAppManagement/windowsInformationProtectionPolicies" -logLevel "Verbose"
         return "deviceAppManagement/windowsInformationProtectionPolicies"
     }
     if ($odataType -match '#microsoft\.graph\.mdmwindowsinformationprotectionpolicy')
     {
+        Write-Log -logFile $LogFile -module $functionName -Message "Matched MDM Windows Information Protection policy type, using deviceAppManagement/mdmWindowsInformationProtectionPolicies" -logLevel "Verbose"
         return "deviceAppManagement/mdmWindowsInformationProtectionPolicies"
     }
     
     # Intents (Security Baselines)
     if ($odataType -match 'intent')
     {
+        Write-Log -logFile $LogFile -module $functionName -Message "Matched security intent type, using deviceManagement/intents" -logLevel "Verbose"
         return "deviceManagement/intents"
     }
     
     # Policy Sets
     if ($odataType -match 'policyset')
     {
+        Write-Log -logFile $LogFile -module $functionName -Message "Matched policy set type, using deviceAppManagement/policySets" -logLevel "Verbose"
         return "deviceAppManagement/policySets"
     }
     
     # Autopilot Profiles
     if ($odataType -match 'windowsautopilotdeploymentprofile')
     {
+        Write-Log -logFile $LogFile -module $functionName -Message "Matched Autopilot profile type, using deviceManagement/windowsAutopilotDeploymentProfiles" -logLevel "Verbose"
         return "deviceManagement/windowsAutopilotDeploymentProfiles"
     }
     
     # Windows Feature Update Profiles
     if ($odataType -match 'windowsfeatureupdateprofile')
     {
+        Write-Log -logFile $LogFile -module $functionName -Message "Matched Windows Feature Update profile type, using deviceManagement/windowsFeatureUpdateProfiles" -logLevel "Verbose"
         return "deviceManagement/windowsFeatureUpdateProfiles"
     }
     
     # Windows Quality Update Profiles
     if ($odataType -match 'windowsqualityupdateprofile')
     {
+        Write-Log -logFile $LogFile -module $functionName -Message "Matched Windows Quality Update profile type, using deviceManagement/windowsQualityUpdateProfiles" -logLevel "Verbose"
         return "deviceManagement/windowsQualityUpdateProfiles"
     }
     
     # Windows Driver Update Profiles
     if ($odataType -match 'windowsdriverupdateprofile')
     {
+        Write-Log -logFile $LogFile -module $functionName -Message "Matched Windows Driver Update profile type, using deviceManagement/windowsDriverUpdateProfiles" -logLevel "Verbose"
         return "deviceManagement/windowsDriverUpdateProfiles"
     }
     
     # Resource Access Profiles
     if ($odataType -match 'resourceaccessprofile')
     {
+        Write-Log -logFile $LogFile -module $functionName -Message "Matched resource access profile type, using deviceManagement/resourceAccessProfiles" -logLevel "Verbose"
         return "deviceManagement/resourceAccessProfiles"
     }
     
     # If we can't determine, return null
+    Write-Log -logFile $LogFile -module $functionName -Message "Unable to determine base URI for OData type: $odataType" -logLevel "Warning"
     return $null
 }
 
@@ -1382,6 +1674,7 @@ function Get-AppProtectionPolicyAssignments()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -logFile $LogFile -module $functionName -Message "Retrieving app protection policy assignments (ResourceId: '$ResourceId', ODataType: '$ODataType', API: $APIVersion)" -logLevel "Verbose"
     
     # Determine the correct endpoint based on OData type
     $endpoint = $null
@@ -1390,14 +1683,17 @@ function Get-AppProtectionPolicyAssignments()
         'androidManagedAppProtection'
         {
             $endpoint = "deviceAppManagement/androidManagedAppProtections/$ResourceId/assignments"
+            Write-Log -logFile $LogFile -module $functionName -Message "Using Android managed app protection endpoint: $endpoint" -logLevel "Verbose"
         }
         'iosManagedAppProtection'
         {
             $endpoint = "deviceAppManagement/iosManagedAppProtections/$ResourceId/assignments"
+            Write-Log -logFile $LogFile -module $functionName -Message "Using iOS managed app protection endpoint: $endpoint" -logLevel "Verbose"
         }
         'targetedManagedAppConfiguration'
         {
             $endpoint = "deviceAppManagement/targetedManagedAppConfigurations/$ResourceId/assignments"
+            Write-Log -logFile $LogFile -module $functionName -Message "Using targeted managed app configuration endpoint: $endpoint" -logLevel "Verbose"
         }
         default
         {
@@ -1410,6 +1706,7 @@ function Get-AppProtectionPolicyAssignments()
     {
         Write-Log -logFile $LogFile -module $functionName -Message "Fetching app protection assignments using endpoint: $endpoint" -logLevel "Verbose"
         $result = CallGraphAPI -accessToken $AccessToken -ResourcePath $endpoint -APIVersion $APIVersion -Method "GET"
+        Write-Log -logFile $LogFile -module $functionName -Message "Successfully retrieved assignments for ResourceId: $ResourceId" -logLevel "Verbose"
         return $result
     }
     catch
@@ -1463,15 +1760,18 @@ function Test-ResourceSupportsAssignments()
     if (-not $script:MetadataCache)
     {
         $script:MetadataCache = @{}
+        Write-Log -logFile $LogFile -module $functionName -Message "Initialized metadata cache for assignment support validation" -logLevel "Verbose"
     }
     
     # Get entity type from @odata.type
     $odataType = $Resource.'@odata.type'
     if ([string]::IsNullOrWhiteSpace($odataType))
     {
-        Write-Log -logFile $LogFile -module $functionName -Message "Resource missing @odata.type, cannot validate assignment support" -logLevel "Verbose"
+        Write-Log -logFile $LogFile -module $functionName -Message "Resource missing @odata.type, cannot validate assignment support - assuming supported" -logLevel "Verbose"
         return $true  # Assume supported if we can't determine
     }
+    
+    Write-Log -logFile $LogFile -module $functionName -Message "Testing assignment support for ODataType: '$odataType'" -logLevel "Verbose"
     
     # Exception list for known API design limitations that require alternative handling
     # PolicySets: Use non-standard OData routing, assignments exist but GET endpoint differs
@@ -1505,6 +1805,7 @@ function Test-ResourceSupportsAssignments()
         
         # Determine API version from script scope or default to v1.0
         $apiVersion = if ($script:APIVersion) { $script:APIVersion } else { 'v1.0' }
+        Write-Log -logFile $LogFile -module $functionName -Message "Using API version: $apiVersion for metadata query" -logLevel "Debug"
         
         # Create a minimal response object with @odata.context for GetGraphObjectMetadata
         $fakeResponse = [PSCustomObject]@{
@@ -1591,6 +1892,9 @@ function Get-ErrorCategory()
         [string]$ODataType
     )
     
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -logFile $LogFile -module $functionName -Message "Categorizing error: Code='$ErrorCode', ResourceType='$ResourceType', ODataType='$ODataType'" -logLevel "Verbose"
+    
     # PolicySets OData routing limitation
     if ($ResourceType -eq 'policySets' -and $ErrorCode -like '*No method match route template*')
     {
@@ -1609,14 +1913,46 @@ function Get-ErrorCategory()
     # Standard error codes
     switch -Regex ($ErrorCode)
     {
-        '^403$|Forbidden' { return 'PERMISSION_DENIED' }
-        '^404$|NotFound' { return 'RESOURCE_NOT_FOUND' }
-        '^429$|TooManyRequests' { return 'RATE_LIMIT' }
-        '^5\d{2}$|ServerError' { return 'SERVER_ERROR' }
-        'BadRequest' { return 'INVALID_REQUEST' }
-        'NULL' { return 'NO_RESPONSE' }
-        'MALFORMED' { return 'MALFORMED_RESPONSE' }
-        default { return 'UNKNOWN' }
+        '^403$|Forbidden'
+        { 
+            Write-Log -logFile $LogFile -module $functionName -Message "Categorized as PERMISSION_DENIED" -logLevel "Verbose"
+            return 'PERMISSION_DENIED'
+        }
+        '^404$|NotFound'
+        { 
+            Write-Log -logFile $LogFile -module $functionName -Message "Categorized as RESOURCE_NOT_FOUND" -logLevel "Verbose"
+            return 'RESOURCE_NOT_FOUND'
+        }
+        '^429$|TooManyRequests'
+        { 
+            Write-Log -logFile $LogFile -module $functionName -Message "Categorized as RATE_LIMIT" -logLevel "Verbose"
+            return 'RATE_LIMIT'
+        }
+        '^5\d{2}$|ServerError'
+        { 
+            Write-Log -logFile $LogFile -module $functionName -Message "Categorized as SERVER_ERROR" -logLevel "Verbose"
+            return 'SERVER_ERROR'
+        }
+        'BadRequest'
+        { 
+            Write-Log -logFile $LogFile -module $functionName -Message "Categorized as INVALID_REQUEST" -logLevel "Verbose"
+            return 'INVALID_REQUEST'
+        }
+        'NULL'
+        { 
+            Write-Log -logFile $LogFile -module $functionName -Message "Categorized as NO_RESPONSE" -logLevel "Verbose"
+            return 'NO_RESPONSE'
+        }
+        'MALFORMED'
+        { 
+            Write-Log -logFile $LogFile -module $functionName -Message "Categorized as MALFORMED_RESPONSE" -logLevel "Verbose"
+            return 'MALFORMED_RESPONSE'
+        }
+        default
+        { 
+            Write-Log -logFile $LogFile -module $functionName -Message "Categorized as UNKNOWN (unmatched error code)" -logLevel "Verbose"
+            return 'UNKNOWN'
+        }
     }
 }
 
@@ -1655,6 +1991,9 @@ function Get-RemediationGuidance()
         [string]$ResourceType,
         [string]$ODataType
     )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -logFile $LogFile -module $functionName -Message "Providing remediation guidance for error category: '$ErrorCategory'" -logLevel "Verbose"
     
     switch ($ErrorCategory)
     {
@@ -1756,4 +2095,453 @@ function Build-BatchResponseLookup()
     Write-Log -logFile $LogFile -module $functionName -Message "Built response lookup with $($lookup.Count) entries from $($BatchResponses.Count) batch responses" -logLevel "Verbose"
     
     return $lookup
+}
+
+function Get-IntuneResourceLists()
+{
+    <#
+    .SYNOPSIS
+    Fetches all Intune resource lists using batch API with caching and platform filtering support.
+    
+    .DESCRIPTION
+    Retrieves all Intune resource types (apps, configurations, policies, scripts, etc.) via Microsoft Graph API.
+    Implements intelligent caching per API version with per-resource retry logic for failed endpoints.
+    Supports platform filtering when Settings.operatingSystem is specified.
+    
+    This function consolidates duplicate resource fetching logic previously present in:
+    - GetGroupDirectAssignments
+    - GetGroupIndirectAssignments  
+    - Export-ConfigurationAssignments
+    
+    .PARAMETER AccessToken
+    The access token for Microsoft Graph API authentication.
+    
+    .PARAMETER IncludeBeta
+    Switch to include beta API endpoints for additional resource types.
+    
+    .PARAMETER Settings
+    Optional settings hashtable for platform filtering (Settings.operatingSystem).
+    
+    .PARAMETER CacheKey
+    Optional cache key prefix. If not specified, uses default based on API version.
+    Useful for separating caches for different operational contexts (e.g., 'Direct', 'Indirect', 'Export').
+    
+    .PARAMETER SkipCache
+    Switch to bypass cache and always fetch fresh data. Useful for export scenarios requiring complete data.
+    
+    .PARAMETER ResultObject
+    Optional assignment result object to track failed resources. If provided, failures will be added to ResultObject.FailedResources.
+    
+    .RETURNS
+    Hashtable with the following structure:
+    @{
+        mobileApps             = @(...)
+        deviceConfigs          = @(...)
+        compliancePolicies     = @(...)
+        autopilotProfiles      = @(...)
+        deviceScripts          = @(...)
+        healthScripts          = @(...)
+        appProtectionPolicies  = @(...)
+        intents                = @(...)
+        resourceAccessProfiles = @(...)
+        configurationPolicies  = @(...)
+        groupPolicyConfigs     = @(...)
+        policySets             = @(...)
+        wipPolicies            = @(...)
+        mdmWipPolicies         = @(...)
+        FailedResourceIds      = @(...)  # IDs of resources that failed to fetch
+    }
+    
+    .EXAMPLE
+    # Fetch with caching and platform filtering
+    $resources = Get-IntuneResourceLists -AccessToken $token -IncludeBeta -Settings $settings
+    
+    .EXAMPLE
+    # Fetch without cache for export
+    $resources = Get-IntuneResourceLists -AccessToken $token -IncludeBeta -Settings $settings -SkipCache
+    
+    .EXAMPLE
+    # Fetch with custom cache key and track failures
+    $assignments = Initialize-AssignmentResultObject
+    $resources = Get-IntuneResourceLists -AccessToken $token -IncludeBeta -CacheKey "MyCustomCache" -ResultObject $assignments
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$AccessToken,
+        [Parameter(Mandatory = $false)]
+        [switch]$IncludeBeta,
+        [Parameter(Mandatory = $false)]
+        [hashtable]$Settings,
+        [Parameter(Mandatory = $false)]
+        [string]$CacheKey,
+        [Parameter(Mandatory = $false)]
+        [switch]$SkipCache,
+        [Parameter(Mandatory = $false)]
+        [PSCustomObject]$ResultObject
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -logFile $LogFile -module $functionName -Message "Starting Intune resource list retrieval" -logLevel "Information"
+    Write-Log -logFile $LogFile -module $functionName -Message "Parameters: IncludeBeta=$($IncludeBeta.IsPresent), SkipCache=$($SkipCache.IsPresent), CacheKey='$CacheKey', HasSettings=$($null -ne $Settings)" -logLevel "Verbose"
+    
+    if ($Settings -and $Settings.operatingSystem)
+    {
+        Write-Log -logFile $LogFile -module $functionName -Message "Platform filtering enabled for OS: $($Settings.operatingSystem)" -logLevel "Information"
+    }
+    
+    # Determine API version
+    $apiVersion = if ($IncludeBeta.IsPresent) { 'beta' } else { 'v1.0' }
+    $apiVersionKey = $apiVersion
+    
+    # Determine cache key
+    if (-not $CacheKey)
+    {
+        $CacheKey = "ResourceLists_${apiVersionKey}"
+    }
+    else
+    {
+        $CacheKey = "${CacheKey}_${apiVersionKey}"
+    }
+    
+    Write-Log -logFile $LogFile -module $functionName -Message "Fetching Intune resource lists (API: $apiVersion, CacheKey: $CacheKey, SkipCache: $($SkipCache.IsPresent))" -logLevel "Information"
+    Write-Verbose "[$functionName] API: $apiVersion, CacheKey: $CacheKey, SkipCache: $($SkipCache.IsPresent)"
+    
+    # Check cache unless SkipCache is specified
+    $cachedResourceLists = $null
+    if (-not $SkipCache.IsPresent)
+    {
+        $cachedResourceLists = Get-CachedData -CacheType 'Configuration' -Key $CacheKey
+    }
+    
+    # Initialize result variables
+    $mobileApps = @()
+    $deviceConfigs = @()
+    $compliancePolicies = @()
+    $autopilotProfiles = @()
+    $deviceScripts = @()
+    $healthScripts = @()
+    $appProtectionPolicies = @()
+    $intents = @()
+    $resourceAccessProfiles = @()
+    $configurationPolicies = @()
+    $groupPolicyConfigs = @()
+    $policySets = @()
+    $wipPolicies = @()
+    $mdmWipPolicies = @()
+    $failedResourceIds = @()
+    
+    if ($cachedResourceLists)
+    {
+        Write-Log -logFile $LogFile -module $functionName -Message "Using cached resource lists (CacheKey: $CacheKey)" -logLevel "Verbose"
+        Write-Verbose "[$functionName] Cache hit for resource lists"
+        
+        # Extract cached resources
+        $mobileApps = $cachedResourceLists.mobileApps
+        $deviceConfigs = $cachedResourceLists.deviceConfigs
+        $compliancePolicies = $cachedResourceLists.compliancePolicies
+        $autopilotProfiles = $cachedResourceLists.autopilotProfiles
+        $deviceScripts = $cachedResourceLists.deviceScripts
+        $healthScripts = $cachedResourceLists.healthScripts
+        $appProtectionPolicies = $cachedResourceLists.appProtectionPolicies
+        $intents = $cachedResourceLists.intents
+        $resourceAccessProfiles = $cachedResourceLists.resourceAccessProfiles
+        $configurationPolicies = $cachedResourceLists.configurationPolicies
+        $groupPolicyConfigs = $cachedResourceLists.groupPolicyConfigs
+        $policySets = $cachedResourceLists.policySets
+        $wipPolicies = $cachedResourceLists.wipPolicies
+        $mdmWipPolicies = $cachedResourceLists.mdmWipPolicies
+        
+        # Check for resources marked as $null (previously failed) and retry them
+        $resourcesToRetry = @()
+        $resourceRetryMap = @{
+            'mobileApps'             = @{ endpoint = "deviceAppManagement/mobileApps?`$select=id,displayName,description"; variable = 'mobileApps' }
+            'deviceConfigs'          = @{ endpoint = "deviceManagement/deviceConfigurations?`$select=id,displayName,description"; variable = 'deviceConfigs' }
+            'compliancePolicies'     = @{ endpoint = "deviceManagement/deviceCompliancePolicies?`$select=id,displayName,description"; variable = 'compliancePolicies' }
+            'autopilotProfiles'      = @{ endpoint = "deviceManagement/windowsAutopilotDeploymentProfiles?`$select=id,displayName,description"; variable = 'autopilotProfiles' }
+            'deviceScripts'          = @{ endpoint = "deviceManagement/deviceManagementScripts?`$select=id,displayName,description"; variable = 'deviceScripts' }
+            'healthScripts'          = @{ endpoint = "deviceManagement/deviceHealthScripts?`$select=id,displayName,description"; variable = 'healthScripts' }
+            'appProtectionPolicies'  = @{ endpoint = "deviceAppManagement/managedAppPolicies?`$select=id,displayName,description"; variable = 'appProtectionPolicies' }
+            'intents'                = @{ endpoint = "deviceManagement/intents?`$select=id,displayName,description"; variable = 'intents' }
+            'resourceAccessProfiles' = @{ endpoint = "deviceManagement/resourceAccessProfiles?`$select=id,displayName,description"; variable = 'resourceAccessProfiles' }
+            'configurationPolicies'  = @{ endpoint = "deviceManagement/configurationPolicies?`$select=id,name,description"; variable = 'configurationPolicies' }
+            'groupPolicyConfigs'     = @{ endpoint = "deviceManagement/groupPolicyConfigurations?`$select=id,displayName,description"; variable = 'groupPolicyConfigs' }
+            'policySets'             = @{ endpoint = "deviceAppManagement/policySets?`$select=id,displayName,description"; variable = 'policySets' }
+            'wipPolicies'            = @{ endpoint = "deviceAppManagement/windowsInformationProtectionPolicies?`$select=id,displayName,description"; variable = 'wipPolicies' }
+            'mdmWipPolicies'         = @{ endpoint = "deviceAppManagement/mdmWindowsInformationProtectionPolicies?`$select=id,displayName,description"; variable = 'mdmWipPolicies' }
+        }
+        
+        foreach ($resourceId in $resourceRetryMap.Keys)
+        {
+            if ($null -eq $cachedResourceLists[$resourceId])
+            {
+                $resourcesToRetry += $resourceId
+            }
+        }
+        
+        if ($resourcesToRetry.Count -gt 0)
+        {
+            Write-Log -logFile $LogFile -module $functionName -Message "Retrying $($resourcesToRetry.Count) previously failed resources" -logLevel "Information"
+            Write-Verbose "[$functionName] Retrying failed resources: $($resourcesToRetry -join ', ')"
+            
+            # Build batch request for retry
+            $retryBatchBody = @{
+                requests = @()
+            }
+            
+            foreach ($resourceId in $resourcesToRetry)
+            {
+                $retryBatchBody.requests += @{
+                    id     = $resourceId
+                    method = "GET"
+                    url    = $resourceRetryMap[$resourceId].endpoint
+                }
+            }
+            
+            # Send retry batch request
+            try
+            {
+                $retryBatchResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath "`$batch" -APIVersion $apiVersion -Method "POST" -Body ($retryBatchBody | ConvertTo-Json -Depth $global:maxJSONDepth)
+                
+                if ($retryBatchResponse -and $retryBatchResponse.responses)
+                {
+                    foreach ($response in $retryBatchResponse.responses)
+                    {
+                        if ($response.status -eq 200 -and $response.body.value)
+                        {
+                            # Retry successful - update the variable
+                            $varName = $resourceRetryMap[$response.id].variable
+                            Set-Variable -Name $varName -Value $response.body.value -Scope Local
+                            Write-Log -logFile $LogFile -module $functionName -Message "Retry successful for '$($response.id)' - retrieved $($response.body.value.Count) items" -logLevel "Verbose"
+                        }
+                        else
+                        {
+                            # Retry failed - track error again
+                            $failedResourceIds += $response.id
+                            $errorMsg = if ($response.body.error.message) { $response.body.error.message } else { "Unknown error (Status: $($response.status))" }
+                            
+                            if ($ResultObject)
+                            {
+                                Add-FailedResourceError -ResultObject $ResultObject -ResourceType $response.id -ErrorMessage $errorMsg -StatusCode $response.status -ApiVersion $apiVersionKey
+                            }
+                            
+                            Write-Log -logFile $LogFile -module $functionName -Message "Retry failed for '$($response.id)': $errorMsg" -logLevel "Warning"
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                Write-Log -logFile $LogFile -module $functionName -Message "Error during retry batch request: $($_.Exception.Message)" -LogLevel "Error"
+            }
+        }
+    }
+    else
+    {
+        Write-Log -logFile $LogFile -module $functionName -Message "Cache miss - fetching resource lists from Graph API" -logLevel "Verbose"
+        Write-Verbose "[$functionName] No cached resource lists found, fetching from API"
+        
+        # Create batch request for all resource lists
+        $batchRequestBody = @{
+            requests = @()
+        }
+        
+        # Define resource endpoints
+        $resourceEndpoints = @(
+            @{ id = "mobileApps"; url = "deviceAppManagement/mobileApps"; extraParams = "select=id,displayName,description" }
+            @{ id = "deviceConfigs"; url = "deviceManagement/deviceConfigurations"; extraParams = "select=id,displayName,description" }
+            @{ id = "compliancePolicies"; url = "deviceManagement/deviceCompliancePolicies"; extraParams = "select=id,displayName,description" }
+            @{ id = "deviceScripts"; url = "deviceManagement/deviceManagementScripts"; extraParams = "select=id,displayName,description" }
+            @{ id = "appProtectionPolicies"; url = "deviceAppManagement/managedAppPolicies"; extraParams = "select=id,displayName,description" }
+            @{ id = "intents"; url = "deviceManagement/intents"; extraParams = "select=id,displayName,description" }
+            @{ id = "policySets"; url = "deviceAppManagement/policySets"; extraParams = "select=id,displayName,description" }
+        )
+    
+        # Add beta endpoints if IncludeBeta is specified
+        if ($IncludeBeta.IsPresent)
+        {
+            $resourceEndpoints += @(
+                @{ id = "autopilotProfiles"; url = "deviceManagement/windowsAutopilotDeploymentProfiles"; extraParams = "select=id,displayName,description" }
+                @{ id = "healthScripts"; url = "deviceManagement/deviceHealthScripts"; extraParams = "select=id,displayName,description" }
+                @{ id = "configurationPolicies"; url = "deviceManagement/configurationPolicies"; extraParams = "select=id,name,description" }
+                @{ id = "groupPolicyConfigs"; url = "deviceManagement/groupPolicyConfigurations"; extraParams = "select=id,displayName,description" }
+                @{ id = "resourceAccessProfiles"; url = "deviceManagement/resourceAccessProfiles"; extraParams = "select=id,displayName,description" }
+                @{ id = "wipPolicies"; url = "deviceAppManagement/windowsInformationProtectionPolicies"; extraParams = "select=id,displayName,description" }
+                @{ id = "mdmWipPolicies"; url = "deviceAppManagement/mdmWindowsInformationProtectionPolicies"; extraParams = "select=id,displayName,description" }
+            )
+        }
+    
+        # Build batch request
+        foreach ($endpoint in $resourceEndpoints)
+        {
+            $requestUrl = "$($endpoint.url)?`$$($endpoint.extraParams)"
+            $batchRequestBody.requests += @{
+                id     = $endpoint.id
+                method = "GET"
+                url    = $requestUrl
+            }
+        }
+    
+        Write-Log -logFile $LogFile -module $functionName -Message "Sending batch request for $($resourceEndpoints.Count) resource lists" -logLevel "Information"
+    
+        # Send batch request
+        try
+        {
+            $batchResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath "`$batch" -APIVersion $apiVersion -Method "POST" -Body ($batchRequestBody | ConvertTo-Json -Depth $global:maxJSONDepth)
+        
+            # Process batch response
+            if ($batchResponse -and $batchResponse.responses)
+            {
+                Write-Log -logFile $LogFile -module $functionName -Message "Processing batch response for resource lists" -LogLevel "Verbose"
+            
+                foreach ($response in $batchResponse.responses)
+                {
+                    if ($response.status -eq 200 -and $response.body -and $response.body.value)
+                    {
+                        switch ($response.id)
+                        {
+                            "mobileApps" { $mobileApps = $response.body.value }
+                            "deviceConfigs" { $deviceConfigs = $response.body.value }
+                            "compliancePolicies" { $compliancePolicies = $response.body.value }
+                            "deviceScripts" { $deviceScripts = $response.body.value }
+                            "appProtectionPolicies" { $appProtectionPolicies = $response.body.value }
+                            "intents" { $intents = $response.body.value }
+                            "resourceAccessProfiles" { $resourceAccessProfiles = $response.body.value }
+                            "autopilotProfiles" { $autopilotProfiles = $response.body.value }
+                            "healthScripts" { $healthScripts = $response.body.value }
+                            "configurationPolicies"
+                            { 
+                                # Configuration policies use 'name' instead of 'displayName', so we normalize it
+                                $configurationPolicies = $response.body.value | ForEach-Object { 
+                                    $_ | Add-Member -NotePropertyName 'displayName' -NotePropertyValue $_.name -Force -PassThru
+                                }
+                            }
+                            "groupPolicyConfigs" { $groupPolicyConfigs = $response.body.value }
+                            "policySets" { $policySets = $response.body.value }
+                            "wipPolicies" { $wipPolicies = $response.body.value }
+                            "mdmWipPolicies" { $mdmWipPolicies = $response.body.value }
+                        }
+                    }
+                    elseif ($response.status -ne 200)
+                    {
+                        $errorMessage = "API returned status $($response.status)"
+                        $errorCode = $response.status.ToString()
+                        
+                        if ($response.body -and $response.body.error)
+                        {
+                            $errorMessage += ": $($response.body.error.message)"
+                            if ($response.body.error.code)
+                            {
+                                $errorCode = $response.body.error.code
+                            }
+                        }
+                        
+                        # Categorize error using common helper
+                        $errorCategory = Get-ErrorCategory -ErrorCode $errorCode -ErrorMessage $errorMessage -ResourceType $response.id -ODataType ""
+                        $remediationGuidance = Get-RemediationGuidance -ErrorCategory $errorCategory -ErrorCode $errorCode -ResourceType $response.id -ODataType ""
+                        
+                        Write-Log -logFile $LogFile -module $functionName -Message "Failed to get resource list for $($response.id). Category: $errorCategory, Error: $errorMessage" -logLevel "Warning"
+                        Write-Log -logFile $LogFile -module $functionName -Message "Remediation guidance: $remediationGuidance" -logLevel "Information"
+                        
+                        if ($ResultObject)
+                        {
+                            Add-FailedResourceError -ResultObject $ResultObject -ResourceType $response.id -ErrorMessage $errorMessage -StatusCode $response.status -ApiVersion $apiVersion
+                        }
+                        
+                        # Track this resource ID so it's NOT cached and will be retried next time
+                        $failedResourceIds += $response.id
+                    }
+                }
+            }
+        }
+        catch
+        {
+            Write-Log -logFile $LogFile -module $functionName -Message "Error fetching resource lists: $($_.Exception.Message)" -LogLevel "Error"
+            throw
+        }
+    
+        Write-Log -logFile $LogFile -module $functionName -Message "Retrieved resource counts via batch - Apps: $($mobileApps.Count), Configs: $($deviceConfigs.Count), Compliance: $($compliancePolicies.Count), Autopilot: $($autopilotProfiles.Count), Scripts: $($deviceScripts.Count), HealthScripts: $($healthScripts.Count), AppProtection: $($appProtectionPolicies.Count), Intents: $($intents.Count), ResourceAccess: $($resourceAccessProfiles.Count), ConfigPolicies: $($configurationPolicies.Count), GroupPolicy: $($groupPolicyConfigs.Count), PolicySets: $($policySets.Count), WIP: $($wipPolicies.Count), MDMWIP: $($mdmWipPolicies.Count)" -logLevel "Information"
+        
+        # Cache only successfully fetched resources (exclude failed ones)
+        # Failed resources will be retried on next run
+        if (-not $SkipCache.IsPresent)
+        {
+            $resourceListsToCache = @{
+                mobileApps             = $mobileApps
+                deviceConfigs          = $deviceConfigs
+                compliancePolicies     = $compliancePolicies
+                autopilotProfiles      = $autopilotProfiles
+                deviceScripts          = $deviceScripts
+                healthScripts          = $healthScripts
+                appProtectionPolicies  = $appProtectionPolicies
+                intents                = $intents
+                resourceAccessProfiles = $resourceAccessProfiles
+                configurationPolicies  = $configurationPolicies
+                groupPolicyConfigs     = $groupPolicyConfigs
+                policySets             = $policySets
+                wipPolicies            = $wipPolicies
+                mdmWipPolicies         = $mdmWipPolicies
+            }
+            
+            # Remove failed resources from cache object (set to $null so cache knows they weren't fetched)
+            foreach ($failedId in $failedResourceIds)
+            {
+                if ($resourceListsToCache.ContainsKey($failedId))
+                {
+                    $resourceListsToCache[$failedId] = $null
+                    Write-Log -logFile $LogFile -module $functionName -Message "Excluding failed resource '$failedId' from cache (will retry next time)" -logLevel "Verbose"
+                }
+            }
+            
+            $cached = Set-CachedData -CacheType 'Configuration' -Key $CacheKey -Data $resourceListsToCache -Metadata @{ApiVersion = $apiVersionKey; FetchedAt = Get-Date; FailedResources = $failedResourceIds}
+            if ($cached)
+            {
+                $successCount = ($resourceListsToCache.Keys | Where-Object { $resourceListsToCache[$_] -ne $null }).Count
+                Write-Log -logFile $LogFile -module $functionName -Message "Successfully cached $successCount resource lists (CacheKey: $CacheKey, excluded $($failedResourceIds.Count) failed)" -logLevel "Verbose"
+            }
+        }
+    }
+    
+    # Apply platform filtering if Settings.operatingSystem is specified
+    if ($Settings -and $Settings.operatingSystem)
+    {
+        $targetOS = $Settings.operatingSystem
+        Write-Log -logFile $LogFile -module $functionName -Message "Filtering resources for operating system: $targetOS" -logLevel "Information"
+        
+        $mobileApps = @($mobileApps | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+        $deviceConfigs = @($deviceConfigs | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+        $compliancePolicies = @($compliancePolicies | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+        $autopilotProfiles = @($autopilotProfiles | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+        $deviceScripts = @($deviceScripts | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+        $healthScripts = @($healthScripts | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+        $appProtectionPolicies = @($appProtectionPolicies | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+        $intents = @($intents | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+        $resourceAccessProfiles = @($resourceAccessProfiles | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+        $configurationPolicies = @($configurationPolicies | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+        $groupPolicyConfigs = @($groupPolicyConfigs | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+        $policySets = @($policySets | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+        $wipPolicies = @($wipPolicies | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+        $mdmWipPolicies = @($mdmWipPolicies | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+        
+        Write-Log -logFile $LogFile -module $functionName -Message "After filtering for $targetOS - Apps: $($mobileApps.Count), Configs: $($deviceConfigs.Count), Compliance: $($compliancePolicies.Count), Autopilot: $($autopilotProfiles.Count), Scripts: $($deviceScripts.Count), HealthScripts: $($healthScripts.Count), AppProtection: $($appProtectionPolicies.Count), Intents: $($intents.Count), ResourceAccess: $($resourceAccessProfiles.Count), ConfigPolicies: $($configurationPolicies.Count), GroupPolicy: $($groupPolicyConfigs.Count), PolicySets: $($policySets.Count), WIP: $($wipPolicies.Count), MDMWIP: $($mdmWipPolicies.Count)" -logLevel "Information"
+    }
+    
+    # Return hashtable with all resource lists
+    return @{
+        mobileApps             = $mobileApps
+        deviceConfigs          = $deviceConfigs
+        compliancePolicies     = $compliancePolicies
+        autopilotProfiles      = $autopilotProfiles
+        deviceScripts          = $deviceScripts
+        healthScripts          = $healthScripts
+        appProtectionPolicies  = $appProtectionPolicies
+        intents                = $intents
+        resourceAccessProfiles = $resourceAccessProfiles
+        configurationPolicies  = $configurationPolicies
+        groupPolicyConfigs     = $groupPolicyConfigs
+        policySets             = $policySets
+        wipPolicies            = $wipPolicies
+        mdmWipPolicies         = $mdmWipPolicies
+        FailedResourceIds      = $failedResourceIds
+    }
 }

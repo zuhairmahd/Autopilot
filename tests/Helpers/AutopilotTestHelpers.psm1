@@ -400,6 +400,27 @@ function Initialize-MockGlobalVariables
     
     $Global:settings = $defaultSettings
     
+    # Initialize cache settings
+    $Global:cacheSettings = @{
+        enabled                  = $true
+        defaultExpirationMinutes = 15
+        maxCacheSize             = 1000
+        cacheTypes               = @{
+            Configuration    = @{
+                enabled           = $true
+                expirationMinutes = 60
+            }
+            DirectoryObjects = @{
+                enabled           = $true
+                expirationMinutes = 15
+            }
+            Devices          = @{
+                enabled           = $true
+                expirationMinutes = 15
+            }
+        }
+    }
+    
     # Initialize return values if requested
     if ($IncludeReturnValues)
     {
@@ -432,6 +453,7 @@ function Clear-MockGlobalVariables
     Remove-Variable -Name LogFile -Scope Global -ErrorAction SilentlyContinue
     Remove-Variable -Name settings -Scope Global -ErrorAction SilentlyContinue
     Remove-Variable -Name returnValues -Scope Global -ErrorAction SilentlyContinue
+    Remove-Variable -Name cacheSettings -Scope Global -ErrorAction SilentlyContinue
     
     Write-Verbose "[Clear-MockGlobalVariables] Global variables cleared"
 }
