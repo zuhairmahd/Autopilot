@@ -72,7 +72,7 @@ function Export-ConfigurationAssignments()
     $errorLog = @()
     
     # Helper function to get correct BaseUri for a resource based on its @odata.type
-    function Get-CorrectBaseUriForResource
+    function Get-CorrectBaseUriForResource()
     {
         param(
             [Parameter(Mandatory = $true)]
@@ -212,7 +212,7 @@ function Export-ConfigurationAssignments()
     }
     
     # Helper function to get assignments for app protection policies using resource-type-specific endpoints
-    function Get-AppProtectionPolicyAssignments
+    function Get-AppProtectionPolicyAssignments()
     {
         param(
             [Parameter(Mandatory = $true)]
@@ -262,7 +262,7 @@ function Export-ConfigurationAssignments()
     }
     
     # Helper function to test if a resource supports assignments using metadata
-    function Test-ResourceSupportsAssignments
+    function Test-ResourceSupportsAssignments()
     {
         param(
             [Parameter(Mandatory = $true)]
@@ -353,7 +353,7 @@ function Export-ConfigurationAssignments()
     }
     
     # Helper function to categorize error types based on error codes, messages, and resource context
-    function Get-ErrorCategory
+    function Get-ErrorCategory()
     {
         param(
             [string]$ErrorCode,
@@ -392,7 +392,7 @@ function Export-ConfigurationAssignments()
     }
     
     # Helper function to provide remediation guidance based on error category
-    function Get-RemediationGuidance
+    function Get-RemediationGuidance()
     {
         param(
             [string]$ErrorCategory,
