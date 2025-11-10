@@ -254,13 +254,26 @@ function GetGroupIndirectAssignments()
                             }
                             elseif ($response.status -ne 200)
                             {
-                                # Still failing - track the error
+                                # Still failing - track the error with categorization
                                 $errorMessage = "API returned status $($response.status)"
+                                $errorCode = $response.status.ToString()
+                                
                                 if ($response.body -and $response.body.error)
                                 {
                                     $errorMessage += ": $($response.body.error.message)"
+                                    if ($response.body.error.code)
+                                    {
+                                        $errorCode = $response.body.error.code
+                                    }
                                 }
-                                Write-Log -logFile $LogFile -module $functionName -Message "Retry failed for '$($response.id)'. $errorMessage" -logLevel "Warning"
+                                
+                                # Categorize error using common helper
+                                $errorCategory = Get-ErrorCategory -ErrorCode $errorCode -ErrorMessage $errorMessage -ResourceType $response.id -ODataType ""
+                                $remediationGuidance = Get-RemediationGuidance -ErrorCategory $errorCategory -ErrorCode $errorCode -ResourceType $response.id -ODataType ""
+                                
+                                Write-Log -logFile $LogFile -module $functionName -Message "Retry failed for '$($response.id)'. Category: $errorCategory, Error: $errorMessage" -logLevel "Warning"
+                                Write-Log -logFile $LogFile -module $functionName -Message "Remediation guidance: $remediationGuidance" -logLevel "Information"
+                                
                                 Add-FailedResourceError -ResultObject $indirectAssignments -ResourceType $response.id -ErrorMessage $errorMessage -StatusCode $response.status -ApiVersion $apiVersion
                             }
                         }
@@ -377,11 +390,23 @@ function GetGroupIndirectAssignments()
                     elseif ($response.status -ne 200)
                     {
                         $errorMessage = "API returned status $($response.status)"
+                        $errorCode = $response.status.ToString()
+                        
                         if ($response.body -and $response.body.error)
                         {
                             $errorMessage += ": $($response.body.error.message)"
+                            if ($response.body.error.code)
+                            {
+                                $errorCode = $response.body.error.code
+                            }
                         }
-                        Write-Log -logFile $LogFile -module $functionName -Message "Failed to get resource list for $($response.id). $errorMessage" -logLevel "Warning"
+                        
+                        # Categorize error using common helper
+                        $errorCategory = Get-ErrorCategory -ErrorCode $errorCode -ErrorMessage $errorMessage -ResourceType $response.id -ODataType ""
+                        $remediationGuidance = Get-RemediationGuidance -ErrorCategory $errorCategory -ErrorCode $errorCode -ResourceType $response.id -ODataType ""
+                        
+                        Write-Log -logFile $LogFile -module $functionName -Message "Failed to get resource list for $($response.id). Category: $errorCategory, Error: $errorMessage" -logLevel "Warning"
+                        Write-Log -logFile $LogFile -module $functionName -Message "Remediation guidance: $remediationGuidance" -logLevel "Information"
                         
                         Add-FailedResourceError -ResultObject $indirectAssignments -ResourceType $response.id -ErrorMessage $errorMessage -StatusCode $response.status -ApiVersion $apiVersion
                         
@@ -521,7 +546,15 @@ function GetGroupIndirectAssignments()
     }
     catch
     {
-        Write-Log -logFile $LogFile -module $functionName -Message "Error retrieving indirect assignments: $($_.Exception.Message)" -LogLevel "Error"
+        $errorMessage = "Error retrieving indirect assignments: $($_.Exception.Message)"
+        $errorCode = $_.Exception.GetType().Name
+        
+        # Categorize error using common helper
+        $errorCategory = Get-ErrorCategory -ErrorCode $errorCode -ErrorMessage $errorMessage -ResourceType "IndirectAssignments" -ODataType ""
+        $remediationGuidance = Get-RemediationGuidance -ErrorCategory $errorCategory -ErrorCode $errorCode -ResourceType "IndirectAssignments" -ODataType ""
+        
+        Write-Log -logFile $LogFile -module $functionName -Message "$errorMessage (Category: $errorCategory)" -LogLevel "Error"
+        Write-Log -logFile $LogFile -module $functionName -Message "Remediation guidance: $remediationGuidance" -logLevel "Information"
         Write-Verbose "[$functionName] Error: $($_.Exception.Message)"
     }
     

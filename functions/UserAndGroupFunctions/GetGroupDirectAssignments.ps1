@@ -196,7 +196,14 @@ function GetGroupDirectAssignments()
         catch
         {
             $errorMessage = "Failed to fetch assignments for ${ResourceType}: $($_.Exception.Message)"
-            Write-Log -logFile $LogFile -module $functionName -Message $errorMessage -LogLevel "Error"
+            $errorCode = $_.Exception.GetType().Name
+            
+            # Categorize error using common helper
+            $errorCategory = Get-ErrorCategory -ErrorCode $errorCode -ErrorMessage $errorMessage -ResourceType $ResourceType -ODataType ""
+            $remediationGuidance = Get-RemediationGuidance -ErrorCategory $errorCategory -ErrorCode $errorCode -ResourceType $ResourceType -ODataType ""
+            
+            Write-Log -logFile $LogFile -module $functionName -Message "$errorMessage (Category: $errorCategory)" -LogLevel "Error"
+            Write-Log -logFile $LogFile -module $functionName -Message "Remediation guidance: $remediationGuidance" -logLevel "Information"
             
             Add-FailedResourceError -ResultObject $ResultObject -ResourceType $ResourceType -ErrorMessage $errorMessage -StatusCode "N/A" -ApiVersion $apiVersion
             return
@@ -486,11 +493,23 @@ function GetGroupDirectAssignments()
                     elseif ($response.status -ne 200)
                     {
                         $errorMessage = "API returned status $($response.status)"
+                        $errorCode = $response.status.ToString()
+                        
                         if ($response.body -and $response.body.error)
                         {
                             $errorMessage += ": $($response.body.error.message)"
+                            if ($response.body.error.code)
+                            {
+                                $errorCode = $response.body.error.code
+                            }
                         }
-                        Write-Log -logFile $LogFile -module $functionName -Message "Failed to get resource list for $($response.id). $errorMessage" -logLevel "Warning"
+                        
+                        # Categorize error using common helper
+                        $errorCategory = Get-ErrorCategory -ErrorCode $errorCode -ErrorMessage $errorMessage -ResourceType $response.id -ODataType ""
+                        $remediationGuidance = Get-RemediationGuidance -ErrorCategory $errorCategory -ErrorCode $errorCode -ResourceType $response.id -ODataType ""
+                        
+                        Write-Log -logFile $LogFile -module $functionName -Message "Failed to get resource list for $($response.id). Category: $errorCategory, Error: $errorMessage" -logLevel "Warning"
+                        Write-Log -logFile $LogFile -module $functionName -Message "Remediation guidance: $remediationGuidance" -logLevel "Information"
                         
                         Add-FailedResourceError -ResultObject $assignments -ResourceType $response.id -ErrorMessage $errorMessage -StatusCode $response.status -ApiVersion $apiVersion
                         

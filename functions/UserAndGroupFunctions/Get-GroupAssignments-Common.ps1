@@ -1152,3 +1152,608 @@ function Get-UnassignedResources()
         FailedResources       = $failedResourcesArray
     }
 }
+
+function Get-CorrectBaseUriForResource()
+{
+    <#
+    .SYNOPSIS
+    Determines the correct Graph API base URI for a resource based on its @odata.type.
+    
+    .DESCRIPTION
+    Maps resource OData types to their corresponding Microsoft Graph API endpoint base URIs.
+    This ensures consistent endpoint usage across all assignment functions, especially important
+    for resources that may be returned from batch endpoints with incorrect base URIs.
+    
+    Special handling includes:
+    - Managed app protection policies with T_ or A_ prefixes
+    - All mobile app types (win32, iOS, Android, etc.)
+    - Compliance policies
+    - Device configurations including Update rings
+    - Configuration policies (Settings Catalog)
+    - Scripts (standard and health)
+    - App protection/managed app policies
+    - Windows Information Protection policies
+    - Security intents/baselines
+    - Policy sets
+    - Autopilot profiles
+    - Windows Update profiles (Feature, Quality, Driver)
+    - Resource access profiles
+    
+    .PARAMETER Resource
+    The resource object containing the id and @odata.type properties.
+    
+    .PARAMETER ODataType
+    Optional explicit OData type string. If not provided, uses Resource.@odata.type.
+    
+    .RETURNS
+    String containing the correct base URI path, or $null if unable to determine.
+    
+    .EXAMPLE
+    $baseUri = Get-CorrectBaseUriForResource -Resource $myResource
+    
+    .EXAMPLE
+    $baseUri = Get-CorrectBaseUriForResource -Resource $resource -ODataType "#microsoft.graph.win32LobApp"
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        $Resource,
+        [Parameter(Mandatory = $false)]
+        [string]$ODataType
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    
+    # Special handling for managed app protection IDs with T_ or A_ prefixes
+    # These are targetedManagedAppConfiguration and managed app protection policies
+    if ($Resource.id -and ($Resource.id -match '^[TA]_'))
+    {
+        Write-Log -logFile $LogFile -module $functionName -Message "Detected managed app protection ID prefix: $($Resource.id)" -logLevel "Verbose"
+        return "deviceAppManagement/managedAppPolicies"
+    }
+    
+    $odataType = if ([string]::IsNullOrWhiteSpace($ODataType) -and $Resource.'@odata.type')
+    { 
+        $Resource.'@odata.type'.ToLower() 
+    }
+    elseif (-not [string]::IsNullOrWhiteSpace($ODataType))
+    {
+        $ODataType.ToLower()
+    }
+    else
+    { 
+        return $null 
+    }
+    
+    # Mobile Apps - all app types go to deviceAppManagement/mobileApps
+    if ($odataType -match 'win32lobapp|ioslobapp|androidlobapp|iosvppapp|androidmanagedstoreapp|managediosstore|' +
+        'webapp|microsoftstoreforbusinessapp|wingetapp|macoslobapp|macosvppapp|macospkgapp|windowsmobilemsi|' +
+        'iosstoreapp|officesuiteapp|managedapp')
+    {
+        return "deviceAppManagement/mobileApps"
+    }
+    
+    # Compliance Policies
+    if ($odataType -match 'compliancepolicy')
+    {
+        return "deviceManagement/deviceCompliancePolicies"
+    }
+    
+    # Device Configurations
+    if ($odataType -match 'windows10generalconfiguration|windowscustomconfiguration|windows10customconfiguration|' +
+        'iosgeneraldeviceconfiguration|ioscustomconfiguration|androidgeneraldeviceconfiguration|androidcustomconfiguration|' +
+        'macosgeneraldeviceconfiguration|macoscustomconfiguration|windowsupdateforbusinessconfiguration')
+    {
+        return "deviceManagement/deviceConfigurations"
+    }
+    
+    # Configuration Policies (Settings Catalog)
+    if ($odataType -match '#microsoft\.graph\.configurationpolicy')
+    {
+        return "deviceManagement/configurationPolicies"
+    }
+    
+    # Group Policy Configurations
+    if ($odataType -match 'grouppolicyconfiguration')
+    {
+        return "deviceManagement/groupPolicyConfigurations"
+    }
+    
+    # Scripts
+    if ($odataType -match 'devicemanagementscript' -and $odataType -notmatch 'health')
+    {
+        return "deviceManagement/deviceManagementScripts"
+    }
+    
+    # Health Scripts
+    if ($odataType -match 'devicehealthscript')
+    {
+        return "deviceManagement/deviceHealthScripts"
+    }
+    
+    # App Protection/Managed App Policies
+    if ($odataType -match 'managedapppolicy|managedappprotection|iosmanagedappprotection|androidmanagedappprotection|' +
+        'targetedmanagedappconfiguration|windowsinformationprotectionpolicy|mdmwindowsinformationprotectionpolicy')
+    {
+        return "deviceAppManagement/managedAppPolicies"
+    }
+    
+    # Windows Information Protection (specific endpoints)
+    if ($odataType -match '#microsoft\.graph\.windowsinformationprotectionpolicy$')
+    {
+        return "deviceAppManagement/windowsInformationProtectionPolicies"
+    }
+    if ($odataType -match '#microsoft\.graph\.mdmwindowsinformationprotectionpolicy')
+    {
+        return "deviceAppManagement/mdmWindowsInformationProtectionPolicies"
+    }
+    
+    # Intents (Security Baselines)
+    if ($odataType -match 'intent')
+    {
+        return "deviceManagement/intents"
+    }
+    
+    # Policy Sets
+    if ($odataType -match 'policyset')
+    {
+        return "deviceAppManagement/policySets"
+    }
+    
+    # Autopilot Profiles
+    if ($odataType -match 'windowsautopilotdeploymentprofile')
+    {
+        return "deviceManagement/windowsAutopilotDeploymentProfiles"
+    }
+    
+    # Windows Feature Update Profiles
+    if ($odataType -match 'windowsfeatureupdateprofile')
+    {
+        return "deviceManagement/windowsFeatureUpdateProfiles"
+    }
+    
+    # Windows Quality Update Profiles
+    if ($odataType -match 'windowsqualityupdateprofile')
+    {
+        return "deviceManagement/windowsQualityUpdateProfiles"
+    }
+    
+    # Windows Driver Update Profiles
+    if ($odataType -match 'windowsdriverupdateprofile')
+    {
+        return "deviceManagement/windowsDriverUpdateProfiles"
+    }
+    
+    # Resource Access Profiles
+    if ($odataType -match 'resourceaccessprofile')
+    {
+        return "deviceManagement/resourceAccessProfiles"
+    }
+    
+    # If we can't determine, return null
+    return $null
+}
+
+function Get-AppProtectionPolicyAssignments()
+{
+    <#
+    .SYNOPSIS
+    Retrieves assignments for app protection policies using resource-type-specific endpoints.
+    
+    .DESCRIPTION
+    App protection policies (iOS/Android Managed App Protection and Targeted Managed App Configuration)
+    require resource-type-specific endpoints instead of the standard /assignments pattern.
+    
+    This function determines the correct endpoint based on the OData type and retrieves the assignments.
+    
+    Supported types:
+    - androidManagedAppProtection → /deviceAppManagement/androidManagedAppProtections/{id}/assignments
+    - iosManagedAppProtection → /deviceAppManagement/iosManagedAppProtections/{id}/assignments
+    - targetedManagedAppConfiguration → /deviceAppManagement/targetedManagedAppConfigurations/{id}/assignments
+    
+    .PARAMETER ResourceId
+    The ID of the app protection policy resource.
+    
+    .PARAMETER ODataType
+    The @odata.type of the resource (determines which endpoint to use).
+    
+    .PARAMETER AccessToken
+    The access token for Microsoft Graph API authentication.
+    
+    .PARAMETER APIVersion
+    The API version to use (v1.0 or beta).
+    
+    .RETURNS
+    Assignment response object with value property containing assignments, or $null if error.
+    
+    .EXAMPLE
+    $assignments = Get-AppProtectionPolicyAssignments -ResourceId "abc-123" -ODataType "#microsoft.graph.androidManagedAppProtection" -AccessToken $token -APIVersion "v1.0"
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ResourceId,
+        [Parameter(Mandatory = $true)]
+        [string]$ODataType,
+        [Parameter(Mandatory = $true)]
+        [string]$AccessToken,
+        [Parameter(Mandatory = $true)]
+        [string]$APIVersion
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    
+    # Determine the correct endpoint based on OData type
+    $endpoint = $null
+    switch -Regex ($ODataType)
+    {
+        'androidManagedAppProtection'
+        {
+            $endpoint = "deviceAppManagement/androidManagedAppProtections/$ResourceId/assignments"
+        }
+        'iosManagedAppProtection'
+        {
+            $endpoint = "deviceAppManagement/iosManagedAppProtections/$ResourceId/assignments"
+        }
+        'targetedManagedAppConfiguration'
+        {
+            $endpoint = "deviceAppManagement/targetedManagedAppConfigurations/$ResourceId/assignments"
+        }
+        default
+        {
+            Write-Log -logFile $LogFile -module $functionName -Message "Unknown app protection type: $ODataType, cannot determine endpoint" -logLevel "Warning"
+            return $null
+        }
+    }
+    
+    try
+    {
+        Write-Log -logFile $LogFile -module $functionName -Message "Fetching app protection assignments using endpoint: $endpoint" -logLevel "Verbose"
+        $result = CallGraphAPI -accessToken $AccessToken -ResourcePath $endpoint -APIVersion $APIVersion -Method "GET"
+        return $result
+    }
+    catch
+    {
+        Write-Log -logFile $LogFile -module $functionName -Message "Error fetching app protection assignments: $($_.Exception.Message)" -logLevel "Warning"
+        return $null
+    }
+}
+
+function Test-ResourceSupportsAssignments()
+{
+    <#
+    .SYNOPSIS
+    Tests if a resource supports assignments using metadata analysis.
+    
+    .DESCRIPTION
+    Uses Graph API metadata to determine if a resource type supports assignments navigation property.
+    Caches results per entity type to avoid redundant API calls.
+    
+    Special cases handled:
+    - PolicySets: Known API design limitation, standard assignment endpoint not supported
+    - App Protection Policies: Require alternative resource-type-specific endpoints (returns special flag)
+    
+    .PARAMETER Resource
+    The resource object to test (must include @odata.type).
+    
+    .PARAMETER AccessToken
+    The access token for Microsoft Graph API authentication.
+    
+    .RETURNS
+    - $true: Resource supports standard /assignments endpoint
+    - $false: Resource does not support assignments or has known limitations
+    - 'ALTERNATIVE_ENDPOINT_REQUIRED': Resource requires special endpoint pattern (app protection policies)
+    
+    .EXAMPLE
+    $supportsAssignments = Test-ResourceSupportsAssignments -Resource $myResource -AccessToken $token
+    if ($supportsAssignments -eq $true) { # Standard assignment retrieval }
+    elseif ($supportsAssignments -eq 'ALTERNATIVE_ENDPOINT_REQUIRED') { # Use alternative endpoint }
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        $Resource,
+        [Parameter(Mandatory = $true)]
+        [string]$AccessToken
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    
+    # Cache metadata results per entity type to avoid redundant API calls
+    if (-not $script:MetadataCache)
+    {
+        $script:MetadataCache = @{}
+    }
+    
+    # Get entity type from @odata.type
+    $odataType = $Resource.'@odata.type'
+    if ([string]::IsNullOrWhiteSpace($odataType))
+    {
+        Write-Log -logFile $LogFile -module $functionName -Message "Resource missing @odata.type, cannot validate assignment support" -logLevel "Verbose"
+        return $true  # Assume supported if we can't determine
+    }
+    
+    # Exception list for known API design limitations that require alternative handling
+    # PolicySets: Use non-standard OData routing, assignments exist but GET endpoint differs
+    if ($Resource.ResourceType -eq 'policySets' -or $odataType -match 'policySet')
+    {
+        Write-Log -logFile $LogFile -module $functionName -Message "PolicySet detected ($odataType): Known API design limitation, standard assignment endpoint not supported" -logLevel "Verbose"
+        $script:MetadataCache[$odataType] = $false
+        return $false
+    }
+    
+    # App Protection Policies: Use targetedManagedAppPolicyAssignment, require resource-type-specific endpoints
+    if ($odataType -match 'ManagedAppProtection|targetedManagedAppConfiguration')
+    {
+        Write-Log -logFile $LogFile -module $functionName -Message "App Protection Policy detected ($odataType): Requires alternative endpoint pattern" -logLevel "Verbose"
+        # Return special value to flag for alternative handling (will be processed separately)
+        $script:MetadataCache[$odataType] = 'ALTERNATIVE_ENDPOINT_REQUIRED'
+        return 'ALTERNATIVE_ENDPOINT_REQUIRED'
+    }
+    
+    # Check cache first
+    if ($script:MetadataCache.ContainsKey($odataType))
+    {
+        $supportsAssignments = $script:MetadataCache[$odataType]
+        Write-Log -logFile $LogFile -module $functionName -Message "Metadata cache hit for $($odataType): SupportsAssignments=$supportsAssignments" -logLevel "Verbose"
+        return $supportsAssignments
+    }
+    
+    try
+    {
+        Write-Log -logFile $LogFile -module $functionName -Message "Fetching metadata for $odataType to validate assignment support" -logLevel "Verbose"
+        
+        # Determine API version from script scope or default to v1.0
+        $apiVersion = if ($script:APIVersion) { $script:APIVersion } else { 'v1.0' }
+        
+        # Create a minimal response object with @odata.context for GetGraphObjectMetadata
+        $fakeResponse = [PSCustomObject]@{
+            '@odata.context' = "https://graph.microsoft.com/$apiVersion/`$metadata#$odataType"
+            value            = @($Resource)
+        }
+        
+        # Call GetGraphObjectMetadata to analyze the entity type
+        $metadata = GetGraphObjectMetadata -ApiResponse $fakeResponse -AccessToken $AccessToken -IncludeSampleQueries $false
+        
+        if ($metadata -and $metadata.NavigationProperties)
+        {
+            # Check if 'assignments' is in the navigation properties
+            $hasAssignments = $metadata.NavigationProperties | Where-Object { $_.Name -eq 'assignments' }
+            $supportsAssignments = $null -ne $hasAssignments
+            
+            Write-Log -logFile $LogFile -module $functionName -Message "Metadata analysis for $($odataType): SupportsAssignments=$supportsAssignments" -logLevel "Verbose"
+            
+            # Cache the result
+            $script:MetadataCache[$odataType] = $supportsAssignments
+            return $supportsAssignments
+        }
+        else
+        {
+            Write-Log -logFile $LogFile -module $functionName -Message "No navigation properties found in metadata for $odataType, assuming assignment support" -logLevel "Verbose"
+            $script:MetadataCache[$odataType] = $true
+            return $true
+        }
+    }
+    catch
+    {
+        Write-Log -logFile $LogFile -module $functionName -Message "Error fetching metadata for $($odataType): $($_.Exception.Message). Assuming assignment support." -logLevel "Warning"
+        # On error, assume supported to avoid false negatives
+        $script:MetadataCache[$odataType] = $true
+        return $true
+    }
+}
+
+function Get-ErrorCategory()
+{
+    <#
+    .SYNOPSIS
+    Categorizes errors based on error codes, messages, and resource context.
+    
+    .DESCRIPTION
+    Analyzes error information to classify errors into standard categories for consistent
+    error handling and reporting across all assignment functions.
+    
+    Categories:
+    - API_DESIGN_LIMITATION: Known API design patterns requiring alternative approaches (e.g., PolicySets)
+    - UNSUPPORTED_ENDPOINT: Resource requires alternative endpoint pattern
+    - PERMISSION_DENIED: Insufficient API permissions (403)
+    - RESOURCE_NOT_FOUND: Resource not found (404)
+    - RATE_LIMIT: API rate limit exceeded (429)
+    - SERVER_ERROR: Microsoft Graph server error (5xx)
+    - INVALID_REQUEST: Bad request (400)
+    - NO_RESPONSE: No response from API
+    - MALFORMED_RESPONSE: Unexpected response structure
+    - UNKNOWN: Unclassified error
+    
+    .PARAMETER ErrorCode
+    The error code from the API response or exception.
+    
+    .PARAMETER ErrorMessage
+    The error message text.
+    
+    .PARAMETER ResourceType
+    The type of resource being accessed (e.g., 'policySets').
+    
+    .PARAMETER ODataType
+    The @odata.type of the resource.
+    
+    .RETURNS
+    String containing the error category.
+    
+    .EXAMPLE
+    $category = Get-ErrorCategory -ErrorCode "403" -ErrorMessage "Forbidden" -ResourceType "mobileApps" -ODataType "#microsoft.graph.win32LobApp"
+    #>
+    [CmdletBinding()]
+    param(
+        [string]$ErrorCode,
+        [string]$ErrorMessage,
+        [string]$ResourceType,
+        [string]$ODataType
+    )
+    
+    # PolicySets OData routing limitation
+    if ($ResourceType -eq 'policySets' -and $ErrorCode -like '*No method match route template*')
+    {
+        return 'API_DESIGN_LIMITATION'
+    }
+    
+    # App Protection Policies different assignment model
+    if ($ErrorCode -eq 'BadRequest' -and $ErrorMessage -like '*Resource not found for the segment*assignments*')
+    {
+        if ($ODataType -match 'ManagedAppProtection|targetedManagedAppConfiguration')
+        {
+            return 'UNSUPPORTED_ENDPOINT'
+        }
+    }
+    
+    # Standard error codes
+    switch -Regex ($ErrorCode)
+    {
+        '^403$|Forbidden' { return 'PERMISSION_DENIED' }
+        '^404$|NotFound' { return 'RESOURCE_NOT_FOUND' }
+        '^429$|TooManyRequests' { return 'RATE_LIMIT' }
+        '^5\d{2}$|ServerError' { return 'SERVER_ERROR' }
+        'BadRequest' { return 'INVALID_REQUEST' }
+        'NULL' { return 'NO_RESPONSE' }
+        'MALFORMED' { return 'MALFORMED_RESPONSE' }
+        default { return 'UNKNOWN' }
+    }
+}
+
+function Get-RemediationGuidance()
+{
+    <#
+    .SYNOPSIS
+    Provides remediation guidance based on error category.
+    
+    .DESCRIPTION
+    Returns actionable guidance text for remediating errors based on the error category
+    and resource context. Helps users understand what to do when errors occur.
+    
+    .PARAMETER ErrorCategory
+    The categorized error type from Get-ErrorCategory.
+    
+    .PARAMETER ErrorCode
+    The original error code.
+    
+    .PARAMETER ResourceType
+    The type of resource being accessed.
+    
+    .PARAMETER ODataType
+    The @odata.type of the resource.
+    
+    .RETURNS
+    String containing remediation guidance.
+    
+    .EXAMPLE
+    $guidance = Get-RemediationGuidance -ErrorCategory "PERMISSION_DENIED" -ErrorCode "403" -ResourceType "mobileApps" -ODataType "#microsoft.graph.win32LobApp"
+    #>
+    [CmdletBinding()]
+    param(
+        [string]$ErrorCategory,
+        [string]$ErrorCode,
+        [string]$ResourceType,
+        [string]$ODataType
+    )
+    
+    switch ($ErrorCategory)
+    {
+        'API_DESIGN_LIMITATION'
+        {
+            return "PolicySets use non-standard OData routing. Consider implementing alternative query method or skipping assignment retrieval for this resource type."
+        }
+        'UNSUPPORTED_ENDPOINT'
+        {
+            if ($ODataType -match 'androidManagedAppProtection')
+            {
+                return "Use /deviceAppManagement/androidManagedAppProtections/{id}/assignments endpoint instead."
+            }
+            elseif ($ODataType -match 'iosManagedAppProtection')
+            {
+                return "Use /deviceAppManagement/iosManagedAppProtections/{id}/assignments endpoint instead."
+            }
+            elseif ($ODataType -match 'targetedManagedAppConfiguration')
+            {
+                return "Use /deviceAppManagement/targetedManagedAppConfigurations/{id}/assignments endpoint instead."
+            }
+            else
+            {
+                return "App Protection Policies require resource-type-specific endpoints. Check Microsoft Graph API documentation."
+            }
+        }
+        'PERMISSION_DENIED'
+        {
+            return "Insufficient permissions. Verify API permissions include DeviceManagementApps.Read.All and DeviceManagementConfiguration.Read.All."
+        }
+        'RESOURCE_NOT_FOUND'
+        {
+            return "Resource may have been deleted or ID is invalid. Verify resource exists in Intune portal."
+        }
+        'RATE_LIMIT'
+        {
+            return "API rate limit exceeded. Implement retry logic with exponential backoff or reduce request frequency."
+        }
+        'SERVER_ERROR'
+        {
+            return "Microsoft Graph API server error. Retry the operation after a brief delay."
+        }
+        'NO_RESPONSE'
+        {
+            return "No response from API. Check network connectivity and API availability."
+        }
+        'MALFORMED_RESPONSE'
+        {
+            return "Response structure unexpected. May indicate API version mismatch or schema change."
+        }
+        default
+        {
+            return "Review error details and check Microsoft Graph API documentation for this resource type."
+        }
+    }
+}
+
+function Build-BatchResponseLookup()
+{
+    <#
+    .SYNOPSIS
+    Builds an efficient lookup dictionary for batch API responses.
+    
+    .DESCRIPTION
+    Creates a hashtable that maps batch response IDs to their response objects for efficient lookup.
+    CallGraphAPI batch responses include an 'id' field matching the request order (1, 2, 3...).
+    
+    This function ensures consistent ID handling (converts to strings for hashtable keys) and
+    provides logging for troubleshooting batch response matching issues.
+    
+    .PARAMETER BatchResponses
+    Array of batch response objects from CallGraphAPI (must have 'id' property).
+    
+    .RETURNS
+    Hashtable with string keys (response IDs) and response objects as values.
+    
+    .EXAMPLE
+    $lookup = Build-BatchResponseLookup -BatchResponses $batchResult.value
+    $response = $lookup["5"]  # Get response for request ID 5
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [array]$BatchResponses
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    $lookup = @{}
+    
+    foreach ($response in $BatchResponses)
+    {
+        if ($response.id)
+        {
+            # Convert ID to string for consistent hashtable lookup
+            $lookup[$response.id.ToString()] = $response
+        }
+    }
+    
+    Write-Log -logFile $LogFile -module $functionName -Message "Built response lookup with $($lookup.Count) entries from $($BatchResponses.Count) batch responses" -logLevel "Verbose"
+    
+    return $lookup
+}
