@@ -2301,7 +2301,35 @@ $getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Exp
 $getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Export all unassigned configurations" -Action {
     & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $false -exportInstead $true -ShowOnlyUnassigned $true
 }
-$getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Export all configurations and their assignments" -Action {
+$getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Export all Windows configurations and their assignments" -Action {
+    Write-Host "Exporting all configurations and their assignments..." -ForegroundColor Cyan
+    Write-Host "This will export all resources with detailed assignment information to a CSV file." -ForegroundColor Gray
+    Write-Host ""
+    
+    # Call the export function with current settings
+    $exportResult = Export-ConfigurationAssignments `
+        -AccessToken $accessToken `
+        -OutputPath $ScriptPath `
+        -IncludeBeta `
+        -Settings $settings `
+        -CreateErrorExportFile `
+        -RespectOperatingSystem
+
+    if ($exportResult.Success)
+    {
+        Write-Host ""
+        Write-Host "Export completed successfully!" -ForegroundColor Green
+        Write-Host "File: $($exportResult.OutputFile)" -ForegroundColor Cyan
+        Write-Host "Resources exported: $($exportResult.ResourceCount)" -ForegroundColor Cyan
+    }
+    else
+    {
+        Write-Host ""
+        Write-Host "Export failed: $($exportResult.Message)" -ForegroundColor Red
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Export failed: $($exportResult.Message)" -LogLevel "Error"
+    }
+}
+$getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Export all tenant configurations and their assignments" -Action {
     Write-Host "Exporting all configurations and their assignments..." -ForegroundColor Cyan
     Write-Host "This will export all resources with detailed assignment information to a CSV file." -ForegroundColor Gray
     Write-Host ""

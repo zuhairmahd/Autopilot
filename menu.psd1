@@ -930,8 +930,18 @@
                 )                       
             },
             @{
-                description           = 'Export all configurations and their assignments to a CSV file'
-                name                  = 'Export all configurations and their assignments'
+                description           = 'Export all Windows configurations and their assignments to a CSV file'
+                name                  = 'Export all Windows configurations and their assignments'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin',
+                    'advanced'
+                )           
+            }
+            @{
+                description           = 'Export all tenant configurations and their assignments to a CSV file'
+                name                  = 'Export all tenant configurations and their assignments'
                 blockType             = 'action'
                 includeInDisplayModes = @(
                     'full',
