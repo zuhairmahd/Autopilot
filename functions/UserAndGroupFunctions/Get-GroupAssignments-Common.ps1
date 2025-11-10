@@ -2229,6 +2229,9 @@ function Get-IntuneResourceLists()
     $policySets = @()
     $wipPolicies = @()
     $mdmWipPolicies = @()
+    $windowsFeatureUpdates = @()
+    $windowsQualityUpdates = @()
+    $windowsDriverUpdates = @()
     $failedResourceIds = @()
     
     if ($cachedResourceLists)
@@ -2251,6 +2254,18 @@ function Get-IntuneResourceLists()
         $policySets = $cachedResourceLists.policySets
         $wipPolicies = $cachedResourceLists.wipPolicies
         $mdmWipPolicies = $cachedResourceLists.mdmWipPolicies
+        if ($cachedResourceLists.PSObject.Properties['windowsFeatureUpdates'])
+        {
+            $windowsFeatureUpdates = $cachedResourceLists.windowsFeatureUpdates
+        }
+        if ($cachedResourceLists.PSObject.Properties['windowsQualityUpdates'])
+        {
+            $windowsQualityUpdates = $cachedResourceLists.windowsQualityUpdates
+        }
+        if ($cachedResourceLists.PSObject.Properties['windowsDriverUpdates'])
+        {
+            $windowsDriverUpdates = $cachedResourceLists.windowsDriverUpdates
+        }
         
         # Check for resources marked as $null (previously failed) and retry them
         $resourcesToRetry = @()
@@ -2269,6 +2284,13 @@ function Get-IntuneResourceLists()
             'policySets'             = @{ endpoint = "deviceAppManagement/policySets?`$select=id,displayName,description"; variable = 'policySets' }
             'wipPolicies'            = @{ endpoint = "deviceAppManagement/windowsInformationProtectionPolicies?`$select=id,displayName,description"; variable = 'wipPolicies' }
             'mdmWipPolicies'         = @{ endpoint = "deviceAppManagement/mdmWindowsInformationProtectionPolicies?`$select=id,displayName,description"; variable = 'mdmWipPolicies' }
+        }
+
+        if ($IncludeBeta.IsPresent)
+        {
+            $resourceRetryMap['windowsFeatureUpdates'] = @{ endpoint = "deviceManagement/windowsFeatureUpdateProfiles?`$select=id,displayName,description"; variable = 'windowsFeatureUpdates' }
+            $resourceRetryMap['windowsQualityUpdates'] = @{ endpoint = "deviceManagement/windowsQualityUpdateProfiles?`$select=id,displayName,description"; variable = 'windowsQualityUpdates' }
+            $resourceRetryMap['windowsDriverUpdates'] = @{ endpoint = "deviceManagement/windowsDriverUpdateProfiles?`$select=id,displayName,description"; variable = 'windowsDriverUpdates' }
         }
         
         foreach ($resourceId in $resourceRetryMap.Keys)
@@ -2368,6 +2390,9 @@ function Get-IntuneResourceLists()
                 @{ id = "resourceAccessProfiles"; url = "deviceManagement/resourceAccessProfiles"; extraParams = "select=id,displayName,description" }
                 @{ id = "wipPolicies"; url = "deviceAppManagement/windowsInformationProtectionPolicies"; extraParams = "select=id,displayName,description" }
                 @{ id = "mdmWipPolicies"; url = "deviceAppManagement/mdmWindowsInformationProtectionPolicies"; extraParams = "select=id,displayName,description" }
+                @{ id = "windowsFeatureUpdates"; url = "deviceManagement/windowsFeatureUpdateProfiles"; extraParams = "select=id,displayName,description" }
+                @{ id = "windowsQualityUpdates"; url = "deviceManagement/windowsQualityUpdateProfiles"; extraParams = "select=id,displayName,description" }
+                @{ id = "windowsDriverUpdates"; url = "deviceManagement/windowsDriverUpdateProfiles"; extraParams = "select=id,displayName,description" }
             )
         }
     
@@ -2420,6 +2445,9 @@ function Get-IntuneResourceLists()
                             "policySets" { $policySets = $response.body.value }
                             "wipPolicies" { $wipPolicies = $response.body.value }
                             "mdmWipPolicies" { $mdmWipPolicies = $response.body.value }
+                            "windowsFeatureUpdates" { $windowsFeatureUpdates = $response.body.value }
+                            "windowsQualityUpdates" { $windowsQualityUpdates = $response.body.value }
+                            "windowsDriverUpdates" { $windowsDriverUpdates = $response.body.value }
                         }
                     }
                     elseif ($response.status -ne 200)
@@ -2481,6 +2509,9 @@ function Get-IntuneResourceLists()
                 policySets             = $policySets
                 wipPolicies            = $wipPolicies
                 mdmWipPolicies         = $mdmWipPolicies
+                windowsFeatureUpdates  = $windowsFeatureUpdates
+                windowsQualityUpdates  = $windowsQualityUpdates
+                windowsDriverUpdates   = $windowsDriverUpdates
             }
             
             # Remove failed resources from cache object (set to $null so cache knows they weren't fetched)
@@ -2522,8 +2553,11 @@ function Get-IntuneResourceLists()
         $policySets = @($policySets | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
         $wipPolicies = @($wipPolicies | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
         $mdmWipPolicies = @($mdmWipPolicies | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
-        
-        Write-Log -logFile $LogFile -module $functionName -Message "After filtering for $targetOS - Apps: $($mobileApps.Count), Configs: $($deviceConfigs.Count), Compliance: $($compliancePolicies.Count), Autopilot: $($autopilotProfiles.Count), Scripts: $($deviceScripts.Count), HealthScripts: $($healthScripts.Count), AppProtection: $($appProtectionPolicies.Count), Intents: $($intents.Count), ResourceAccess: $($resourceAccessProfiles.Count), ConfigPolicies: $($configurationPolicies.Count), GroupPolicy: $($groupPolicyConfigs.Count), PolicySets: $($policySets.Count), WIP: $($wipPolicies.Count), MDMWIP: $($mdmWipPolicies.Count)" -logLevel "Information"
+        $windowsFeatureUpdates = @($windowsFeatureUpdates | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+        $windowsQualityUpdates = @($windowsQualityUpdates | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+        $windowsDriverUpdates = @($windowsDriverUpdates | Where-Object { Test-ResourcePlatformMatch -Resource $_ -TargetOS $targetOS })
+
+        Write-Log -logFile $LogFile -module $functionName -Message "After filtering for $targetOS - Apps: $($mobileApps.Count), Configs: $($deviceConfigs.Count), Compliance: $($compliancePolicies.Count), Autopilot: $($autopilotProfiles.Count), Scripts: $($deviceScripts.Count), HealthScripts: $($healthScripts.Count), AppProtection: $($appProtectionPolicies.Count), Intents: $($intents.Count), ResourceAccess: $($resourceAccessProfiles.Count), ConfigPolicies: $($configurationPolicies.Count), GroupPolicy: $($groupPolicyConfigs.Count), PolicySets: $($policySets.Count), WIP: $($wipPolicies.Count), MDMWIP: $($mdmWipPolicies.Count), FeatureUpdates: $($windowsFeatureUpdates.Count), QualityUpdates: $($windowsQualityUpdates.Count), DriverUpdates: $($windowsDriverUpdates.Count)" -logLevel "Information"
     }
     
     # Return hashtable with all resource lists
@@ -2542,6 +2576,9 @@ function Get-IntuneResourceLists()
         policySets             = $policySets
         wipPolicies            = $wipPolicies
         mdmWipPolicies         = $mdmWipPolicies
+        windowsFeatureUpdates  = $windowsFeatureUpdates
+        windowsQualityUpdates  = $windowsQualityUpdates
+        windowsDriverUpdates   = $windowsDriverUpdates
         FailedResourceIds      = $failedResourceIds
     }
 }
