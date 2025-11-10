@@ -11,8 +11,18 @@ function GetGroupIndirectAssignments()
     - All Users: #microsoft.graph.allLicensedUsersAssignmentTarget
     - All Devices: #microsoft.graph.allDevicesAssignmentTarget
     
+    When GroupId is specified, only resources that have BOTH the group assignment AND
+    All Users/All Devices assignments are returned.
+    
+    When GroupId is not specified, ALL resources with All Users/All Devices assignments
+    are returned (regardless of other group assignments).
+    
     .PARAMETER AccessToken
     The access token for Microsoft Graph API authentication.
+    
+    .PARAMETER GroupId
+    Optional. When specified, filters to show only resources that have assignments to
+    BOTH this group AND All Users/All Devices.
     
     .PARAMETER IncludeBeta
     Switch to include beta API endpoints for additional resource types.
@@ -20,8 +30,16 @@ function GetGroupIndirectAssignments()
     .PARAMETER BatchSize
     The batch size for API requests (default: 20).
     
+    .PARAMETER Settings
+    Optional settings hashtable for platform filtering and other options.
+    
     .EXAMPLE
     GetGroupIndirectAssignments -AccessToken $token -IncludeBeta
+    Returns all resources assigned to All Users or All Devices.
+    
+    .EXAMPLE
+    GetGroupIndirectAssignments -AccessToken $token -GroupId "abc-123" -IncludeBeta
+    Returns only resources assigned to BOTH the specified group AND All Users/All Devices.
     
     .NOTES
     This function can be used standalone or integrated with GetGroupDirectAssignments.
@@ -31,6 +49,8 @@ function GetGroupIndirectAssignments()
         [Parameter(Mandatory = $true)]
         [string]$AccessToken,
         [Parameter(Mandatory = $false)]
+        [string]$GroupId,
+        [Parameter(Mandatory = $false)]
         [switch]$IncludeBeta,
         [Parameter(Mandatory = $false)]
         [int]$BatchSize = 20,
@@ -39,8 +59,11 @@ function GetGroupIndirectAssignments()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Retrieving indirect assignments (All Users and All Devices)"
-    Write-Log -logFile $LogFile -module $functionName -Message "Retrieving indirect assignments (All Users and All Devices)" -logLevel "Information"
+    
+    # Log parameters
+    $modeDesc = if ($GroupId) { "with GroupId filter (show resources with BOTH group and All Users/All Devices)" } else { "without GroupId filter (show ALL All Users/All Devices)" }
+    Write-Verbose "[$functionName] Retrieving indirect assignments (All Users and All Devices) $modeDesc"
+    Write-Log -logFile $LogFile -module $functionName -Message "Retrieving indirect assignments (All Users and All Devices) $modeDesc" -logLevel "Information"
     
     # Log Settings parameter
     Write-Verbose "[$functionName] Settings provided: $($null -ne $Settings)"
@@ -59,9 +82,16 @@ function GetGroupIndirectAssignments()
     Write-Log -logFile $LogFile -module $functionName -Message "Using API version: $apiVersion" -logLevel "Information"
     
     # Check for cached indirect assignments
+    # NOTE: Cache is only used when NO GroupId filter is specified (showing ALL indirect assignments)
+    # When GroupId is specified, we always fetch fresh to ensure accuracy
     $apiVersionKey = $apiVersion
     $indirectAssignmentsCacheKey = "AllIndirectAssignments_${apiVersionKey}"
-    $cachedIndirectAssignments = Get-CachedData -Key $indirectAssignmentsCacheKey -CacheType Configuration
+    $cachedIndirectAssignments = $null
+    
+    if (-not $GroupId)
+    {
+        $cachedIndirectAssignments = Get-CachedData -Key $indirectAssignmentsCacheKey -CacheType Configuration
+    }
     
     if ($cachedIndirectAssignments)
     {
@@ -425,52 +455,68 @@ function GetGroupIndirectAssignments()
         }
         
         # Process indirect assignments for each resource type
-        Get-IndirectResourceAssignments -ResultObject $indirectAssignments -AccessToken $AccessToken -ApiVersion $apiVersion -Resources $mobileApps -ResourceType "Mobile Apps" -BaseUri "deviceAppManagement/mobileApps" -AssignmentCategory "Application"
-        Get-IndirectResourceAssignments -ResultObject $indirectAssignments -AccessToken $AccessToken -ApiVersion $apiVersion -Resources $deviceConfigs -ResourceType "Device Configurations" -BaseUri "deviceManagement/deviceConfigurations" -AssignmentCategory "Configuration"
-        Get-IndirectResourceAssignments -ResultObject $indirectAssignments -AccessToken $AccessToken -ApiVersion $apiVersion -Resources $compliancePolicies -ResourceType "Compliance Policies" -BaseUri "deviceManagement/deviceCompliancePolicies" -AssignmentCategory "Compliance"
-        Get-IndirectResourceAssignments -ResultObject $indirectAssignments -AccessToken $AccessToken -ApiVersion $apiVersion -Resources $deviceScripts -ResourceType "Device Management Scripts" -BaseUri "deviceManagement/deviceManagementScripts" -AssignmentCategory "Script"
-        Get-IndirectResourceAssignments -ResultObject $indirectAssignments -AccessToken $AccessToken -ApiVersion $apiVersion -Resources $appProtectionPolicies -ResourceType "App Protection Policies" -BaseUri "deviceAppManagement/managedAppPolicies" -AssignmentCategory "AppProtection"
-        Get-IndirectResourceAssignments -ResultObject $indirectAssignments -AccessToken $AccessToken -ApiVersion $apiVersion -Resources $intents -ResourceType "Device Management Intents" -BaseUri "deviceManagement/intents" -AssignmentCategory "Intent"
-        Get-IndirectResourceAssignments -ResultObject $indirectAssignments -AccessToken $AccessToken -ApiVersion $apiVersion -Resources $policySets -ResourceType "Policy Sets" -BaseUri "deviceAppManagement/policySets" -AssignmentCategory "PolicySet"
+        # Pass GroupId if specified to filter for resources with BOTH group and All Users/All Devices (requirement #2)
+        $splatParams = @{
+            ResultObject = $indirectAssignments
+            AccessToken = $AccessToken
+            ApiVersion = $apiVersion
+        }
+        if ($GroupId) { $splatParams['GroupId'] = $GroupId }
+        
+        Get-IndirectResourceAssignments @splatParams -Resources $mobileApps -ResourceType "Mobile Apps" -BaseUri "deviceAppManagement/mobileApps" -EndpointId "mobileApps"
+        Get-IndirectResourceAssignments @splatParams -Resources $deviceConfigs -ResourceType "Device Configurations" -BaseUri "deviceManagement/deviceConfigurations" -EndpointId "deviceConfigs"
+        Get-IndirectResourceAssignments @splatParams -Resources $compliancePolicies -ResourceType "Compliance Policies" -BaseUri "deviceManagement/deviceCompliancePolicies" -EndpointId "compliancePolicies"
+        Get-IndirectResourceAssignments @splatParams -Resources $deviceScripts -ResourceType "Device Management Scripts" -BaseUri "deviceManagement/deviceManagementScripts" -EndpointId "deviceScripts"
+        Get-IndirectResourceAssignments @splatParams -Resources $appProtectionPolicies -ResourceType "App Protection Policies" -BaseUri "deviceAppManagement/managedAppPolicies" -EndpointId "appProtectionPolicies"
+        Get-IndirectResourceAssignments @splatParams -Resources $intents -ResourceType "Device Management Intents" -BaseUri "deviceManagement/intents" -EndpointId "intents"
+        Get-IndirectResourceAssignments @splatParams -Resources $policySets -ResourceType "Policy Sets" -BaseUri "deviceAppManagement/policySets" -EndpointId "policySets"
         
         if ($IncludeBeta.IsPresent)
         {
-            Get-IndirectResourceAssignments -ResultObject $indirectAssignments -AccessToken $AccessToken -ApiVersion $apiVersion -Resources $autopilotProfiles -ResourceType "Autopilot Profiles" -BaseUri "deviceManagement/windowsAutopilotDeploymentProfiles" -AssignmentCategory "AutopilotProfile"
-            Get-IndirectResourceAssignments -ResultObject $indirectAssignments -AccessToken $AccessToken -ApiVersion $apiVersion -Resources $healthScripts -ResourceType "Device Health Scripts" -BaseUri "deviceManagement/deviceHealthScripts" -AssignmentCategory "HealthScript"
-            Get-IndirectResourceAssignments -ResultObject $indirectAssignments -AccessToken $AccessToken -ApiVersion $apiVersion -Resources $configurationPolicies -ResourceType "Configuration Policies" -BaseUri "deviceManagement/configurationPolicies" -AssignmentCategory "ConfigurationPolicy"
-            Get-IndirectResourceAssignments -ResultObject $indirectAssignments -AccessToken $AccessToken -ApiVersion $apiVersion -Resources $groupPolicyConfigs -ResourceType "Group Policy Configurations" -BaseUri "deviceManagement/groupPolicyConfigurations" -AssignmentCategory "GroupPolicy"
-            Get-IndirectResourceAssignments -ResultObject $indirectAssignments -AccessToken $AccessToken -ApiVersion $apiVersion -Resources $resourceAccessProfiles -ResourceType "Resource Access Profiles" -BaseUri "deviceManagement/resourceAccessProfiles" -AssignmentCategory "ResourceAccess"
-            Get-IndirectResourceAssignments -ResultObject $indirectAssignments -AccessToken $AccessToken -ApiVersion $apiVersion -Resources $wipPolicies -ResourceType "Windows Information Protection" -BaseUri "deviceAppManagement/windowsInformationProtectionPolicies" -AssignmentCategory "WindowsInformationProtection"
-            Get-IndirectResourceAssignments -ResultObject $indirectAssignments -AccessToken $AccessToken -ApiVersion $apiVersion -Resources $mdmWipPolicies -ResourceType "MDM Windows Information Protection" -BaseUri "deviceAppManagement/mdmWindowsInformationProtectionPolicies" -AssignmentCategory "WindowsInformationProtection"
+            Get-IndirectResourceAssignments @splatParams -Resources $autopilotProfiles -ResourceType "Autopilot Profiles" -BaseUri "deviceManagement/windowsAutopilotDeploymentProfiles" -EndpointId "autopilotProfiles"
+            Get-IndirectResourceAssignments @splatParams -Resources $healthScripts -ResourceType "Device Health Scripts" -BaseUri "deviceManagement/deviceHealthScripts" -EndpointId "healthScripts"
+            Get-IndirectResourceAssignments @splatParams -Resources $configurationPolicies -ResourceType "Configuration Policies" -BaseUri "deviceManagement/configurationPolicies" -EndpointId "configurationPolicies"
+            Get-IndirectResourceAssignments @splatParams -Resources $groupPolicyConfigs -ResourceType "Group Policy Configurations" -BaseUri "deviceManagement/groupPolicyConfigurations" -EndpointId "groupPolicyConfigs"
+            Get-IndirectResourceAssignments @splatParams -Resources $resourceAccessProfiles -ResourceType "Resource Access Profiles" -BaseUri "deviceManagement/resourceAccessProfiles" -EndpointId "resourceAccessProfiles"
+            Get-IndirectResourceAssignments @splatParams -Resources $wipPolicies -ResourceType "Windows Information Protection" -BaseUri "deviceAppManagement/windowsInformationProtectionPolicies" -EndpointId "wipPolicies"
+            Get-IndirectResourceAssignments @splatParams -Resources $mdmWipPolicies -ResourceType "MDM Windows Information Protection" -BaseUri "deviceAppManagement/mdmWindowsInformationProtectionPolicies" -EndpointId "mdmWipPolicies"
         }
         
         $totalIndirectAssignments = $indirectAssignments.AllAssignments.Count
         Write-Log -logFile $LogFile -module $functionName -Message "Total indirect assignments found (All Users/All Devices): $totalIndirectAssignments" -LogLevel "Information"
         
-        # Cache the indirect assignments results (even if empty, to avoid re-fetching)
-        $indirectAssignmentsCacheKey = "AllIndirectAssignments_${apiVersionKey}"
-        $indirectAssignmentsData = @{
-            AppAssignments                          = $indirectAssignments.AppAssignments
-            ConfigurationAssignments                = $indirectAssignments.ConfigurationAssignments
-            ComplianceAssignments                   = $indirectAssignments.ComplianceAssignments
-            AutopilotAssignments                    = $indirectAssignments.AutopilotAssignments
-            ScriptAssignments                       = $indirectAssignments.ScriptAssignments
-            HealthScriptAssignments                 = $indirectAssignments.HealthScriptAssignments
-            AppProtectionAssignments                = $indirectAssignments.AppProtectionAssignments
-            IntentAssignments                       = $indirectAssignments.IntentAssignments
-            ResourceAccessAssignments               = $indirectAssignments.ResourceAccessAssignments
-            ConfigurationPolicyAssignments          = $indirectAssignments.ConfigurationPolicyAssignments
-            GroupPolicyAssignments                  = $indirectAssignments.GroupPolicyAssignments
-            WindowsInformationProtectionAssignments = $indirectAssignments.WindowsInformationProtectionAssignments
-            PolicySetAssignments                    = $indirectAssignments.PolicySetAssignments
-            AllAssignments                          = $indirectAssignments.AllAssignments
-            FailedResources                         = $indirectAssignments.FailedResources
-        }
-        
-        $cached = Set-CachedData -CacheType 'Configuration' -Key $indirectAssignmentsCacheKey -Data $indirectAssignmentsData -Metadata @{ApiVersion = $apiVersionKey; FetchedAt = Get-Date; Type = 'IndirectAssignments'; Scope = 'AllUsers_AllDevices'}
-        if ($cached)
+        # Cache the indirect assignments results (only when NO GroupId filter is used)
+        # When GroupId is specified, results are filtered and shouldn't be cached globally
+        if (-not $GroupId)
         {
-            Write-Log -logFile $LogFile -module $functionName -Message "Successfully cached indirect assignments (All Users/All Devices, count: $totalIndirectAssignments)" -logLevel "Verbose"
+            $indirectAssignmentsCacheKey = "AllIndirectAssignments_${apiVersionKey}"
+            $indirectAssignmentsData = @{
+                AppAssignments                          = $indirectAssignments.AppAssignments
+                ConfigurationAssignments                = $indirectAssignments.ConfigurationAssignments
+                ComplianceAssignments                   = $indirectAssignments.ComplianceAssignments
+                AutopilotAssignments                    = $indirectAssignments.AutopilotAssignments
+                ScriptAssignments                       = $indirectAssignments.ScriptAssignments
+                HealthScriptAssignments                 = $indirectAssignments.HealthScriptAssignments
+                AppProtectionAssignments                = $indirectAssignments.AppProtectionAssignments
+                IntentAssignments                       = $indirectAssignments.IntentAssignments
+                ResourceAccessAssignments               = $indirectAssignments.ResourceAccessAssignments
+                ConfigurationPolicyAssignments          = $indirectAssignments.ConfigurationPolicyAssignments
+                GroupPolicyAssignments                  = $indirectAssignments.GroupPolicyAssignments
+                WindowsInformationProtectionAssignments = $indirectAssignments.WindowsInformationProtectionAssignments
+                PolicySetAssignments                    = $indirectAssignments.PolicySetAssignments
+                AllAssignments                          = $indirectAssignments.AllAssignments
+                FailedResources                         = $indirectAssignments.FailedResources
+            }
+        
+            $cached = Set-CachedData -CacheType 'Configuration' -Key $indirectAssignmentsCacheKey -Data $indirectAssignmentsData -Metadata @{ApiVersion = $apiVersionKey; FetchedAt = Get-Date; Type = 'IndirectAssignments'; Scope = 'AllUsers_AllDevices'}
+            if ($cached)
+            {
+                Write-Log -logFile $LogFile -module $functionName -Message "Successfully cached indirect assignments (All Users/All Devices, count: $totalIndirectAssignments)" -logLevel "Verbose"
+            }
+        }
+        else
+        {
+            Write-Log -logFile $LogFile -module $functionName -Message "Skipping cache (GroupId filter specified, results are filtered)" -logLevel "Verbose"
         }
     }
     catch

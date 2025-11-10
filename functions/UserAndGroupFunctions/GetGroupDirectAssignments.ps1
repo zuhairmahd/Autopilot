@@ -169,7 +169,7 @@ function GetGroupDirectAssignments()
             [array]$Resources,
             [string]$ResourceType,
             [string]$BaseUri,
-            [string]$AssignmentCategory
+            [string]$EndpointId
         )
         
         $functionName = $MyInvocation.MyCommand.Name
@@ -219,7 +219,10 @@ function GetGroupDirectAssignments()
                     
                     foreach ($assignment in $relevantAssignments)
                     {
-                        $assignmentObject = New-AssignmentObject -Type $AssignmentCategory `
+                        # Use Get-ResourceCategory to determine the correct category based on @odata.type
+                        $category = Get-ResourceCategory -Resource $resource -EndpointId $EndpointId
+                        
+                        $assignmentObject = New-AssignmentObject -Type $category `
                             -Name $resource.displayName `
                             -Description $(if ($resource.description) { $resource.description } else { "" }) `
                             -Id $resource.id `
@@ -228,7 +231,7 @@ function GetGroupDirectAssignments()
                             -Settings $assignment.settings `
                             -AssignmentScope "Direct"
                         
-                        Add-AssignmentToCategory -ResultObject $ResultObject -Assignment $assignmentObject -AssignmentCategory $AssignmentCategory
+                        Add-AssignmentToCategory -ResultObject $ResultObject -Assignment $assignmentObject -AssignmentCategory $category
                     }
                 }
             }
@@ -561,23 +564,23 @@ function GetGroupDirectAssignments()
         }
         
         # Process assignments using CallGraphAPI's built-in batch support for each resource type
-        Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $mobileApps -ResourceType "Mobile Apps" -BaseUri "deviceAppManagement/mobileApps" -AssignmentCategory "Application"
-        Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $deviceConfigs -ResourceType "Device Configurations" -BaseUri "deviceManagement/deviceConfigurations" -AssignmentCategory "Configuration"
-        Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $compliancePolicies -ResourceType "Compliance Policies" -BaseUri "deviceManagement/deviceCompliancePolicies" -AssignmentCategory "Compliance"
-        Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $deviceScripts -ResourceType "Device Management Scripts" -BaseUri "deviceManagement/deviceManagementScripts" -AssignmentCategory "Script"
-        Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $appProtectionPolicies -ResourceType "App Protection Policies" -BaseUri "deviceAppManagement/managedAppPolicies" -AssignmentCategory "AppProtection"
-        Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $intents -ResourceType "Device Management Intents" -BaseUri "deviceManagement/intents" -AssignmentCategory "Intent"
-        Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $policySets -ResourceType "Policy Sets" -BaseUri "deviceAppManagement/policySets" -AssignmentCategory "PolicySet"
+        Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $mobileApps -ResourceType "Mobile Apps" -BaseUri "deviceAppManagement/mobileApps" -EndpointId "mobileApps"
+        Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $deviceConfigs -ResourceType "Device Configurations" -BaseUri "deviceManagement/deviceConfigurations" -EndpointId "deviceConfigs"
+        Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $compliancePolicies -ResourceType "Compliance Policies" -BaseUri "deviceManagement/deviceCompliancePolicies" -EndpointId "compliancePolicies"
+        Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $deviceScripts -ResourceType "Device Management Scripts" -BaseUri "deviceManagement/deviceManagementScripts" -EndpointId "deviceScripts"
+        Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $appProtectionPolicies -ResourceType "App Protection Policies" -BaseUri "deviceAppManagement/managedAppPolicies" -EndpointId "appProtectionPolicies"
+        Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $intents -ResourceType "Device Management Intents" -BaseUri "deviceManagement/intents" -EndpointId "intents"
+        Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $policySets -ResourceType "Policy Sets" -BaseUri "deviceAppManagement/policySets" -EndpointId "policySets"
         
         if ($IncludeBeta.IsPresent)
         {
-            Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $autopilotProfiles -ResourceType "Autopilot Profiles" -BaseUri "deviceManagement/windowsAutopilotDeploymentProfiles" -AssignmentCategory "AutopilotProfile"
-            Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $healthScripts -ResourceType "Device Health Scripts" -BaseUri "deviceManagement/deviceHealthScripts" -AssignmentCategory "HealthScript"
-            Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $configurationPolicies -ResourceType "Configuration Policies" -BaseUri "deviceManagement/configurationPolicies" -AssignmentCategory "ConfigurationPolicy"
-            Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $groupPolicyConfigs -ResourceType "Group Policy Configurations" -BaseUri "deviceManagement/groupPolicyConfigurations" -AssignmentCategory "GroupPolicy"
-            Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $resourceAccessProfiles -ResourceType "Resource Access Profiles" -BaseUri "deviceManagement/resourceAccessProfiles" -AssignmentCategory "ResourceAccess"
-            Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $wipPolicies -ResourceType "Windows Information Protection" -BaseUri "deviceAppManagement/windowsInformationProtectionPolicies" -AssignmentCategory "WindowsInformationProtection"
-            Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $mdmWipPolicies -ResourceType "MDM Windows Information Protection" -BaseUri "deviceAppManagement/mdmWindowsInformationProtectionPolicies" -AssignmentCategory "WindowsInformationProtection"
+            Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $autopilotProfiles -ResourceType "Autopilot Profiles" -BaseUri "deviceManagement/windowsAutopilotDeploymentProfiles" -EndpointId "autopilotProfiles"
+            Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $healthScripts -ResourceType "Device Health Scripts" -BaseUri "deviceManagement/deviceHealthScripts" -EndpointId "healthScripts"
+            Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $configurationPolicies -ResourceType "Configuration Policies" -BaseUri "deviceManagement/configurationPolicies" -EndpointId "configurationPolicies"
+            Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $groupPolicyConfigs -ResourceType "Group Policy Configurations" -BaseUri "deviceManagement/groupPolicyConfigurations" -EndpointId "groupPolicyConfigs"
+            Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $resourceAccessProfiles -ResourceType "Resource Access Profiles" -BaseUri "deviceManagement/resourceAccessProfiles" -EndpointId "resourceAccessProfiles"
+            Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $wipPolicies -ResourceType "Windows Information Protection" -BaseUri "deviceAppManagement/windowsInformationProtectionPolicies" -EndpointId "wipPolicies"
+            Get-ResourceAssignments -ResultObject $assignments -GroupIdValue $groupIdValue -Resources $mdmWipPolicies -ResourceType "MDM Windows Information Protection" -BaseUri "deviceAppManagement/mdmWindowsInformationProtectionPolicies" -EndpointId "mdmWipPolicies"
         }
         
         Write-Log -logFile $LogFile -module $functionName -Message "Batch processing complete. Found assignments - Apps: $($assignments.AppAssignments.Count), Configs: $($assignments.ConfigurationAssignments.Count), Compliance: $($assignments.ComplianceAssignments.Count), Autopilot: $($assignments.AutopilotAssignments.Count), Scripts: $($assignments.ScriptAssignments.Count), HealthScripts: $($assignments.HealthScriptAssignments.Count), AppProtection: $($assignments.AppProtectionAssignments.Count), Intents: $($assignments.IntentAssignments.Count), ResourceAccess: $($assignments.ResourceAccessAssignments.Count), ConfigPolicies: $($assignments.ConfigurationPolicyAssignments.Count), GroupPolicy: $($assignments.GroupPolicyAssignments.Count), WIP: $($assignments.WindowsInformationProtectionAssignments.Count), PolicySets: $($assignments.PolicySetAssignments.Count)" -LogLevel "Verbose"

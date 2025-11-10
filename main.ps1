@@ -529,8 +529,6 @@ if ($clearCache)
 }
 #endregion  Initialize script parameters
 
-
-
 #region Process login
 Write-Verbose "[$scriptName] Checking configuration file: $configFile"
 # Check if the .secrets directory exists, create it if it doesn't
@@ -2156,7 +2154,7 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
 }
 #endregion Check menu
 
-#region Group Assignments menu
+#region show Group Assignments menu
 <#
     This script-scoped variable defines a reusable script block for showing group assignments in the Intune Helpdesk Menu.
     It is defined at script scope to allow sharing between multiple menu items (e.g., direct and indirect assignment views),
@@ -2167,21 +2165,32 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
 $script:ShowGroupAssignmentsAction = {
     param(
         [bool]$IncludeIndirectAssignments,
+        [bool]$ShowOnlyUnassigned,
         [bool]$exportInstead
     )
     
     $assignmentScope = if ($IncludeIndirectAssignments) { "indirect (All Users/All Devices)" } else { "direct" }
     $specialGroups = @("*", "?")    
     $messageText = if ($IncludeIndirectAssignments) { "Enter the name of the group whose indirect (All Users/All Devices) assignments you want to view. Enter any of $specialGroups             for all assignments" } else { "Enter the name of the group whose direct assignments you want to view." }                                                                
-    $groupName = GetUserInput -Message $messageText -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
-    $needsResolution = if ($IncludeIndirectAssignments -and $groupName -in $specialGroups                                                           ) { $false } else { $true }                                     
+    if ($ShowOnlyUnassigned -eq $false)
+    {
+        write-log -logFile $LogFile -Module $scriptName -Message "Prompting user for group name to view $assignmentScope assignments" -LogLevel "Information"                   
+        $groupName = GetUserInput -Message $messageText -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
+    }
+    $needsResolution = if ($ShowOnlyUnassigned -or ($IncludeIndirectAssignments -and $groupName -in $specialGroups                                                           )) { $false } else { $true }                                     
     Write-Log -LogFile $LogFile -Module $scriptName -Message "GroupName: $groupName, IncludeIndirectAssignments: $IncludeIndirectAssignments, AssignmentScope: $assignmentScope, SpecialGroups: $specialGroups, NeedsResolution: $needsResolution"
-    if ($null -eq $groupName)
+    
+    # Only check for null groupName if we actually needed to prompt for it (not in ShowOnlyUnassigned mode)
+    if (-not $ShowOnlyUnassigned -and $null -eq $groupName)
     {
         Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
         return $returnValues.backoutText
     }
-    Write-Verbose "[$scriptName] Got group name: $groupName"
+    
+    if ($groupName)
+    {
+        Write-Verbose "[$scriptName] Got group name: $groupName"
+    }
     
     #region Resolve group using unified Resolve-DirectoryObject with entity return
     if ($needsResolution)
@@ -2226,14 +2235,25 @@ $script:ShowGroupAssignmentsAction = {
     Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName) with IncludeIndirect=$IncludeIndirectAssignments"
     $showGroupAssignmentsSplat = @{
         AccessToken = $accessToken
-        Group       = $selectedGroup
         Settings    = $global:settings
     }
+    
+    # Add Group parameter for all cases except ShowOnlyUnassigned
+    if (-not $ShowOnlyUnassigned)
+    {
+        $showGroupAssignmentsSplat['Group'] = $selectedGroup
+    }
+    
     if ($IncludeIndirectAssignments)
     {
         $showGroupAssignmentsSplat['ShowIndirectAssignments'] = $true
         $showGroupAssignmentsSplat['SpecialGroups'] = $specialGroups 
     }
+    if ($ShowOnlyUnassigned)
+    {
+        $showGroupAssignmentsSplat['ShowOnlyUnassigned'] = $true
+        # $showGroupAssignmentsSplat['Group'] = $selectedGroup
+    }                               
     if ($exportInstead)
     {
         $showGroupAssignmentsSplat['exportInstead'] = $true
@@ -2269,11 +2289,44 @@ $getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Vie
 $getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "View indirect group assignments (All Users/All Devices)" -Action {
     & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $true -exportInstead $false
 }
+$getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "View all unassigned configurations" -Action {
+    & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $false -exportInstead $false -ShowOnlyUnassigned $true
+}
 $getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Export direct group assignments" -Action {
     & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $false -exportInstead $true                            
 }
 $getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Export indirect group assignments (All Users/All Devices)" -Action {
     & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $true -exportInstead $true                 
+}
+$getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Export all unassigned configurations" -Action {
+    & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $false -exportInstead $true -ShowOnlyUnassigned $true
+}
+$getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Export all configurations and their assignments" -Action {
+    Write-Host "Exporting all configurations and their assignments..." -ForegroundColor Cyan
+    Write-Host "This will export all resources with detailed assignment information to a CSV file." -ForegroundColor Gray
+    Write-Host ""
+    
+    # Call the export function with current settings
+    $exportResult = Export-ConfigurationAssignments `
+        -AccessToken $accessToken `
+        -OutputPath $ScriptPath `
+        -IncludeBeta `
+        -Settings $settings `
+        -CreateErrorExportFile
+    
+    if ($exportResult.Success)
+    {
+        Write-Host ""
+        Write-Host "Export completed successfully!" -ForegroundColor Green
+        Write-Host "File: $($exportResult.OutputFile)" -ForegroundColor Cyan
+        Write-Host "Resources exported: $($exportResult.ResourceCount)" -ForegroundColor Cyan
+    }
+    else
+    {
+        Write-Host ""
+        Write-Host "Export failed: $($exportResult.Message)" -ForegroundColor Red
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Export failed: $($exportResult.Message)" -LogLevel "Error"
+    }
 }
 #endregion Show Group Assignments menu
 
