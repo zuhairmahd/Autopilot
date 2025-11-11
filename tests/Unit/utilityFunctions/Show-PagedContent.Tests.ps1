@@ -385,35 +385,59 @@ Describe "Function: Show-PagedContent" -Tags 'Unit', 'UtilityFunctions', 'Paging
         }
     }
     
-    Context "EstimatedLinesPerItem parameter" {
-        It "Should accept EstimatedLinesPerItem parameter" {
+    Context "UseDynamicSize parameter" {
+        It "Should accept UseDynamicSize switch parameter" {
             $content = @("Item 1", "Item 2", "Item 3")
-            { Show-PagedContent -Content $content -EstimatedLinesPerItem 5 -Silent } | Should -Not -Throw
+            { Show-PagedContent -Content $content -UseDynamicSize -Silent } | Should -Not -Throw
         }
         
-        It "Should validate EstimatedLinesPerItem and default to 1 if invalid" {
-            $content = @("Item 1")
-            # Should not throw but log warning and use default
-            { Show-PagedContent -Content $content -EstimatedLinesPerItem -5 -Silent } | Should -Not -Throw
-        }
-        
-        It "Should calculate screen-aware page size when EstimatedLinesPerItem > 1" {
-            # This test verifies the calculation logic doesn't crash
-            # Actual page size adjustment depends on console height
-            $content = 1..50 | ForEach-Object { "Item $_" }
-            $result = Show-PagedContent -Content $content -EstimatedLinesPerItem 8 -PageSize 10 -Silent
+        It "Should calculate dynamic page size for PSCustomObjects with Description properties" {
+            $content = @(
+                [PSCustomObject]@{ Name = "App1"; Description = "Short description"; Intent = "required" },
+                [PSCustomObject]@{ Name = "App2"; Description = "This is a much longer description that will wrap to multiple lines when displayed in the console window and should be accounted for in the line calculations"; Intent = "available" },
+                [PSCustomObject]@{ Name = "App3"; Description = "Medium length description here"; Intent = "required" }
+            )
+            $displayBlock = {
+                param($item)
+                Write-Host "Name: $($item.Name)"
+                Write-Host "  Description: $($item.Description)"
+                Write-Host "  Intent: $($item.Intent)"
+                Write-Host ""
+            }
+            $result = Show-PagedContent -Content $content -UseDynamicSize -PageSize 10 -DisplayScriptBlock $displayBlock -Silent
             $result | Should -Be "completed"
         }
         
-        It "Should skip screen-aware paging in Silent mode even with EstimatedLinesPerItem" {
+        It "Should handle string arrays with UseDynamicSize" {
             $content = 1..50 | ForEach-Object { "Item $_" }
-            $result = Show-PagedContent -Content $content -EstimatedLinesPerItem 8 -Silent
+            $result = Show-PagedContent -Content $content -UseDynamicSize -Silent
             $result | Should -Be "completed"
         }
         
-        It "Should skip screen-aware paging with NoPaging switch" {
+        It "Should skip dynamic sizing in Silent mode" {
             $content = 1..50 | ForEach-Object { "Item $_" }
-            $result = Show-PagedContent -Content $content -EstimatedLinesPerItem 8 -NoPaging -Silent
+            $result = Show-PagedContent -Content $content -UseDynamicSize -Silent
+            $result | Should -Be "completed"
+        }
+        
+        It "Should skip dynamic sizing with NoPaging switch" {
+            $content = 1..50 | ForEach-Object { "Item $_" }
+            $result = Show-PagedContent -Content $content -UseDynamicSize -NoPaging -Silent
+            $result | Should -Be "completed"
+        }
+        
+        It "Should handle empty Description properties gracefully" {
+            $content = @(
+                [PSCustomObject]@{ Name = "App1"; Description = $null; Intent = "required" },
+                [PSCustomObject]@{ Name = "App2"; Description = ""; Intent = "available" }
+            )
+            $displayBlock = {
+                param($item)
+                Write-Host "Name: $($item.Name)"
+                if ($item.Description) { Write-Host "  Description: $($item.Description)" }
+                Write-Host "  Intent: $($item.Intent)"
+            }
+            $result = Show-PagedContent -Content $content -UseDynamicSize -DisplayScriptBlock $displayBlock -Silent
             $result | Should -Be "completed"
         }
     }
