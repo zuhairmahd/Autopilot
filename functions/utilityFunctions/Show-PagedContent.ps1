@@ -270,22 +270,86 @@ function Show-PagedContent()
                 # Check if items are objects with properties (PSCustomObject, etc.)
                 elseif ($firstItem -is [PSCustomObject] -or $firstItem -is [System.Collections.Specialized.OrderedDictionary])
                 {
-                    # Calculate average lines based on actual rendered output of DisplayScriptBlock
+                    # Calculate average lines based on actual rendered output
+                    # This is the most accurate approach as it accounts for how DisplayScriptBlock renders content
                     $totalLines = 0
-                    $sampleSize = [Math]::Min(10, $items.Count)  # Sample first 10 items for performance
+                    $sampleSize = [Math]::Min(5, $items.Count)  # Sample first 5 items for performance
+                    
+                    Write-Verbose "[$functionName] Sampling $sampleSize items to calculate actual rendered line count"
                     
                     for ($i = 0; $i -lt $sampleSize; $i++)
                     {
                         $item = $items[$i]
+                        
                         # Capture the output of the DisplayScriptBlock for this item
-                        $output = & $DisplayScriptBlock $item | Out-String
-                        # Count the number of lines in the output
-                        $itemLines = ($output -split "`r?`n").Count
-                        $totalLines += $itemLines
+                        if ($DisplayScriptBlock)
+                        {
+                            try
+                            {
+                                # Redirect output to capture it
+                                $capturedOutput = & $DisplayScriptBlock $item | Out-String
+                                
+                                # Count non-empty lines in the output
+                                $outputLines = ($capturedOutput -split "`r?`n")
+                                $itemLines = ($outputLines | Where-Object { $_.Trim() -ne '' }).Count
+                                
+                                # Add 1 for the blank line separator that Write-Host "" creates
+                                # (it shows as empty in captured output but takes screen space)
+                                $itemLines += 1
+                                
+                                $totalLines += $itemLines
+                                Write-Verbose "[$functionName] Item $i rendered as $itemLines lines"
+                            }
+                            catch
+                            {
+                                # Fallback: use property-based estimate if DisplayScriptBlock fails
+                                Write-Verbose "[$functionName] DisplayScriptBlock execution failed, using property count fallback"
+                                $properties = $item.PSObject.Properties
+                                $itemLines = $properties.Count + 2  # Properties + blank line + buffer
+                                $totalLines += $itemLines
+                            }
+                        }
+                        else
+                        {
+                            # Fallback: count properties if no DisplayScriptBlock
+                            $properties = $item.PSObject.Properties
+                            $itemLines = 0
+                            
+                            foreach ($prop in $properties)
+                            {
+                                # Each property typically takes 1 line
+                                $itemLines += 1
+                                
+                                # Check for long text properties that will wrap
+                                if ($prop.Name -match 'Description|Comments|Notes' -and $prop.Value -is [string] -and $prop.Value)
+                                {
+                                    # Calculate wrapped lines dynamically based on property name
+                                    $prefix = 2 + $prop.Name.Length + 2  # "  PropertyName: "
+                                    $availableWidth = $consoleWidth - $prefix
+                                    
+                                    if ($availableWidth -gt 0 -and $prop.Value.Length -gt $availableWidth)
+                                    {
+                                        $wrappedLines = [Math]::Ceiling($prop.Value.Length / $availableWidth)
+                                        $itemLines += ($wrappedLines - 1)  # Add extra wrapped lines
+                                    }
+                                }
+                            }
+                            
+                            # Add 1 for blank line between items
+                            $itemLines += 1
+                            $totalLines += $itemLines
+                        }
                     }
                     
-                    $estimatedLinesPerItem = [Math]::Ceiling($totalLines / $sampleSize)
-                    Write-Verbose "[$functionName] Content type: PSCustomObject - calculated $estimatedLinesPerItem lines per item (sampled $sampleSize items)"
+                    if ($sampleSize -gt 0)
+                    {
+                        $estimatedLinesPerItem = [Math]::Ceiling($totalLines / $sampleSize)
+                        Write-Verbose "[$functionName] Content type: PSCustomObject - calculated $estimatedLinesPerItem lines per item (sampled $sampleSize items, total lines: $totalLines)"
+                    }
+                    else
+                    {
+                        $estimatedLinesPerItem = 5  # Conservative fallback
+                    }
                 }
                 # Check if items are hashtables or other dictionary types
                 if ($prop.Value -is [string] -and $prop.Value)
@@ -306,11 +370,12 @@ function Show-PagedContent()
             
             # Reserve lines for UI elements:
             # - Initial info (2 lines: total items message + navigation hint)
-            # - Title (2-3 lines: blank + title + blank)
+            # - Initial blank line (1 line)
+            # - Title (3 lines: blank + title + blank if title present)
             # - Page info header (3 lines: page number + showing items + blank)
-            # - Navigation footer (3 lines: blank + separator + navigation prompt)
-            # Total reserved: approximately 10-11 lines
-            $reservedLines = 11
+            # - Navigation footer (4 lines: blank + separator + navigation prompt + input prompt)
+            # Total reserved: approximately 13-14 lines (use 15 to be safe)
+            $reservedLines = 15
             
             # Calculate available lines for content
             $availableLines = $consoleHeight - $reservedLines
