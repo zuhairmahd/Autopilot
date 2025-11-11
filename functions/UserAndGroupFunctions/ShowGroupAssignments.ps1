@@ -133,15 +133,19 @@ function ShowGroupAssignments()
     )
 
     $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -logFile $LogFile -Module $functionName -Message "Function started - Group: '$Group', ShowOnlyUnassigned: $($ShowOnlyUnassigned.IsPresent), ShowIndirectAssignments: $($ShowIndirectAssignments.IsPresent), exportInstead: $($exportInstead.IsPresent), DoNotShowEmptyMenus: $($DoNotShowEmptyMenus.IsPresent)" -logLevel "Information"
+    
     #region process initial setup
     #define the action type
     if ($exportInstead.IsPresent)
     {
         $actionType = "Export"
+        Write-Log -logFile $LogFile -Module $functionName -Message "Action type set to: Export" -logLevel "Verbose"
     }
     else
     {
         $actionType = "Show"
+        Write-Log -logFile $LogFile -Module $functionName -Message "Action type set to: Show" -logLevel "Verbose"
     }           
     # Extract group name for logging and display
     $groupName = if ($Group -and $Group.displayName)
@@ -160,6 +164,8 @@ function ShowGroupAssignments()
     { 
         "Unknown" 
     }
+    
+    Write-Log -logFile $LogFile -Module $functionName -Message "Extracted group name: '$groupName' (Group type: $($Group.GetType().Name))" -logLevel "Verbose"
     
     # Validate access token
     if (-not $accessToken)
@@ -266,20 +272,9 @@ function ShowGroupAssignments()
         $assignments.GroupPolicyAssignments = @($unassignedProfiles | Where-Object { $_.Type -eq 'GroupPolicy' })
         $assignments.WindowsInformationProtectionAssignments = @($unassignedProfiles | Where-Object { $_.Type -eq 'WindowsInformationProtection' })
         $assignments.PolicySetAssignments = @($unassignedProfiles | Where-Object { $_.Type -eq 'PolicySet' })
-        
-        # Add Windows Update categories (Feature Updates, Quality Updates, Driver Updates)
-        if (-not $assignments.PSObject.Properties['WindowsFeatureUpdateAssignments'])
-        {
-            $assignments | Add-Member -NotePropertyName 'WindowsFeatureUpdateAssignments' -NotePropertyValue @($unassignedProfiles | Where-Object { $_.Type -eq 'WindowsFeatureUpdate' })
-        }
-        if (-not $assignments.PSObject.Properties['WindowsQualityUpdateAssignments'])
-        {
-            $assignments | Add-Member -NotePropertyName 'WindowsQualityUpdateAssignments' -NotePropertyValue @($unassignedProfiles | Where-Object { $_.Type -eq 'WindowsQualityUpdate' })
-        }
-        if (-not $assignments.PSObject.Properties['WindowsDriverUpdateAssignments'])
-        {
-            $assignments | Add-Member -NotePropertyName 'WindowsDriverUpdateAssignments' -NotePropertyValue @($unassignedProfiles | Where-Object { $_.Type -eq 'WindowsDriverUpdate' })
-        }
+        $assignments.WindowsFeatureUpdateAssignments = @($unassignedProfiles | Where-Object { $_.Type -eq 'WindowsFeatureUpdate' }) 
+        $assignments.WindowsQualityUpdateAssignments = @($unassignedProfiles | Where-Object { $_.Type -eq 'WindowsQualityUpdate' })                         
+        $assignments.WindowsDriverUpdateAssignments = @($unassignedProfiles | Where-Object { $_.Type -eq 'WindowsDriverUpdate' })
         
         $groupName = "Unassigned Profiles"
         
@@ -376,6 +371,7 @@ function ShowGroupAssignments()
     
     # Cache all assignments to avoid re-query per selection
     $allAssignments = @($assignments.allAssignments)
+    Write-Log -logFile $LogFile -Module $functionName -Message "Cached $($allAssignments.Count) total assignments for processing" -logLevel "Information"
     
     # Skip consolidation for unassigned profiles (they have no assignments to consolidate)
     if ($ShowOnlyUnassigned.IsPresent)
@@ -489,16 +485,19 @@ function ShowGroupAssignments()
     #endregion                  
     
     #region Build and show assignment type menu    
+    Write-Log -logFile $LogFile -Module $functionName -Message "Building assignment type menu (DoNotShowEmptyMenus: $($DoNotShowEmptyMenus.IsPresent))" -logLevel "Verbose"
     $groupAssignmentsMenu = NewMenu -MenuName "groupAssignmentsMenu"
     if (-not $groupAssignmentsMenu)
     {
         # Fallback to manual creation if config not found
+        Write-Log -logFile $LogFile -Module $functionName -Message "Menu config not found, creating menu manually" -logLevel "Debug"
         $groupAssignmentsMenu = NewMenu -Title "Group Assignments for $groupName" -Description "What type of assignments would you like to see?"
     }
     else
     {
         # Update title with actual group name
         $groupAssignmentsMenu.Title = $groupAssignmentsMenu.Title -replace '\$groupName', $groupName
+        Write-Log -logFile $LogFile -Module $functionName -Message "Menu loaded from config, title updated with group name" -logLevel "Debug"
     }
     
     if (-not $DoNotShowEmptyMenus -or $assignments.AppAssignments.count -gt 0)
@@ -620,23 +619,34 @@ function ShowGroupAssignments()
             return 'All'
         } -returnsValue
     }
+    
+    Write-Log -logFile $LogFile -Module $functionName -Message "Assignment type menu built with $($groupAssignmentsMenu.MenuItems.Count) visible items" -logLevel "Information"
     #endregion
 
     # Loop: after showing assignments, return to the assignment type menu
+    Write-Log -logFile $LogFile -Module $functionName -Message "Entering main assignment type selection loop" -logLevel "Verbose"
+    $loopIteration = 0
     while ($true)
     {
+        $loopIteration++
+        Write-Log -logFile $LogFile -Module $functionName -Message "Assignment type menu loop iteration: $loopIteration" -logLevel "Debug"
+        
         # Use proper stack operation to maintain menu navigation integrity
         $assignmentType = ShowMenu -Menu $groupAssignmentsMenu -CalledBy 'Custom_GroupAssignmentSubmenu' -StackOperation 'Push'
+        Write-Log -logFile $LogFile -Module $functionName -Message "User selected assignment type: '$assignmentType'" -logLevel "Information"
+        
         # Validate that we got a proper assignment, not a navigation option
         if ($assignmentType -eq "Back" -or $assignmentType -eq "Main Menu" -or $assignmentType -eq 0 -or $assignmentType -eq "0")
         {
             Write-Verbose "[$functionName] ShowMenu returned navigation option: '$assignmentType', treating as navigation"
+            Write-Log -logFile $LogFile -Module $functionName -Message "Navigation option selected: '$assignmentType', exiting function" -logLevel "Information"
             return $assignmentType
         }
         # If assignmentType is null, user may have navigated away - don't continue processing
         if ($null -eq $assignmentType)
         {
             Write-Verbose "[$functionName] ShowMenu returned null, user may have navigated away"
+            Write-Log -logFile $LogFile -Module $functionName -Message "ShowMenu returned null, user navigated away" -logLevel "Information"
             return $null
         }
         
@@ -668,16 +678,19 @@ function ShowGroupAssignments()
             if ($internalType)
             {
                 $selectedAssignments = @($allAssignments | Where-Object { $_.Type -eq $internalType })
+                Write-Log -logFile $LogFile -Module $functionName -Message "Filtered assignments by type '$assignmentType' (internal: '$internalType'): $($selectedAssignments.Count) found" -logLevel "Information"
             }
             else
             {
                 $selectedAssignments = @()
+                Write-Log -logFile $LogFile -Module $functionName -Message "Unknown assignment type '$assignmentType', returning empty set" -logLevel "Warning"
             }
             Write-Host "Found $($selectedAssignments.Count) assignments of type $assignmentType"
         }
         else
         {
             $selectedAssignments = $allAssignments
+            Write-Log -logFile $LogFile -Module $functionName -Message "Showing all assignment types: $($selectedAssignments.Count) total assignments" -logLevel "Information"
             Write-Host "Found $($selectedAssignments.Count) assignments"
         }
         # Process assignments based on export or display mode
@@ -702,7 +715,7 @@ function ShowGroupAssignments()
                 }                   
                 
                 Write-Host "Exporting $($selectedAssignments.Count) assignments to CSV..." -ForegroundColor Cyan
-                Write-Log -logFile $LogFile -Module $functionName -Message "Exporting $($selectedAssignments.Count) assignments to: $exportPath" -LogLevel "Information"
+                Write-Log -logFile $LogFile -Module $functionName -Message "Starting export - Type: '$assignmentType', Count: $($selectedAssignments.Count), Path: '$exportPath'" -LogLevel "Information"
                 
                 try
                 {
@@ -736,24 +749,30 @@ function ShowGroupAssignments()
                     
                     # Export to CSV
                     $exportData | Export-Csv -Path $exportPath -NoTypeInformation -Encoding UTF8
+                    $exportFileSize = (Get-Item $exportPath).Length
                     
                     Write-Host "Export completed successfully!" -ForegroundColor Green
                     Write-Host "File location: $exportPath" -ForegroundColor White
-                    Write-Log -logFile $LogFile -Module $functionName -Message "Export completed: $exportPath" -LogLevel "Information"
+                    Write-Log -logFile $LogFile -Module $functionName -Message "Export completed successfully - Records: $($exportData.Count), File size: $exportFileSize bytes, Path: '$exportPath'" -LogLevel "Information"
                     
                     # Offer to open the file
                     Write-Host ""
                     $openChoice = Read-Host "Would you like to open the exported file? (yes/no)"
+                    Write-Log -logFile $LogFile -Module $functionName -Message "User prompted to open file, response: '$openChoice'" -LogLevel "Debug"
                     if ($openChoice -in @('yes', 'y'))
                     {
                         Start-Process $exportPath
-                        Write-Log -logFile $LogFile -Module $functionName -Message "User opened exported file: $exportPath" -LogLevel "Verbose"
+                        Write-Log -logFile $LogFile -Module $functionName -Message "User opened exported file: $exportPath" -LogLevel "Information"
+                    }
+                    else
+                    {
+                        Write-Log -logFile $LogFile -Module $functionName -Message "User declined to open exported file" -LogLevel "Verbose"
                     }
                 }
                 catch
                 {
                     Write-Host "Error exporting assignments: $($_.Exception.Message)" -ForegroundColor Red
-                    Write-Log -logFile $LogFile -Module $functionName -Message "Export failed: $($_.Exception.Message)" -LogLevel "Error"
+                    Write-Log -logFile $LogFile -Module $functionName -Message "Export failed - Error: $($_.Exception.Message), Stack: $($_.ScriptStackTrace)" -LogLevel "Error"
                 }
                 
                 Write-Host ""
@@ -817,20 +836,22 @@ function ShowGroupAssignments()
                 {
                     "$assignmentType Assignments for '$groupName' ($($selectedAssignments.Count) total)"
                 }
-                Write-Log -logFile $LogFile -Module $functionName -Message "Displaying $($selectedAssignments.Count) assignments with paging" -LogLevel "Information"
+                Write-Log -logFile $LogFile -Module $functionName -Message "Starting paged display - Type: '$assignmentType', Count: $($selectedAssignments.Count), PageSize: 10, Title: '$pageTitle'" -LogLevel "Information"
+                
                 # Use Show-PagedContent for display
                 $pagingResult = Show-PagedContent -Content $selectedAssignments `
                     -DisplayScriptBlock $displayScript `
                     -Title $pageTitle `
                     -PageSize 10 `
                     -ShowPageInfo $true
-                Write-Log -logFile $LogFile -Module $functionName -Message "Paging completed with result: $pagingResult" -LogLevel "Verbose"
+                    
+                Write-Log -logFile $LogFile -Module $functionName -Message "Paged display completed - Result: '$pagingResult'" -LogLevel "Information"
             }
         }
         else
         {
             Write-Host "No assignments found for the selected type." -ForegroundColor Yellow
-            Write-Log -logFile $LogFile -Module $functionName -Message "No assignments found for type: $assignmentType" -LogLevel "Information"
+            Write-Log -logFile $LogFile -Module $functionName -Message "No assignments found for type: '$assignmentType' (filtered from $($allAssignments.Count) total assignments)" -LogLevel "Information"
             Write-Host ""
             Write-Host "Press any key to continue..."
             [void][System.Console]::ReadKey($true)
@@ -839,5 +860,6 @@ function ShowGroupAssignments()
 
         # Loop continues to re-show the assignment type menu
     }
+    Write-Log -logFile $LogFile -Module $functionName -Message "Function exiting with return value: $($returnValues.backoutText)" -logLevel "Information"
     return $returnValues.backoutText
 }
