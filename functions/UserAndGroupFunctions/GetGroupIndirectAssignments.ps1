@@ -112,6 +112,18 @@ function GetGroupIndirectAssignments()
         $indirectAssignments.GroupPolicyAssignments = $cachedIndirectAssignments.GroupPolicyAssignments
         $indirectAssignments.WindowsInformationProtectionAssignments = $cachedIndirectAssignments.WindowsInformationProtectionAssignments
         $indirectAssignments.PolicySetAssignments = $cachedIndirectAssignments.PolicySetAssignments
+        if ($cachedIndirectAssignments.PSObject.Properties['WindowsFeatureUpdateAssignments'])
+        {
+            $indirectAssignments.WindowsFeatureUpdateAssignments = $cachedIndirectAssignments.WindowsFeatureUpdateAssignments
+        }
+        if ($cachedIndirectAssignments.PSObject.Properties['WindowsQualityUpdateAssignments'])
+        {
+            $indirectAssignments.WindowsQualityUpdateAssignments = $cachedIndirectAssignments.WindowsQualityUpdateAssignments
+        }
+        if ($cachedIndirectAssignments.PSObject.Properties['WindowsDriverUpdateAssignments'])
+        {
+            $indirectAssignments.WindowsDriverUpdateAssignments = $cachedIndirectAssignments.WindowsDriverUpdateAssignments
+        }
         $indirectAssignments.AllAssignments = $cachedIndirectAssignments.AllAssignments
         
         # Restore FailedResources if present
@@ -307,6 +319,9 @@ function GetGroupIndirectAssignments()
             $policySets = $resourceLists.policySets
             $wipPolicies = $resourceLists.wipPolicies
             $mdmWipPolicies = $resourceLists.mdmWipPolicies
+            $windowsFeatureUpdates = $resourceLists.windowsFeatureUpdates
+            $windowsQualityUpdates = $resourceLists.windowsQualityUpdates
+            $windowsDriverUpdates = $resourceLists.windowsDriverUpdates
             
             Write-Log -logFile $LogFile -module $functionName -Message "Retrieved resource counts from helper - Apps: $($mobileApps.Count), Configs: $($deviceConfigs.Count), Compliance: $($compliancePolicies.Count), Autopilot: $($autopilotProfiles.Count), Scripts: $($deviceScripts.Count), HealthScripts: $($healthScripts.Count), AppProtection: $($appProtectionPolicies.Count), Intents: $($intents.Count), ResourceAccess: $($resourceAccessProfiles.Count), ConfigPolicies: $($configurationPolicies.Count), GroupPolicy: $($groupPolicyConfigs.Count), PolicySets: $($policySets.Count), WIP: $($wipPolicies.Count), MDMWIP: $($mdmWipPolicies.Count)" -logLevel "Information"
         }
@@ -342,6 +357,9 @@ function GetGroupIndirectAssignments()
             Get-ResourceAssignments @splatParams -Resources $resourceAccessProfiles -ResourceType "Resource Access Profiles" -BaseUri "deviceManagement/resourceAccessProfiles" -EndpointId "resourceAccessProfiles"
             Get-ResourceAssignments @splatParams -Resources $wipPolicies -ResourceType "Windows Information Protection" -BaseUri "deviceAppManagement/windowsInformationProtectionPolicies" -EndpointId "wipPolicies"
             Get-ResourceAssignments @splatParams -Resources $mdmWipPolicies -ResourceType "MDM Windows Information Protection" -BaseUri "deviceAppManagement/mdmWindowsInformationProtectionPolicies" -EndpointId "mdmWipPolicies"
+            Get-ResourceAssignments @splatParams -Resources $windowsFeatureUpdates -ResourceType "Windows Feature Update Profiles" -BaseUri "deviceManagement/windowsFeatureUpdateProfiles" -EndpointId "windowsFeatureUpdates"
+            Get-ResourceAssignments @splatParams -Resources $windowsQualityUpdates -ResourceType "Windows Quality Update Profiles" -BaseUri "deviceManagement/windowsQualityUpdateProfiles" -EndpointId "windowsQualityUpdates"
+            Get-ResourceAssignments @splatParams -Resources $windowsDriverUpdates -ResourceType "Windows Driver Update Profiles" -BaseUri "deviceManagement/windowsDriverUpdateProfiles" -EndpointId "windowsDriverUpdates"
         }
         
         $totalIndirectAssignments = $indirectAssignments.AllAssignments.Count
@@ -366,6 +384,9 @@ function GetGroupIndirectAssignments()
                 GroupPolicyAssignments                  = $indirectAssignments.GroupPolicyAssignments
                 WindowsInformationProtectionAssignments = $indirectAssignments.WindowsInformationProtectionAssignments
                 PolicySetAssignments                    = $indirectAssignments.PolicySetAssignments
+                WindowsFeatureUpdateAssignments         = $indirectAssignments.WindowsFeatureUpdateAssignments
+                WindowsQualityUpdateAssignments         = $indirectAssignments.WindowsQualityUpdateAssignments
+                WindowsDriverUpdateAssignments          = $indirectAssignments.WindowsDriverUpdateAssignments
                 AllAssignments                          = $indirectAssignments.AllAssignments
                 FailedResources                         = $indirectAssignments.FailedResources
             }

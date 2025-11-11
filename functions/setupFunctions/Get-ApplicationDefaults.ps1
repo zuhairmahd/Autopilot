@@ -124,6 +124,7 @@ function Get-ApplicationDefaults()
             }
             operatingSystem              = "Windows"
             migrateLegacyConfiguration   = $true
+            hideEmptyMenus               = $true
             autoUpdate                   = $true
         }
 
@@ -170,6 +171,7 @@ function Get-ApplicationDefaults()
             companyName                     = ""
             version                         = $Version
             validateScopes                  = $false
+            hideEmptyMenus                  = $true
             maxWaitTime                     = 30
             showLicenseBanner               = $true
             deviceContactThresholdInDays    = 30

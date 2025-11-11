@@ -1,3 +1,5 @@
+. "$PSScriptRoot/Get-GroupAssignments-Common.ps1"
+
 function Export-ConfigurationAssignments()
 {
     <#
@@ -140,13 +142,35 @@ function Export-ConfigurationAssignments()
         if ($endpointIndex -ge 0 -and $endpointIndex -lt $resourceEndpoints.Count)
         {
             $endpointInfo = $resourceEndpoints[$endpointIndex]
-            # Access response.body.value since CallGraphAPI now preserves full response structure
-            $resources = $result.body.value
+            $resourceDescription = $endpointInfo.id
+            
+            if ($null -eq $result.body)
+            {
+                Write-Log -logFile $LogFile -module $functionName -Message "Batch response for '$resourceDescription' returned no body. Status: $($result.status)" -logLevel "Warning"
+                continue
+            }
+            
+            $pagedResources = Get-PagedCollectionItems -InitialResponse $result.body -AccessToken $AccessToken -ResourceDescription $resourceDescription
+            $resources = $pagedResources.Items
+            Write-Log -logFile $LogFile -module $functionName -Message "Endpoint '$resourceDescription' returned $($resources.Count) item(s) across $($pagedResources.PageCount) page(s)" -logLevel "Verbose"
             
             if ($resources -and $resources.Count -gt 0)
             {
                 foreach ($resource in $resources)
                 {
+                    $resourceType = $endpointInfo.id
+                    
+                    # Backfill @odata.type when Graph omits metadata so platform filtering still works
+                    if ([string]::IsNullOrWhiteSpace($resource.'@odata.type'))
+                    {
+                        $fallbackODataType = Get-DefaultODataTypeForEndpoint -EndpointId $resourceType
+                        if ($fallbackODataType)
+                        {
+                            $resource | Add-Member -NotePropertyName '@odata.type' -NotePropertyValue $fallbackODataType -Force
+                            Write-Log -logFile $LogFile -module $functionName -Message "Injected default ODataType '$fallbackODataType' for resource '$($resource.displayName)' (ID: $($resource.id)) via endpoint '$resourceType'." -logLevel "Verbose"
+                        }
+                    }
+                    
                     # Validate if resource supports assignments using metadata
                     $supportsAssignments = Test-ResourceSupportsAssignments -Resource $resource -AccessToken $AccessToken
                     
@@ -157,7 +181,6 @@ function Export-ConfigurationAssignments()
                     }
                     
                     # Determine resource type and category using unified function
-                    $resourceType = $endpointInfo.id
                     $category = Get-ResourceCategory -Resource $resource -EndpointId $resourceType
                     
                     # Validate and correct BaseUri based on @odata.type
@@ -191,6 +214,11 @@ function Export-ConfigurationAssignments()
             Write-Log -logFile $LogFile -module $functionName -Message "Batch response ID $responseId (endpoint: $($endpointInfo.id)) returned no resources or failed" -logLevel "Verbose"
         }
     }    Write-Log -logFile $LogFile -module $functionName -Message "Retrieved $($allResources.Count) total resources across all types" -logLevel "Information"
+    if ($allResources.Count -gt 0)
+    {
+        $resourceTypeSummary = ($allResources | Group-Object ResourceType | Sort-Object Name | ForEach-Object { "$($_.Name): $($_.Count)" }) -join '; '
+        Write-Log -logFile $LogFile -module $functionName -Message "Resource type distribution pre-filter: $resourceTypeSummary" -logLevel "Verbose"
+    }
     Write-Host "  Retrieved $($allResources.Count) total resources" -ForegroundColor Gray
     
     # Apply platform filtering if specified and RespectOperatingSystem is true
@@ -672,6 +700,7 @@ function Export-ConfigurationAssignments()
             
             $rawTargetString = ($rawTargets -join " | ")
             Write-Log -logFile $LogFile -module $functionName -Message "Resource '$($resource.Name)': RawTargets=$rawTargetString" -logLevel "Debug"
+            Write-Log -logFile $LogFile -module $functionName -Message "Resource '$($resource.Name)': Classification Summary -> Classification=$classification, HasDirect=$hasDirectAssignment, DirectGroups=$($directGroupIds.Count), HasAllUsers=$hasAllUsers, HasAllDevices=$hasAllDevices" -logLevel "Verbose"
             
             $exportData += [PSCustomObject]@{
                 ResourceName        = $resource.Name

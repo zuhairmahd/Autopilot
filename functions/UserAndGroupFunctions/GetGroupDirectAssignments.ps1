@@ -185,6 +185,9 @@ function GetGroupDirectAssignments()
         $policySets = $resourceLists.policySets
         $wipPolicies = $resourceLists.wipPolicies
         $mdmWipPolicies = $resourceLists.mdmWipPolicies
+        $windowsFeatureUpdates = $resourceLists.windowsFeatureUpdates
+        $windowsQualityUpdates = $resourceLists.windowsQualityUpdates
+        $windowsDriverUpdates = $resourceLists.windowsDriverUpdates
         
         Write-Log -logFile $LogFile -module $functionName -Message "Retrieved resource counts from helper - Apps: $($mobileApps.Count), Configs: $($deviceConfigs.Count), Compliance: $($compliancePolicies.Count), Autopilot: $($autopilotProfiles.Count), Scripts: $($deviceScripts.Count), HealthScripts: $($healthScripts.Count), AppProtection: $($appProtectionPolicies.Count), Intents: $($intents.Count), ResourceAccess: $($resourceAccessProfiles.Count), ConfigPolicies: $($configurationPolicies.Count), GroupPolicy: $($groupPolicyConfigs.Count), PolicySets: $($policySets.Count), WIP: $($wipPolicies.Count), MDMWIP: $($mdmWipPolicies.Count)" -logLevel "Information"
         
@@ -206,9 +209,12 @@ function GetGroupDirectAssignments()
             Get-ResourceAssignments -ResultObject $assignments -AccessToken $AccessToken -ApiVersion $apiVersion -GroupIdValue $groupIdValue -Resources $groupPolicyConfigs -ResourceType "Group Policy Configurations" -BaseUri "deviceManagement/groupPolicyConfigurations" -EndpointId "groupPolicyConfigs" -AssignmentMode "Direct"
             Get-ResourceAssignments -ResultObject $assignments -AccessToken $AccessToken -ApiVersion $apiVersion -GroupIdValue $groupIdValue -Resources $wipPolicies -ResourceType "Windows Information Protection Policies" -BaseUri "deviceAppManagement/windowsInformationProtectionPolicies" -EndpointId "wipPolicies" -AssignmentMode "Direct"
             Get-ResourceAssignments -ResultObject $assignments -AccessToken $AccessToken -ApiVersion $apiVersion -GroupIdValue $groupIdValue -Resources $mdmWipPolicies -ResourceType "MDM Windows Information Protection Policies" -BaseUri "deviceAppManagement/mdmWindowsInformationProtectionPolicies" -EndpointId "mdmWipPolicies" -AssignmentMode "Direct"
+            Get-ResourceAssignments -ResultObject $assignments -AccessToken $AccessToken -ApiVersion $apiVersion -GroupIdValue $groupIdValue -Resources $windowsFeatureUpdates -ResourceType "Windows Feature Update Profiles" -BaseUri "deviceManagement/windowsFeatureUpdateProfiles" -EndpointId "windowsFeatureUpdates" -AssignmentMode "Direct"
+            Get-ResourceAssignments -ResultObject $assignments -AccessToken $AccessToken -ApiVersion $apiVersion -GroupIdValue $groupIdValue -Resources $windowsQualityUpdates -ResourceType "Windows Quality Update Profiles" -BaseUri "deviceManagement/windowsQualityUpdateProfiles" -EndpointId "windowsQualityUpdates" -AssignmentMode "Direct"
+            Get-ResourceAssignments -ResultObject $assignments -AccessToken $AccessToken -ApiVersion $apiVersion -GroupIdValue $groupIdValue -Resources $windowsDriverUpdates -ResourceType "Windows Driver Update Profiles" -BaseUri "deviceManagement/windowsDriverUpdateProfiles" -EndpointId "windowsDriverUpdates" -AssignmentMode "Direct"
         }
         
-        Write-Log -logFile $LogFile -module $functionName -Message "Batch processing complete. Found assignments - Apps: $($assignments.AppAssignments.Count), Configs: $($assignments.ConfigurationAssignments.Count), Compliance: $($assignments.ComplianceAssignments.Count), Autopilot: $($assignments.AutopilotAssignments.Count), Scripts: $($assignments.ScriptAssignments.Count), HealthScripts: $($assignments.HealthScriptAssignments.Count), AppProtection: $($assignments.AppProtectionAssignments.Count), Intents: $($assignments.IntentAssignments.Count), ResourceAccess: $($assignments.ResourceAccessAssignments.Count), ConfigPolicies: $($assignments.ConfigurationPolicyAssignments.Count), GroupPolicy: $($assignments.GroupPolicyAssignments.Count), WIP: $($assignments.WindowsInformationProtectionAssignments.Count), PolicySets: $($assignments.PolicySetAssignments.Count)" -LogLevel "Verbose"
+        Write-Log -logFile $LogFile -module $functionName -Message "Batch processing complete. Found assignments - Apps: $($assignments.AppAssignments.Count), Configs: $($assignments.ConfigurationAssignments.Count), Compliance: $($assignments.ComplianceAssignments.Count), Autopilot: $($assignments.AutopilotAssignments.Count), Scripts: $($assignments.ScriptAssignments.Count), HealthScripts: $($assignments.HealthScriptAssignments.Count), AppProtection: $($assignments.AppProtectionAssignments.Count), Intents: $($assignments.IntentAssignments.Count), ResourceAccess: $($assignments.ResourceAccessAssignments.Count), ConfigPolicies: $($assignments.ConfigurationPolicyAssignments.Count), GroupPolicy: $($assignments.GroupPolicyAssignments.Count), WIP: $($assignments.WindowsInformationProtectionAssignments.Count), PolicySets: $($assignments.PolicySetAssignments.Count), FeatureUpdates: $($assignments.WindowsFeatureUpdateAssignments.Count), QualityUpdates: $($assignments.WindowsQualityUpdateAssignments.Count), DriverUpdates: $($assignments.WindowsDriverUpdateAssignments.Count)" -LogLevel "Verbose"
         
         # Cache the direct assignments for this group (even if empty, to avoid re-fetching)
         if ($groupIdValue)
@@ -318,6 +324,9 @@ function GetGroupDirectAssignments()
             Write-Host "  Configuration Policies: $($assignments.ConfigurationPolicyAssignments.Count)" -ForegroundColor Yellow
             Write-Host "  Group Policy Configurations: $($assignments.GroupPolicyAssignments.Count)" -ForegroundColor Yellow
             Write-Host "  Windows Information Protection: $($assignments.WindowsInformationProtectionAssignments.Count)" -ForegroundColor Yellow
+            Write-Host "  Windows Feature Update Profiles: $($assignments.WindowsFeatureUpdateAssignments.Count)" -ForegroundColor Yellow
+            Write-Host "  Windows Quality Update Profiles: $($assignments.WindowsQualityUpdateAssignments.Count)" -ForegroundColor Yellow
+            Write-Host "  Windows Driver Update Profiles: $($assignments.WindowsDriverUpdateAssignments.Count)" -ForegroundColor Yellow
         }
         Write-Host "  Total: $totalAssignments" -ForegroundColor Cyan
     }

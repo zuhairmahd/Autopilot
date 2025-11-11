@@ -61,7 +61,7 @@ Parses the @odata.context from Graph API responses to extract metadata.
         [string]$CustomMetadataUrl
     )
     
-    $ functionName = $MyInvocation.MyCommand.Name
+    $functionName = $MyInvocation.MyCommand.Name
     Write-Log -logFile $logFile -module $functionName -Message "Starting GetGraphObjectMetadata function with RecursionDepth=$RecursionDepth" -logLevel "Verbose"
     if (-not $ApiResponse)
     {
