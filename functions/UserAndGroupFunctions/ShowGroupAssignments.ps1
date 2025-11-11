@@ -851,7 +851,6 @@ function ShowGroupAssignments()
                 
                 # Use Show-PagedContent for display with dynamic screen-aware paging
                 # The -UseDynamicSize switch tells Show-PagedContent to automatically
-                # calculate lines per item based on object properties and console dimensions
                 $pagingResult = Show-PagedContent -Content $selectedAssignments `
                     -DisplayScriptBlock $displayScript `
                     -Title $pageTitle `

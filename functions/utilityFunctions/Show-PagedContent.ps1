@@ -252,7 +252,7 @@ function Show-PagedContent()
             $consoleWidth = $Host.UI.RawUI.WindowSize.Width
             
             Write-Verbose "[$functionName] Console dimensions: ${consoleWidth}x${consoleHeight}"
-            
+            write-log -LogFile $logFile -Module $functionName -Message "Console dimensions: ${consoleWidth}x${consoleHeight}" -LogLevel "Verbose"
             # Determine content type and calculate lines per item
             $estimatedLinesPerItem = 1  # Default for simple content
             
@@ -268,43 +268,19 @@ function Show-PagedContent()
                     Write-Verbose "[$functionName] Content type: String - using 1 line per item"
                 }
                 # Check if items are objects with properties (PSCustomObject, etc.)
-                elseif ($firstItem -is [PSCustomObject] -or $firstItem.GetType().Name -match 'PSCustomObject|OrderedDictionary')
+                elseif ($firstItem -is [PSCustomObject] -or $firstItem -is [System.Collections.Specialized.OrderedDictionary])
                 {
-                    # Calculate average lines based on actual object content
+                    # Calculate average lines based on actual rendered output of DisplayScriptBlock
                     $totalLines = 0
                     $sampleSize = [Math]::Min(10, $items.Count)  # Sample first 10 items for performance
                     
                     for ($i = 0; $i -lt $sampleSize; $i++)
                     {
                         $item = $items[$i]
-                        $itemLines = 0
-                        
-                        # Get all properties
-                        $properties = $item.PSObject.Properties
-                        
-                        foreach ($prop in $properties)
-                        {
-                            # Each property typically takes 1 line
-                            $itemLines += 1
-                            
-                            # Check for Description or similar long-text properties
-                            if ($prop.Name -match 'Description|Comments|Notes' -and $prop.Value)
-                            {
-                                # Calculate wrapped lines for description
-                                # Assume "  PropertyName: " prefix (varies, use average of 14 chars)
-                                $prefix = 14
-                                $availableWidth = $consoleWidth - $prefix
-                                
-                                if ($availableWidth -gt 0 -and $prop.Value.Length -gt $availableWidth)
-                                {
-                                    $wrappedLines = [Math]::Ceiling($prop.Value.Length / $availableWidth)
-                                    $itemLines += ($wrappedLines - 1)  # Add extra wrapped lines
-                                }
-                            }
-                        }
-                        
-                        # Add 1 for blank line between items (typical pattern)
-                        $itemLines += 1
+                        # Capture the output of the DisplayScriptBlock for this item
+                        $output = & $DisplayScriptBlock $item | Out-String
+                        # Count the number of lines in the output
+                        $itemLines = ($output -split "`r?`n").Count
                         $totalLines += $itemLines
                     }
                     
@@ -312,11 +288,11 @@ function Show-PagedContent()
                     Write-Verbose "[$functionName] Content type: PSCustomObject - calculated $estimatedLinesPerItem lines per item (sampled $sampleSize items)"
                 }
                 # Check if items are hashtables or other dictionary types
-                elseif ($firstItem -is [System.Collections.DictionaryEntry] -or $firstItem -is [hashtable])
+                if ($prop.Value -is [string] -and $prop.Value)
                 {
-                    # Dictionary entries typically display as "Key: Value" on one line
-                    $estimatedLinesPerItem = 1
-                    Write-Verbose "[$functionName] Content type: Dictionary - using 1 line per item"
+                    # Calculate wrapped lines for any long string property
+                    # Calculate prefix length dynamically: "  PropertyName: "
+                    $prefix = 2 + $prop.Name.Length + 2  # 2 spaces + property name + ": "
                 }
                 else
                 {
