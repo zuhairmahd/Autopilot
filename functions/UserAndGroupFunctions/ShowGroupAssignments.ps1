@@ -849,10 +849,86 @@ function ShowGroupAssignments()
                 }
                 Write-Log -logFile $LogFile -Module $functionName -Message "Starting paged display - Type: '$assignmentType', Count: $($selectedAssignments.Count), PageSize: 10, Title: '$pageTitle'" -LogLevel "Information"
                 
-                # Estimate lines per item for screen-aware paging
-                # Applications often have long descriptions spanning multiple lines
-                # Conservative estimate to ensure items fit on screen
-                $estimatedLinesPerItem = 8
+                # Calculate dynamic lines per item based on actual content
+                # This is more accurate than a fixed estimate
+                try
+                {
+                    # Get console width for line wrapping calculations
+                    $consoleWidth = $Host.UI.RawUI.WindowSize.Width
+                    
+                    # Calculate average lines per item based on actual descriptions
+                    $totalLines = 0
+                    $itemCount = 0
+                    
+                    foreach ($assignment in $selectedAssignments)
+                    {
+                        # Base lines: Name (1) + blank line (1) = 2
+                        $itemLines = 2
+                        
+                        # Assignment type line (only if showing all types)
+                        if ($assignmentType -eq 'All')
+                        {
+                            $itemLines += 1
+                        }
+                        
+                        # Description: Calculate wrapped lines
+                        if ($assignment.Description)
+                        {
+                            # Account for "  Description: " prefix (14 chars)
+                            $descPrefix = 14
+                            $availableWidth = $consoleWidth - $descPrefix
+                            
+                            if ($availableWidth -gt 0)
+                            {
+                                # Calculate how many lines the description will wrap to
+                                $descLength = $assignment.Description.Length
+                                $descLines = [Math]::Ceiling($descLength / $availableWidth)
+                                $itemLines += $descLines
+                            }
+                            else
+                            {
+                                # Fallback if console width is too small
+                                $itemLines += 1
+                            }
+                        }
+                        
+                        # Intent line (if present)
+                        if ($null -ne $assignment.Intent)
+                        {
+                            $itemLines += 1
+                        }
+                        
+                        # Assignment scope line (if present)
+                        if ($assignment.AssignmentScope -and $assignment.AssignmentScope.Count -gt 0)
+                        {
+                            $itemLines += 1
+                        }
+                        
+                        $totalLines += $itemLines
+                        $itemCount++
+                    }
+                    
+                    # Calculate average lines per item
+                    if ($itemCount -gt 0)
+                    {
+                        $estimatedLinesPerItem = [Math]::Ceiling($totalLines / $itemCount)
+                        Write-Log -logFile $LogFile -Module $functionName -Message "Calculated average lines per item: $estimatedLinesPerItem (total lines: $totalLines, items: $itemCount, console width: $consoleWidth)" -LogLevel "Information"
+                        Write-Verbose "[$functionName] Calculated dynamic EstimatedLinesPerItem: $estimatedLinesPerItem based on actual content"
+                    }
+                    else
+                    {
+                        # Fallback
+                        $estimatedLinesPerItem = 8
+                        Write-Log -logFile $LogFile -Module $functionName -Message "No items to calculate, using default EstimatedLinesPerItem: $estimatedLinesPerItem" -LogLevel "Verbose"
+                    }
+                }
+                catch
+                {
+                    # Fallback to conservative estimate if calculation fails
+                    $estimatedLinesPerItem = 8
+                    Write-Log -logFile $LogFile -Module $functionName -Message "Failed to calculate dynamic lines per item: $($_.Exception.Message). Using default: $estimatedLinesPerItem" -LogLevel "Warning"
+                    Write-Verbose "[$functionName] Dynamic calculation failed, using default EstimatedLinesPerItem: $estimatedLinesPerItem"
+                }
                 
                 # Use Show-PagedContent for display with screen-aware paging
                 $pagingResult = Show-PagedContent -Content $selectedAssignments `
