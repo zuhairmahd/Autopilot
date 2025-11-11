@@ -42,6 +42,12 @@ function Show-PagedContent()
     .PARAMETER NoPaging
         If specified, displays all content without paging (useful when content is small).
     
+    .PARAMETER EstimatedLinesPerItem
+        Estimated number of console lines each item will occupy when displayed.
+        Used to calculate screen-aware page sizes for complex multi-line items.
+        Default: 1 (assumes single-line items).
+        For multi-line items (e.g., objects with descriptions), set to approximate line count.
+    
     .OUTPUTS
         System.String
         Returns navigation action taken: 'completed', 'quit', or error message.
@@ -72,11 +78,24 @@ function Show-PagedContent()
         # Display without paging
         Show-PagedContent -Content $smallArray -NoPaging -DisplayScriptBlock { param($item) Write-Host $item }
     
+    .EXAMPLE
+        # Display complex multi-line items with screen-aware paging
+        $apps = @($app1, $app2, $app3)
+        Show-PagedContent -Content $apps -EstimatedLinesPerItem 8 -DisplayScriptBlock {
+            param($app)
+            Write-Host "Name: $($app.Name)"
+            Write-Host "  Description: $($app.Description)"
+            Write-Host "  Intent: $($app.Intent)"
+            Write-Host ""
+        }
+    
     .NOTES
         - Maintains PowerShell 5.1 compatibility (no null-coalescing, ordered hashtables created via [ordered])
         - Follows repository coding standards (4-space indentation, Write-Verbose, Write-Log)
         - Implements ASCII-only navigation prompts
         - Uses separate Write-Host calls for newlines
+        - Screen-aware paging: Uses EstimatedLinesPerItem to fit items within console height
+        - Reserves lines for headers, page info, and navigation prompts when calculating page size
     #>
     [CmdletBinding()]
     param(
@@ -94,7 +113,9 @@ function Show-PagedContent()
         [Parameter(Mandatory = $false)]
         [switch]$Silent,
         [Parameter(Mandatory = $false)]
-        [switch]$NoPaging
+        [switch]$NoPaging,
+        [Parameter(Mandatory = $false)]
+        [int]$EstimatedLinesPerItem = 1
     )
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -107,6 +128,75 @@ function Show-PagedContent()
         Write-Log -LogFile $logFile -Module $functionName -Message "Invalid PageSize: $PageSize. Must be >= 1. Using default 10." -LogLevel "Warning"
         Write-Warning "[$functionName] Invalid PageSize: $PageSize. Must be >= 1. Using default 10."
         $PageSize = 10
+    }
+    
+    if ($EstimatedLinesPerItem -lt 1)
+    {
+        Write-Log -LogFile $logFile -Module $functionName -Message "Invalid EstimatedLinesPerItem: $EstimatedLinesPerItem. Must be >= 1. Using default 1." -LogLevel "Warning"
+        Write-Warning "[$functionName] Invalid EstimatedLinesPerItem: $EstimatedLinesPerItem. Must be >= 1. Using default 1."
+        $EstimatedLinesPerItem = 1
+    }
+    
+    # Calculate screen-aware page size if EstimatedLinesPerItem > 1 and not in Silent mode
+    if ($EstimatedLinesPerItem -gt 1 -and -not $Silent -and -not $NoPaging)
+    {
+        try
+        {
+            # Get console window height
+            $consoleHeight = $Host.UI.RawUI.WindowSize.Height
+            
+            # Reserve lines for UI elements:
+            # - Initial info (2 lines: total items message + navigation hint)
+            # - Title (2-3 lines: blank + title + blank)
+            # - Page info header (3 lines: page number + showing items + blank)
+            # - Navigation footer (3 lines: blank + separator + navigation prompt)
+            # Total reserved: approximately 10-11 lines
+            $reservedLines = 11
+            
+            # Calculate available lines for content
+            $availableLines = $consoleHeight - $reservedLines
+            
+            if ($availableLines -gt 0)
+            {
+                # Calculate max items that fit on screen
+                $calculatedPageSize = [Math]::Floor($availableLines / $EstimatedLinesPerItem)
+                
+                # Ensure at least 1 item per page
+                if ($calculatedPageSize -lt 1)
+                {
+                    $calculatedPageSize = 1
+                }
+                
+                # Use the smaller of calculated size or provided PageSize
+                # This allows manual override if user wants fewer items per page
+                if ($calculatedPageSize -lt $PageSize)
+                {
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Adjusting PageSize from $PageSize to $calculatedPageSize based on console height $consoleHeight and EstimatedLinesPerItem $EstimatedLinesPerItem" -LogLevel "Information"
+                    Write-Verbose "[$functionName] Screen-aware paging: Adjusted PageSize from $PageSize to $calculatedPageSize (console height: $consoleHeight, lines per item: $EstimatedLinesPerItem)"
+                    $PageSize = $calculatedPageSize
+                }
+                else
+                {
+                    Write-Log -LogFile $logFile -Module $functionName -Message "PageSize $PageSize fits within console height $consoleHeight with EstimatedLinesPerItem $EstimatedLinesPerItem (calculated max: $calculatedPageSize)" -LogLevel "Verbose"
+                    Write-Verbose "[$functionName] PageSize $PageSize fits within console (calculated max: $calculatedPageSize)"
+                }
+            }
+            else
+            {
+                Write-Log -LogFile $logFile -Module $functionName -Message "Console height $consoleHeight too small for screen-aware paging (reserved: $reservedLines), using provided PageSize $PageSize" -LogLevel "Warning"
+                Write-Verbose "[$functionName] Console too small for screen-aware paging, using provided PageSize"
+            }
+        }
+        catch
+        {
+            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to calculate screen-aware page size: $($_.Exception.Message). Using provided PageSize $PageSize" -LogLevel "Warning"
+            Write-Verbose "[$functionName] Screen-aware paging calculation failed, using provided PageSize: $($_.Exception.Message)"
+        }
+    }
+    elseif ($EstimatedLinesPerItem -gt 1)
+    {
+        Write-Log -LogFile $logFile -Module $functionName -Message "EstimatedLinesPerItem=$EstimatedLinesPerItem but screen-aware paging disabled (Silent=$($Silent.IsPresent), NoPaging=$($NoPaging.IsPresent))" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] EstimatedLinesPerItem specified but screen-aware paging not applicable in current mode"
     }
     
     # Handle null or empty content

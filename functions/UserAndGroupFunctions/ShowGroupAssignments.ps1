@@ -849,12 +849,18 @@ function ShowGroupAssignments()
                 }
                 Write-Log -logFile $LogFile -Module $functionName -Message "Starting paged display - Type: '$assignmentType', Count: $($selectedAssignments.Count), PageSize: 10, Title: '$pageTitle'" -LogLevel "Information"
                 
-                # Use Show-PagedContent for display
+                # Estimate lines per item for screen-aware paging
+                # Applications often have long descriptions spanning multiple lines
+                # Conservative estimate to ensure items fit on screen
+                $estimatedLinesPerItem = 8
+                
+                # Use Show-PagedContent for display with screen-aware paging
                 $pagingResult = Show-PagedContent -Content $selectedAssignments `
                     -DisplayScriptBlock $displayScript `
                     -Title $pageTitle `
                     -PageSize 10 `
-                    -ShowPageInfo $true
+                    -ShowPageInfo $true `
+                    -EstimatedLinesPerItem $estimatedLinesPerItem
                     
                 Write-Log -logFile $LogFile -Module $functionName -Message "Paged display completed - Result: '$pagingResult'" -LogLevel "Information"
             }

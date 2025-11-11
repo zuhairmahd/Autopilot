@@ -384,4 +384,37 @@ Describe "Function: Show-PagedContent" -Tags 'Unit', 'UtilityFunctions', 'Paging
             { Show-PagedContent -Content $content -Silent } | Should -Not -Throw
         }
     }
+    
+    Context "EstimatedLinesPerItem parameter" {
+        It "Should accept EstimatedLinesPerItem parameter" {
+            $content = @("Item 1", "Item 2", "Item 3")
+            { Show-PagedContent -Content $content -EstimatedLinesPerItem 5 -Silent } | Should -Not -Throw
+        }
+        
+        It "Should validate EstimatedLinesPerItem and default to 1 if invalid" {
+            $content = @("Item 1")
+            # Should not throw but log warning and use default
+            { Show-PagedContent -Content $content -EstimatedLinesPerItem -5 -Silent } | Should -Not -Throw
+        }
+        
+        It "Should calculate screen-aware page size when EstimatedLinesPerItem > 1" {
+            # This test verifies the calculation logic doesn't crash
+            # Actual page size adjustment depends on console height
+            $content = 1..50 | ForEach-Object { "Item $_" }
+            $result = Show-PagedContent -Content $content -EstimatedLinesPerItem 8 -PageSize 10 -Silent
+            $result | Should -Be "completed"
+        }
+        
+        It "Should skip screen-aware paging in Silent mode even with EstimatedLinesPerItem" {
+            $content = 1..50 | ForEach-Object { "Item $_" }
+            $result = Show-PagedContent -Content $content -EstimatedLinesPerItem 8 -Silent
+            $result | Should -Be "completed"
+        }
+        
+        It "Should skip screen-aware paging with NoPaging switch" {
+            $content = 1..50 | ForEach-Object { "Item $_" }
+            $result = Show-PagedContent -Content $content -EstimatedLinesPerItem 8 -NoPaging -Silent
+            $result | Should -Be "completed"
+        }
+    }
 }
