@@ -188,7 +188,7 @@
                 blockType             = 'menu'
                 name                  = 'Group Assignments Menu'
                 menuName              = 'getGroupAssignmentsMenu'
-                description           = 'View or export various     group assignment reports'
+                description           = 'View or export various group assignment reports'
             },
             @{
                 includeInDisplayModes = @(
