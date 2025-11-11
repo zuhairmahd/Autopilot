@@ -43,7 +43,7 @@ function ShowGroupAssignments()
     Switch parameter. When used with a specific group, includes indirect assignments (All Users/All Devices) 
     in addition to direct group assignments. When used with special groups, shows only indirect assignments.
 
-    .PARAMETER DoNotShowEmptyMenus
+    .PARAMETER HideEmptyMenus
     Switch parameter. When present, assignment type menu will omit options for assignment types with zero entries.                      
 
 .PARAMETER Settings
@@ -127,13 +127,13 @@ function ShowGroupAssignments()
         [string]$ExportFilePath,
         [switch]$ShowOnlyUnassigned,
         [switch]$ShowIndirectAssignments,
-        [switch]$DoNotShowEmptyMenus,
+        [switch]$HideEmptyMenus,
         [Parameter(Mandatory = $false)]
         [hashtable]$Settings
     )
 
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Log -logFile $LogFile -Module $functionName -Message "Function started - Group: '$Group', ShowOnlyUnassigned: $($ShowOnlyUnassigned.IsPresent), ShowIndirectAssignments: $($ShowIndirectAssignments.IsPresent), exportInstead: $($exportInstead.IsPresent), DoNotShowEmptyMenus: $($DoNotShowEmptyMenus.IsPresent)" -logLevel "Information"
+    Write-Log -logFile $LogFile -Module $functionName -Message "Function started - Group: '$Group', ShowOnlyUnassigned: $($ShowOnlyUnassigned.IsPresent), ShowIndirectAssignments: $($ShowIndirectAssignments.IsPresent), exportInstead: $($exportInstead.IsPresent), HideEmptyMenus: $($HideEmptyMenus.IsPresent)" -logLevel "Information"
     
     #region process initial setup
     #define the action type
@@ -485,7 +485,7 @@ function ShowGroupAssignments()
     #endregion                  
     
     #region Build and show assignment type menu    
-    Write-Log -logFile $LogFile -Module $functionName -Message "Building assignment type menu (DoNotShowEmptyMenus: $($DoNotShowEmptyMenus.IsPresent))" -logLevel "Verbose"
+    Write-Log -logFile $LogFile -Module $functionName -Message "Building assignment type menu (Hide EmptyMenus: $($HideEmptyMenus.IsPresent))" -logLevel "Verbose"
     $groupAssignmentsMenu = NewMenu -MenuName "groupAssignmentsMenu"
     if (-not $groupAssignmentsMenu)
     {
@@ -500,119 +500,119 @@ function ShowGroupAssignments()
         Write-Log -logFile $LogFile -Module $functionName -Message "Menu loaded from config, title updated with group name" -logLevel "Debug"
     }
     
-    if (-not $DoNotShowEmptyMenus -or $assignments.AppAssignments.count -gt 0)
+    if (-not $HideEmptyMenus -or $assignments.AppAssignments.count -gt 0)
     {
         $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Application Assignments ($($assignments.AppAssignments.count))" -Action {
             Write-Host "Selected Assignment Type: Application"
             return 'Application'
         } -returnsValue
     }
-    if (-not $DoNotShowEmptyMenus -or $assignments.ConfigurationAssignments.count -gt 0)
+    if (-not $HideEmptyMenus -or $assignments.ConfigurationAssignments.count -gt 0)
     {
         $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType           Device Configurations ($($assignments.ConfigurationAssignments.count))" -Action {
             Write-Host "Selected Assignment Type: Configuration"
             return 'Configuration'
         } -returnsValue
     }
-    if (-not $DoNotShowEmptyMenus -or $assignments.ComplianceAssignments.count -gt 0)
+    if (-not $HideEmptyMenus -or $assignments.ComplianceAssignments.count -gt 0)
     {
         $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Device Compliance Policies ($($assignments.ComplianceAssignments.count))" -Action {
             Write-Host "Selected Assignment Type: Compliance"
             return 'Compliance'
         } -returnsValue
     }
-    if (-not $DoNotShowEmptyMenus -or $assignments.ScriptAssignments.count -gt 0)
+    if (-not $HideEmptyMenus -or $assignments.ScriptAssignments.count -gt 0)
     {
         $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Device Management Scripts ($($assignments.ScriptAssignments.count))" -Action {
             Write-Host "Selected Assignment Type: Script"
             return 'Script'
         } -returnsValue
     }
-    if (-not $DoNotShowEmptyMenus -or $assignments.AppProtectionAssignments.count -gt 0)
+    if (-not $HideEmptyMenus -or $assignments.AppProtectionAssignments.count -gt 0)
     {
         $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType App Protection Policies ($($assignments.AppProtectionAssignments.count))" -Action {
             Write-Host "Selected Assignment Type: AppProtection"
             return 'AppProtection'
         } -returnsValue
     }
-    if (-not $DoNotShowEmptyMenus -or $assignments.IntentAssignments.count -gt 0)
+    if (-not $HideEmptyMenus -or $assignments.IntentAssignments.count -gt 0)
     {
         $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Security Intents (Baselines) ($($assignments.IntentAssignments.count))" -Action {
             Write-Host "Selected Assignment Type: Intent"
             return 'Intent'
         } -returnsValue
     }
-    if (-not $DoNotShowEmptyMenus -or $assignments.ResourceAccessAssignments.count -gt 0)
+    if (-not $HideEmptyMenus -or $assignments.ResourceAccessAssignments.count -gt 0)
     {
         $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Resource Access Profiles ($($assignments.ResourceAccessAssignments.count))" -Action {
             Write-Host "Selected Assignment Type: ResourceAccess"
             return 'ResourceAccess'
         } -returnsValue
     }
-    if (-not $DoNotShowEmptyMenus -or $assignments.AutopilotAssignments.count -gt 0)
+    if (-not $HideEmptyMenus -or $assignments.AutopilotAssignments.count -gt 0)
     {
         $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Autopilot Profiles ($($assignments.AutopilotAssignments.count))" -Action {
             Write-Host "Selected Assignment Type: AutopilotProfile"
             return 'AutopilotProfile'
         } -returnsValue
     }
-    if (-not $DoNotShowEmptyMenus -or $assignments.HealthScriptAssignments.count -gt 0)
+    if (-not $HideEmptyMenus -or $assignments.HealthScriptAssignments.count -gt 0)
     {
         $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Device Health Scripts ($($assignments.HealthScriptAssignments.count))" -Action {
             Write-Host "Selected Assignment Type: HealthScript"
             return 'HealthScript'
         } -returnsValue
     }
-    if (-not $DoNotShowEmptyMenus -or $assignments.ConfigurationPolicyAssignments.count -gt 0)
+    if (-not $HideEmptyMenus -or $assignments.ConfigurationPolicyAssignments.count -gt 0)
     {
         $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Configuration Policies (Settings Catalog) ($($assignments.ConfigurationPolicyAssignments.count))" -Action {
             Write-Host "Selected Assignment Type: ConfigurationPolicy"
             return 'ConfigurationPolicy'
         } -returnsValue
     }
-    if (-not $DoNotShowEmptyMenus -or $assignments.GroupPolicyAssignments.count -gt 0)
+    if (-not $HideEmptyMenus -or $assignments.GroupPolicyAssignments.count -gt 0)
     {
         $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Group Policy Configurations ($($assignments.GroupPolicyAssignments.count))" -Action {
             Write-Host "Selected Assignment Type: GroupPolicy"
             return 'GroupPolicy'
         } -returnsValue
     }
-    if (-not $DoNotShowEmptyMenus -or $assignments.WindowsInformationProtectionAssignments.count -gt 0)
+    if (-not $HideEmptyMenus -or $assignments.WindowsInformationProtectionAssignments.count -gt 0)
     {
         $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Windows Information Protection Policies ($($assignments.WindowsInformationProtectionAssignments.count))" -Action {
             Write-Host "Selected Assignment Type: WindowsInformationProtection"
             return 'WindowsInformationProtection'
         } -returnsValue
     }
-    if (-not $DoNotShowEmptyMenus -or $assignments.PolicySetAssignments.count -gt 0)
+    if (-not $HideEmptyMenus -or $assignments.PolicySetAssignments.count -gt 0)
     {
         $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Policy Sets ($($assignments.PolicySetAssignments.count))" -Action {
             Write-Host "Selected Assignment Type: PolicySet"
             return 'PolicySet'
         } -returnsValue
     }
-    if (-not $DoNotShowEmptyMenus -or $assignments.WindowsFeatureUpdateAssignments.count -gt 0)
+    if (-not $HideEmptyMenus -or $assignments.WindowsFeatureUpdateAssignments.count -gt 0)
     {
         $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Windows Feature Updates ($($assignments.WindowsFeatureUpdateAssignments.count))" -Action {
             Write-Host "Selected Assignment Type: WindowsFeatureUpdate"
             return 'WindowsFeatureUpdate'
         } -returnsValue
     }
-    if (-not $DoNotShowEmptyMenus -or $assignments.WindowsQualityUpdateAssignments.count -gt 0)
+    if (-not $HideEmptyMenus -or $assignments.WindowsQualityUpdateAssignments.count -gt 0)
     {
         $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Windows Quality Updates ($($assignments.WindowsQualityUpdateAssignments.count))" -Action {
             Write-Host "Selected Assignment Type: WindowsQualityUpdate"
             return 'WindowsQualityUpdate'
         } -returnsValue
     }
-    if (-not $DoNotShowEmptyMenus -or $assignments.WindowsDriverUpdateAssignments.count -gt 0)
+    if (-not $HideEmptyMenus -or $assignments.WindowsDriverUpdateAssignments.count -gt 0)
     {
         $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Windows Driver Updates ($($assignments.WindowsDriverUpdateAssignments.count))" -Action {
             Write-Host "Selected Assignment Type: WindowsDriverUpdate"
             return 'WindowsDriverUpdate'
         } -returnsValue
     }
-    if (-not $DoNotShowEmptyMenus -or $assignments.AllAssignments.count -gt 0)
+    if (-not $HideEmptyMenus -or $assignments.AllAssignments.count -gt 0)
     {
         $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType  All Assignments ($($assignments.AllAssignments.count))" -Action {
             Write-Host "Displaying all assignments"
