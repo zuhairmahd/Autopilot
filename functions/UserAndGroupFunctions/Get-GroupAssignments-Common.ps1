@@ -739,7 +739,9 @@ function Invoke-AssignmentBatchRequest()
     
     try
     {
+        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Batch request for $($AssignmentPaths.Count) assignment path(s)" -logLevel "Debug"
         $batchResult = CallGraphAPI -accessToken $AccessToken -ResourcePath $AssignmentPaths -APIVersion $ApiVersion -Method "GET"
+        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Batch result structure - Has value: $(if ($batchResult.value) { "Yes ($($batchResult.value.Count) responses)" } else { 'No' })" -logLevel "Debug"
         
         return @{
             Success = $true
@@ -1295,15 +1297,24 @@ function Test-ResourcePlatformMatch()
 
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Target OS: $TargetOS"
+    Write-Log -logFile $logFile -module $functionName -message "=== START Platform Match Check ===" -logLevel "Debug"
     Write-Log -logFile $logFile -module $functionName -message "Target OS: $TargetOS" -logLevel "Information"
+    
+    # Log resource identification details
+    $resourceId = if ($Resource.id) { $Resource.id } else { "Unknown" }
+    $resourceName = if ($Resource.displayName) { $Resource.displayName } elseif ($Resource.name) { $Resource.name } else { "Unnamed" }
+    Write-Log -logFile $logFile -module $functionName -message "Resource: ID='$resourceId', Name='$resourceName'" -logLevel "Debug"
 
     if ([string]::IsNullOrWhiteSpace($TargetOS))
     {
-        Write-Log -logFile $logFile -module $functionName -message "No Target OS specified, including all resources." -logLevel "Verbose"
+        Write-Log -logFile $logFile -module $functionName -message "DECISION: No Target OS specified, including all resources." -logLevel "Verbose"
+        Write-Log -logFile $logFile -module $functionName -message "=== END Platform Match Check === RESULT: TRUE (no filter)" -logLevel "Debug"
         return $true
     }
 
     $targetOSLower = $TargetOS.ToLowerInvariant()
+    Write-Log -logFile $logFile -module $functionName -message "Target OS (normalized): '$targetOSLower'" -logLevel "Debug"
+    
     $platformHints = New-Object System.Collections.ArrayList
     $addPlatformHint = {
         param(
@@ -1314,35 +1325,54 @@ function Test-ResourcePlatformMatch()
         if (-not [string]::IsNullOrWhiteSpace($Hint) -and -not $HintCollection.Contains($Hint))
         {
             [void]$HintCollection.Add($Hint)
+            Write-Log -logFile $logFile -module $functionName -message "HINT ADDED: '$Hint' to platform hints collection" -logLevel "Debug"
+        }
+        else
+        {
+            $reason = if ([string]::IsNullOrWhiteSpace($Hint)) { "empty/null" } else { "duplicate" }
+            Write-Log -logFile $logFile -module $functionName -message "HINT SKIPPED: '$Hint' ($reason)" -logLevel "Debug"
         }
     }
 
     $odataType = if ($Resource.'@odata.type') { $Resource.'@odata.type'.ToLower() } else { '' }
     Write-Verbose "[$functionName] Resource @odata.type: $odataType"
-    Write-Log -logFile $logFile -module $functionName -message "Resource @odata.type: $odataType" -logLevel "Debug"
+    Write-Log -logFile $logFile -module $functionName -message "Resource @odata.type: '$odataType'" -logLevel "Debug"
 
     if ($odataType)
     {
+        Write-Log -logFile $logFile -module $functionName -message "PHASE 1: Analyzing @odata.type for platform hints" -logLevel "Debug"
+        
         if ($odataType -match 'windows|win32|intunewin|msi|officesuiteapp|desktop')
         {
+            Write-Log -logFile $logFile -module $functionName -message "MATCH: @odata.type contains Windows indicators (pattern: 'windows|win32|intunewin|msi|officesuiteapp|desktop')" -logLevel "Debug"
             &$addPlatformHint -Hint 'windows' -HintCollection $platformHints
         }
         if ($odataType -match 'android')
         {
+            Write-Log -logFile $logFile -module $functionName -message "MATCH: @odata.type contains Android indicators (pattern: 'android')" -logLevel "Debug"
             &$addPlatformHint -Hint 'android' -HintCollection $platformHints
         }
         if ($odataType -match 'ios' -and $odataType -notmatch 'windows')
         {
+            Write-Log -logFile $logFile -module $functionName -message "MATCH: @odata.type contains iOS indicators (pattern: 'ios', excluding 'windows')" -logLevel "Debug"
             &$addPlatformHint -Hint 'ios' -HintCollection $platformHints
         }
         if ($odataType -match 'macos')
         {
+            Write-Log -logFile $logFile -module $functionName -message "MATCH: @odata.type contains macOS indicators (pattern: 'macos')" -logLevel "Debug"
             &$addPlatformHint -Hint 'macos' -HintCollection $platformHints
         }
         if ($odataType -match 'linux')
         {
+            Write-Log -logFile $logFile -module $functionName -message "MATCH: @odata.type contains Linux indicators (pattern: 'linux')" -logLevel "Debug"
             &$addPlatformHint -Hint 'linux' -HintCollection $platformHints
         }
+        
+        Write-Log -logFile $logFile -module $functionName -message "PHASE 1 COMPLETE: Platform hints after @odata.type analysis: $($platformHints.Count) hint(s)" -logLevel "Debug"
+    }
+    else
+    {
+        Write-Log -logFile $logFile -module $functionName -message "PHASE 1 SKIPPED: No @odata.type property found" -logLevel "Debug"
     }
 
     $platformPropertyNames = @(
@@ -1354,19 +1384,25 @@ function Test-ResourcePlatformMatch()
         'targetedPlatforms',
         'supportedPlatforms'
     )
+    
+    Write-Log -logFile $logFile -module $functionName -message "PHASE 2: Analyzing platform-specific properties (checking $($platformPropertyNames.Count) property names)" -logLevel "Debug"
 
     foreach ($propertyName in $platformPropertyNames)
     {
         if (-not $Resource.PSObject.Properties[$propertyName])
         {
+            Write-Log -logFile $logFile -module $functionName -message "Property '$propertyName': NOT FOUND on resource" -logLevel "Debug"
             continue
         }
 
         $propertyValue = $Resource.$propertyName
         if ($null -eq $propertyValue)
         {
+            Write-Log -logFile $logFile -module $functionName -message "Property '$propertyName': EXISTS but value is NULL" -logLevel "Debug"
             continue
         }
+
+        Write-Log -logFile $logFile -module $functionName -message "Property '$propertyName': FOUND with value type '$($propertyValue.GetType().Name)'" -logLevel "Debug"
 
         $values = @()
         if ($propertyValue -is [System.Collections.IEnumerable] -and -not ($propertyValue -is [string]))
@@ -1378,69 +1414,98 @@ function Test-ResourcePlatformMatch()
                     $values += $entry
                 }
             }
+            Write-Log -logFile $logFile -module $functionName -message "Property '$propertyName': Collection contains $($values.Count) non-empty entries" -logLevel "Debug"
         }
         else
         {
             $values += $propertyValue
+            Write-Log -logFile $logFile -module $functionName -message "Property '$propertyName': Single value = '$propertyValue'" -logLevel "Debug"
         }
 
         foreach ($value in $values)
         {
             $valueText = $value.ToString().ToLower()
+            Write-Log -logFile $logFile -module $functionName -message "Analyzing value: '$valueText' from property '$propertyName'" -logLevel "Debug"
+            
             if ($valueText -match 'windows')
             {
+                Write-Log -logFile $logFile -module $functionName -message "MATCH: Value '$valueText' contains 'windows'" -logLevel "Debug"
                 &$addPlatformHint -Hint 'windows' -HintCollection $platformHints
             }
             elseif ($valueText -match 'android')
             {
+                Write-Log -logFile $logFile -module $functionName -message "MATCH: Value '$valueText' contains 'android'" -logLevel "Debug"
                 &$addPlatformHint -Hint 'android' -HintCollection $platformHints
             }
             elseif (($valueText -match 'ios') -or ($valueText -match 'ipad') -or ($valueText -match 'iphone'))
             {
+                Write-Log -logFile $logFile -module $functionName -message "MATCH: Value '$valueText' contains iOS indicators (ios/ipad/iphone)" -logLevel "Debug"
                 &$addPlatformHint -Hint 'ios' -HintCollection $platformHints
             }
             elseif ($valueText -match 'macos')
             {
+                Write-Log -logFile $logFile -module $functionName -message "MATCH: Value '$valueText' contains 'macos'" -logLevel "Debug"
                 &$addPlatformHint -Hint 'macos' -HintCollection $platformHints
             }
             elseif ($valueText -match 'linux')
             {
+                Write-Log -logFile $logFile -module $functionName -message "MATCH: Value '$valueText' contains 'linux'" -logLevel "Debug"
                 &$addPlatformHint -Hint 'linux' -HintCollection $platformHints
+            }
+            else
+            {
+                Write-Log -logFile $logFile -module $functionName -message "NO MATCH: Value '$valueText' does not match any known platform pattern" -logLevel "Debug"
             }
         }
     }
+    
+    Write-Log -logFile $logFile -module $functionName -message "PHASE 2 COMPLETE: Platform hints after property analysis: $($platformHints.Count) hint(s)" -logLevel "Debug"
 
     $hintSummary = if ($platformHints.Count -gt 0) { ($platformHints -join ', ') } else { 'None' }
-    Write-Log -logFile $logFile -module $functionName -message "Derived platform hints: $hintSummary" -logLevel "Debug"
+    Write-Log -logFile $logFile -module $functionName -message "SUMMARY: Derived platform hints: $hintSummary (Total: $($platformHints.Count))" -logLevel "Debug"
 
     if ($platformHints.Count -eq 0)
     {
         $defaultInclude = ($targetOSLower -eq 'windows')
-        Write-Log -logFile $logFile -module $functionName -message "No platform hints found; defaulting to Include=$defaultInclude for TargetOS '$TargetOS'." -logLevel "Verbose"
+        Write-Log -logFile $logFile -module $functionName -message "DECISION PATH: No platform hints found" -logLevel "Debug"
+        Write-Log -logFile $logFile -module $functionName -message "DECISION LOGIC: When no hints exist, default behavior is Include=TRUE for Windows, Include=FALSE for others" -logLevel "Debug"
+        Write-Log -logFile $logFile -module $functionName -message "DECISION: TargetOS='$TargetOS', DefaultInclude=$defaultInclude" -logLevel "Verbose"
+        Write-Log -logFile $logFile -module $functionName -message "=== END Platform Match Check === RESULT: $defaultInclude (no hints found)" -logLevel "Debug"
         return $defaultInclude
     }
 
     $hasTargetHint = $platformHints -contains $targetOSLower
+    Write-Log -logFile $logFile -module $functionName -message "DECISION PATH: Platform hints found, checking for target OS match" -logLevel "Debug"
+    Write-Log -logFile $logFile -module $functionName -message "TARGET CHECK: Looking for '$targetOSLower' in hints [$hintSummary] = $hasTargetHint" -logLevel "Debug"
 
     switch ($targetOSLower)
     {
         'windows'
         {
+            Write-Log -logFile $logFile -module $functionName -message "DECISION PATH: Windows-specific filtering logic" -logLevel "Debug"
+            Write-Log -logFile $logFile -module $functionName -message "CRITICAL LOGIC: Windows filtering ONLY includes resources with explicit Windows hints" -logLevel "Debug"
+            
+            # CRITICAL: For Windows filtering, ONLY include resources that explicitly have Windows hints
+            # Resources with no hints or conflicting hints should be EXCLUDED
             if ($hasTargetHint)
             {
-                Write-Log -logFile $logFile -module $functionName -message "Resource identified as Windows-capable via hints." -logLevel "Verbose"
+                Write-Log -logFile $logFile -module $functionName -message "DECISION: Resource HAS Windows hint - INCLUDING" -logLevel "Verbose"
+                Write-Log -logFile $logFile -module $functionName -message "=== END Platform Match Check === RESULT: TRUE (Windows hint found)" -logLevel "Debug"
                 return $true
             }
-
-            $conflictingHints = @('ios', 'android', 'macos', 'linux')
-            $hasConflict = $platformHints | Where-Object { $_ -in $conflictingHints }
-            $result = ($hasConflict.Count -eq 0)
-            Write-Log -logFile $logFile -module $functionName -message "Windows fallback result: $result (Conflicts: $($hasConflict -join ', '))" -logLevel "Verbose"
-            return $result
+            
+            # If no Windows hint found, exclude the resource
+            Write-Log -logFile $logFile -module $functionName -message "DECISION: Resource does NOT have Windows hint (hints: $hintSummary) - EXCLUDING" -logLevel "Verbose"
+            Write-Log -logFile $logFile -module $functionName -message "RATIONALE: Windows filter requires explicit Windows platform indicator" -logLevel "Debug"
+            Write-Log -logFile $logFile -module $functionName -message "=== END Platform Match Check === RESULT: FALSE (no Windows hint)" -logLevel "Debug"
+            return $false
         }
         default
         {
-            Write-Log -logFile $logFile -module $functionName -message "Returning $hasTargetHint for TargetOS '$TargetOS' based on hints." -logLevel "Verbose"
+            Write-Log -logFile $logFile -module $functionName -message "DECISION PATH: Default filtering logic for TargetOS='$TargetOS'" -logLevel "Debug"
+            Write-Log -logFile $logFile -module $functionName -message "DECISION LOGIC: Include resource if target OS hint exists in platform hints" -logLevel "Debug"
+            Write-Log -logFile $logFile -module $functionName -message "DECISION: Returning $hasTargetHint for TargetOS '$TargetOS' based on hints." -logLevel "Verbose"
+            Write-Log -logFile $logFile -module $functionName -message "=== END Platform Match Check === RESULT: $hasTargetHint" -logLevel "Debug"
             return $hasTargetHint
         }
     }
@@ -1498,10 +1563,13 @@ function Get-UnassignedResources()
     
     # Fetch all resources using batch API
     $allResourcePaths = $resourceEndpoints | ForEach-Object { $_.url }
+    Write-Log -logFile $LogFile -module $functionName -Message "Querying $($allResourcePaths.Count) resource endpoint(s) via batch API" -logLevel "Verbose"
     
     try
     {
         $resourceResults = CallGraphAPI -accessToken $AccessToken -ResourcePath $allResourcePaths -APIVersion $apiVersion -Method "GET"
+        Write-Log -logFile $LogFile -module $functionName -Message "Successfully fetched batch responses: $($resourceResults.value.Count) response(s)" -logLevel "Information"
+        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Resource batch response structure: $(if ($resourceResults.value) { 'Has value array' } else { 'Missing value array' }), Sample first response ID: $(if ($resourceResults.value[0].id) { $resourceResults.value[0].id } else { 'N/A' })" -logLevel "Debug"
     }
     catch
     {
@@ -1513,43 +1581,75 @@ function Get-UnassignedResources()
     $allResources = @()
     $resourceTypeMap = @{}
     
-    for ($i = 0; $i -lt $resourceResults.value.Count; $i++)
+    # CRITICAL FIX: Graph API batch responses include an 'id' field that maps to the request 'id',
+    # and response data is in 'body' property, not directly in the response object.
+    # We must match by response.id to pair resources with the correct endpoints.
+    foreach ($result in $resourceResults.value)
     {
-        $endpointInfo = $resourceEndpoints[$i]
-        $resources = $resourceResults.value[$i].value
+        # Match response to original request by ID (batch request IDs are sequential: 1, 2, 3...)
+        # CallGraphAPI builds requests with $requestId starting at 1, so array index = id - 1
+        $responseId = [int]$result.id
+        $endpointIndex = $responseId - 1
         
-        if ($resources -and $resources.Count -gt 0)
+        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Processing batch response ID $responseId (endpoint index $endpointIndex), Status: $($result.status)" -logLevel "Debug"
+        
+        if ($endpointIndex -ge 0 -and $endpointIndex -lt $resourceEndpoints.Count)
         {
-            foreach ($resource in $resources)
+            $endpointInfo = $resourceEndpoints[$endpointIndex]
+            $resourceDescription = $endpointInfo.id
+            
+            Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Endpoint '$resourceDescription' - Body structure: $(if ($result.body) { 'Present' } else { 'Missing' }), Has value array: $(if ($result.body.value) { "Yes ($($result.body.value.Count) items)" } else { 'No' })" -logLevel "Debug"
+            
+            if ($null -eq $result.body)
             {
-                # Determine resource type and category using unified function
-                $resourceType = $endpointInfo.id
-
-                if ([string]::IsNullOrWhiteSpace($resource.'@odata.type'))
-                {
-                    $fallbackODataType = Get-DefaultODataTypeForEndpoint -EndpointId $resourceType
-                    if ($fallbackODataType)
-                    {
-                        $resource | Add-Member -NotePropertyName '@odata.type' -NotePropertyValue $fallbackODataType -Force
-                        Write-Log -logFile $LogFile -module $functionName -Message "Injected default ODataType '$fallbackODataType' for resource '$($resource.displayName)' (ID: $($resource.id)) via endpoint '$resourceType' during unassigned check." -logLevel "Verbose"
-                    }
-                }
-
-                $category = Get-ResourceCategory -Resource $resource -EndpointId $resourceType
-                
-                $allResources += [PSCustomObject]@{
-                    Id            = $resource.id
-                    Name          = if ($resource.displayName) { $resource.displayName } elseif ($resource.name) { $resource.name } else { "Unknown" }
-                    Description   = if ($resource.description) { $resource.description } else { "" }
-                    ResourceType  = $resourceType
-                    Category      = $category
-                    BaseUri       = $endpointInfo.url
-                    '@odata.type' = $resource.'@odata.type'
-                    Resource      = $resource
-                }
-                
-                $resourceTypeMap[$resource.id] = $category
+                Write-Log -logFile $LogFile -module $functionName -Message "Batch response for '$resourceDescription' returned no body. Status: $($result.status)" -logLevel "Warning"
+                continue
             }
+            
+            # Handle pagination for batch responses
+            Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Calling Get-PagedCollectionItems for '$resourceDescription'" -logLevel "Debug"
+            $pagedResources = Get-PagedCollectionItems -InitialResponse $result.body -AccessToken $AccessToken -ResourceDescription $resourceDescription
+            $resources = $pagedResources.Items
+            Write-Log -logFile $LogFile -module $functionName -Message "Endpoint '$resourceDescription' returned $($resources.Count) item(s) across $($pagedResources.PageCount) page(s)" -logLevel "Verbose"
+            Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Sample resource from '$resourceDescription': $(if ($resources -and $resources.Count -gt 0) { ($resources[0] | Select-Object -Property id, displayName, '@odata.type' | ConvertTo-Json -Compress) } else { 'No resources' })" -logLevel "Debug"
+            
+            if ($resources -and $resources.Count -gt 0)
+            {
+                foreach ($resource in $resources)
+                {
+                    $resourceType = $endpointInfo.id
+                    
+                    # Backfill @odata.type when Graph omits metadata so platform filtering still works
+                    if ([string]::IsNullOrWhiteSpace($resource.'@odata.type'))
+                    {
+                        $fallbackODataType = Get-DefaultODataTypeForEndpoint -EndpointId $resourceType
+                        if ($fallbackODataType)
+                        {
+                            $resource | Add-Member -NotePropertyName '@odata.type' -NotePropertyValue $fallbackODataType -Force
+                            Write-Log -logFile $LogFile -module $functionName -Message "Injected default ODataType '$fallbackODataType' for resource '$($resource.displayName)' (ID: $($resource.id)) via endpoint '$resourceType' during unassigned check." -logLevel "Verbose"
+                        }
+                    }
+
+                    $category = Get-ResourceCategory -Resource $resource -EndpointId $resourceType
+                    
+                    $allResources += [PSCustomObject]@{
+                        Id            = $resource.id
+                        Name          = if ($resource.displayName) { $resource.displayName } elseif ($resource.name) { $resource.name } else { "Unknown" }
+                        Description   = if ($resource.description) { $resource.description } else { "" }
+                        ResourceType  = $resourceType
+                        Category      = $category
+                        BaseUri       = $endpointInfo.url
+                        '@odata.type' = $resource.'@odata.type'
+                        Resource      = $resource
+                    }
+                    
+                    $resourceTypeMap[$resource.id] = $category
+                }
+            }
+        }
+        else
+        {
+            Write-Log -logFile $LogFile -module $functionName -Message "Batch response ID $responseId out of range (expected 0-$($resourceEndpoints.Count-1))" -logLevel "Warning"
         }
     }
     
@@ -1576,10 +1676,14 @@ function Get-UnassignedResources()
     $assignmentPaths = $allResources | ForEach-Object { "$($_.BaseUri)/$($_.Id)/assignments" }
     
     Write-Log -logFile $LogFile -module $functionName -Message "Checking assignments for $($allResources.Count) resources" -logLevel "Information"
+    Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Sample assignment paths (first 3): $(($assignmentPaths | Select-Object -First 3) -join ', ')" -logLevel "Debug"
     
     try
     {
+        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Calling batch API for $($assignmentPaths.Count) assignment paths" -logLevel "Debug"
         $assignmentResults = CallGraphAPI -accessToken $AccessToken -ResourcePath $assignmentPaths -APIVersion $apiVersion -Method "GET"
+        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Assignment batch response received with $($assignmentResults.value.Count) response(s)" -logLevel "Debug"
+        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Assignment batch response structure: $(if ($assignmentResults.value) { 'Has value array' } else { 'Missing value array' })" -logLevel "Debug"
     }
     catch
     {
@@ -1591,15 +1695,52 @@ function Get-UnassignedResources()
     $unassignedResources = @()
     $failedChecks = @()
     
-    for ($i = 0; $i -lt $assignmentResults.value.Count; $i++)
+    # Build lookup map for resources by assignment path for proper batch response matching
+    $resourceLookup = @{}
+    for ($i = 0; $i -lt $allResources.Count; $i++)
     {
-        $assignmentData = $assignmentResults.value[$i]
-        $resource = $allResources[$i]
+        $batchId = $i + 1  # Batch request IDs start at 1
+        $resourceLookup[$batchId] = $allResources[$i]  # Store with INTEGER key
+        $resourceLookup[$batchId.ToString()] = $allResources[$i]  # Also store with STRING key for safety
+    }
+    Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Built resource lookup with $($allResources.Count) entries (IDs 1-$($allResources.Count))" -logLevel "Debug"
+    if ($allResources.Count -gt 0)
+    {
+        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Sample lookup entries: 1='$($resourceLookup[1].Name)', 2='$(if ($allResources.Count -gt 1) { $resourceLookup[2].Name } else { 'N/A' })'" -logLevel "Debug"
+    }
+    
+    # CRITICAL FIX: Process batch responses using response.id to match with original requests
+    foreach ($assignmentResponse in $assignmentResults.value)
+    {
+        $responseId = [int]$assignmentResponse.id
+        # Try lookup with both integer and string keys
+        $resource = $resourceLookup[$responseId]
+        if (-not $resource) { $resource = $resourceLookup[$responseId.ToString()] }
         
-        # Check if we got a successful response (not null and has value property)
-        if ($null -ne $assignmentData -and $assignmentData.PSObject.Properties['value'])
+        if (-not $resource)
         {
+            Write-Log -logFile $LogFile -module $functionName -Message "WARNING: Could not find resource for batch response ID $($assignmentResponse.id)" -logLevel "Warning"
+            Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Lookup failed - tried keys: $responseId (int) and '$($responseId.ToString())' (string), Lookup contains keys: $(($resourceLookup.Keys | Select-Object -First 5) -join ', ')..." -logLevel "Debug"
+            continue
+        }
+        
+        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Successfully matched response ID $($assignmentResponse.id) to resource '$($resource.Name)' (Category: $($resource.Category))" -logLevel "Debug"
+        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Processing assignment response for '$($resource.Name)' (ResponseID: $($assignmentResponse.id), Status: $($assignmentResponse.status))" -logLevel "Debug"
+        
+        # Check response status and body
+        if ($assignmentResponse.status -eq 200 -and $null -ne $assignmentResponse.body)
+        {
+            $assignmentData = $assignmentResponse.body
+            Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Assignment body structure for '$($resource.Name)': $(if ($assignmentData.PSObject.Properties['value']) { "Has 'value' property with $($assignmentData.value.Count) item(s)" } else { 'Missing value property' })" -logLevel "Debug"
+            
             $assignmentCount = if ($assignmentData.value) { $assignmentData.value.Count } else { 0 }
+            
+            # Log first assignment as JSON sample for debugging
+            if ($assignmentCount -gt 0)
+            {
+                $sampleAssignment = $assignmentData.value[0] | Select-Object -Property id, target, intent | ConvertTo-Json -Compress -Depth 3
+                Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Sample assignment JSON for '$($resource.Name)': $sampleAssignment" -logLevel "Debug"
+            }
             
             if ($assignmentCount -eq 0)
             {
@@ -1663,7 +1804,9 @@ function Get-UnassignedResources()
         {
             # Failed to get assignments or error occurred (404, 400, etc.)
             $failedChecks += $resource
-            Write-Log -logFile $LogFile -module $functionName -Message "Failed to check assignments for $($resource.Name) (likely deleted or inaccessible)" -logLevel "Warning"
+            $statusMsg = if ($assignmentResponse.status) { "Status: $($assignmentResponse.status)" } else { "No status code" }
+            Write-Log -logFile $LogFile -module $functionName -Message "Failed to check assignments for '$($resource.Name)' ($statusMsg) - likely deleted or inaccessible" -logLevel "Warning"
+            Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Failed response details - ID: $($assignmentResponse.id), Status: $($assignmentResponse.status), Has body: $(if ($assignmentResponse.body) { 'Yes' } else { 'No' })" -logLevel "Debug"
         }
     }
     
@@ -2695,48 +2838,50 @@ function Get-IntuneResourceLists()
         # Send batch request
         try
         {
+            Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Sending batch request with $($batchRequestBody.requests.Count) resource list request(s)" -logLevel "Debug"
             $batchResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath "`$batch" -APIVersion $apiVersion -Method "POST" -Body ($batchRequestBody | ConvertTo-Json -Depth $global:maxJSONDepth)
+            Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Batch response received - Structure: $(if ($batchResponse.responses) { "Has 'responses' array with $($batchResponse.responses.Count) item(s)" } else { 'Missing responses array' })" -logLevel "Debug"
         
             # Process batch response
             if ($batchResponse -and $batchResponse.responses)
             {
-                Write-Log -logFile $LogFile -module $functionName -Message "Processing batch response for resource lists" -LogLevel "Verbose"
+                Write-Log -logFile $LogFile -module $functionName -Message "Processing batch response for resource lists ($($batchResponse.responses.Count) response(s))" -LogLevel "Verbose"
             
-        foreach ($response in $batchResponse.responses)
-        {
-            if ($response.status -eq 200 -and $response.body)
-            {
-                $pagedResult = Get-PagedCollectionItems -InitialResponse $response.body -AccessToken $AccessToken -ResourceDescription $response.id
-                $items = $pagedResult.Items
-                Write-Log -logFile $LogFile -module $functionName -Message "Endpoint '$($response.id)' fetched $($items.Count) item(s) across $($pagedResult.PageCount) page(s)" -logLevel "Verbose"
-                
-                switch ($response.id)
+                foreach ($response in $batchResponse.responses)
                 {
-                    "mobileApps" { $mobileApps = $items }
-                    "deviceConfigs" { $deviceConfigs = $items }
-                    "compliancePolicies" { $compliancePolicies = $items }
-                    "deviceScripts" { $deviceScripts = $items }
-                    "appProtectionPolicies" { $appProtectionPolicies = $items }
-                    "intents" { $intents = $items }
-                    "resourceAccessProfiles" { $resourceAccessProfiles = $items }
-                    "autopilotProfiles" { $autopilotProfiles = $items }
-                    "healthScripts" { $healthScripts = $items }
-                    "configurationPolicies"
-                    { 
-                        # Configuration policies use 'name' instead of 'displayName', so we normalize it
-                        $configurationPolicies = $items | ForEach-Object { 
-                            $_ | Add-Member -NotePropertyName 'displayName' -NotePropertyValue $_.name -Force -PassThru
+                    if ($response.status -eq 200 -and $response.body)
+                    {
+                        $pagedResult = Get-PagedCollectionItems -InitialResponse $response.body -AccessToken $AccessToken -ResourceDescription $response.id
+                        $items = $pagedResult.Items
+                        Write-Log -logFile $LogFile -module $functionName -Message "Endpoint '$($response.id)' fetched $($items.Count) item(s) across $($pagedResult.PageCount) page(s)" -logLevel "Verbose"
+                
+                        switch ($response.id)
+                        {
+                            "mobileApps" { $mobileApps = $items }
+                            "deviceConfigs" { $deviceConfigs = $items }
+                            "compliancePolicies" { $compliancePolicies = $items }
+                            "deviceScripts" { $deviceScripts = $items }
+                            "appProtectionPolicies" { $appProtectionPolicies = $items }
+                            "intents" { $intents = $items }
+                            "resourceAccessProfiles" { $resourceAccessProfiles = $items }
+                            "autopilotProfiles" { $autopilotProfiles = $items }
+                            "healthScripts" { $healthScripts = $items }
+                            "configurationPolicies"
+                            { 
+                                # Configuration policies use 'name' instead of 'displayName', so we normalize it
+                                $configurationPolicies = $items | ForEach-Object { 
+                                    $_ | Add-Member -NotePropertyName 'displayName' -NotePropertyValue $_.name -Force -PassThru
+                                }
+                            }
+                            "groupPolicyConfigs" { $groupPolicyConfigs = $items }
+                            "policySets" { $policySets = $items }
+                            "wipPolicies" { $wipPolicies = $items }
+                            "mdmWipPolicies" { $mdmWipPolicies = $items }
+                            "windowsFeatureUpdates" { $windowsFeatureUpdates = $items }
+                            "windowsQualityUpdates" { $windowsQualityUpdates = $items }
+                            "windowsDriverUpdates" { $windowsDriverUpdates = $items }
                         }
                     }
-                    "groupPolicyConfigs" { $groupPolicyConfigs = $items }
-                    "policySets" { $policySets = $items }
-                    "wipPolicies" { $wipPolicies = $items }
-                    "mdmWipPolicies" { $mdmWipPolicies = $items }
-                    "windowsFeatureUpdates" { $windowsFeatureUpdates = $items }
-                    "windowsQualityUpdates" { $windowsQualityUpdates = $items }
-                    "windowsDriverUpdates" { $windowsDriverUpdates = $items }
-                }
-            }
                     elseif ($response.status -ne 200)
                     {
                         $errorMessage = "API returned status $($response.status)"

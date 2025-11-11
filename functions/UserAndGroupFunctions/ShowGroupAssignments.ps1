@@ -200,7 +200,9 @@ function ShowGroupAssignments()
         Write-Host "This may take a while..."
         
         # Call helper function to get truly unassigned resources
+        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Calling Get-UnassignedResources with IncludeBeta=$IncludeBeta, Settings.operatingSystem='$($Settings.operatingSystem)'" -logLevel "Debug"
         $unassignedResult = Get-UnassignedResources -AccessToken $accessToken -IncludeBeta:$IncludeBeta -Settings $Settings
+        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Get-UnassignedResources returned $(if ($unassignedResult.UnassignedResources) { $unassignedResult.UnassignedResources.Count } else { 0 }) unassigned resources, $($unassignedResult.TotalResourcesChecked) total checked" -logLevel "Debug"
         
         if ($null -eq $unassignedResult)
         {
@@ -287,7 +289,9 @@ function ShowGroupAssignments()
         Write-Host "This may take a while..."
         
         # Get only indirect assignments
+        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Calling GetGroupIndirectAssignments with Settings.operatingSystem='$($Settings.operatingSystem)'" -logLevel "Debug"
         $assignments = GetGroupIndirectAssignments -AccessToken $accessToken -IncludeBeta -Settings $Settings
+        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: GetGroupIndirectAssignments returned $(if ($assignments.AllAssignments) { $assignments.AllAssignments.Count } else { 0 }) total assignments" -logLevel "Debug"
         
         if ($null -eq $assignments -or $assignments.AllAssignments.count -eq 0)
         {
@@ -311,7 +315,9 @@ function ShowGroupAssignments()
         }
         Write-Host "This may take a while..."
         # Get group assignments (fetch once and reuse)
+        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Calling GetGroupDirectAssignments for group '$Group', IncludeIndirectAssignments=$($ShowIndirectAssignments.IsPresent), Settings.operatingSystem='$($Settings.operatingSystem)'" -logLevel "Debug"
         $assignments = GetGroupDirectAssignments -accessToken $accessToken -GroupName $Group -includeBeta -IncludeIndirectAssignments:$ShowIndirectAssignments -Settings $Settings
+        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: GetGroupDirectAssignments returned $(if ($assignments -and $assignments -ne 'noGroup' -and $assignments.AllAssignments) { $assignments.AllAssignments.Count } else { 0 }) total assignments" -logLevel "Debug"
         if ($assignments -eq 'noGroup')
         {
             Write-Log -logFile $LogFile -Module $functionName -Message "No group found for name '$groupName'." -LogLevel "Verbose"
