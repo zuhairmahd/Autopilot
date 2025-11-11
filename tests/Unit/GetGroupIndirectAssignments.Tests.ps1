@@ -13,9 +13,10 @@ BeforeAll {
     
     # Load required functions
     . "$script:RepoRoot/functions/UserAndGroupFunctions/GetGroupIndirectAssignments.ps1"
+    . "$script:RepoRoot/functions/UserAndGroupFunctions/Get-GroupAssignments-Common.ps1"
     . "$script:RepoRoot/functions/graphFunctions/CallGraphAPI.ps1"
     . "$script:RepoRoot/functions/utilityFunctions/Write-Log.ps1"
-    
+    . "$script:RepoRoot/functions/utilityFunctions/Get-CachedData.ps1"
     # Set up global variables required by functions
     $global:logFile = Join-Path $script:TestEnv.TestFolder "test.log"
     $global:maxJSONDepth = 10

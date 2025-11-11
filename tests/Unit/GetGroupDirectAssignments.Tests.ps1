@@ -16,7 +16,9 @@ BeforeAll {
     . "$script:RepoRoot/functions/graphFunctions/CallGraphAPI.ps1"
     . "$script:RepoRoot/functions/UserAndGroupFunctions/GetGroupDirectAssignments.ps1"
     . "$script:RepoRoot/functions/UserAndGroupFunctions/GetGroupIndirectAssignments.ps1"
+    . "$script:RepoRoot/functions/UserAndGroupFunctions/Get-GroupAssignments-Common.ps1"
     . "$script:RepoRoot/functions/utilityFunctions/Write-Log.ps1"
+    . "$script:RepoRoot/functions/utilityFunctions/Get-CachedData.ps1"
     
     # Set up global variables required by functions
     $global:logFile = Join-Path $script:TestEnv.TestFolder "test.log"
@@ -26,7 +28,7 @@ BeforeAll {
     $script:TestAccessToken = "test-token-12345"
     $script:TestGroupId = "group-guid-12345"
     $script:TestGroup = @{
-        id = $script:TestGroupId
+        id          = $script:TestGroupId
         displayName = "Test Group"
     }
 }
@@ -59,7 +61,8 @@ Describe "Function: GetGroupDirectAssignments" -Tags 'Unit' {
         It "Should retrieve all v1.0 resource types when IncludeBeta not specified" {
             Mock CallGraphAPI { 
                 param($ResourcePath)
-                if ($ResourcePath -eq '$batch') {
+                if ($ResourcePath -eq '$batch')
+                {
                     return @{
                         responses = @(
                             @{ id = "mobileApps"; status = 200; body = @{ value = @() } }
@@ -86,7 +89,8 @@ Describe "Function: GetGroupDirectAssignments" -Tags 'Unit' {
         It "Should retrieve additional beta resource types when IncludeBeta specified" {
             Mock CallGraphAPI { 
                 param($ResourcePath)
-                if ($ResourcePath -eq '$batch') {
+                if ($ResourcePath -eq '$batch')
+                {
                     return @{
                         responses = @(
                             @{ id = "autopilotProfiles"; status = 200; body = @{ value = @() } }
@@ -110,7 +114,8 @@ Describe "Function: GetGroupDirectAssignments" -Tags 'Unit' {
         It "Should include description field in resource queries" {
             Mock CallGraphAPI { 
                 param($ResourcePath, $Body)
-                if ($ResourcePath -eq '$batch') {
+                if ($ResourcePath -eq '$batch')
+                {
                     # Verify that select includes description
                     $bodyObj = $Body | ConvertFrom-Json
                     $bodyObj.requests[0].url | Should -Match 'description'
@@ -131,38 +136,40 @@ Describe "Function: GetGroupDirectAssignments" -Tags 'Unit' {
     Context "Assignment Processing" {
         It "Should filter assignments for specific group" {
             $testApp = @{
-                id = "app-1"
+                id          = "app-1"
                 displayName = "Test App"
                 description = "Test app description"
             }
             
             Mock CallGraphAPI { 
                 param($ResourcePath)
-                if ($ResourcePath -eq '$batch') {
+                if ($ResourcePath -eq '$batch')
+                {
                     return @{
                         responses = @(
                             @{ id = "mobileApps"; status = 200; body = @{ value = @($testApp) } }
                         )
                     }
                 }
-                elseif ($ResourcePath -is [array]) {
+                elseif ($ResourcePath -is [array])
+                {
                     # Return assignments for the app
                     return @{
                         value = @(
                             @{
                                 value = @(
                                     @{
-                                        target = @{
+                                        target   = @{
                                             '@odata.type' = '#microsoft.graph.groupAssignmentTarget'
-                                            groupId = $TestGroupId
+                                            groupId       = $TestGroupId
                                         }
-                                        intent = "available"
+                                        intent   = "available"
                                         settings = @{}
                                     }
                                     @{
                                         target = @{
                                             '@odata.type' = '#microsoft.graph.groupAssignmentTarget'
-                                            groupId = "different-group-id"
+                                            groupId       = "different-group-id"
                                         }
                                         intent = "available"
                                     }
@@ -183,21 +190,23 @@ Describe "Function: GetGroupDirectAssignments" -Tags 'Unit' {
         
         It "Should include description field in assignment objects" {
             $testApp = @{
-                id = "app-1"
+                id          = "app-1"
                 displayName = "Test App"
                 description = "App description for testing"
             }
             
             Mock CallGraphAPI { 
                 param($ResourcePath)
-                if ($ResourcePath -eq '$batch') {
+                if ($ResourcePath -eq '$batch')
+                {
                     return @{
                         responses = @(
                             @{ id = "mobileApps"; status = 200; body = @{ value = @($testApp) } }
                         )
                     }
                 }
-                elseif ($ResourcePath -is [array]) {
+                elseif ($ResourcePath -is [array])
+                {
                     return @{
                         value = @(
                             @{
@@ -205,7 +214,7 @@ Describe "Function: GetGroupDirectAssignments" -Tags 'Unit' {
                                     @{
                                         target = @{
                                             '@odata.type' = '#microsoft.graph.groupAssignmentTarget'
-                                            groupId = $TestGroupId
+                                            groupId       = $TestGroupId
                                         }
                                         intent = "required"
                                     }
@@ -226,21 +235,23 @@ Describe "Function: GetGroupDirectAssignments" -Tags 'Unit' {
         
         It "Should handle resources without description gracefully" {
             $testApp = @{
-                id = "app-1"
+                id          = "app-1"
                 displayName = "Test App"
                 # No description property
             }
             
             Mock CallGraphAPI { 
                 param($ResourcePath)
-                if ($ResourcePath -eq '$batch') {
+                if ($ResourcePath -eq '$batch')
+                {
                     return @{
                         responses = @(
                             @{ id = "mobileApps"; status = 200; body = @{ value = @($testApp) } }
                         )
                     }
                 }
-                elseif ($ResourcePath -is [array]) {
+                elseif ($ResourcePath -is [array])
+                {
                     return @{
                         value = @(
                             @{
@@ -248,7 +259,7 @@ Describe "Function: GetGroupDirectAssignments" -Tags 'Unit' {
                                     @{
                                         target = @{
                                             '@odata.type' = '#microsoft.graph.groupAssignmentTarget'
-                                            groupId = $TestGroupId
+                                            groupId       = $TestGroupId
                                         }
                                         intent = "required"
                                     }
@@ -268,16 +279,18 @@ Describe "Function: GetGroupDirectAssignments" -Tags 'Unit' {
         It "Should categorize assignments correctly" {
             Mock CallGraphAPI { 
                 param($ResourcePath)
-                if ($ResourcePath -eq '$batch') {
+                if ($ResourcePath -eq '$batch')
+                {
                     return @{
                         responses = @(
-                            @{ id = "mobileApps"; status = 200; body = @{ value = @(@{id="app-1"; displayName="App1"; description="Desc1"}) } }
-                            @{ id = "deviceConfigs"; status = 200; body = @{ value = @(@{id="config-1"; displayName="Config1"; description="Desc2"}) } }
-                            @{ id = "policySets"; status = 200; body = @{ value = @(@{id="ps-1"; displayName="PolicySet1"; description="Desc3"}) } }
+                            @{ id = "mobileApps"; status = 200; body = @{ value = @(@{id = "app-1"; displayName = "App1"; description = "Desc1"}) } }
+                            @{ id = "deviceConfigs"; status = 200; body = @{ value = @(@{id = "config-1"; displayName = "Config1"; description = "Desc2"}) } }
+                            @{ id = "policySets"; status = 200; body = @{ value = @(@{id = "ps-1"; displayName = "PolicySet1"; description = "Desc3"}) } }
                         )
                     }
                 }
-                elseif ($ResourcePath -is [array]) {
+                elseif ($ResourcePath -is [array])
+                {
                     return @{
                         value = @(
                             @{
@@ -285,7 +298,7 @@ Describe "Function: GetGroupDirectAssignments" -Tags 'Unit' {
                                     @{
                                         target = @{
                                             '@odata.type' = '#microsoft.graph.groupAssignmentTarget'
-                                            groupId = $TestGroupId
+                                            groupId       = $TestGroupId
                                         }
                                     }
                                 )
@@ -309,14 +322,16 @@ Describe "Function: GetGroupDirectAssignments" -Tags 'Unit' {
         It "Should retrieve WIP policy assignments when IncludeBeta specified" {
             Mock CallGraphAPI { 
                 param($ResourcePath)
-                if ($ResourcePath -eq '$batch') {
+                if ($ResourcePath -eq '$batch')
+                {
                     return @{
                         responses = @(
-                            @{ id = "wipPolicies"; status = 200; body = @{ value = @(@{id="wip-1"; displayName="WIP Policy"; description="WIP Desc"}) } }
+                            @{ id = "wipPolicies"; status = 200; body = @{ value = @(@{id = "wip-1"; displayName = "WIP Policy"; description = "WIP Desc"}) } }
                         )
                     }
                 }
-                elseif ($ResourcePath -is [array]) {
+                elseif ($ResourcePath -is [array])
+                {
                     return @{
                         value = @(
                             @{
@@ -324,7 +339,7 @@ Describe "Function: GetGroupDirectAssignments" -Tags 'Unit' {
                                     @{
                                         target = @{
                                             '@odata.type' = '#microsoft.graph.groupAssignmentTarget'
-                                            groupId = $TestGroupId
+                                            groupId       = $TestGroupId
                                         }
                                     }
                                 )
@@ -424,21 +439,23 @@ Describe "Function: GetGroupDirectAssignments" -Tags 'Unit' {
         It "Should merge indirect assignments with direct assignments" {
             # Setup direct assignments
             $testApp = @{
-                id = "app-1"
+                id          = "app-1"
                 displayName = "Direct App"
                 description = "Direct assignment"
             }
             
             Mock CallGraphAPI { 
                 param($ResourcePath)
-                if ($ResourcePath -eq '$batch') {
+                if ($ResourcePath -eq '$batch')
+                {
                     return @{
                         responses = @(
                             @{ id = "mobileApps"; status = 200; body = @{ value = @($testApp) } }
                         )
                     }
                 }
-                elseif ($ResourcePath -is [array]) {
+                elseif ($ResourcePath -is [array])
+                {
                     return @{
                         value = @(
                             @{
@@ -446,7 +463,7 @@ Describe "Function: GetGroupDirectAssignments" -Tags 'Unit' {
                                     @{
                                         target = @{
                                             '@odata.type' = '#microsoft.graph.groupAssignmentTarget'
-                                            groupId = $TestGroupId
+                                            groupId       = $TestGroupId
                                         }
                                         intent = "required"
                                     }
@@ -547,13 +564,13 @@ Describe "Function: GetGroupDirectAssignments" -Tags 'Unit' {
             
             Mock GetGroupIndirectAssignments {
                 return @{
-                    AppAssignments           = @(
+                    AppAssignments                          = @(
                         @{ Type = "Application"; Name = "App1"; AssignmentScope = "All Users" }
                     )
-                    ConfigurationAssignments = @(
+                    ConfigurationAssignments                = @(
                         @{ Type = "Configuration"; Name = "Config1"; AssignmentScope = "All Devices" }
                     )
-                    ComplianceAssignments    = @(
+                    ComplianceAssignments                   = @(
                         @{ Type = "Compliance"; Name = "Compliance1"; AssignmentScope = "All Users" }
                     )
                     AutopilotAssignments                    = @()
@@ -566,7 +583,7 @@ Describe "Function: GetGroupDirectAssignments" -Tags 'Unit' {
                     GroupPolicyAssignments                  = @()
                     WindowsInformationProtectionAssignments = @()
                     PolicySetAssignments                    = @()
-                    AllAssignments           = @(
+                    AllAssignments                          = @(
                         @{ Type = "Application"; Name = "App1"; AssignmentScope = "All Users" }
                         @{ Type = "Configuration"; Name = "Config1"; AssignmentScope = "All Devices" }
                         @{ Type = "Compliance"; Name = "Compliance1"; AssignmentScope = "All Users" }
@@ -589,7 +606,8 @@ Describe "Function: GetGroupDirectAssignments" -Tags 'Unit' {
 }
 
 AfterAll {
-    if ($script:TestEnv) {
+    if ($script:TestEnv)
+    {
         Remove-TestEnvironment -TestContext $script:TestEnv
     }
 }
