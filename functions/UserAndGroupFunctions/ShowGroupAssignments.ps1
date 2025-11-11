@@ -6,6 +6,7 @@ function ShowGroupAssignments()
         [string]$accessToken,
         [string[]]$specialGroups,
         [switch]$exportInstead,
+        [string]$ExportFilePath,
         [switch]$ShowOnlyUnassigned,
         [switch]$ShowIndirectAssignments,
         [Parameter(Mandatory = $false)]
@@ -455,6 +456,10 @@ function ShowGroupAssignments()
             return 'WindowsFeatureUpdate'
         } -returnsValue
     }
+    else
+    {
+        Write-Log -logFile $LogFile -Module $functionName -Message "No Windows Feature Update assignments available for menu display" -LogLevel "Verbose"
+    }
     if ($assignments.WindowsQualityUpdateAssignments.count -gt 0)
     {
         $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Windows Quality Updates ($($assignments.WindowsQualityUpdateAssignments.count))" -Action {
@@ -462,12 +467,20 @@ function ShowGroupAssignments()
             return 'WindowsQualityUpdate'
         } -returnsValue
     }
+    else
+    {
+        Write-Log -logFile $LogFile -Module $functionName -Message "No Windows Quality Update assignments available for menu display" -LogLevel "Verbose"
+    }
     if ($assignments.WindowsDriverUpdateAssignments.count -gt 0)
     {
         $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Windows Driver Updates ($($assignments.WindowsDriverUpdateAssignments.count))" -Action {
             Write-Host "Selected Assignment Type: WindowsDriverUpdate"
             return 'WindowsDriverUpdate'
         } -returnsValue
+    }
+    else
+    {
+        Write-Log -logFile $LogFile -Module $functionName -Message "No Windows Driver Update assignments available for menu display" -LogLevel "Verbose"
     }
     
     $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType  All Assignments ($($assignments.AllAssignments.count))" -Action {
@@ -544,7 +557,16 @@ function ShowGroupAssignments()
                 $sanitizedGroupName = $groupName -replace '[\\/:*?"<>|]', '_'
                 $exportTypeLabel = if ($assignmentType -eq 'All') { 'AllAssignments' } else { $assignmentType }
                 $exportFileName = "GroupAssignments_${sanitizedGroupName}_${exportTypeLabel}_${timestamp}.csv"
-                $exportPath = Join-Path -Path $env:TEMP -ChildPath $exportFileName
+                $exportPath = if ($ExportFilePath)
+                {
+                    # Use provided export path
+                    Join-Path -Path $ExportFilePath -ChildPath $exportFileName
+                }
+                else
+                {
+                    # Use current directory
+                    Join-Path -Path (Get-Location).Path -ChildPath $exportFileName
+                }                   
                 
                 Write-Host "Exporting $($selectedAssignments.Count) assignments to CSV..." -ForegroundColor Cyan
                 Write-Log -logFile $LogFile -Module $functionName -Message "Exporting $($selectedAssignments.Count) assignments to: $exportPath" -LogLevel "Information"

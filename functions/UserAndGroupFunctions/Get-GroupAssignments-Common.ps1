@@ -598,6 +598,103 @@ function Add-AssignmentToCategory()
     Write-Log -logFile $LogFile -module $functionName -Message "Assignment added successfully. Total assignments in AllAssignments: $($ResultObject.AllAssignments.Count)" -logLevel "Debug"
 }
 
+function Invoke-GraphNextLinkRequest()
+{
+    <#
+    .SYNOPSIS
+    Executes a GET request against a Microsoft Graph @odata.nextLink URL.
+    
+    .DESCRIPTION
+    Used by pagination helpers to retrieve additional pages when the initial response
+    returned a nextLink reference. Keeps authorization/header handling consistent.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$AccessToken,
+        [Parameter(Mandatory = $true)]
+        [string]$NextLink,
+        [Parameter(Mandatory = $false)]
+        [string]$ResourceDescription = "resource page"
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -logFile $LogFile -module $functionName -Message "Retrieving nextLink for ${ResourceDescription}: $NextLink" -logLevel "Verbose"
+    
+    $headers = @{
+        Authorization  = "Bearer $AccessToken"
+        'Content-Type' = 'application/json'
+    }
+    
+    try
+    {
+        return Invoke-RestMethod -Method Get -Uri $NextLink -Headers $headers -UseBasicParsing
+    }
+    catch
+    {
+        Write-Log -logFile $LogFile -module $functionName -Message "Failed to retrieve nextLink for ${ResourceDescription}: $($_.Exception.Message)" -logLevel "Warning"
+        throw
+    }
+}
+
+function Get-PagedCollectionItems()
+{
+    <#
+    .SYNOPSIS
+    Aggregates all items from a potentially paged Graph response.
+    
+    .DESCRIPTION
+    Takes the initial response body from a batch request and follows any @odata.nextLink
+    references until all pages are collected.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [PSCustomObject]$InitialResponse,
+        [Parameter(Mandatory = $true)]
+        [string]$AccessToken,
+        [Parameter(Mandatory = $false)]
+        [string]$ResourceDescription = "resource collection"
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    $items = @()
+    $pageCount = 0
+    
+    if ($null -eq $InitialResponse)
+    {
+        Write-Log -logFile $LogFile -module $functionName -Message "No initial response provided for $ResourceDescription" -logLevel "Verbose"
+        return @{
+            Items     = $items
+            PageCount = 0
+        }
+    }
+    
+    if ($InitialResponse.value)
+    {
+        $items += $InitialResponse.value
+    }
+    $pageCount = 1
+    
+    $nextLink = $InitialResponse.'@odata.nextLink'
+    while ($nextLink)
+    {
+        $pageCount++
+        $nextResponse = Invoke-GraphNextLinkRequest -AccessToken $AccessToken -NextLink $nextLink -ResourceDescription $ResourceDescription
+        if ($nextResponse -and $nextResponse.value)
+        {
+            $items += $nextResponse.value
+        }
+        $nextLink = $nextResponse.'@odata.nextLink'
+    }
+    
+    Write-Log -logFile $LogFile -module $functionName -Message "$ResourceDescription pagination complete - Pages: $pageCount, Items: $($items.Count)" -logLevel "Verbose"
+    return @{
+        Items     = $items
+        PageCount = $pageCount
+    }
+}
+
 function Invoke-AssignmentBatchRequest()
 {
     <#
@@ -1048,7 +1145,8 @@ function Get-ResourceCategory()
         # Scripts
         elseif ($odataType -match 'devicemanagementscript|devicehealthscript')
         {
-            return if ($odataType -match 'health') { 'HealthScript' } else { 'Script' }
+            $scriptReturnValue = if ($odataType -match 'health') { 'HealthScript' } else { 'Script' }
+            return $scriptReturnValue       
         }
         # App protection
         elseif ($odataType -match 'managedapppolicy|managedappprotection')
@@ -1122,67 +1220,228 @@ function Get-ResourceCategory()
     }
 }
 
+function Get-DefaultODataTypeForEndpoint()
+{
+    <#
+    .SYNOPSIS
+    Provides a best-effort default @odata.type string for known endpoint identifiers.
+    
+    .DESCRIPTION
+    Some Graph responses omit @odata.type when minimal metadata is returned. This helper
+    returns a representative type name so downstream logic (platform filtering, base URI
+    resolution, metadata lookups) can continue operating without warnings.
+    
+    .PARAMETER EndpointId
+    Endpoint identifier such as 'deviceScripts', 'windowsFeatureUpdates', etc.
+    
+    .EXAMPLE
+    $odataType = Get-DefaultODataTypeForEndpoint -EndpointId 'windowsFeatureUpdates'
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$EndpointId
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    if ([string]::IsNullOrWhiteSpace($EndpointId))
+    {
+        Write-Log -logFile $LogFile -module $functionName -Message "EndpointId not provided, cannot derive default ODataType." -logLevel "Verbose"
+        return $null
+    }
+    
+    $originalId = $EndpointId
+    $normalizedId = $EndpointId.Trim().ToLowerInvariant()
+    $defaultTypes = @{
+        mobileapps             = '#microsoft.graph.mobileApp'
+        deviceconfigs          = '#microsoft.graph.deviceConfiguration'
+        compliancepolicies     = '#microsoft.graph.deviceCompliancePolicy'
+        devicescripts          = '#microsoft.graph.deviceManagementScript'
+        appprotectionpolicies  = '#microsoft.graph.managedAppPolicy'
+        intents                = '#microsoft.graph.deviceManagementIntent'
+        resourceaccessprofiles = '#microsoft.graph.deviceManagementResourceAccessProfile'
+        policysets             = '#microsoft.graph.policySet'
+        autopilotprofiles      = '#microsoft.graph.windowsAutopilotDeploymentProfile'
+        healthscripts          = '#microsoft.graph.deviceHealthScript'
+        configurationpolicies  = '#microsoft.graph.configurationPolicy'
+        grouppolicyconfigs     = '#microsoft.graph.groupPolicyConfiguration'
+        wippolicies            = '#microsoft.graph.windowsInformationProtectionPolicy'
+        mdmwippolicies         = '#microsoft.graph.mdmWindowsInformationProtectionPolicy'
+        windowsfeatureupdates  = '#microsoft.graph.windowsFeatureUpdateProfile'
+        windowsqualityupdates  = '#microsoft.graph.windowsQualityUpdateProfile'
+        windowsdriverupdates   = '#microsoft.graph.windowsDriverUpdateProfile'
+    }
+    
+    if ($defaultTypes.ContainsKey($normalizedId))
+    {
+        $inferredType = $defaultTypes[$normalizedId]
+        Write-Log -logFile $LogFile -module $functionName -Message "Derived default ODataType '$inferredType' for EndpointId '$originalId'." -logLevel "Verbose"
+        return $inferredType
+    }
+    
+    Write-Log -logFile $LogFile -module $functionName -Message "No default ODataType mapping for EndpointId '$originalId'." -logLevel "Verbose"
+    return $null
+}
+
 function Test-ResourcePlatformMatch()
 {
-    [CmdletBinding()                                        ]
+    [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
         $Resource,
         [Parameter(Mandatory = $false)]
         [string]$TargetOS
     )
-    $functionName = $MyInvocation.MyCommand.Name                                
+
+    $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Target OS: $TargetOS"
-    write-log -logFile $logFile -module $functionName -message "Target OS: $TargetOS"
-    # If no target OS specified, include all resources
+    Write-Log -logFile $logFile -module $functionName -message "Target OS: $TargetOS" -logLevel "Information"
+
     if ([string]::IsNullOrWhiteSpace($TargetOS))
     {
-        write-log -logFile $logFile -module $functionName -message "No Target OS specified, including all resources."                   
+        Write-Log -logFile $logFile -module $functionName -message "No Target OS specified, including all resources." -logLevel "Verbose"
         return $true
     }
-        
-    # Get the @odata.type if available
+
+    $targetOSLower = $TargetOS.ToLowerInvariant()
+    $platformHints = New-Object System.Collections.ArrayList
+    $addPlatformHint = {
+        param(
+            [string]$Hint,
+            [System.Collections.ArrayList]$HintCollection
+        )
+
+        if (-not [string]::IsNullOrWhiteSpace($Hint) -and -not $HintCollection.Contains($Hint))
+        {
+            [void]$HintCollection.Add($Hint)
+        }
+    }
+
     $odataType = if ($Resource.'@odata.type') { $Resource.'@odata.type'.ToLower() } else { '' }
-    Write-Verbose "[$functionName] Resource @odata.type: $odataType"        
-    write-log -logFile $logFile -module $functionName -message "Resource @odata.type: $odataType"                   
-    # Platform matching logic based on @odata.type
-    switch ($TargetOS.ToLower())
+    Write-Verbose "[$functionName] Resource @odata.type: $odataType"
+    Write-Log -logFile $logFile -module $functionName -message "Resource @odata.type: $odataType" -logLevel "Debug"
+
+    if ($odataType)
+    {
+        if ($odataType -match 'windows|win32|intunewin|msi|officesuiteapp|desktop')
+        {
+            &$addPlatformHint -Hint 'windows' -HintCollection $platformHints
+        }
+        if ($odataType -match 'android')
+        {
+            &$addPlatformHint -Hint 'android' -HintCollection $platformHints
+        }
+        if ($odataType -match 'ios' -and $odataType -notmatch 'windows')
+        {
+            &$addPlatformHint -Hint 'ios' -HintCollection $platformHints
+        }
+        if ($odataType -match 'macos')
+        {
+            &$addPlatformHint -Hint 'macos' -HintCollection $platformHints
+        }
+        if ($odataType -match 'linux')
+        {
+            &$addPlatformHint -Hint 'linux' -HintCollection $platformHints
+        }
+    }
+
+    $platformPropertyNames = @(
+        'platforms',
+        'platform',
+        'platformType',
+        'devicePlatformType',
+        'applicablePlatforms',
+        'targetedPlatforms',
+        'supportedPlatforms'
+    )
+
+    foreach ($propertyName in $platformPropertyNames)
+    {
+        if (-not $Resource.PSObject.Properties[$propertyName])
+        {
+            continue
+        }
+
+        $propertyValue = $Resource.$propertyName
+        if ($null -eq $propertyValue)
+        {
+            continue
+        }
+
+        $values = @()
+        if ($propertyValue -is [System.Collections.IEnumerable] -and -not ($propertyValue -is [string]))
+        {
+            foreach ($entry in $propertyValue)
+            {
+                if (-not [string]::IsNullOrWhiteSpace($entry))
+                {
+                    $values += $entry
+                }
+            }
+        }
+        else
+        {
+            $values += $propertyValue
+        }
+
+        foreach ($value in $values)
+        {
+            $valueText = $value.ToString().ToLower()
+            if ($valueText -match 'windows')
+            {
+                &$addPlatformHint -Hint 'windows' -HintCollection $platformHints
+            }
+            elseif ($valueText -match 'android')
+            {
+                &$addPlatformHint -Hint 'android' -HintCollection $platformHints
+            }
+            elseif (($valueText -match 'ios') -or ($valueText -match 'ipad') -or ($valueText -match 'iphone'))
+            {
+                &$addPlatformHint -Hint 'ios' -HintCollection $platformHints
+            }
+            elseif ($valueText -match 'macos')
+            {
+                &$addPlatformHint -Hint 'macos' -HintCollection $platformHints
+            }
+            elseif ($valueText -match 'linux')
+            {
+                &$addPlatformHint -Hint 'linux' -HintCollection $platformHints
+            }
+        }
+    }
+
+    $hintSummary = if ($platformHints.Count -gt 0) { ($platformHints -join ', ') } else { 'None' }
+    Write-Log -logFile $logFile -module $functionName -message "Derived platform hints: $hintSummary" -logLevel "Debug"
+
+    if ($platformHints.Count -eq 0)
+    {
+        $defaultInclude = ($targetOSLower -eq 'windows')
+        Write-Log -logFile $logFile -module $functionName -message "No platform hints found; defaulting to Include=$defaultInclude for TargetOS '$TargetOS'." -logLevel "Verbose"
+        return $defaultInclude
+    }
+
+    $hasTargetHint = $platformHints -contains $targetOSLower
+
+    switch ($targetOSLower)
     {
         'windows'
         {
-            # Match Windows-specific types
-            write-log -logFile $logFile -module $functionName -message "Checking for Windows platform match."
-            return ($odataType -match 'windows|win32|msi|intunewin|officeSuiteApp')
-        }
-        'ios'
-        {
-            # Match iOS-specific types
-            write-log -logFile $logFile -module $functionName -message "Checking for iOS platform match."                                               
-            return ($odataType -match 'ios(?!.*mac)')
-        }
-        'android'
-        {
-            # Match Android-specific types  
-            write-log -logFile $logFile -module $functionName -message "Checking for Android platform match."                           
-            return ($odataType -match 'android')
-        }
-        'macos'
-        {
-            # Match macOS-specific types
-            write-log -logFile $logFile -module $functionName -message "Checking for macOS platform match."                                 
-            return ($odataType -match 'macos|macOSLobApp|macOSOfficeApp')
-        }
-        'linux'
-        {
-            # Match Linux-specific types (rare but possible)
-            write-log -logFile $logFile -module $functionName -message "Checking for Linux platform match."                                                 
-            return ($odataType -match 'linux')
+            if ($hasTargetHint)
+            {
+                Write-Log -logFile $logFile -module $functionName -message "Resource identified as Windows-capable via hints." -logLevel "Verbose"
+                return $true
+            }
+
+            $conflictingHints = @('ios', 'android', 'macos', 'linux')
+            $hasConflict = $platformHints | Where-Object { $_ -in $conflictingHints }
+            $result = ($hasConflict.Count -eq 0)
+            Write-Log -logFile $logFile -module $functionName -message "Windows fallback result: $result (Conflicts: $($hasConflict -join ', '))" -logLevel "Verbose"
+            return $result
         }
         default
         {
-            # Unknown OS - include all
-            write-log -logFile $logFile -module $functionName -message "Unknown Target OS specified, including all resources."                                              
-            return $true
+            Write-Log -logFile $logFile -module $functionName -message "Returning $hasTargetHint for TargetOS '$TargetOS' based on hints." -logLevel "Verbose"
+            return $hasTargetHint
         }
     }
 }
@@ -1265,6 +1524,17 @@ function Get-UnassignedResources()
             {
                 # Determine resource type and category using unified function
                 $resourceType = $endpointInfo.id
+
+                if ([string]::IsNullOrWhiteSpace($resource.'@odata.type'))
+                {
+                    $fallbackODataType = Get-DefaultODataTypeForEndpoint -EndpointId $resourceType
+                    if ($fallbackODataType)
+                    {
+                        $resource | Add-Member -NotePropertyName '@odata.type' -NotePropertyValue $fallbackODataType -Force
+                        Write-Log -logFile $LogFile -module $functionName -Message "Injected default ODataType '$fallbackODataType' for resource '$($resource.displayName)' (ID: $($resource.id)) via endpoint '$resourceType' during unassigned check." -logLevel "Verbose"
+                    }
+                }
+
                 $category = Get-ResourceCategory -Resource $resource -EndpointId $resourceType
                 
                 $allResources += [PSCustomObject]@{
@@ -1773,6 +2043,14 @@ function Test-ResourceSupportsAssignments()
     
     Write-Log -logFile $LogFile -module $functionName -Message "Testing assignment support for ODataType: '$odataType'" -logLevel "Verbose"
     
+    # Known Graph metadata gaps for Windows Update profiles – treat as supported
+    if ($odataType -match 'windowsfeatureupdateprofile|windowsqualityupdateprofile|windowsdriverupdateprofile')
+    {
+        Write-Log -logFile $LogFile -module $functionName -Message "Bypassing metadata check for Windows Update profile type '$odataType' (known Graph limitation)" -logLevel "Verbose"
+        $script:MetadataCache[$odataType] = $true
+        return $true
+    }
+    
     # Exception list for known API design limitations that require alternative handling
     # PolicySets: Use non-standard OData routing, assignments exist but GET endpoint differs
     if ($Resource.ResourceType -eq 'policySets' -or $odataType -match 'policySet')
@@ -1818,15 +2096,19 @@ function Test-ResourceSupportsAssignments()
         
         if ($metadata -and $metadata.NavigationProperties)
         {
-            # Check if 'assignments' is in the navigation properties
-            $hasAssignments = $metadata.NavigationProperties | Where-Object { $_.Name -eq 'assignments' }
-            $supportsAssignments = $null -ne $hasAssignments
+            # Look for any navigation property that references assignments (exact or variant names)
+            $assignmentNav = $metadata.NavigationProperties | Where-Object { $_.Name -match 'assignment' }
             
-            Write-Log -logFile $LogFile -module $functionName -Message "Metadata analysis for $($odataType): SupportsAssignments=$supportsAssignments" -logLevel "Verbose"
+            if ($assignmentNav)
+            {
+                Write-Log -logFile $LogFile -module $functionName -Message "Metadata analysis for $($odataType): assignment navigation detected ($($assignmentNav.Name -join ', '))" -logLevel "Verbose"
+                $script:MetadataCache[$odataType] = $true
+                return $true
+            }
             
-            # Cache the result
-            $script:MetadataCache[$odataType] = $supportsAssignments
-            return $supportsAssignments
+            Write-Log -logFile $LogFile -module $functionName -Message "Metadata for $($odataType) contains navigation properties but none named like 'assignment'. Defaulting to supported." -logLevel "Verbose"
+            $script:MetadataCache[$odataType] = $true
+            return $true
         }
         else
         {
@@ -2233,6 +2515,7 @@ function Get-IntuneResourceLists()
     $windowsQualityUpdates = @()
     $windowsDriverUpdates = @()
     $failedResourceIds = @()
+    $resourceListsToCache = $null
     
     if ($cachedResourceLists)
     {
@@ -2419,37 +2702,41 @@ function Get-IntuneResourceLists()
             {
                 Write-Log -logFile $LogFile -module $functionName -Message "Processing batch response for resource lists" -LogLevel "Verbose"
             
-                foreach ($response in $batchResponse.responses)
+        foreach ($response in $batchResponse.responses)
+        {
+            if ($response.status -eq 200 -and $response.body)
+            {
+                $pagedResult = Get-PagedCollectionItems -InitialResponse $response.body -AccessToken $AccessToken -ResourceDescription $response.id
+                $items = $pagedResult.Items
+                Write-Log -logFile $LogFile -module $functionName -Message "Endpoint '$($response.id)' fetched $($items.Count) item(s) across $($pagedResult.PageCount) page(s)" -logLevel "Verbose"
+                
+                switch ($response.id)
                 {
-                    if ($response.status -eq 200 -and $response.body -and $response.body.value)
-                    {
-                        switch ($response.id)
-                        {
-                            "mobileApps" { $mobileApps = $response.body.value }
-                            "deviceConfigs" { $deviceConfigs = $response.body.value }
-                            "compliancePolicies" { $compliancePolicies = $response.body.value }
-                            "deviceScripts" { $deviceScripts = $response.body.value }
-                            "appProtectionPolicies" { $appProtectionPolicies = $response.body.value }
-                            "intents" { $intents = $response.body.value }
-                            "resourceAccessProfiles" { $resourceAccessProfiles = $response.body.value }
-                            "autopilotProfiles" { $autopilotProfiles = $response.body.value }
-                            "healthScripts" { $healthScripts = $response.body.value }
-                            "configurationPolicies"
-                            { 
-                                # Configuration policies use 'name' instead of 'displayName', so we normalize it
-                                $configurationPolicies = $response.body.value | ForEach-Object { 
-                                    $_ | Add-Member -NotePropertyName 'displayName' -NotePropertyValue $_.name -Force -PassThru
-                                }
-                            }
-                            "groupPolicyConfigs" { $groupPolicyConfigs = $response.body.value }
-                            "policySets" { $policySets = $response.body.value }
-                            "wipPolicies" { $wipPolicies = $response.body.value }
-                            "mdmWipPolicies" { $mdmWipPolicies = $response.body.value }
-                            "windowsFeatureUpdates" { $windowsFeatureUpdates = $response.body.value }
-                            "windowsQualityUpdates" { $windowsQualityUpdates = $response.body.value }
-                            "windowsDriverUpdates" { $windowsDriverUpdates = $response.body.value }
+                    "mobileApps" { $mobileApps = $items }
+                    "deviceConfigs" { $deviceConfigs = $items }
+                    "compliancePolicies" { $compliancePolicies = $items }
+                    "deviceScripts" { $deviceScripts = $items }
+                    "appProtectionPolicies" { $appProtectionPolicies = $items }
+                    "intents" { $intents = $items }
+                    "resourceAccessProfiles" { $resourceAccessProfiles = $items }
+                    "autopilotProfiles" { $autopilotProfiles = $items }
+                    "healthScripts" { $healthScripts = $items }
+                    "configurationPolicies"
+                    { 
+                        # Configuration policies use 'name' instead of 'displayName', so we normalize it
+                        $configurationPolicies = $items | ForEach-Object { 
+                            $_ | Add-Member -NotePropertyName 'displayName' -NotePropertyValue $_.name -Force -PassThru
                         }
                     }
+                    "groupPolicyConfigs" { $groupPolicyConfigs = $items }
+                    "policySets" { $policySets = $items }
+                    "wipPolicies" { $wipPolicies = $items }
+                    "mdmWipPolicies" { $mdmWipPolicies = $items }
+                    "windowsFeatureUpdates" { $windowsFeatureUpdates = $items }
+                    "windowsQualityUpdates" { $windowsQualityUpdates = $items }
+                    "windowsDriverUpdates" { $windowsDriverUpdates = $items }
+                }
+            }
                     elseif ($response.status -ne 200)
                     {
                         $errorMessage = "API returned status $($response.status)"
@@ -2490,8 +2777,7 @@ function Get-IntuneResourceLists()
     
         Write-Log -logFile $LogFile -module $functionName -Message "Retrieved resource counts via batch - Apps: $($mobileApps.Count), Configs: $($deviceConfigs.Count), Compliance: $($compliancePolicies.Count), Autopilot: $($autopilotProfiles.Count), Scripts: $($deviceScripts.Count), HealthScripts: $($healthScripts.Count), AppProtection: $($appProtectionPolicies.Count), Intents: $($intents.Count), ResourceAccess: $($resourceAccessProfiles.Count), ConfigPolicies: $($configurationPolicies.Count), GroupPolicy: $($groupPolicyConfigs.Count), PolicySets: $($policySets.Count), WIP: $($wipPolicies.Count), MDMWIP: $($mdmWipPolicies.Count)" -logLevel "Information"
         
-        # Cache only successfully fetched resources (exclude failed ones)
-        # Failed resources will be retried on next run
+        # Prepare resource lists for caching (actual cache write occurs after metadata sanitation)
         if (-not $SkipCache.IsPresent)
         {
             $resourceListsToCache = @{
@@ -2513,23 +2799,76 @@ function Get-IntuneResourceLists()
                 windowsQualityUpdates  = $windowsQualityUpdates
                 windowsDriverUpdates   = $windowsDriverUpdates
             }
-            
-            # Remove failed resources from cache object (set to $null so cache knows they weren't fetched)
-            foreach ($failedId in $failedResourceIds)
+        }
+    }
+    
+    # Ensure @odata.type exists for all resources (Graph may omit for minimal metadata responses)
+    $resourceCollections = @{
+        mobileApps             = $mobileApps
+        deviceConfigs          = $deviceConfigs
+        compliancePolicies     = $compliancePolicies
+        autopilotProfiles      = $autopilotProfiles
+        deviceScripts          = $deviceScripts
+        healthScripts          = $healthScripts
+        appProtectionPolicies  = $appProtectionPolicies
+        intents                = $intents
+        resourceAccessProfiles = $resourceAccessProfiles
+        configurationPolicies  = $configurationPolicies
+        groupPolicyConfigs     = $groupPolicyConfigs
+        policySets             = $policySets
+        wipPolicies            = $wipPolicies
+        mdmWipPolicies         = $mdmWipPolicies
+        windowsFeatureUpdates  = $windowsFeatureUpdates
+        windowsQualityUpdates  = $windowsQualityUpdates
+        windowsDriverUpdates   = $windowsDriverUpdates
+    }
+    
+    foreach ($endpointKey in $resourceCollections.Keys)
+    {
+        $resourcesForEndpoint = $resourceCollections[$endpointKey]
+        if (-not $resourcesForEndpoint -or $resourcesForEndpoint.Count -eq 0)
+        {
+            continue
+        }
+        
+        $fallbackType = Get-DefaultODataTypeForEndpoint -EndpointId $endpointKey
+        if ([string]::IsNullOrWhiteSpace($fallbackType))
+        {
+            continue
+        }
+        
+        foreach ($resource in $resourcesForEndpoint)
+        {
+            if ([string]::IsNullOrWhiteSpace($resource.'@odata.type'))
             {
-                if ($resourceListsToCache.ContainsKey($failedId))
-                {
-                    $resourceListsToCache[$failedId] = $null
-                    Write-Log -logFile $LogFile -module $functionName -Message "Excluding failed resource '$failedId' from cache (will retry next time)" -logLevel "Verbose"
-                }
+                $resource | Add-Member -NotePropertyName '@odata.type' -NotePropertyValue $fallbackType -Force
+                Write-Log -logFile $LogFile -module $functionName -Message "Populated missing ODataType '$fallbackType' for resource '$($resource.displayName)' (ID: $($resource.id)) via endpoint '$endpointKey'." -logLevel "Verbose"
             }
-            
-            $cached = Set-CachedData -CacheType 'Configuration' -Key $CacheKey -Data $resourceListsToCache -Metadata @{ApiVersion = $apiVersionKey; FetchedAt = Get-Date; FailedResources = $failedResourceIds}
-            if ($cached)
+        }
+    }
+    
+    # Persist sanitized resource lists to cache if we fetched fresh data this run
+    if ($resourceListsToCache)
+    {
+        foreach ($failedId in $failedResourceIds)
+        {
+            if ($resourceListsToCache.ContainsKey($failedId))
             {
-                $successCount = ($resourceListsToCache.Keys | Where-Object { $resourceListsToCache[$_] -ne $null }).Count
-                Write-Log -logFile $LogFile -module $functionName -Message "Successfully cached $successCount resource lists (CacheKey: $CacheKey, excluded $($failedResourceIds.Count) failed)" -logLevel "Verbose"
+                $resourceListsToCache[$failedId] = $null
+                Write-Log -logFile $LogFile -module $functionName -Message "Excluding failed resource '$failedId' from cache (will retry next time)" -logLevel "Verbose"
             }
+        }
+        
+        $cacheMetadata = @{
+            ApiVersion      = $apiVersionKey
+            FetchedAt       = Get-Date
+            FailedResources = $failedResourceIds
+        }
+        $cached = Set-CachedData -CacheType 'Configuration' -Key $CacheKey -Data $resourceListsToCache -Metadata $cacheMetadata
+        if ($cached)
+        {
+            $successCount = ($resourceListsToCache.Keys | Where-Object { $resourceListsToCache[$_] -ne $null }).Count
+            Write-Log -logFile $LogFile -module $functionName -Message "Successfully cached $successCount resource lists (CacheKey: $CacheKey, excluded $($failedResourceIds.Count) failed)" -logLevel "Verbose"
         }
     }
     
