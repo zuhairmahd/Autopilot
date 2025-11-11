@@ -890,16 +890,6 @@
                 )
             },
             @{
-                description           = 'View all unassigned configuration profiles'
-                name                  = 'View all unassigned configurations'        
-                blockType             = 'action'
-                includeInDisplayModes = @(
-                    'full',
-                    'admin',
-                    'advanced'
-                )                   
-            },
-            @{
                 description           = 'Export direct group assignments to a CSV file'
                 name                  = 'Export direct group assignments'        
                 blockType             = 'action'
@@ -918,16 +908,6 @@
                     'admin',
                     'advanced'
                 )                                           
-            },
-            @{
-                description           = 'Export all unassigned configuration profiles to a CSV file'
-                name                  = 'Export all unassigned configurations'        
-                blockType             = 'action'
-                includeInDisplayModes = @(
-                    'full',
-                    'admin',
-                    'advanced'
-                )                       
             },
             @{
                 description           = 'Export all Windows configurations and their assignments to a CSV file'

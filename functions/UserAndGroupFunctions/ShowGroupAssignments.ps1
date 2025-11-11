@@ -10,7 +10,6 @@ function ShowGroupAssignments()
     
     - Direct group assignments: Show assignments targeted to a specific Azure AD group
     - Indirect assignments: Show assignments targeted to "All Users" and "All Devices"
-    - Unassigned resources: Show resources with no assignments at all
     - Export mode: Export assignment data to CSV instead of displaying
     
     The function consolidates duplicate assignments with multiple scopes (Direct, All Users, All Devices) into 
@@ -19,7 +18,6 @@ function ShowGroupAssignments()
 
 .PARAMETER Group
     The Azure AD group object, hashtable, or group name (string) for which to retrieve assignments.
-    Not required when using -ShowOnlyUnassigned with special groups.
 
 .PARAMETER accessToken
     Required. The Microsoft Graph API access token for authentication.
@@ -34,10 +32,6 @@ function ShowGroupAssignments()
 .PARAMETER ExportFilePath
     Directory path where CSV exports should be saved. If not specified, uses current directory.
     Only relevant when -exportInstead is used.
-
-.PARAMETER ShowOnlyUnassigned
-    Switch parameter. When present, retrieves and displays only resources that have no assignments 
-    (not assigned to any group, user, or device).
 
 .PARAMETER ShowIndirectAssignments
     Switch parameter. When used with a specific group, includes indirect assignments (All Users/All Devices) 
@@ -73,11 +67,6 @@ function ShowGroupAssignments()
     Displays only indirect assignments (All Users and All Devices) without filtering to a specific group.
 
 .EXAMPLE
-    ShowGroupAssignments -accessToken $token -ShowOnlyUnassigned
-    
-    Displays all Intune resources that have no assignments.
-
-.EXAMPLE
     ShowGroupAssignments -Group "Marketing" -accessToken $token -exportInstead -ExportFilePath "C:\Reports"
     
     Exports all assignments for the "Marketing" group to a CSV file in C:\Reports directory.
@@ -88,7 +77,6 @@ function ShowGroupAssignments()
     Dependencies:
     - GetGroupDirectAssignments: Retrieves assignments for a specific group
     - GetGroupIndirectAssignments: Retrieves All Users/All Devices assignments
-    - Get-UnassignedResources: Retrieves resources with no assignments
     - ShowMenu, AddMenuItem, NewMenu: Menu system functions
     - Show-PagedContent: Paginated display function
     - Write-Log: Logging function
@@ -125,7 +113,6 @@ function ShowGroupAssignments()
         [string[]]$specialGroups,
         [switch]$exportInstead,
         [string]$ExportFilePath,
-        [switch]$ShowOnlyUnassigned,
         [switch]$ShowIndirectAssignments,
         [switch]$HideEmptyMenus,
         [Parameter(Mandatory = $false)]
@@ -133,7 +120,7 @@ function ShowGroupAssignments()
     )
 
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Log -logFile $LogFile -Module $functionName -Message "Function started - Group: '$Group', ShowOnlyUnassigned: $($ShowOnlyUnassigned.IsPresent), ShowIndirectAssignments: $($ShowIndirectAssignments.IsPresent), exportInstead: $($exportInstead.IsPresent), HideEmptyMenus: $($HideEmptyMenus.IsPresent)" -logLevel "Information"
+    Write-Log -logFile $LogFile -Module $functionName -Message "Function started - Group: '$Group', ShowIndirectAssignments: $($ShowIndirectAssignments.IsPresent), exportInstead: $($exportInstead.IsPresent), HideEmptyMenus: $($HideEmptyMenus.IsPresent)" -logLevel "Information"
     
     #region process initial setup
     #define the action type
@@ -188,100 +175,11 @@ function ShowGroupAssignments()
     }
     
     # Log operational mode for debugging
-    Write-Log -logFile $LogFile -Module $functionName -Message "Operational mode - ShowOnlyUnassigned: $($ShowOnlyUnassigned.IsPresent), ShowIndirectAssignments: $($ShowIndirectAssignments.IsPresent), exportInstead: $($exportInstead.IsPresent)" -logLevel "Information"
-    Write-Verbose "[$functionName] Operational mode - ShowOnlyUnassigned: $($ShowOnlyUnassigned.IsPresent), ShowIndirectAssignments: $($ShowIndirectAssignments.IsPresent), exportInstead: $($exportInstead.IsPresent)"
-    
+    Write-Log -logFile $LogFile -Module $functionName -Message "Operational mode - ShowIndirectAssignments: $($ShowIndirectAssignments.IsPresent), exportInstead: $($exportInstead.IsPresent)" -logLevel "Information"
+    Write-Verbose "[$functionName] Operational mode - ShowIndirectAssignments: $($ShowIndirectAssignments.IsPresent), exportInstead: $($exportInstead.IsPresent)"
+    #endregion
     # Handle special cases for different assignment retrieval modes
-    if ($ShowOnlyUnassigned.IsPresent)
-    {
-        # Special mode: Show only unassigned configuration profiles (no group filtering)
-        Write-Log -logFile $LogFile -Module $functionName -Message "Retrieving all resources to identify unassigned configuration profiles" -logLevel "Information"
-        Write-Host "Getting all configuration profiles and checking for unassigned ones..."
-        Write-Host "This may take a while..."
-        
-        # Call helper function to get truly unassigned resources
-        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Calling Get-UnassignedResources with IncludeBeta=$IncludeBeta, Settings.operatingSystem='$($Settings.operatingSystem)'" -logLevel "Debug"
-        $unassignedResult = Get-UnassignedResources -AccessToken $accessToken -IncludeBeta:$IncludeBeta -Settings $Settings
-        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Get-UnassignedResources returned $(if ($unassignedResult.UnassignedResources) { $unassignedResult.UnassignedResources.Count } else { 0 }) unassigned resources, $($unassignedResult.TotalResourcesChecked) total checked" -logLevel "Debug"
-        
-        if ($null -eq $unassignedResult)
-        {
-            Write-Log -logFile $LogFile -Module $functionName -Message "Failed to retrieve resources for unassigned check." -LogLevel "Error"
-            Write-Host "Failed to retrieve resources." -ForegroundColor Red
-            return $returnValues.noGroupAssignmentsFoundMessage
-        }
-        
-        $unassignedProfiles = $unassignedResult.UnassignedResources
-        Write-Log -logFile $LogFile -Module $functionName -Message "Found $($unassignedProfiles.Count) truly unassigned resources out of $($unassignedResult.TotalResourcesChecked) total resources" -LogLevel "Information"
-        
-        # Handle failed resource checks for unassigned mode
-        if ($unassignedResult.FailedResources -and $unassignedResult.FailedResources.Count -gt 0)
-        {
-            # Filter out known backend issues
-            $knownBackendIssues = if ($null -ne $settings.knownProblemGraphEndpoints)
-            {
-                $settings.knownProblemGraphEndpoints
-            }
-            else
-            {
-                @()
-            }
-            
-            $displayableFailures = $unassignedResult.FailedResources | Where-Object { $_.ResourceType -notin $knownBackendIssues }
-            
-            if ($displayableFailures -and $displayableFailures.Count -gt 0)
-            {
-                $failedResourceTypes = ($displayableFailures | Select-Object -ExpandProperty ResourceType -Unique) -join ', '
-                Write-Host "Warning: Some resources could not be checked: $failedResourceTypes" -ForegroundColor Yellow
-                Write-Log -logFile $LogFile -Module $functionName -Message "Failed to check $($displayableFailures.Count) resource type(s) for assignments" -logLevel "Warning"
-                
-                foreach ($failedResource in $displayableFailures)
-                {
-                    Write-Log -logFile $LogFile -Module $functionName -Message "Failed Resource Check - Type: $($failedResource.ResourceType), Status: $($failedResource.StatusCode), API Version: $($failedResource.ApiVersion), Error: $($failedResource.ErrorMessage)" -logLevel "Error"
-                }
-            }
-            
-            # Still log known backend issues but don't display warning to user
-            $knownIssueFailures = $unassignedResult.FailedResources | Where-Object { $_.ResourceType -in $knownBackendIssues }
-            foreach ($failedResource in $knownIssueFailures)
-            {
-                Write-Log -logFile $LogFile -Module $functionName -Message "Known Backend Issue - Type: $($failedResource.ResourceType), Status: $($failedResource.StatusCode), API Version: $($failedResource.ApiVersion), Error: $($failedResource.ErrorMessage) (suppressed from user display)" -logLevel "Verbose"
-            }
-        }
-        
-        if ($unassignedProfiles.Count -eq 0)
-        {
-            Write-Log -logFile $LogFile -Module $functionName -Message "No unassigned configuration profiles found (checked $($unassignedResult.TotalResourcesChecked) resources)." -LogLevel "Information"
-            Write-Host "No unassigned configuration profiles found." -ForegroundColor Yellow
-            return $returnValues.noGroupAssignmentsFoundMessage
-        }
-        
-        # Create a new assignments object with only unassigned profiles
-        $assignments = Initialize-AssignmentResultObject -GroupName "Unassigned Profiles" -GroupId "N/A"
-        $assignments.AllAssignments = $unassignedProfiles
-        $assignments.AppAssignments = @($unassignedProfiles | Where-Object { $_.Type -eq 'Application' })
-        $assignments.ConfigurationAssignments = @($unassignedProfiles | Where-Object { $_.Type -eq 'Configuration' })
-        $assignments.ComplianceAssignments = @($unassignedProfiles | Where-Object { $_.Type -eq 'Compliance' })
-        $assignments.ScriptAssignments = @($unassignedProfiles | Where-Object { $_.Type -eq 'Script' })
-        $assignments.AppProtectionAssignments = @($unassignedProfiles | Where-Object { $_.Type -eq 'AppProtection' })
-        $assignments.IntentAssignments = @($unassignedProfiles | Where-Object { $_.Type -eq 'Intent' })
-        $assignments.ResourceAccessAssignments = @($unassignedProfiles | Where-Object { $_.Type -eq 'ResourceAccess' })
-        $assignments.AutopilotAssignments = @($unassignedProfiles | Where-Object { $_.Type -eq 'AutopilotProfile' })
-        $assignments.HealthScriptAssignments = @($unassignedProfiles | Where-Object { $_.Type -eq 'HealthScript' })
-        $assignments.ConfigurationPolicyAssignments = @($unassignedProfiles | Where-Object { $_.Type -eq 'ConfigurationPolicy' })
-        $assignments.GroupPolicyAssignments = @($unassignedProfiles | Where-Object { $_.Type -eq 'GroupPolicy' })
-        $assignments.WindowsInformationProtectionAssignments = @($unassignedProfiles | Where-Object { $_.Type -eq 'WindowsInformationProtection' })
-        $assignments.PolicySetAssignments = @($unassignedProfiles | Where-Object { $_.Type -eq 'PolicySet' })
-        $assignments.WindowsFeatureUpdateAssignments = @($unassignedProfiles | Where-Object { $_.Type -eq 'WindowsFeatureUpdate' }) 
-        $assignments.WindowsQualityUpdateAssignments = @($unassignedProfiles | Where-Object { $_.Type -eq 'WindowsQualityUpdate' })                         
-        $assignments.WindowsDriverUpdateAssignments = @($unassignedProfiles | Where-Object { $_.Type -eq 'WindowsDriverUpdate' })
-        
-        $groupName = "Unassigned Profiles"
-        
-        Write-Log -logFile $LogFile -Module $functionName -Message "Found $($unassignedProfiles.Count) unassigned configuration profiles." -LogLevel "Information"
-        Write-Verbose "[$functionName] Completed ShowOnlyUnassigned branch successfully"
-    }
-    elseif ($ShowIndirectAssignments.IsPresent -and $groupName -in $specialGroups)
+    if ($ShowIndirectAssignments.IsPresent -and $groupName -in $specialGroups)
     {
         Write-Log -logFile $LogFile -Module $functionName -Message "Retrieving all indirect assignments (All Users and All Devices) without group filter (groupName: '$groupName', specialGroups: $($specialGroups -join ', '))" -logLevel "Information"
         Write-Verbose "[$functionName] Entering ShowIndirectAssignments with special group branch"
@@ -303,9 +201,9 @@ function ShowGroupAssignments()
         $groupName = "All Users/All Devices"
         Write-Verbose "[$functionName] Completed ShowIndirectAssignments with special group branch successfully"
     }
-    elseif (-not $ShowOnlyUnassigned.IsPresent)
+    else
     {
-        # Normal flow: get assignments for specific group (only if NOT in ShowOnlyUnassigned mode)
+        # Normal flow: get assignments for specific group
         Write-Log -logFile $LogFile -Module $functionName -Message "Retrieving group assignments for specific group '$groupName'..." -logLevel "Information"
         Write-Verbose "[$functionName] Entering normal group assignment retrieval flow"
         Write-Host "Getting group assignments for '$groupName'..."
@@ -330,13 +228,7 @@ function ShowGroupAssignments()
         }
         Write-Verbose "[$functionName] Completed normal group assignment retrieval successfully"
     }
-    else
-    {
-        # Fallback case - should not be reached under normal operation
-        Write-Log -logFile $LogFile -Module $functionName -Message "WARNING: Unexpected code path reached. ShowOnlyUnassigned: $($ShowOnlyUnassigned.IsPresent), ShowIndirectAssignments: $($ShowIndirectAssignments.IsPresent), groupName: '$groupName', specialGroups: $($specialGroups -join ', ')" -LogLevel "Warning"
-        Write-Host "Warning: Unexpected operational state detected. Please check logs." -ForegroundColor Yellow
-        return $returnValues.noGroupAssignmentsFoundMessage
-    }
+
     # Check for failed resources and notify user
     if ($assignments.FailedResources -and $assignments.FailedResources.Count -gt 0)
     {
@@ -376,116 +268,107 @@ function ShowGroupAssignments()
     # Cache all assignments to avoid re-query per selection
     $allAssignments = @($assignments.allAssignments)
     Write-Log -logFile $LogFile -Module $functionName -Message "Cached $($allAssignments.Count) total assignments for processing" -logLevel "Information"
+        
+    # Consolidate duplicate assignments with multiple scopes
+    Write-Verbose "[$functionName] Consolidating duplicate assignments with multiple scopes"
+    Write-Log -logFile $LogFile -Module $functionName -Message "Consolidating duplicate assignments (before: $($allAssignments.Count) entries)" -logLevel "Verbose"
     
-    # Skip consolidation for unassigned profiles (they have no assignments to consolidate)
-    if ($ShowOnlyUnassigned.IsPresent)
+    # Group assignments by unique identifier (Type + Name + Id)
+    $groupedAssignments = $allAssignments | Group-Object -Property { "$($_.Type)|$($_.Name)|$($_.Id)" }
+    
+    # Consolidate each group
+    $consolidatedAssignments = @()
+    foreach ($group in $groupedAssignments)
     {
-        Write-Verbose "[$functionName] Skipping consolidation for unassigned profiles mode"
-        Write-Log -logFile $LogFile -Module $functionName -Message "Skipping consolidation for unassigned profiles (count: $($allAssignments.Count) entries)" -logLevel "Verbose"
-    }
-    else
-    {
-        # Consolidate duplicate assignments with multiple scopes
-        Write-Verbose "[$functionName] Consolidating duplicate assignments with multiple scopes"
-        Write-Log -logFile $LogFile -Module $functionName -Message "Consolidating duplicate assignments (before: $($allAssignments.Count) entries)" -logLevel "Verbose"
-    
-        # Group assignments by unique identifier (Type + Name + Id)
-        $groupedAssignments = $allAssignments | Group-Object -Property { "$($_.Type)|$($_.Name)|$($_.Id)" }
-    
-        # Consolidate each group
-        $consolidatedAssignments = @()
-        foreach ($group in $groupedAssignments)
+        if ($group.Count -eq 1)
         {
-            if ($group.Count -eq 1)
+            # Single assignment - create new object with AssignmentScope array
+            $assignment = $group.Group[0]
+            $scopeArray = if ($assignment.AssignmentScope)
             {
-                # Single assignment - create new object with AssignmentScope array
-                $assignment = $group.Group[0]
-                $scopeArray = if ($assignment.AssignmentScope)
-                {
-                    # Has indirect scope
-                    @($assignment.AssignmentScope)
-                }
-                else
-                {
-                    # Direct assignment only
-                    @("Direct")
-                }
-            
-                # Create new consolidated object
-                $consolidatedAssignments += [PSCustomObject]@{
-                    Type            = $assignment.Type
-                    Name            = $assignment.Name
-                    Description     = $assignment.Description
-                    Id              = $assignment.Id
-                    Intent          = $assignment.Intent
-                    Target          = $assignment.Target
-                    Settings        = $assignment.Settings
-                    AssignmentScope = $scopeArray
-                }
+                # Has indirect scope
+                @($assignment.AssignmentScope)
             }
             else
             {
-                # Multiple assignments - consolidate into one with combined scopes
-                $primaryAssignment = $group.Group[0]
+                # Direct assignment only
+                @("Direct")
+            }
             
-                # Collect all unique scopes
-                $allScopes = @()
-                foreach ($assignment in $group.Group)
-                {
-                    if ($assignment.AssignmentScope)
-                    {
-                        # Indirect assignment
-                        $allScopes += $assignment.AssignmentScope
-                    }
-                    else
-                    {
-                        # Direct assignment
-                        $allScopes += "Direct"
-                    }
-                }
-            
-                # Remove duplicates and sort for consistency
-                $uniqueScopes = @($allScopes | Select-Object -Unique | Sort-Object)
-            
-                # Create new consolidated object with combined scopes
-                $consolidatedAssignments += [PSCustomObject]@{
-                    Type            = $primaryAssignment.Type
-                    Name            = $primaryAssignment.Name
-                    Description     = $primaryAssignment.Description
-                    Id              = $primaryAssignment.Id
-                    Intent          = $primaryAssignment.Intent
-                    Target          = $primaryAssignment.Target
-                    Settings        = $primaryAssignment.Settings
-                    AssignmentScope = $uniqueScopes
-                }
+            # Create new consolidated object
+            $consolidatedAssignments += [PSCustomObject]@{
+                Type            = $assignment.Type
+                Name            = $assignment.Name
+                Description     = $assignment.Description
+                Id              = $assignment.Id
+                Intent          = $assignment.Intent
+                Target          = $assignment.Target
+                Settings        = $assignment.Settings
+                AssignmentScope = $scopeArray
             }
         }
+        else
+        {
+            # Multiple assignments - consolidate into one with combined scopes
+            $primaryAssignment = $group.Group[0]
+            
+            # Collect all unique scopes
+            $allScopes = @()
+            foreach ($assignment in $group.Group)
+            {
+                if ($assignment.AssignmentScope)
+                {
+                    # Indirect assignment
+                    $allScopes += $assignment.AssignmentScope
+                }
+                else
+                {
+                    # Direct assignment
+                    $allScopes += "Direct"
+                }
+            }
+            
+            # Remove duplicates and sort for consistency
+            $uniqueScopes = @($allScopes | Select-Object -Unique | Sort-Object)
+            
+            # Create new consolidated object with combined scopes
+            $consolidatedAssignments += [PSCustomObject]@{
+                Type            = $primaryAssignment.Type
+                Name            = $primaryAssignment.Name
+                Description     = $primaryAssignment.Description
+                Id              = $primaryAssignment.Id
+                Intent          = $primaryAssignment.Intent
+                Target          = $primaryAssignment.Target
+                Settings        = $primaryAssignment.Settings
+                AssignmentScope = $uniqueScopes
+            }
+        }
+    }
     
-        # Replace allAssignments with consolidated version
-        $allAssignments = @($consolidatedAssignments)
-        Write-Verbose "[$functionName] Consolidation complete (after: $($allAssignments.Count) entries)"
-        Write-Log -logFile $LogFile -Module $functionName -Message "Consolidation complete (after: $($allAssignments.Count) entries)" -logLevel "Information"
+    # Replace allAssignments with consolidated version
+    $allAssignments = @($consolidatedAssignments)
+    Write-Verbose "[$functionName] Consolidation complete (after: $($allAssignments.Count) entries)"
+    Write-Log -logFile $LogFile -Module $functionName -Message "Consolidation complete (after: $($allAssignments.Count) entries)" -logLevel "Information"
     
-        # Update the assignments object with consolidated data
-        # Re-categorize the consolidated assignments
-        $assignments.AllAssignments = $allAssignments
-        $assignments.AppAssignments = @($allAssignments | Where-Object { $_.Type -eq 'Application' })
-        $assignments.ConfigurationAssignments = @($allAssignments | Where-Object { $_.Type -eq 'Configuration' })
-        $assignments.ComplianceAssignments = @($allAssignments | Where-Object { $_.Type -eq 'Compliance' })
-        $assignments.ScriptAssignments = @($allAssignments | Where-Object { $_.Type -eq 'Script' })
-        $assignments.AppProtectionAssignments = @($allAssignments | Where-Object { $_.Type -eq 'AppProtection' })
-        $assignments.IntentAssignments = @($allAssignments | Where-Object { $_.Type -eq 'Intent' })
-        $assignments.ResourceAccessAssignments = @($allAssignments | Where-Object { $_.Type -eq 'ResourceAccess' })
-        $assignments.AutopilotAssignments = @($allAssignments | Where-Object { $_.Type -eq 'AutopilotProfile' })
-        $assignments.HealthScriptAssignments = @($allAssignments | Where-Object { $_.Type -eq 'HealthScript' })
-        $assignments.ConfigurationPolicyAssignments = @($allAssignments | Where-Object { $_.Type -eq 'ConfigurationPolicy' })
-        $assignments.GroupPolicyAssignments = @($allAssignments | Where-Object { $_.Type -eq 'GroupPolicy' })
-        $assignments.WindowsInformationProtectionAssignments = @($allAssignments | Where-Object { $_.Type -eq 'WindowsInformationProtection' })
-        $assignments.PolicySetAssignments = @($allAssignments | Where-Object { $_.Type -eq 'PolicySet' })
-        $assignments.WindowsFeatureUpdateAssignments = @($allAssignments | Where-Object { $_.Type -eq 'WindowsFeatureUpdate' })
-        $assignments.WindowsQualityUpdateAssignments = @($allAssignments | Where-Object { $_.Type -eq 'WindowsQualityUpdate' })
-        $assignments.WindowsDriverUpdateAssignments = @($allAssignments | Where-Object { $_.Type -eq 'WindowsDriverUpdate' })
-    }  # End of else block for consolidation
+    # Update the assignments object with consolidated data
+    # Re-categorize the consolidated assignments
+    $assignments.AllAssignments = $allAssignments
+    $assignments.AppAssignments = @($allAssignments | Where-Object { $_.Type -eq 'Application' })
+    $assignments.ConfigurationAssignments = @($allAssignments | Where-Object { $_.Type -eq 'Configuration' })
+    $assignments.ComplianceAssignments = @($allAssignments | Where-Object { $_.Type -eq 'Compliance' })
+    $assignments.ScriptAssignments = @($allAssignments | Where-Object { $_.Type -eq 'Script' })
+    $assignments.AppProtectionAssignments = @($allAssignments | Where-Object { $_.Type -eq 'AppProtection' })
+    $assignments.IntentAssignments = @($allAssignments | Where-Object { $_.Type -eq 'Intent' })
+    $assignments.ResourceAccessAssignments = @($allAssignments | Where-Object { $_.Type -eq 'ResourceAccess' })
+    $assignments.AutopilotAssignments = @($allAssignments | Where-Object { $_.Type -eq 'AutopilotProfile' })
+    $assignments.HealthScriptAssignments = @($allAssignments | Where-Object { $_.Type -eq 'HealthScript' })
+    $assignments.ConfigurationPolicyAssignments = @($allAssignments | Where-Object { $_.Type -eq 'ConfigurationPolicy' })
+    $assignments.GroupPolicyAssignments = @($allAssignments | Where-Object { $_.Type -eq 'GroupPolicy' })
+    $assignments.WindowsInformationProtectionAssignments = @($allAssignments | Where-Object { $_.Type -eq 'WindowsInformationProtection' })
+    $assignments.PolicySetAssignments = @($allAssignments | Where-Object { $_.Type -eq 'PolicySet' })
+    $assignments.WindowsFeatureUpdateAssignments = @($allAssignments | Where-Object { $_.Type -eq 'WindowsFeatureUpdate' })
+    $assignments.WindowsQualityUpdateAssignments = @($allAssignments | Where-Object { $_.Type -eq 'WindowsQualityUpdate' })
+    $assignments.WindowsDriverUpdateAssignments = @($allAssignments | Where-Object { $_.Type -eq 'WindowsDriverUpdate' })
     #endregion                  
     
     #region Build and show assignment type menu    
