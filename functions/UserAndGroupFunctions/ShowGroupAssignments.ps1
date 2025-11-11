@@ -1,5 +1,123 @@
 function ShowGroupAssignments()
 {
+    <#
+.SYNOPSIS
+    Displays or exports Microsoft Intune policy and profile assignments for a specified group or special assignment scenarios.
+
+.DESCRIPTION
+    ShowGroupAssignments retrieves and displays Intune assignments for various resource types including applications, 
+    device configurations, compliance policies, scripts, and more. The function supports multiple operational modes:
+    
+    - Direct group assignments: Show assignments targeted to a specific Azure AD group
+    - Indirect assignments: Show assignments targeted to "All Users" and "All Devices"
+    - Unassigned resources: Show resources with no assignments at all
+    - Export mode: Export assignment data to CSV instead of displaying
+    
+    The function consolidates duplicate assignments with multiple scopes (Direct, All Users, All Devices) into 
+    single entries for cleaner display. It provides an interactive menu to filter assignments by type and supports 
+    paginated display for large result sets.
+
+.PARAMETER Group
+    The Azure AD group object, hashtable, or group name (string) for which to retrieve assignments.
+    Not required when using -ShowOnlyUnassigned with special groups.
+
+.PARAMETER accessToken
+    Required. The Microsoft Graph API access token for authentication.
+
+.PARAMETER specialGroups
+    Array of special group names (e.g., "All Users", "All Devices") that trigger specific handling 
+    when combined with -ShowIndirectAssignments.
+
+.PARAMETER exportInstead
+    Switch parameter. When present, exports assignment data to CSV file instead of displaying interactively.
+
+.PARAMETER ExportFilePath
+    Directory path where CSV exports should be saved. If not specified, uses current directory.
+    Only relevant when -exportInstead is used.
+
+.PARAMETER ShowOnlyUnassigned
+    Switch parameter. When present, retrieves and displays only resources that have no assignments 
+    (not assigned to any group, user, or device).
+
+.PARAMETER ShowIndirectAssignments
+    Switch parameter. When used with a specific group, includes indirect assignments (All Users/All Devices) 
+    in addition to direct group assignments. When used with special groups, shows only indirect assignments.
+
+    .PARAMETER DoNotShowEmptyMenus
+    Switch parameter. When present, assignment type menu will omit options for assignment types with zero entries.                      
+
+.PARAMETER Settings
+    Hashtable containing configuration settings, including:
+    - operatingSystem: Filter criteria for OS-specific resources
+    - knownProblemGraphEndpoints: Array of Graph API endpoints with known issues to suppress warnings
+
+.OUTPUTS
+    Returns navigation values for menu system:
+    - "Back": User navigated back
+    - "Main Menu": User returned to main menu
+    - Return value messages for specific scenarios (no assignments found, etc.)
+
+.EXAMPLE
+    ShowGroupAssignments -Group "Finance-Users" -accessToken $token
+    
+    Displays all assignment types for the "Finance-Users" group in an interactive menu.
+
+.EXAMPLE
+    ShowGroupAssignments -Group "IT-Admins" -accessToken $token -ShowIndirectAssignments
+    
+    Displays direct assignments to "IT-Admins" plus all indirect assignments (All Users/All Devices).
+
+.EXAMPLE
+    ShowGroupAssignments -Group "All Users" -accessToken $token -ShowIndirectAssignments -specialGroups @("All Users", "All Devices")
+    
+    Displays only indirect assignments (All Users and All Devices) without filtering to a specific group.
+
+.EXAMPLE
+    ShowGroupAssignments -accessToken $token -ShowOnlyUnassigned
+    
+    Displays all Intune resources that have no assignments.
+
+.EXAMPLE
+    ShowGroupAssignments -Group "Marketing" -accessToken $token -exportInstead -ExportFilePath "C:\Reports"
+    
+    Exports all assignments for the "Marketing" group to a CSV file in C:\Reports directory.
+
+.NOTES
+    Author: Function from Autopilot management system
+    
+    Dependencies:
+    - GetGroupDirectAssignments: Retrieves assignments for a specific group
+    - GetGroupIndirectAssignments: Retrieves All Users/All Devices assignments
+    - Get-UnassignedResources: Retrieves resources with no assignments
+    - ShowMenu, AddMenuItem, NewMenu: Menu system functions
+    - Show-PagedContent: Paginated display function
+    - Write-Log: Logging function
+    
+    Assignment Types Supported:
+    - Application
+    - Configuration (Device Configuration)
+    - Compliance (Device Compliance Policies)
+    - Script (Device Management Scripts)
+    - AppProtection (App Protection Policies)
+    - Intent (Security Baselines)
+    - ResourceAccess (Resource Access Profiles)
+    - AutopilotProfile (Windows Autopilot Profiles)
+    - HealthScript (Proactive Remediations/Health Scripts)
+    - ConfigurationPolicy (Settings Catalog)
+    - GroupPolicy (Administrative Templates)
+    - WindowsInformationProtection (WIP Policies)
+    - PolicySet (Policy Sets/Bundles)
+    - WindowsFeatureUpdate (Windows Feature Updates)
+    - WindowsQualityUpdate (Windows Quality Updates)
+    - WindowsDriverUpdate (Windows Driver Updates)
+    
+    The function automatically consolidates assignments that appear multiple times due to different 
+    assignment scopes (e.g., same policy assigned directly and via All Users) into a single entry 
+    with combined scope information.
+
+.LINK
+    https://docs.microsoft.com/en-us/graph/api/resources/intune-graph-overview
+    #>
     [CmdletBinding()]
     param (
         $Group,
@@ -9,6 +127,7 @@ function ShowGroupAssignments()
         [string]$ExportFilePath,
         [switch]$ShowOnlyUnassigned,
         [switch]$ShowIndirectAssignments,
+        [switch]$DoNotShowEmptyMenus,
         [Parameter(Mandatory = $false)]
         [hashtable]$Settings
     )
@@ -381,112 +500,126 @@ function ShowGroupAssignments()
         # Update title with actual group name
         $groupAssignmentsMenu.Title = $groupAssignmentsMenu.Title -replace '\$groupName', $groupName
     }
-    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Application Assignments ($($assignments.AppAssignments.count))" -Action {
-        Write-Host "Selected Assignment Type: Application"
-        return 'Application'
-    } -returnsValue
-    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType           Device Configurations ($($assignments.ConfigurationAssignments.count))" -Action {
-        Write-Host "Selected Assignment Type: Configuration"
-        return 'Configuration'
-    } -returnsValue
-    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Device Compliance Policies ($($assignments.ComplianceAssignments.count))" -Action {
-        Write-Host "Selected Assignment Type: Compliance"
-        return 'Compliance'
-    } -returnsValue
-    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Device Management Scripts ($($assignments.ScriptAssignments.count))" -Action {
-        Write-Host "Selected Assignment Type: Script"
-        return 'Script'
-    } -returnsValue
-    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType App Protection Policies ($($assignments.AppProtectionAssignments.count))" -Action {
-        Write-Host "Selected Assignment Type: AppProtection"
-        return 'AppProtection'
-    } -returnsValue
-    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Security Intents (Baselines) ($($assignments.IntentAssignments.count))" -Action {
-        Write-Host "Selected Assignment Type: Intent"
-        return 'Intent'
-    } -returnsValue
-    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Resource Access Profiles ($($assignments.ResourceAccessAssignments.count))" -Action {
-        Write-Host "Selected Assignment Type: ResourceAccess"
-        return 'ResourceAccess'
-    } -returnsValue
-    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Autopilot Profiles ($($assignments.AutopilotAssignments.count))" -Action {
-        Write-Host "Selected Assignment Type: AutopilotProfile"
-        return 'AutopilotProfile'
-    } -returnsValue
-    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Device Health Scripts ($($assignments.HealthScriptAssignments.count))" -Action {
-        Write-Host "Selected Assignment Type: HealthScript"
-        return 'HealthScript'
-    } -returnsValue
-    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Configuration Policies (Settings Catalog) ($($assignments.ConfigurationPolicyAssignments.count))" -Action {
-        Write-Host "Selected Assignment Type: ConfigurationPolicy"
-        return 'ConfigurationPolicy'
-    } -returnsValue
-    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Group Policy Configurations ($($assignments.GroupPolicyAssignments.count))" -Action {
-        Write-Host "Selected Assignment Type: GroupPolicy"
-        return 'GroupPolicy'
-    } -returnsValue
-    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Windows Information Protection Policies ($($assignments.WindowsInformationProtectionAssignments.count))" -Action {
-        Write-Host "Selected Assignment Type: WindowsInformationProtection"
-        return 'WindowsInformationProtection'
-    } -returnsValue
-    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Policy Sets ($($assignments.PolicySetAssignments.count))" -Action {
-        Write-Host "Selected Assignment Type: PolicySet"
-        return 'PolicySet'
-    } -returnsValue
     
-    # Add Windows Update menu items - create properties if they don't exist and populate from AllAssignments
-    if (-not $assignments.PSObject.Properties['WindowsFeatureUpdateAssignments'])
+    if (-not $DoNotShowEmptyMenus -or $assignments.AppAssignments.count -gt 0)
     {
-        $assignments | Add-Member -NotePropertyName 'WindowsFeatureUpdateAssignments' -NotePropertyValue @($allAssignments | Where-Object { $_.Type -eq 'WindowsFeatureUpdate' }) -Force
+        $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Application Assignments ($($assignments.AppAssignments.count))" -Action {
+            Write-Host "Selected Assignment Type: Application"
+            return 'Application'
+        } -returnsValue
     }
-    if (-not $assignments.PSObject.Properties['WindowsQualityUpdateAssignments'])
+    if (-not $DoNotShowEmptyMenus -or $assignments.ConfigurationAssignments.count -gt 0)
     {
-        $assignments | Add-Member -NotePropertyName 'WindowsQualityUpdateAssignments' -NotePropertyValue @($allAssignments | Where-Object { $_.Type -eq 'WindowsQualityUpdate' }) -Force
+        $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType           Device Configurations ($($assignments.ConfigurationAssignments.count))" -Action {
+            Write-Host "Selected Assignment Type: Configuration"
+            return 'Configuration'
+        } -returnsValue
     }
-    if (-not $assignments.PSObject.Properties['WindowsDriverUpdateAssignments'])
+    if (-not $DoNotShowEmptyMenus -or $assignments.ComplianceAssignments.count -gt 0)
     {
-        $assignments | Add-Member -NotePropertyName 'WindowsDriverUpdateAssignments' -NotePropertyValue @($allAssignments | Where-Object { $_.Type -eq 'WindowsDriverUpdate' }) -Force
+        $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Device Compliance Policies ($($assignments.ComplianceAssignments.count))" -Action {
+            Write-Host "Selected Assignment Type: Compliance"
+            return 'Compliance'
+        } -returnsValue
     }
-    
-    # Add menu items for Windows Update categories if they have any assignments
-    if ($assignments.WindowsFeatureUpdateAssignments.count -gt 0)
+    if (-not $DoNotShowEmptyMenus -or $assignments.ScriptAssignments.count -gt 0)
+    {
+        $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Device Management Scripts ($($assignments.ScriptAssignments.count))" -Action {
+            Write-Host "Selected Assignment Type: Script"
+            return 'Script'
+        } -returnsValue
+    }
+    if (-not $DoNotShowEmptyMenus -or $assignments.AppProtectionAssignments.count -gt 0)
+    {
+        $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType App Protection Policies ($($assignments.AppProtectionAssignments.count))" -Action {
+            Write-Host "Selected Assignment Type: AppProtection"
+            return 'AppProtection'
+        } -returnsValue
+    }
+    if (-not $DoNotShowEmptyMenus -or $assignments.IntentAssignments.count -gt 0)
+    {
+        $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Security Intents (Baselines) ($($assignments.IntentAssignments.count))" -Action {
+            Write-Host "Selected Assignment Type: Intent"
+            return 'Intent'
+        } -returnsValue
+    }
+    if (-not $DoNotShowEmptyMenus -or $assignments.ResourceAccessAssignments.count -gt 0)
+    {
+        $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Resource Access Profiles ($($assignments.ResourceAccessAssignments.count))" -Action {
+            Write-Host "Selected Assignment Type: ResourceAccess"
+            return 'ResourceAccess'
+        } -returnsValue
+    }
+    if (-not $DoNotShowEmptyMenus -or $assignments.AutopilotAssignments.count -gt 0)
+    {
+        $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Autopilot Profiles ($($assignments.AutopilotAssignments.count))" -Action {
+            Write-Host "Selected Assignment Type: AutopilotProfile"
+            return 'AutopilotProfile'
+        } -returnsValue
+    }
+    if (-not $DoNotShowEmptyMenus -or $assignments.HealthScriptAssignments.count -gt 0)
+    {
+        $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Device Health Scripts ($($assignments.HealthScriptAssignments.count))" -Action {
+            Write-Host "Selected Assignment Type: HealthScript"
+            return 'HealthScript'
+        } -returnsValue
+    }
+    if (-not $DoNotShowEmptyMenus -or $assignments.ConfigurationPolicyAssignments.count -gt 0)
+    {
+        $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Configuration Policies (Settings Catalog) ($($assignments.ConfigurationPolicyAssignments.count))" -Action {
+            Write-Host "Selected Assignment Type: ConfigurationPolicy"
+            return 'ConfigurationPolicy'
+        } -returnsValue
+    }
+    if (-not $DoNotShowEmptyMenus -or $assignments.GroupPolicyAssignments.count -gt 0)
+    {
+        $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Group Policy Configurations ($($assignments.GroupPolicyAssignments.count))" -Action {
+            Write-Host "Selected Assignment Type: GroupPolicy"
+            return 'GroupPolicy'
+        } -returnsValue
+    }
+    if (-not $DoNotShowEmptyMenus -or $assignments.WindowsInformationProtectionAssignments.count -gt 0)
+    {
+        $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Windows Information Protection Policies ($($assignments.WindowsInformationProtectionAssignments.count))" -Action {
+            Write-Host "Selected Assignment Type: WindowsInformationProtection"
+            return 'WindowsInformationProtection'
+        } -returnsValue
+    }
+    if (-not $DoNotShowEmptyMenus -or $assignments.PolicySetAssignments.count -gt 0)
+    {
+        $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Policy Sets ($($assignments.PolicySetAssignments.count))" -Action {
+            Write-Host "Selected Assignment Type: PolicySet"
+            return 'PolicySet'
+        } -returnsValue
+    }
+    if (-not $DoNotShowEmptyMenus -or $assignments.WindowsFeatureUpdateAssignments.count -gt 0)
     {
         $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Windows Feature Updates ($($assignments.WindowsFeatureUpdateAssignments.count))" -Action {
             Write-Host "Selected Assignment Type: WindowsFeatureUpdate"
             return 'WindowsFeatureUpdate'
         } -returnsValue
     }
-    else
-    {
-        Write-Log -logFile $LogFile -Module $functionName -Message "No Windows Feature Update assignments available for menu display" -LogLevel "Verbose"
-    }
-    if ($assignments.WindowsQualityUpdateAssignments.count -gt 0)
+    if (-not $DoNotShowEmptyMenus -or $assignments.WindowsQualityUpdateAssignments.count -gt 0)
     {
         $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Windows Quality Updates ($($assignments.WindowsQualityUpdateAssignments.count))" -Action {
             Write-Host "Selected Assignment Type: WindowsQualityUpdate"
             return 'WindowsQualityUpdate'
         } -returnsValue
     }
-    else
-    {
-        Write-Log -logFile $LogFile -Module $functionName -Message "No Windows Quality Update assignments available for menu display" -LogLevel "Verbose"
-    }
-    if ($assignments.WindowsDriverUpdateAssignments.count -gt 0)
+    if (-not $DoNotShowEmptyMenus -or $assignments.WindowsDriverUpdateAssignments.count -gt 0)
     {
         $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Windows Driver Updates ($($assignments.WindowsDriverUpdateAssignments.count))" -Action {
             Write-Host "Selected Assignment Type: WindowsDriverUpdate"
             return 'WindowsDriverUpdate'
         } -returnsValue
     }
-    else
+    if (-not $DoNotShowEmptyMenus -or $assignments.AllAssignments.count -gt 0)
     {
-        Write-Log -logFile $LogFile -Module $functionName -Message "No Windows Driver Update assignments available for menu display" -LogLevel "Verbose"
+        $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType  All Assignments ($($assignments.AllAssignments.count))" -Action {
+            Write-Host "Displaying all assignments"
+            return 'All'
+        } -returnsValue
     }
-    
-    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType  All Assignments ($($assignments.AllAssignments.count))" -Action {
-        Write-Host "Displaying all assignments"
-        return 'All'
-    } -returnsValue
     #endregion
 
     # Loop: after showing assignments, return to the assignment type menu
