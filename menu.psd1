@@ -890,7 +890,7 @@
                 )
             },
             @{
-                description           = 'View all unassigned configuration profiles     '
+                description           = 'View all unassigned configuration profiles'
                 name                  = 'View all unassigned configurations'        
                 blockType             = 'action'
                 includeInDisplayModes = @(
