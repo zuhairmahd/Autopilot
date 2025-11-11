@@ -286,24 +286,33 @@ function Show-PagedContent()
                         {
                             try
                             {
-                                # Redirect output to capture it
-                                $capturedOutput = & $DisplayScriptBlock $item | Out-String
+                                # Redirect all output streams to capture Write-Host output
+                                # Write-Host uses the Information stream in PowerShell 5+
+                                $capturedOutput = (& $DisplayScriptBlock $item *>&1 | Out-String)
                                 
                                 # Count non-empty lines in the output
                                 $outputLines = ($capturedOutput -split "`r?`n")
                                 $itemLines = ($outputLines | Where-Object { $_.Trim() -ne '' }).Count
                                 
-                                # Add 1 for the blank line separator that Write-Host "" creates
-                                # (it shows as empty in captured output but takes screen space)
-                                $itemLines += 1
-                                
-                                $totalLines += $itemLines
-                                Write-Verbose "[$functionName] Item $i rendered as $itemLines lines"
+                                # If we got actual output, use it; otherwise fall back
+                                if ($itemLines -gt 0)
+                                {
+                                    $totalLines += $itemLines
+                                    Write-Verbose "[$functionName] Item $i rendered as $itemLines lines (captured)"
+                                }
+                                else
+                                {
+                                    # No output captured, use property-based fallback
+                                    Write-Verbose "[$functionName] No output captured for item $i, using property fallback"
+                                    $properties = $item.PSObject.Properties
+                                    $itemLines = $properties.Count + 2  # Properties + blank line + buffer
+                                    $totalLines += $itemLines
+                                }
                             }
                             catch
                             {
                                 # Fallback: use property-based estimate if DisplayScriptBlock fails
-                                Write-Verbose "[$functionName] DisplayScriptBlock execution failed, using property count fallback"
+                                Write-Verbose "[$functionName] DisplayScriptBlock execution failed: $($_.Exception.Message), using property count fallback"
                                 $properties = $item.PSObject.Properties
                                 $itemLines = $properties.Count + 2  # Properties + blank line + buffer
                                 $totalLines += $itemLines
