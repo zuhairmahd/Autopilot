@@ -377,14 +377,14 @@ function Show-PagedContent()
             
             Write-Log -LogFile $logFile -Module $functionName -Message "Calculated EstimatedLinesPerItem: $estimatedLinesPerItem" -LogLevel "Information"
             
-            # Reserve lines for UI elements:
-            # - Initial info (2 lines: total items message + navigation hint)
-            # - Initial blank line (1 line)
+            # Reserve lines for UI elements with generous margin:
+            # - Initial info (3 lines: total items + navigation hint + blank)
             # - Title (3 lines: blank + title + blank if title present)
-            # - Page info header (3 lines: page number + showing items + blank)
+            # - Page info header (3 lines: page separator + showing items + blank)
             # - Navigation footer (4 lines: blank + separator + navigation prompt + input prompt)
-            # Total reserved: approximately 13-14 lines (use 15 to be safe)
-            $reservedLines = 15
+            # - Safety margin (5 lines for unexpected wrapping, prompt variations)
+            # Total reserved: approximately 18-20 lines (use 20 to be safe)
+            $reservedLines = 20
             
             # Calculate available lines for content
             $availableLines = $consoleHeight - $reservedLines
