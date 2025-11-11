@@ -793,50 +793,80 @@ function ShowGroupAssignments()
             else
             {
                 # Display mode: Show assignments using Show-PagedContent for large datasets
-                # Create display scriptblock for formatting each assignment
+                # Initialize counter for item numbering (tracked outside scriptblock)
+                $script:itemCounter = 0
+                
+                # Create display scriptblock for formatting each assignment in tabular format
                 $displayScript = {
                     param($assignment)
                     
-                    # Display assignment type if showing all assignments
+                    # Increment counter for each item displayed
+                    $script:itemCounter++
+                    
+                    # Prepare columns
+                    $typeColumn = if ($assignmentType -eq 'All')
+                    {
+                        $assignment.Type.PadRight(20)
+                    }
+                    else
+                    {
+                        ""
+                    }
+                    
+                    # Truncate name if too long (max 50 chars)
+                    $nameColumn = if ($assignment.Name.Length -gt 50)
+                    {
+                        $assignment.Name.Substring(0, 47) + "..."
+                    }
+                    else
+                    {
+                        $assignment.Name
+                    }
+                    
+                    # Format intent if present
+                    $intentColumn = if ($null -ne $assignment.Intent)
+                    {
+                        " | Intent: $($assignment.Intent)"
+                    }
+                    else
+                    {
+                        ""
+                    }
+                    
+                    # Format assignment scope
+                    $scopeDisplay = if ($assignment.AssignmentScope -and $assignment.AssignmentScope.Count -gt 0)
+                    {
+                        $assignment.AssignmentScope -join ", "
+                    }
+                    else
+                    {
+                        "Direct"
+                    }
+                    
+                    # Determine scope color
+                    $scopeColor = "Green"  # Default for Direct only
+                    if ($assignment.AssignmentScope -and $assignment.AssignmentScope.Count -gt 1)
+                    {
+                        $scopeColor = "Yellow"  # Multiple scopes
+                    }
+                    elseif ($assignment.AssignmentScope -and $assignment.AssignmentScope[0] -ne "Direct")
+                    {
+                        $scopeColor = "Cyan"  # Indirect only
+                    }
+                    
+                    # Display in single line format
+                    Write-Host "$($script:itemCounter). " -NoNewline -ForegroundColor Gray
                     if ($assignmentType -eq 'All')
                     {
-                        Write-Host "Assignment Type: $($assignment.Type)" -ForegroundColor Magenta
+                        Write-Host "[$typeColumn] " -NoNewline -ForegroundColor Magenta
                     }
-                    
-                    Write-Host "Name: $($assignment.Name)" -ForegroundColor White
-                    
-                    if ($assignment.Description)
+                    Write-Host $nameColumn -NoNewline -ForegroundColor White
+                    if ($intentColumn)
                     {
-                        Write-Host "  Description: $($assignment.Description)" -ForegroundColor Gray
+                        Write-Host $intentColumn -NoNewline -ForegroundColor Yellow
                     }
-                    
-                    if ($null -ne $assignment.Intent)
-                    {
-                        Write-Host "  Intent: $($assignment.Intent)" -ForegroundColor Yellow
-                    }
-                    
-                    # Display assignment scope (always an array after consolidation)
-                    if ($assignment.AssignmentScope -and $assignment.AssignmentScope.Count -gt 0)
-                    {
-                        $scopeDisplay = $assignment.AssignmentScope -join ", "
-                        
-                        # Color coding based on scope types
-                        $scopeColor = "Green"  # Default for Direct only
-                        if ($assignment.AssignmentScope.Count -gt 1)
-                        {
-                            # Multiple scopes (e.g., Direct + All Users + All Devices)
-                            $scopeColor = "Yellow"
-                        }
-                        elseif ($assignment.AssignmentScope[0] -ne "Direct")
-                        {
-                            # Indirect only (All Users or All Devices)
-                            $scopeColor = "Cyan"
-                        }
-                        
-                        Write-Host "  Assignment Scope: $scopeDisplay" -ForegroundColor $scopeColor
-                    }
-                    
-                    Write-Host ""  # Blank line between assignments
+                    Write-Host " | Scope: " -NoNewline -ForegroundColor Gray
+                    Write-Host $scopeDisplay -ForegroundColor $scopeColor
                 }
                 # Determine page title
                 $pageTitle = if ($assignmentType -eq 'All')
@@ -853,7 +883,7 @@ function ShowGroupAssignments()
                 $pagingResult = Show-PagedContent -Content $selectedAssignments `
                     -DisplayScriptBlock $displayScript `
                     -Title $pageTitle `
-                    -PageSize 10 `
+                    -PageSize 15 `
                     -ShowPageInfo $true
                     
                 Write-Log -logFile $LogFile -Module $functionName -Message "Paged display completed - Result: '$pagingResult'" -LogLevel "Information"
