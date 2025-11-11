@@ -938,7 +938,7 @@
                     'admin',
                     'advanced'
                 )           
-            }
+            },
             @{
                 description           = 'Export all tenant configurations and their assignments to a CSV file'
                 name                  = 'Export all tenant configurations and their assignments'
