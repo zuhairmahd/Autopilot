@@ -42,11 +42,11 @@ function Show-PagedContent()
     .PARAMETER NoPaging
         If specified, displays all content without paging (useful when content is small).
     
-    .PARAMETER UseDynamicSize
-        If specified, automatically calculates screen-aware page sizes based on content type.
-        For arrays/objects with properties like Description, calculates actual lines per item
-        considering console width and text wrapping. Adjusts page size to fit console height.
-        Without this switch, uses fixed PageSize regardless of item complexity.
+    .PARAMETER ShowGUI
+        If specified, displays content in a graphical grid view using Out-GridView.
+        Objects are automatically formatted and displayed in an interactive, sortable, filterable grid.
+        The DisplayScriptBlock is ignored when using ShowGUI as Out-GridView handles formatting.
+        Requires a GUI environment (not available in headless/SSH sessions).
     
     .OUTPUTS
         System.String
@@ -79,23 +79,16 @@ function Show-PagedContent()
         Show-PagedContent -Content $smallArray -NoPaging -DisplayScriptBlock { param($item) Write-Host $item }
     
     .EXAMPLE
-        # Display complex multi-line items with automatic screen-aware paging
+        # Display complex multi-line items in graphical grid view
         $apps = @($app1, $app2, $app3)
-        Show-PagedContent -Content $apps -UseDynamicSize -DisplayScriptBlock {
-            param($app)
-            Write-Host "Name: $($app.Name)"
-            Write-Host "  Description: $($app.Description)"
-            Write-Host "  Intent: $($app.Intent)"
-            Write-Host ""
-        }
+        Show-PagedContent -Content $apps -ShowGUI -Title "Application Assignments"
     
     .NOTES
         - Maintains PowerShell 5.1 compatibility (no null-coalescing, ordered hashtables created via [ordered])
         - Follows repository coding standards (4-space indentation, Write-Verbose, Write-Log)
         - Implements ASCII-only navigation prompts
         - Uses separate Write-Host calls for newlines
-        - UseDynamicSize: Automatically detects object properties and calculates lines per item
-        - Reserves lines for headers, page info, and navigation prompts when calculating page size
+        - ShowGUI: Uses Out-GridView for interactive display (requires GUI environment)
     #>
     [CmdletBinding()]
     param(
@@ -115,12 +108,12 @@ function Show-PagedContent()
         [Parameter(Mandatory = $false)]
         [switch]$NoPaging,
         [Parameter(Mandatory = $false)]
-        [switch]$UseDynamicSize
+        [switch]$ShowGUI
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Log -LogFile $logFile -Module $functionName -Message "Starting paged content display (UseDynamicSize: $($UseDynamicSize.IsPresent))" -LogLevel "Verbose"
-    Write-Verbose "[$functionName] Starting paged content display (UseDynamicSize: $($UseDynamicSize.IsPresent))"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Starting paged content display (ShowGUI: $($ShowGUI.IsPresent))" -LogLevel "Verbose"
+    Write-Verbose "[$functionName] Starting paged content display (ShowGUI: $($ShowGUI.IsPresent))"
     
     # Validate parameters
     if ($PageSize -lt 1)
@@ -239,198 +232,39 @@ function Show-PagedContent()
     Write-Log -LogFile $logFile -Module $functionName -Message "Total items to display: $($items.Count)" -LogLevel "Information"
     Write-Verbose "[$functionName] Total items to display: $($items.Count)"
     
-    # Dynamic size calculation if UseDynamicSize is enabled
-    if ($UseDynamicSize -and -not $Silent -and -not $NoPaging)
+    # ShowGUI: Display in Out-GridView if requested
+    if ($ShowGUI)
     {
-        Write-Log -LogFile $logFile -Module $functionName -Message "UseDynamicSize enabled - calculating lines per item based on content type" -LogLevel "Information"
-        Write-Verbose "[$functionName] Calculating dynamic page size based on content"
+        Write-Log -LogFile $logFile -Module $functionName -Message "ShowGUI enabled - displaying content in Out-GridView" -LogLevel "Information"
+        Write-Verbose "[$functionName] Displaying content in Out-GridView"
         
         try
         {
-            # Get console dimensions
-            $consoleHeight = $Host.UI.RawUI.WindowSize.Height
-            $consoleWidth = $Host.UI.RawUI.WindowSize.Width
-            
-            Write-Verbose "[$functionName] Console dimensions: ${consoleWidth}x${consoleHeight}"
-            write-log -LogFile $logFile -Module $functionName -Message "Console dimensions: ${consoleWidth}x${consoleHeight}" -LogLevel "Verbose"
-            # Determine content type and calculate lines per item
-            $estimatedLinesPerItem = 1  # Default for simple content
-            
-            if ($items.Count -gt 0)
+            # Prepare title for Out-GridView
+            $gridTitle = if (-not [string]::IsNullOrWhiteSpace($Title))
             {
-                $firstItem = $items[0]
-                
-                # Check if items are multi-line strings
-                if ($firstItem -is [string])
-                {
-                    # For multi-line strings, each item is already a line
-                    $estimatedLinesPerItem = 1
-                    Write-Verbose "[$functionName] Content type: String - using 1 line per item"
-                }
-                # Check if items are objects with properties (PSCustomObject, etc.)
-                elseif ($firstItem -is [PSCustomObject] -or $firstItem -is [System.Collections.Specialized.OrderedDictionary])
-                {
-                    # Calculate average lines based on actual rendered output
-                    # This is the most accurate approach as it accounts for how DisplayScriptBlock renders content
-                    $totalLines = 0
-                    $sampleSize = [Math]::Min(5, $items.Count)  # Sample first 5 items for performance
-                    
-                    Write-Verbose "[$functionName] Sampling $sampleSize items to calculate actual rendered line count"
-                    
-                    for ($i = 0; $i -lt $sampleSize; $i++)
-                    {
-                        $item = $items[$i]
-                        
-                        # Capture the output of the DisplayScriptBlock for this item
-                        if ($DisplayScriptBlock)
-                        {
-                            try
-                            {
-                                # Redirect all output streams to capture Write-Host output
-                                # Write-Host uses the Information stream in PowerShell 5+
-                                $capturedOutput = (& $DisplayScriptBlock $item *>&1 | Out-String)
-                                
-                                # Count non-empty lines in the output
-                                $outputLines = ($capturedOutput -split "`r?`n")
-                                $itemLines = ($outputLines | Where-Object { $_.Trim() -ne '' }).Count
-                                
-                                # If we got actual output, use it; otherwise fall back
-                                if ($itemLines -gt 0)
-                                {
-                                    $totalLines += $itemLines
-                                    Write-Verbose "[$functionName] Item $i rendered as $itemLines lines (captured)"
-                                }
-                                else
-                                {
-                                    # No output captured, use property-based fallback
-                                    Write-Verbose "[$functionName] No output captured for item $i, using property fallback"
-                                    $properties = $item.PSObject.Properties
-                                    $itemLines = $properties.Count + 2  # Properties + blank line + buffer
-                                    $totalLines += $itemLines
-                                }
-                            }
-                            catch
-                            {
-                                # Fallback: use property-based estimate if DisplayScriptBlock fails
-                                Write-Verbose "[$functionName] DisplayScriptBlock execution failed: $($_.Exception.Message), using property count fallback"
-                                $properties = $item.PSObject.Properties
-                                $itemLines = $properties.Count + 2  # Properties + blank line + buffer
-                                $totalLines += $itemLines
-                            }
-                        }
-                        else
-                        {
-                            # Fallback: count properties if no DisplayScriptBlock
-                            $properties = $item.PSObject.Properties
-                            $itemLines = 0
-                            
-                            foreach ($prop in $properties)
-                            {
-                                # Each property typically takes 1 line
-                                $itemLines += 1
-                                
-                                # Check for long text properties that will wrap
-                                if ($prop.Name -match 'Description|Comments|Notes' -and $prop.Value -is [string] -and $prop.Value)
-                                {
-                                    # Calculate wrapped lines dynamically based on property name
-                                    $prefix = 2 + $prop.Name.Length + 2  # "  PropertyName: "
-                                    $availableWidth = $consoleWidth - $prefix
-                                    
-                                    if ($availableWidth -gt 0 -and $prop.Value.Length -gt $availableWidth)
-                                    {
-                                        $wrappedLines = [Math]::Ceiling($prop.Value.Length / $availableWidth)
-                                        $itemLines += ($wrappedLines - 1)  # Add extra wrapped lines
-                                    }
-                                }
-                            }
-                            
-                            # Add 1 for blank line between items
-                            $itemLines += 1
-                            $totalLines += $itemLines
-                        }
-                    }
-                    
-                    if ($sampleSize -gt 0)
-                    {
-                        $estimatedLinesPerItem = [Math]::Ceiling($totalLines / $sampleSize)
-                        Write-Verbose "[$functionName] Content type: PSCustomObject - calculated $estimatedLinesPerItem lines per item (sampled $sampleSize items, total lines: $totalLines)"
-                    }
-                    else
-                    {
-                        $estimatedLinesPerItem = 5  # Conservative fallback
-                    }
-                }
-                # Check if items are hashtables or other dictionary types
-                if ($prop.Value -is [string] -and $prop.Value)
-                {
-                    # Calculate wrapped lines for any long string property
-                    # Calculate prefix length dynamically: "  PropertyName: "
-                    $prefix = 2 + $prop.Name.Length + 2  # 2 spaces + property name + ": "
-                }
-                else
-                {
-                    # For other object types, use a conservative estimate
-                    $estimatedLinesPerItem = 3
-                    Write-Verbose "[$functionName] Content type: $($firstItem.GetType().Name) - using conservative estimate of 3 lines per item"
-                }
-            }
-            
-            Write-Log -LogFile $logFile -Module $functionName -Message "Calculated EstimatedLinesPerItem: $estimatedLinesPerItem" -LogLevel "Information"
-            
-            # Reserve lines for UI elements with generous margin:
-            # - Initial info (3 lines: total items + navigation hint + blank)
-            # - Title (3 lines: blank + title + blank if title present)
-            # - Page info header (3 lines: page separator + showing items + blank)
-            # - Navigation footer (4 lines: blank + separator + navigation prompt + input prompt)
-            # - Safety margin (5 lines for unexpected wrapping, prompt variations)
-            # Total reserved: approximately 18-20 lines (use 20 to be safe)
-            $reservedLines = 20
-            
-            # Calculate available lines for content
-            $availableLines = $consoleHeight - $reservedLines
-            
-            if ($availableLines -gt 0 -and $estimatedLinesPerItem -gt 0)
-            {
-                # Calculate max items that fit on screen
-                $calculatedPageSize = [Math]::Floor($availableLines / $estimatedLinesPerItem)
-                
-                # Ensure at least 1 item per page
-                if ($calculatedPageSize -lt 1)
-                {
-                    $calculatedPageSize = 1
-                }
-                
-                # Use the smaller of calculated size or provided PageSize
-                # This allows manual override if user wants fewer items per page
-                if ($calculatedPageSize -lt $PageSize)
-                {
-                    Write-Log -LogFile $logFile -Module $functionName -Message "Adjusting PageSize from $PageSize to $calculatedPageSize (console: ${consoleWidth}x${consoleHeight}, lines per item: $estimatedLinesPerItem, available: $availableLines)" -LogLevel "Information"
-                    Write-Verbose "[$functionName] Dynamic paging: Adjusted PageSize from $PageSize to $calculatedPageSize"
-                    $PageSize = $calculatedPageSize
-                }
-                else
-                {
-                    Write-Log -LogFile $logFile -Module $functionName -Message "PageSize $PageSize fits within console (calculated max: $calculatedPageSize)" -LogLevel "Verbose"
-                    Write-Verbose "[$functionName] PageSize $PageSize fits within console (calculated max: $calculatedPageSize)"
-                }
+                $Title
             }
             else
             {
-                Write-Log -LogFile $logFile -Module $functionName -Message "Console height $consoleHeight too small for dynamic paging (reserved: $reservedLines), using provided PageSize $PageSize" -LogLevel "Warning"
-                Write-Verbose "[$functionName] Console too small for dynamic paging, using provided PageSize"
+                "Content Viewer"
             }
+            
+            # Display items in Out-GridView
+            # Out-GridView automatically handles object formatting
+            $items | Out-GridView -Title $gridTitle -Wait
+            
+            Write-Log -LogFile $logFile -Module $functionName -Message "Out-GridView display completed" -LogLevel "Information"
+            return "completed"
         }
         catch
         {
-            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to calculate dynamic page size: $($_.Exception.Message). Using provided PageSize $PageSize" -LogLevel "Warning"
-            Write-Verbose "[$functionName] Dynamic paging calculation failed, using provided PageSize: $($_.Exception.Message)"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to display Out-GridView: $($_.Exception.Message). Falling back to console display" -LogLevel "Warning"
+            Write-Warning "[$functionName] Out-GridView not available (GUI required). Falling back to console display."
+            # Fall through to console paging
         }
     }
-    elseif ($UseDynamicSize)
-    {
-        Write-Log -LogFile $logFile -Module $functionName -Message "UseDynamicSize specified but disabled in current mode (Silent=$($Silent.IsPresent), NoPaging=$($NoPaging.IsPresent))" -LogLevel "Verbose"
-        Write-Verbose "[$functionName] UseDynamicSize not applicable in current mode"
-    }
+    
     
     # Determine if paging is needed
     $needsPaging = ($items.Count -gt $PageSize) -and (-not $NoPaging) -and (-not $Silent)

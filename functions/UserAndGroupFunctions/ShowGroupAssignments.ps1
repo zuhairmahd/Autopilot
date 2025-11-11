@@ -849,14 +849,14 @@ function ShowGroupAssignments()
                 }
                 Write-Log -logFile $LogFile -Module $functionName -Message "Starting paged display - Type: '$assignmentType', Count: $($selectedAssignments.Count), PageSize: 10, Title: '$pageTitle'" -LogLevel "Information"
                 
-                # Use Show-PagedContent for display with dynamic screen-aware paging
-                # The -UseDynamicSize switch tells Show-PagedContent to automatically
+                # Use Show-PagedContent for display with GUI option
+                # The -ShowGUI switch tells Show-PagedContent to use Out-GridView for interactive display
                 $pagingResult = Show-PagedContent -Content $selectedAssignments `
                     -DisplayScriptBlock $displayScript `
                     -Title $pageTitle `
                     -PageSize 10 `
                     -ShowPageInfo $true `
-                    -UseDynamicSize
+                    -ShowGUI
                     
                 Write-Log -logFile $LogFile -Module $functionName -Message "Paged display completed - Result: '$pagingResult'" -LogLevel "Information"
             }
