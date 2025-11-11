@@ -165,8 +165,6 @@ function ShowGroupAssignments()
         "Unknown" 
     }
     
-    Write-Log -logFile $LogFile -Module $functionName -Message "Extracted group name: '$groupName' (Group type: $($Group.GetType().Name))" -logLevel "Verbose"
-    
     # Validate access token
     if (-not $accessToken)
     {
@@ -496,7 +494,14 @@ function ShowGroupAssignments()
     else
     {
         # Update title with actual group name
-        $groupAssignmentsMenu.Title = $groupAssignmentsMenu.Title -replace '\$groupName', $groupName
+        $groupAssignmentsMenu.Title = if ($HideEmptyMenus.IsPresent)
+        {
+            "Assignments for $groupName `n(Only resources with assigned configurations are shown)"
+        }
+        else
+        {
+            "Assignments for $groupName"
+        }       
         Write-Log -logFile $LogFile -Module $functionName -Message "Menu loaded from config, title updated with group name" -logLevel "Debug"
     }
     
