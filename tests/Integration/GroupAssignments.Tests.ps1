@@ -42,12 +42,13 @@ BeforeAll {
     . "$script:RepoRoot/functions/UserAndGroupFunctions/GetGroupDirectAssignments.ps1"
     . "$script:RepoRoot/functions/UserAndGroupFunctions/GetGroupIndirectAssignments.ps1"
     . "$script:RepoRoot/functions/UserAndGroupFunctions/ShowGroupAssignments.ps1"
+    . "$script:RepoRoot/functions/UserAndGroupFunctions/Get-GroupAssignments-Common.ps1"
     . "$script:RepoRoot/functions/graphFunctions/CallGraphAPI.ps1"
     . "$script:RepoRoot/functions/menuFunctions/NewMenu.ps1"
     . "$script:RepoRoot/functions/menuFunctions/AddMenuItem.ps1"
     . "$script:RepoRoot/functions/menuFunctions/ShowMenu.ps1"
     . "$script:RepoRoot/functions/utilityFunctions/Write-Log.ps1"
-    
+    . "$script:RepoRoot/functions/utilityFunctions/Get-CachedData.ps1"
     # Set up global variables
     $global:logFile = Join-Path $script:TestEnv.TestFolder "test.log"
     $global:maxJSONDepth = 10
@@ -68,7 +69,8 @@ BeforeAll {
 }
 
 AfterAll {
-    if ($script:TestEnv) {
+    if ($script:TestEnv)
+    {
         Remove-TestEnvironment -TestContext $script:TestEnv
     }
 }
@@ -81,17 +83,22 @@ Describe "GetGroupDirectAssignments Integration" -Tags 'Integration', 'GroupAssi
             Mock CallGraphAPI {
                 param($accessToken, $ResourcePath, $APIVersion, $Method, $Body)
                 
-                if ($ResourcePath -eq "`$batch") {
+                if ($ResourcePath -eq "`$batch")
+                {
                     # Return batch response with multiple resource types
                     return @{
                         responses = @(
                             @{ id = "mobileApps"; status = 200; body = @{ value = @(
-                                @{ id = "app-1"; displayName = "Test App 1"; description = "App description" }
-                                @{ id = "app-2"; displayName = "Test App 2"; description = "" }
-                            )}}
+                                        @{ id = "app-1"; displayName = "Test App 1"; description = "App description" }
+                                        @{ id = "app-2"; displayName = "Test App 2"; description = "" }
+                                    )
+                                }
+                            }
                             @{ id = "deviceConfigs"; status = 200; body = @{ value = @(
-                                @{ id = "config-1"; displayName = "Test Config 1"; description = "Config description" }
-                            )}}
+                                        @{ id = "config-1"; displayName = "Test Config 1"; description = "Config description" }
+                                    )
+                                }
+                            }
                             @{ id = "compliancePolicies"; status = 200; body = @{ value = @() }}
                             @{ id = "deviceScripts"; status = 200; body = @{ value = @() }}
                             @{ id = "appProtectionPolicies"; status = 200; body = @{ value = @() }}
@@ -101,11 +108,14 @@ Describe "GetGroupDirectAssignments Integration" -Tags 'Integration', 'GroupAssi
                         )
                     }
                 }
-                elseif ($ResourcePath -is [array]) {
+                elseif ($ResourcePath -is [array])
+                {
                     # Return batch response for assignments
                     $responses = @()
-                    foreach ($path in $ResourcePath) {
-                        if ($path -match "app-1") {
+                    foreach ($path in $ResourcePath)
+                    {
+                        if ($path -match "app-1")
+                        {
                             $responses += @{
                                 value = @(
                                     @{
@@ -115,7 +125,8 @@ Describe "GetGroupDirectAssignments Integration" -Tags 'Integration', 'GroupAssi
                                 )
                             }
                         }
-                        else {
+                        else
+                        {
                             $responses += @{ value = @() }
                         }
                     }
@@ -138,12 +149,15 @@ Describe "GetGroupDirectAssignments Integration" -Tags 'Integration', 'GroupAssi
             Mock CallGraphAPI {
                 param($accessToken, $ResourcePath, $APIVersion, $Method, $Body)
                 
-                if ($ResourcePath -eq "`$batch") {
+                if ($ResourcePath -eq "`$batch")
+                {
                     return @{
                         responses = @(
                             @{ id = "mobileApps"; status = 200; body = @{ value = @(
-                                @{ id = "app-desc"; displayName = "App With Description"; description = "This is a test description" }
-                            )}}
+                                        @{ id = "app-desc"; displayName = "App With Description"; description = "This is a test description" }
+                                    )
+                                }
+                            }
                             @{ id = "deviceConfigs"; status = 200; body = @{ value = @() }}
                             @{ id = "compliancePolicies"; status = 200; body = @{ value = @() }}
                             @{ id = "deviceScripts"; status = 200; body = @{ value = @() }}
@@ -154,7 +168,8 @@ Describe "GetGroupDirectAssignments Integration" -Tags 'Integration', 'GroupAssi
                         )
                     }
                 }
-                elseif ($ResourcePath -is [array]) {
+                elseif ($ResourcePath -is [array])
+                {
                     return @{
                         value = @(
                             @{
@@ -184,14 +199,17 @@ Describe "GetGroupDirectAssignments Integration" -Tags 'Integration', 'GroupAssi
             Mock CallGraphAPI {
                 param($accessToken, $ResourcePath, $APIVersion, $Method, $Body)
                 
-                if ($ResourcePath -eq "`$batch") {
+                if ($ResourcePath -eq "`$batch")
+                {
                     # Simulate resources for both direct and indirect checks
                     return @{
                         responses = @(
                             @{ id = "mobileApps"; status = 200; body = @{ value = @(
-                                @{ id = "app-direct"; displayName = "Direct App"; description = "" }
-                                @{ id = "app-indirect"; displayName = "Indirect App"; description = "" }
-                            )}}
+                                        @{ id = "app-direct"; displayName = "Direct App"; description = "" }
+                                        @{ id = "app-indirect"; displayName = "Indirect App"; description = "" }
+                                    )
+                                }
+                            }
                             @{ id = "deviceConfigs"; status = 200; body = @{ value = @() }}
                             @{ id = "compliancePolicies"; status = 200; body = @{ value = @() }}
                             @{ id = "deviceScripts"; status = 200; body = @{ value = @() }}
@@ -202,10 +220,13 @@ Describe "GetGroupDirectAssignments Integration" -Tags 'Integration', 'GroupAssi
                         )
                     }
                 }
-                elseif ($ResourcePath -is [array]) {
+                elseif ($ResourcePath -is [array])
+                {
                     $responses = @()
-                    foreach ($path in $ResourcePath) {
-                        if ($path -match "app-direct") {
+                    foreach ($path in $ResourcePath)
+                    {
+                        if ($path -match "app-direct")
+                        {
                             # Direct assignment to group
                             $responses += @{
                                 value = @(
@@ -216,7 +237,8 @@ Describe "GetGroupDirectAssignments Integration" -Tags 'Integration', 'GroupAssi
                                 )
                             }
                         }
-                        elseif ($path -match "app-indirect") {
+                        elseif ($path -match "app-indirect")
+                        {
                             # Indirect assignment via All Users
                             $responses += @{
                                 value = @(
@@ -227,7 +249,8 @@ Describe "GetGroupDirectAssignments Integration" -Tags 'Integration', 'GroupAssi
                                 )
                             }
                         }
-                        else {
+                        else
+                        {
                             $responses += @{ value = @() }
                         }
                     }
@@ -261,12 +284,15 @@ Describe "GetGroupIndirectAssignments Integration" -Tags 'Integration', 'GroupAs
             Mock CallGraphAPI {
                 param($accessToken, $ResourcePath, $APIVersion, $Method, $Body)
                 
-                if ($ResourcePath -eq "`$batch") {
+                if ($ResourcePath -eq "`$batch")
+                {
                     return @{
                         responses = @(
                             @{ id = "mobileApps"; status = 200; body = @{ value = @(
-                                @{ id = "app-allusers"; displayName = "All Users App"; description = "" }
-                            )}}
+                                        @{ id = "app-allusers"; displayName = "All Users App"; description = "" }
+                                    )
+                                }
+                            }
                             @{ id = "deviceConfigs"; status = 200; body = @{ value = @() }}
                             @{ id = "compliancePolicies"; status = 200; body = @{ value = @() }}
                             @{ id = "deviceScripts"; status = 200; body = @{ value = @() }}
@@ -277,7 +303,8 @@ Describe "GetGroupIndirectAssignments Integration" -Tags 'Integration', 'GroupAs
                         )
                     }
                 }
-                elseif ($ResourcePath -is [array]) {
+                elseif ($ResourcePath -is [array])
+                {
                     return @{
                         value = @(
                             @{
@@ -305,13 +332,16 @@ Describe "GetGroupIndirectAssignments Integration" -Tags 'Integration', 'GroupAs
             Mock CallGraphAPI {
                 param($accessToken, $ResourcePath, $APIVersion, $Method, $Body)
                 
-                if ($ResourcePath -eq "`$batch") {
+                if ($ResourcePath -eq "`$batch")
+                {
                     return @{
                         responses = @(
                             @{ id = "mobileApps"; status = 200; body = @{ value = @() }}
                             @{ id = "deviceConfigs"; status = 200; body = @{ value = @(
-                                @{ id = "config-alldevices"; displayName = "All Devices Config"; description = "" }
-                            )}}
+                                        @{ id = "config-alldevices"; displayName = "All Devices Config"; description = "" }
+                                    )
+                                }
+                            }
                             @{ id = "compliancePolicies"; status = 200; body = @{ value = @() }}
                             @{ id = "deviceScripts"; status = 200; body = @{ value = @() }}
                             @{ id = "appProtectionPolicies"; status = 200; body = @{ value = @() }}
@@ -321,7 +351,8 @@ Describe "GetGroupIndirectAssignments Integration" -Tags 'Integration', 'GroupAs
                         )
                     }
                 }
-                elseif ($ResourcePath -is [array]) {
+                elseif ($ResourcePath -is [array])
+                {
                     return @{
                         value = @(
                             @{ value = @() }
@@ -351,7 +382,8 @@ Describe "GetGroupIndirectAssignments Integration" -Tags 'Integration', 'GroupAs
             Mock CallGraphAPI {
                 param($accessToken, $ResourcePath, $APIVersion, $Method, $Body)
                 
-                if ($ResourcePath -eq "`$batch") {
+                if ($ResourcePath -eq "`$batch")
+                {
                     # Include beta-only resource types
                     return @{
                         responses = @(
@@ -364,8 +396,10 @@ Describe "GetGroupIndirectAssignments Integration" -Tags 'Integration', 'GroupAs
                             @{ id = "resourceAccessProfiles"; status = 200; body = @{ value = @() }}
                             @{ id = "policySets"; status = 200; body = @{ value = @() }}
                             @{ id = "autopilotProfiles"; status = 200; body = @{ value = @(
-                                @{ id = "autopilot-1"; displayName = "Autopilot Profile"; description = "" }
-                            )}}
+                                        @{ id = "autopilot-1"; displayName = "Autopilot Profile"; description = "" }
+                                    )
+                                }
+                            }
                             @{ id = "healthScripts"; status = 200; body = @{ value = @() }}
                             @{ id = "configurationPolicies"; status = 200; body = @{ value = @() }}
                             @{ id = "groupPolicyConfigs"; status = 200; body = @{ value = @() }}
@@ -374,10 +408,13 @@ Describe "GetGroupIndirectAssignments Integration" -Tags 'Integration', 'GroupAs
                         )
                     }
                 }
-                elseif ($ResourcePath -is [array]) {
+                elseif ($ResourcePath -is [array])
+                {
                     $responses = @()
-                    foreach ($path in $ResourcePath) {
-                        if ($path -match "autopilot") {
+                    foreach ($path in $ResourcePath)
+                    {
+                        if ($path -match "autopilot")
+                        {
                             $responses += @{
                                 value = @(
                                     @{
@@ -386,7 +423,8 @@ Describe "GetGroupIndirectAssignments Integration" -Tags 'Integration', 'GroupAs
                                 )
                             }
                         }
-                        else {
+                        else
+                        {
                             $responses += @{ value = @() }
                         }
                     }

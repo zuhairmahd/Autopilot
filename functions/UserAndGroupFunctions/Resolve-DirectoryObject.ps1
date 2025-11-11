@@ -1,4 +1,4 @@
-function Resolve-DirectoryObject
+function Resolve-DirectoryObject()
 {
     <#
     .SYNOPSIS
