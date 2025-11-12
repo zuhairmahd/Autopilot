@@ -604,9 +604,10 @@ function Get-ApplicationDefaults()
                         )
                     },
                     @{
-                        description           = 'Learn more about this application'
+                        menuName              = 'aboutMenu'
+                        description           = 'Application information and support'
                         name                  = 'About'
-                        blockType             = 'action'
+                        blockType             = 'menu'
                         includeInDisplayModes = @(
                             'full',
                             'admin',
@@ -928,6 +929,68 @@ function Get-ApplicationDefaults()
                             'full',
                             'admin',
                             'advanced'
+                        )
+                    }
+                )
+                type                  = 'static'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin',
+                    'advanced',
+                    'helpdesk',
+                    'registration'
+                )
+            }
+            aboutMenu                 = @{
+                Title                 = 'About'
+                Description           = 'Application information and support'
+                items                 = @(
+                    @{
+                        description           = 'View Azure registration information'
+                        name                  = 'View Azure Credentials'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced',
+                            'helpdesk',
+                            'registration'
+                        )
+                    },
+                    @{
+                        description           = 'View the scopes available to the Access Token'
+                        name                  = 'View Access Token Scopes'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced',
+                            'helpdesk',
+                            'registration'
+                        )
+                    },
+                    @{
+                        description           = 'View the script logs'
+                        name                  = 'View logs'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced',
+                            'helpdesk',
+                            'registration'
+                        )
+                    },
+                    @{
+                        description           = 'Send a message to support including logs'
+                        name                  = 'Request support'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced',
+                            'helpdesk',
+                            'registration'
                         )
                     }
                 )
