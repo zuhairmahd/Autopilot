@@ -12,6 +12,7 @@ function CallGraphAPI()
         [string]$Filter = $null,
         [string]$Search = $null,
         [string]$ExtraParameters = $null,
+        $headers = $null,
         [string]$body = $null,
         [switch]$consistencyLevel,
         [switch]$secureString
@@ -373,9 +374,14 @@ function CallGraphAPI()
     $restParams = @{
         Method          = $method
         Uri             = $encodedUri
-        Headers         = $headers
         UseBasicParsing = $true
     }
+    #add headers parameter if it was passed
+    if ($headers)
+    {
+        Write-Log -LogFile $logFile -Module $functionName -Message "Headers provided. Adding to the request." -LogLevel "Information"
+        $restParams['Headers'] = $headers
+    }                                                               
     # Only add Body parameter if it exists
     if ($body)
     {
