@@ -867,7 +867,7 @@
     }
     getGroupAssignmentsMenu = @{
         Title = 'Group Assignments Menu'
-        Description = 'View or export various     group assignment reports'
+        Description = 'View or export various group assignment reports'
         type = 'static'
         items = @(
             @{
