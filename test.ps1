@@ -588,9 +588,11 @@ $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $sc
 # }
 #endregion Define variables
 
-$global:cacheCleared = Invoke-CacheManagement -Action Clear -ShowDetails
+
+
 
 exit 0
+Send-EmailWithAttachments -accessToken $accessToken -to 'zuhair@accesstojobs.com' -Subject 'test' -body 'this is a test' -AttachmentPaths $logfile -verbose 
 #region Usage examples for GetGraphObjectMetadata
 # Example 1: Get metadata for users collection
 $usersResponse = CallGraphAPI -accessToken $accessToken -ResourcePath "users"

@@ -89,6 +89,7 @@ function Get-ApplicationDefaults()
                 "Device.ReadWrite.All",
                 "DeviceManagementApps.Read.All",
                 "DeviceManagementConfiguration.ReadWrite.All",
+                "Mail.Send",
                 "DeviceManagementScripts.Read.All",
                 "DeviceManagementManagedDevices.PrivilegedOperations.All",
                 "DeviceManagementManagedDevices.ReadWrite.All",
@@ -258,6 +259,11 @@ function Get-ApplicationDefaults()
                     "deviceAppManagement/mobileApps",
                     "deviceAppManagement/mobileApps/id/assignments"
                 )
+            },
+            @{
+                scope     = 'Mail.Send'
+                endpoints = @('me/sendMail')                                    
+                reason    = 'Required to send emails on behalf of the signed-in user.'              
             },
             @{
                 Scope     = "DeviceManagementConfiguration.Read.All"
@@ -604,10 +610,11 @@ function Get-ApplicationDefaults()
                         )
                     },
                     @{
-                        menuName              = 'aboutMenu'
+                        # menuName              = 'aboutMenu'
                         description           = 'Application information and support'
                         name                  = 'About'
-                        blockType             = 'menu'
+                        # blockType             = 'menu'
+                        blockType             = 'action'
                         includeInDisplayModes = @(
                             'full',
                             'admin',

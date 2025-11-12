@@ -1347,7 +1347,6 @@ $environmentMenu = NewMenu -MenuName "environmentMenu"
 $inclusionExclusionMenu = NewMenu -MenuName "inclusionExclusionMenu"
 $deviceReportsMenu = NewMenu -MenuName "deviceReportsMenu"
 $getGroupAssignmentsMenu = NewMenu -MenuName "getGroupAssignmentsMenu"
-$aboutMenu = NewMenu -MenuName "aboutMenu"
 #endregion Create menus
 
 #region export menu
@@ -2350,21 +2349,6 @@ $getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Exp
 }
 #endregion Show Group Assignments menu
 
-#region about menu
-$aboutMenu = AddMenuItem -Menu $aboutMenu -Name "View Azure app registration information" -Action {
-    $null = Show-AboutApplication -accessToken $accessToken -Release $latestRelease -appId $appId -tenantId $tenantId -name $name -updateAvailable $updateAvailable
-}
-$aboutMenu = AddMenuItem -Menu $aboutMenu -Name "View Access Token Scopes" -Action {
-
-}
-$aboutMenu = AddMenuItem -Menu $aboutMenu -Name "View logs" -Action {
-
-}
-$aboutMenu = AddMenuItem -Menu $aboutMenu -Name "Request support" -Action {
-
-}
-#endregion about menu   
-
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
     $username = GetUserInput -Message "Enter the username (Email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
     # Check if user entered 'back'
@@ -2470,7 +2454,9 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Shutdown the device" -action {
 }
 $mainMenu = AddMenuItem -menu $mainMenu -name "Group Assignments Menu" -Submenu $getGroupAssignmentsMenu
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
-$mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Submenu $aboutMenu               
+$mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -action {
+    $null = Show-AboutApplication -accessToken $accessToken -Release $latestRelease -appId $appId -tenantId $tenantId -name $name -updateAvailable $updateAvailable
+}                   
 #region show menus
 # Add the main menu to both history arrays for proper stack synchronization
 try

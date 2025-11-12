@@ -217,10 +217,11 @@
                 )
             },
             @{
-                menuName              = 'aboutMenu'
+                # menuName              = 'aboutMenu'
                 description           = 'Application information and support'
                 name                  = 'About'
-                blockType             = 'menu'
+                # blockType             = 'menu'
+                blockType             = 'action'            
                 includeInDisplayModes = @(
                     'full',
                     'admin',

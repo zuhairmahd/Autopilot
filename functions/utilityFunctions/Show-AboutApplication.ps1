@@ -7,7 +7,9 @@ function Show-AboutApplication()
         [string]$Release,
         [string]$appId,
         [string]$tenantId,
-        [string]$name
+        [string]$name,
+        [switch]$ShowAppRegistration,
+        [switch]$ShowScopes
     )
     
     $FunctionName = $MyInvocation.MyCommand.Name
@@ -22,7 +24,30 @@ function Show-AboutApplication()
     {
         Show-UpdateInfo -updateAvailable $updateAvailable
     }
+    # Display update settings
+    Write-Host "Auto Update enabled: $($settings.autoUpdate)" -ForegroundColor Cyan
+    Write-Host "Update branch: $Release" -ForegroundColor Cyan
+
+    #Create About Application menu
+    $aboutMenu = NewMenu -MenuName "aboutMenu"
     
+    #Add menu items
+    #region about menu
+    $aboutMenu = AddMenuItem -Menu $aboutMenu -Name "View Azure app registration information" -Action {
+        
+    }
+    $aboutMenu = AddMenuItem -Menu $aboutMenu -Name "View Access Token Scopes" -Action {
+
+    }
+    $aboutMenu = AddMenuItem -Menu $aboutMenu -Name "View logs" -Action {
+
+    }
+    $aboutMenu = AddMenuItem -Menu $aboutMenu -Name "Request support" -Action {
+
+    }
+    #endregion about menu   
+
+
     # Display application configuration
     Write-Host "==========================================================`n"
     Write-Host "Domain: $domain"
@@ -38,10 +63,6 @@ function Show-AboutApplication()
         # Display token scopes
         Show-TokenScopes -accessToken $accessToken
     }
-    
-    # Display update settings
-    Write-Host "Auto Update enabled: $($settings.autoUpdate)" -ForegroundColor Cyan
-    Write-Host "Update branch: $Release" -ForegroundColor Cyan
 }
 
 function Get-RegisteredAppName()
