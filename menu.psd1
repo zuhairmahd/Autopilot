@@ -183,7 +183,7 @@
             },
             @{
                 menuName              = 'getGroupAssignmentsMenu'
-                description           = 'View or export various     group assignment reports'
+                description           = 'View or export various group assignment reports'
                 name                  = 'Group Assignments Menu'
                 blockType             = 'menu'
                 includeInDisplayModes = @(
@@ -205,23 +205,9 @@
                 )
             },
             @{
-                description           = 'Learn more about this application'
-                name                  = 'About'
-                blockType             = 'action'
-                includeInDisplayModes = @(
-                    'full',
-                    'admin',
-                    'advanced',
-                    'helpdesk',
-                    'registration'
-                )
-            },
-            @{
-                # menuName              = 'aboutMenu'
                 description           = 'Application information and support'
                 name                  = 'About'
-                # blockType             = 'menu'
-                blockType             = 'action'            
+                blockType             = 'action'
                 includeInDisplayModes = @(
                     'full',
                     'admin',
@@ -557,6 +543,7 @@
     aboutMenu                 = @{
         Title                 = 'About'
         Description           = 'Application information and support'
+        type                  = 'static'
         items                 = @(
             @{
                 description           = 'View Azure app registration information'
@@ -607,7 +594,6 @@
                 )
             }
         )
-        type                  = 'static'
         includeInDisplayModes = @(
             'full',
             'admin',

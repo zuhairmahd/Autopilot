@@ -138,6 +138,8 @@
         maxWaitTime                  = 30
         showLicenseBanner            = $true
         validateScopes               = $true
+        useGridForLogDisplay         = $true     
+        DisplayManualFilterSelection = $false
         deviceContactThresholdInDays = 30
         appModes                     = @('full')
         timeInSeconds                = 60

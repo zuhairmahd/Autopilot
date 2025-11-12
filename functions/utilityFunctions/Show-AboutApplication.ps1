@@ -32,36 +32,81 @@ function Show-AboutApplication()
     $aboutMenu = NewMenu -MenuName "aboutMenu"
     
     #Add menu items
-    #region about menu
     $aboutMenu = AddMenuItem -Menu $aboutMenu -Name "View Azure app registration information" -Action {
-        
-    }
+        Write-Host "`n================ Azure App Registration Information ================`n"   
+        return 'ShowAzureAppInfo'
+    } -returnsValue
     $aboutMenu = AddMenuItem -Menu $aboutMenu -Name "View Access Token Scopes" -Action {
-
-    }
+        Write-Host "`n================ Access Token Scopes ================`n"   
+        return 'ShowTokenScopes'
+    } -returnsValue
     $aboutMenu = AddMenuItem -Menu $aboutMenu -Name "View logs" -Action {
-
-    }
+        Write-Host "`n================ Log File ================`n"   
+        return 'ViewLogs'
+    } -returnsValue
     $aboutMenu = AddMenuItem -Menu $aboutMenu -Name "Request support" -Action {
+        Write-Host "`n================ Support Information ================`n"   
+        return 'ShowSupportInfo'     
+    } -returnsValue
 
-    }
-    #endregion about menu   
-
-
-    # Display application configuration
-    Write-Host "==========================================================`n"
-    Write-Host "Domain: $domain"
-    Show-ApplicationInfo -registeredAppName $registeredAppName -name $name -appId $appId -tenantId $tenantId
-    
-    # Display authentication information
-    Write-Host "Delegated authentication: $($auth.delegated)."
-    if ($auth.delegated)
+    while ($menuSelectionResultPick -ne "Back" -and $menuSelectionResultPick -ne "Main Menu" -and $menuSelectionResultPick -ne 0 -and $menuSelectionResultPick -ne "0")
     {
-        Write-Host "Authentication type: $($auth.AuthType)"
-        write-log -logFile $LogFile -Module "$FunctionName" -Message "- Authentication type: $($auth.AuthType)" -LogLevel "Information"
+        $menuSelectionResultPick = ShowMenu -Menu $aboutMenu -CalledBy 'Action' -StackOperation 'Push'
+        Write-Verbose "[$functionName] ShowMenu returned: '$menuSelectionResultPick'"
+        write-log -logFile $LogFile -Module $functionName -Message "ShowMenu returned: '$menuSelectionResultPick'" -logLevel "Information"  
+        #Process navigation options
+        if ($menuSelectionResultPick -eq "Back" -or $menuSelectionResultPick -eq "Main Menu" -or $menuSelectionResultPick -eq 0 -or $menuSelectionResultPick -eq "0")
+        {
+            Write-Verbose "[$functionName] ShowMenu returned navigation option: '$menuSelectionResultPick', treating as navigation"
+            Write-Log -logFile $LogFile -Module $functionName -Message "Navigation option selected: '$menuSelectionResultPick', exiting function" -logLevel "Information"
+            return $menuSelectionResultPick
+        }
+        if ($null -eq $menuSelectionResultPick)
+        {
+            Write-Verbose "[$functionName] ShowMenu returned null, treating as navigation"
+            Write-Log -logFile $LogFile -Module $functionName -Message "ShowMenu returned null, exiting function" -logLevel "Information"
+            return $returnValues.exitString
+        }                       
+    
+        #process menu selection
+        switch ($menuSelectionResultPick)
+        {
+            'ShowAzureAppInfo'
+            {
+                Write-Host "==========================================================`n"
+                Write-Host "Domain: $domain"
+                Show-ApplicationInfo -registeredAppName $registeredAppName -name $name -appId $appId -tenantId $tenantId
+            }
+            'ShowTokenScopes'
+            {
+                Write-Host "Delegated authentication: $($auth.delegated)."    
+                Write-Host "Authentication type: $($auth.AuthType)"
+                write-log -logFile $LogFile -Module "$FunctionName" -Message "- Authentication type: $($auth.AuthType), Delegated authentication: $($auth.delegated)" -LogLevel "Information"
         
-        # Display token scopes
-        Show-TokenScopes -accessToken $accessToken
+                # Display token scopes
+                Show-TokenScopes -accessToken $accessToken
+            }
+            'ViewLogs'
+            {
+                Write-Host "`n================ Log File ================`n"
+                if ($settings.useGridForLogDisplay)
+                {
+                    Show-Log -logFile $logFile -UseGrid
+                }               
+                else
+                {
+                    Show-Log -logFile $logFile
+                }                                   
+            }
+            'ShowSupportInfo'
+            {
+                Show-SupportInformation
+
+            }
+        }                   
+        Write-Host "Press any key to continue..."        
+        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")             
+        
     }
 }
 

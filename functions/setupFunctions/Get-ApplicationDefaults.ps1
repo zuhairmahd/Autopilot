@@ -107,6 +107,8 @@ function Get-ApplicationDefaults()
             showLicenseBanner            = $true
             validateScopes               = $true
             deviceContactThresholdInDays = 30
+            useGridForLogDisplay         = $true     
+            DisplayManualFilterSelection = $false
             appModes                     = @(
                 "full"
             )
@@ -172,6 +174,8 @@ function Get-ApplicationDefaults()
             companyName                     = ""
             version                         = $Version
             validateScopes                  = $false
+            useGridForLogDisplay            = $true
+            DisplayManualFilterSelection    = $false
             hideEmptyMenus                  = $true
             maxWaitTime                     = 30
             showLicenseBanner               = $true
