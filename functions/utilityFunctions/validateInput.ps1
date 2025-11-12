@@ -81,7 +81,7 @@ function validateInput()
             $normalizedUserInput = NormalizeUserName -UserName $UserInput -Settings $settings
             write-log -logFile $logFile -module $functionName -Message "Normalized username: '$normalizedUserInput'"                                                                        
             # Basic email format check
-            if ($normalizedUserInput -match '^[a-zA-Z0-9][a-zA-Z0-9._%+-]*@[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,}$')
+            if ($normalizedUserInput -match '^[a-zA-Z0-9][a-zA-Z0-9._%+-]*@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$')
             {
                 Write-Verbose "[$functionName] Username validation passed"
                 write-log -logFile $logFile -module $functionName -Message "Username validation passed"                                                                     
