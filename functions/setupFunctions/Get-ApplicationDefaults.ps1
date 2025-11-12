@@ -946,8 +946,8 @@ function Get-ApplicationDefaults()
                 Description           = 'Application information and support'
                 items                 = @(
                     @{
-                        description           = 'View Azure registration information'
-                        name                  = 'View Azure Credentials'
+                        description           = 'View Azure app registration information'
+                        name                  = 'View Azure app registration information'
                         blockType             = 'action'
                         includeInDisplayModes = @(
                             'full',

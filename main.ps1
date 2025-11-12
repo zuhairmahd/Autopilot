@@ -2351,7 +2351,7 @@ $getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Exp
 #endregion Show Group Assignments menu
 
 #region about menu
-$aboutMenu = AddMenuItem -Menu $aboutMenu -Name "View Azure Credentials" -Action {
+$aboutMenu = AddMenuItem -Menu $aboutMenu -Name "View Azure app registration information" -Action {
     $null = Show-AboutApplication -accessToken $accessToken -Release $latestRelease -appId $appId -tenantId $tenantId -name $name -updateAvailable $updateAvailable
 }
 $aboutMenu = AddMenuItem -Menu $aboutMenu -Name "View Access Token Scopes" -Action {
@@ -2360,7 +2360,6 @@ $aboutMenu = AddMenuItem -Menu $aboutMenu -Name "View Access Token Scopes" -Acti
 $aboutMenu = AddMenuItem -Menu $aboutMenu -Name "View logs" -Action {
 
 }
-
 $aboutMenu = AddMenuItem -Menu $aboutMenu -Name "Request support" -Action {
 
 }
