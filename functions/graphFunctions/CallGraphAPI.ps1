@@ -49,6 +49,7 @@ function CallGraphAPI()
             $batches += , @($ResourcePath[$i..($i + $batchSize - 1)])
         }
         Write-Log -LogFile $logFile -Module $functionName -Message "Processing $($ResourcePath.Count) requests in $($batches.Count) batch(es)" -LogLevel "Information"
+        $batchIndex = 0
         foreach ($batch in $batches)
         {
             # Build batch request body according to Graph API spec
@@ -117,21 +118,31 @@ function CallGraphAPI()
                 $batchUri = "https://graph.microsoft.com/$APIVersion/`$batch"
                 $batchResponse = Invoke-RestMethod -Uri $batchUri -Method Post -Headers $batchHeaders -Body $batchBody -UseBasicParsing
                 # Process batch responses
+                # Renumber response IDs to be globally unique across all batches
+                $globalIdOffset = $batchIndex * $maxBatchSize
                 foreach ($response in $batchResponse.responses)
                 {
+                    # Adjust the response ID to be globally unique (1-240 instead of 1-20 per batch)
+                    $globalId = ([int]$response.id) + $globalIdOffset
+                    $response.id = $globalId
+                    
                     if ($response.status -ge 200 -and $response.status -lt 300)
                     {
-                        $allResults += $response.body
+                        # Preserve the entire response object so downstream code can match by id
+                        $allResults += $response
                         $successCount++
                         Write-Log -LogFile $logFile -Module $functionName -Message "Batch request $($response.id) succeeded (status: $($response.status))" -LogLevel "Verbose"
                     }
                     else
                     {
+                        # Include failed responses so downstream code can handle them properly
+                        $allResults += $response
                         $failureCount++
                         $errorMsg = if ($response.body.error) { $response.body.error.message } else { "Unknown error" }
                         Write-Log -LogFile $logFile -Module $functionName -Message "Batch request $($response.id) failed (status: $($response.status)): $errorMsg" -LogLevel "Warning"
                     }
                 }
+                $batchIndex++
             }
             catch
             {

@@ -1,9 +1,0 @@
-@{
-    'AppId' = 'Your_app_id_goes_here'
-    '_comment' = 'Configuration Sample for Autopilot Application - This file contains sample configuration settings required for authentication and application setup. The domain, TenantId, AppId, AppSecret, Thumbprint, and Subject are placeholders for your Azure AD and certificate details. The auth section has been moved to the settings.json file. Replace the placeholder values with your actual environment-specific values before using in production.'
-    'domain' = 'YourDomainGoesHere.com'
-    'Subject' = 'Your_certificate_subject_goes_here'
-    'AppSecret' = 'Your_app_secret_goes_here_not_needed_if_you_are_using_deligated_authentication'
-    'Thumbprint' = 'Your_cert_thumprint_goes_here'
-    'TenantId' = 'Your_tenant_id_goes_here'
-}

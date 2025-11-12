@@ -125,9 +125,9 @@ Describe "Integration: Configuration Workflow" -Tags 'Integration', 'setupFuncti
             $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
                 -StringsFile $script:StringsFile -menuFile $script:MenuFile -Domain "contoso.com"
             
-            $result.GlobalSettings.cacheSettings | Should -Not -BeNullOrEmpty
-            $result.GlobalSettings.cacheSettings.enabled | Should -Be $true
-            $result.GlobalSettings.cacheSettings.cacheTypes.Configuration.enabled | Should -Be $true
+            $result.CacheSettings | Should -Not -BeNullOrEmpty
+            $result.CacheSettings.enabled | Should -Be $true
+            $result.CacheSettings.cacheTypes.Configuration.enabled | Should -Be $true
         }                   
     }
     

@@ -185,7 +185,9 @@ param(
     [int]$timeInSeconds,
     [String] $GroupTag,
     [switch]$showLicenseBanner,
+    [switch]$HideEmptyMenus,
     [switch]$showAuth,
+    [switch]$clearCache,                    
     [switch]$showVersion,
     [switch]$showSettings,
     [switch]$OverwriteLogs,
@@ -512,6 +514,20 @@ else
     Write-Verbose "[$scriptName] No migration needed."
     Write-Log -LogFile $LogFile -Module $scriptName -Message "No migration needed." -LogLevel "Information" 
 }
+
+#clear cache if requested
+if ($clearCache)
+{
+    $clearedCache = Invoke-CacheManagement -Action Clear -ShowDetails
+    if ($clearedCache.Action -eq 'Clear' -and $clearedCache.CachesCleared -ge 0)
+    {
+        Write-Host "Cache cleared." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "No cache files to clear." -ForegroundColor Yellow                           
+    }
+}
 #endregion  Initialize script parameters
 
 #region Process login
@@ -523,11 +539,9 @@ if (-not (Test-Path $secretsDir))
     Write-Verbose "[$scriptName] Creating secrets directory: $secretsDir"
     New-Item -Path $secretsDir -ItemType Directory -Force | Out-Null
 }
-
 # Initialize variables for encryption handling
 $configContent = $null
 $script:maxRetries = 6
-
 # Skip config loading entirely if testMode and config flag is false
 if ($testMode -and -not $script:testModeOptions.config)
 {
@@ -1301,10 +1315,13 @@ if ($testMode -and $script:testModeOptions.exitAfter)
     Write-Log -LogFile $LogFile -FinishLogging
     exit 0
 }
-
 #endregion initialization block with access token
 
 #region Create menus
+# Clear menu configuration cache to ensure fresh menu loading
+# Write-Verbose "[$scriptName] Clearing menu configuration cache"
+# Invoke-CacheManagement -Action ClearSpecific -CacheType Menu 
+#Now load the menu configuration            
 $menuConfig = $configResult.menu
 if ($menuConfig)
 {
@@ -2138,97 +2155,197 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
 }
 #endregion Check menu
 
-#region Show Group Assignments menu
-<#
+#region show Group Assignments menu
+# Helper scriptblock to avoid duplication between direct and indirect assignment menu items
+$script:ShowGroupAssignmentsAction = {
+    <#
     This script-scoped variable defines a reusable script block for showing group assignments in the Intune Helpdesk Menu.
     It is defined at script scope to allow sharing between multiple menu items (e.g., direct and indirect assignment views),
     avoiding code duplication and ensuring consistent behavior. The script block encapsulates the logic for prompting the user
     for a group name, resolving the group, and handling navigation commands, and is invoked by different menu actions as needed.
-#>
-# Helper scriptblock to avoid duplication between direct and indirect assignment menu items
-$script:ShowGroupAssignmentsAction = {
-    param([bool]$IncludeIndirectAssignments)
+    #>
+    param(
+        [bool]$IncludeIndirectAssignments,
+        [bool]$exportInstead
+    )
     
     $assignmentScope = if ($IncludeIndirectAssignments) { "indirect (All Users/All Devices)" } else { "direct" }
-    $groupName = GetUserInput -Message "Enter the name of the group whose $assignmentScope assignments you want to view." -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
+    $specialGroups = @("*", "?")    
+    $messageText = if ($IncludeIndirectAssignments) { "Enter the name of the group whose indirect (All Users/All Devices) assignments you want to view. Enter any of $specialGroups             for all assignments" } else { "Enter the name of the group whose direct assignments you want to view." }                                                                
+    write-log -logFile $LogFile -Module $scriptName -Message "Prompting user for group name to view $assignmentScope assignments" -LogLevel "Information"                   
+    $groupName = GetUserInput -Message $messageText -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
+    $needsResolution = if ($IncludeIndirectAssignments -and $groupName -in $specialGroups                                                           ) { $false } else { $true }   
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "GroupName: $groupName, IncludeIndirectAssignments: $IncludeIndirectAssignments, AssignmentScope: $assignmentScope, SpecialGroups: $specialGroups, NeedsResolution: $needsResolution"
+    
     if ($null -eq $groupName)
     {
         Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
+        write-log -logFile $LogFile -Module $scriptName -Message "User pressed Enter without providing a group name. Returning $($returnValues.BackoutText)." -LogLevel "Information"
         return $returnValues.backoutText
     }
-    Write-Verbose "[$scriptName] Got group name: $groupName"
+    
+    if ($groupName)
+    {
+        Write-Verbose "[$scriptName] Got group name: $groupName"
+        write-log -logFile $LogFile -Module $scriptName -Message "Got group name: $groupName" -LogLevel "Information"                   
+    }
     
     #region Resolve group using unified Resolve-DirectoryObject with entity return
-    $selectedGroup = Resolve-DirectoryObject -EntityName $groupName -AccessToken $accessToken -Settings $settings -ReturnValues $returnValues -EntityType "Group" -ReturnEntity
+    if ($needsResolution)
+    {
+        Write-Verbose "[$scriptName] Resolving group: $groupName"   
+        write-log -logFile $LogFile -Module $scriptName -Message "Resolving group: $groupName" -LogLevel "Information"                  
+        $selectedGroup = Resolve-DirectoryObject -EntityName $groupName -AccessToken $accessToken -Settings $settings -ReturnValues $returnValues -EntityType "Group" -ReturnEntity
+        write-log -logFile $LogFile -Module $scriptName -Message "Resolve-DirectoryObject returned: $($selectedGroup | Out-String)" -LogLevel "Verbose"         
+        # Handle navigation commands - check these FIRST before trying to use as group object
+        if ($selectedGroup -eq "EXIT_APPLICATION")
+        {
+            Write-Verbose "[$scriptName] User requested application exit from group resolution"
+            write-log -logFile $LogFile -Module $scriptName -Message "User requested application exit from group resolution" -LogLevel "Information"                        
+            return "EXIT_APPLICATION"
+        }
+        elseif ($selectedGroup -eq "Main Menu")
+        {
+            Write-Verbose "[$scriptName] User selected Main Menu from group resolution"
+            write-log -logFile $LogFile -Module $scriptName -Message "User selected Main Menu from group resolution" -LogLevel "Information"                                    
+            return "Main Menu"
+        }
+        elseif ($selectedGroup -in $returnValues.Values)
+        {
+            Write-Verbose "[$scriptName] Resolve-DirectoryObject returned navigation command: $selectedGroup"
+            write-log -logFile $LogFile -Module $scriptName -Message "Resolve-DirectoryObject returned navigation command: $selectedGroup" -LogLevel "Information"                  
+            return $selectedGroup
+        }
     
-    # Handle navigation commands - check these FIRST before trying to use as group object
-    if ($selectedGroup -eq "EXIT_APPLICATION")
-    {
-        Write-Verbose "[$scriptName] User requested application exit from group resolution"
-        return "EXIT_APPLICATION"
+        # Validate we got a valid group object
+        if ($null -eq $selectedGroup -or -not $selectedGroup.id -or -not $selectedGroup.displayName)
+        {
+            write-log -logFile $LogFile -Module $scriptName -Message "Invalid group object returned from Resolve-DirectoryObject" -LogLevel "Error"                 
+            Write-Host "No group found for the specified group name." -ForegroundColor Red
+            return $returnValues.noGroupFoundMessage
+        }
+        Write-Verbose "[$scriptName] Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))"
+        write-log -logFile $LogFile -Module $scriptName -Message "Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))" -LogLevel "Information"                     
     }
-    elseif ($selectedGroup -eq "Main Menu")
+    else
     {
-        Write-Verbose "[$scriptName] User selected Main Menu from group resolution"
-        return "Main Menu"
+        Write-Verbose "[$scriptName] Special group selected, skipping resolution: $groupName"                                                               
+        write-log -logFile $LogFile -Module $scriptName -Message "Special group selected, skipping resolution: $groupName" -LogLevel "Information"                                          
+        $selectedGroup = $groupName                         
     }
-    elseif ($selectedGroup -in $returnValues.Values)
-    {
-        Write-Verbose "[$scriptName] Resolve-DirectoryObject returned navigation command: $selectedGroup"
-        return $selectedGroup
-    }
-    
-    # Validate we got a valid group object
-    if ($null -eq $selectedGroup -or -not $selectedGroup.id -or -not $selectedGroup.displayName)
-    {
-        Write-Verbose "[$scriptName] Invalid group object returned from Resolve-DirectoryObject"
-        Write-Host "No group found for the specified group name." -ForegroundColor Red
-        return $returnValues.noGroupFoundMessage
-    }
-    
-    Write-Verbose "[$scriptName] Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))"
     #endregion Resolve group using unified Resolve-DirectoryObject with entity return
     
     # Call ShowGroupAssignments to display the group's assignments
     Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName) with IncludeIndirect=$IncludeIndirectAssignments"
+    write-log -logFile $LogFile -Module $scriptName -Message "Building splat for ShowGroupAssignments call" -LogLevel "Information"                 
     $showGroupAssignmentsSplat = @{
         AccessToken = $accessToken
+        Settings    = $global:settings
         Group       = $selectedGroup
     }
+    
     if ($IncludeIndirectAssignments)
     {
         $showGroupAssignmentsSplat['ShowIndirectAssignments'] = $true
+        $showGroupAssignmentsSplat['SpecialGroups'] = $specialGroups   
+        write-log -logFile $LogFile -Module $scriptName -Message "Added ShowIndirectAssignments and SpecialGroups parameters to ShowGroupAssignments splat" -LogLevel "Information"                             
     }
-    $ShowGroupAssignmentsResponse = ShowGroupAssignments @showGroupAssignmentsSplat
     
+    if ($exportInstead)
+    {
+        $showGroupAssignmentsSplat['exportInstead'] = $true
+        write-log -logFile $LogFile -Module $scriptName -Message "Added exportInstead parameter to ShowGroupAssignments splat" -LogLevel "Information"                  
+    }                       
+    if ($settings.HideEmptyMenus)
+    {
+        $showGroupAssignmentsSplat['HideEmptyMenus'] = $true
+        write-log -logFile $LogFile -Module $scriptName -Message "Added HideEmptyMenus parameter to ShowGroupAssignments splat" -LogLevel "Information"                             
+    }               
+    $ShowGroupAssignmentsResponse = ShowGroupAssignments @showGroupAssignmentsSplat
+    write-log -logFile $LogFile -Module $scriptName -Message "ShowGroupAssignments returned: $($ShowGroupAssignmentsResponse | Out-String)" -LogLevel "Verbose"         
     #region Handle navigation responses from ShowGroupAssignments
     if ($ShowGroupAssignmentsResponse -eq "Back" -or $ShowGroupAssignmentsResponse -eq "back")
     {
         Write-Verbose "[$scriptName] User selected Back from group assignment selection, returning to previous menu"
+        write-log -logFile $LogFile -Module $scriptName -Message "User selected Back from group assignment selection, returning to previous menu" -LogLevel "Information"                   
         return $returnValues.backoutText
     }
     elseif ($ShowGroupAssignmentsResponse -eq "Main Menu" -or $ShowGroupAssignmentsResponse -eq "main menu")
     {
         Write-Verbose "[$scriptName] User selected Main Menu from group assignment selection"
+        write-log -logFile $LogFile -Module $scriptName -Message "User selected Main Menu from group assignment selection" -LogLevel "Information"                      
         return "EXIT_APPLICATION"
     }
     elseif ([string]::IsNullOrWhiteSpace($ShowGroupAssignmentsResponse) -or $null -eq $ShowGroupAssignmentsResponse)
     {
         Write-Verbose "[$scriptName] User requested application exit from group assignment selection."
+        write-log -logFile $LogFile -Module $scriptName -Message "User requested application exit from group assignment selection" -LogLevel "Information"                  
         return "EXIT_APPLICATION"
     }
     else
     {
+        Write-Verbose "[$scriptName] Continuing script..."                      
+        write-log -logFile $LogFile -Module $scriptName -Message "Continuing script after group assignment selection" -LogLevel "Information"                               
         return $ShowGroupAssignmentsResponse
     }
     #endregion Handle navigation responses from ShowGroupAssignments
 }
 
+$script:ExportGroupAssignmentsAction = {
+    param(
+        [bool]$RespectOperatingSystem
+    )
+    $resourceScope = if ($RespectOperatingSystem) { "Windows" } else { "Tenant" }
+    Write-Host "Exporting all $resourceScope configurations and their assignments..." -ForegroundColor Cyan
+    Write-Host "This will export all $resourceScope resources with detailed assignment information to a CSV file." -ForegroundColor Gray
+    Write-Host ""
+    $exportParamSplat = @{
+        AccessToken           = $accessToken
+        OutputPath            = $ScriptPath 
+        IncludeBeta           = $true
+        Settings              = $settings 
+        CreateErrorExportFile = $true               
+    }                       
+    if ($RespectOperatingSystem)
+    {
+        $exportParamSplat['RespectOperatingSystem'] = $true
+        write-log -logFile $LogFile -Module $scriptName -Message "Added RespectOperatingSystem parameter to Export-AllConfigurationsAndAssignments splat" -LogLevel "Information"                             
+    }       
+    $exportResult = Export-ConfigurationAssignments @exportParamSplat    
+    write-log -logFile $LogFile -Module $scriptName -Message "Export-ConfigurationAssignments returned: $($exportResult | Out-String)" -LogLevel "Verbose"      
+    if ($exportResult.Success)
+    {
+        write-log -logFile $LogFile -Module $scriptName -Message "Export completed successfully. File: $($exportResult.OutputFile), Resources exported: $($exportResult.ResourceCount)" -LogLevel "Information"     
+        Write-Host ""
+        Write-Host "Export completed successfully!" -ForegroundColor Green
+        Write-Host "File: $($exportResult.OutputFile)" -ForegroundColor Cyan
+        Write-Host "Resources exported: $($exportResult.ResourceCount)" -ForegroundColor Cyan
+    }
+    else
+    {
+        Write-Host ""
+        Write-Host "Export failed: $($exportResult.Message)" -ForegroundColor Red
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Export failed: $($exportResult.Message)" -LogLevel "Error"
+    }
+}
+
 $getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "View direct group assignments" -Action {
-    & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $false
+    & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $false -exportInstead $false                       
 }
 $getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "View indirect group assignments (All Users/All Devices)" -Action {
-    & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $true
+    & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $true -exportInstead $false
+}
+$getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Export direct group assignments" -Action {
+    & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $false -exportInstead $true                            
+}
+$getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Export indirect group assignments (All Users/All Devices)" -Action {
+    & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $true -exportInstead $true                 
+}
+$getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Export all Windows configurations and their assignments" -Action {
+    & $script:ExportGroupAssignmentsAction -RespectOperatingSystem $true
+}
+$getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Export all tenant configurations and their assignments" -Action {
+    & $script:ExportGroupAssignmentsAction -RespectOperatingSystem $false
 }
 #endregion Show Group Assignments menu
 
@@ -2335,11 +2452,12 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Shutdown the device" -action {
         return $returnValues.backoutText
     }
 }
-$mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -Submenu $getGroupAssignmentsMenu
+$mainMenu = AddMenuItem -menu $mainMenu -name "Group Assignments Menu" -Submenu $getGroupAssignmentsMenu
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
     $null = Show-AboutApplication -accessToken $accessToken -Release $latestRelease -appId $appId -tenantId $tenantId -name $name -updateAvailable $updateAvailable
 }
+
 #region show menus
 # Add the main menu to both history arrays for proper stack synchronization
 try

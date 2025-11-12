@@ -31,7 +31,8 @@ Describe "Profile Assignment Integration" -Tags 'Integration', 'Profile', 'Assig
         . (Join-Path $script:RepoRoot "functions/utilityFunctions/Write-Log.ps1")
 
         # Define mock CallGraphAPI BEFORE loading functions that depend on it
-        function global:CallGraphAPI {
+        function global:CallGraphAPI
+        {
             param($accessToken, $ResourcePath, $Filter, $ExtraParameters, [switch]$consistencyLevel, [string]$Method = 'GET', $Body = $null, [string]$apiVersion = 'v1.0')
             
             return Invoke-MockGraphAPI -accessToken $accessToken -ResourcePath $ResourcePath `
@@ -42,6 +43,8 @@ Describe "Profile Assignment Integration" -Tags 'Integration', 'Profile', 'Assig
         # Now load functions that will use the mocked CallGraphAPI
         . (Join-Path $script:RepoRoot "functions/UserAndGroupFunctions/GetGroupDirectAssignments.ps1")
         . (Join-Path $script:RepoRoot "functions/UserAndGroupFunctions/GetGroupIndirectAssignments.ps1")
+        . (Join-Path $script:RepoRoot "functions/UserAndGroupFunctions/Get-GroupAssignments-Common.ps1")
+        . (Join-Path $script:RepoRoot "functions/utilityFunctions/Get-CachedData.ps1")
 
         Initialize-GraphMockEnvironment -ClearCache
 
@@ -51,7 +54,7 @@ Describe "Profile Assignment Integration" -Tags 'Integration', 'Profile', 'Assig
 
         $script:token = New-MockAuthToken
         $script:testGroup = @{ 
-            id = "group-test-01"
+            id          = "group-test-01"
             displayName = "Test-Group-1"
         }
     }
@@ -62,8 +65,25 @@ Describe "Profile Assignment Integration" -Tags 'Integration', 'Profile', 'Assig
     }
 
     BeforeEach {
-        # Clear assignment state before each test
+        # Clear assignment state and cache before each test
         Clear-MockProfileAssignments
+        
+        # Clear all caches to ensure tests are isolated
+        if ($global:DirectoryObjectCache)
+        {
+            $global:DirectoryObjectCache.Clear()
+        }
+        if ($global:UnifiedCache)
+        {
+            if ($global:UnifiedCache.DirectoryObjects)
+            {
+                $global:UnifiedCache.DirectoryObjects.Clear()
+            }
+            if ($global:UnifiedCache.Configuration)
+            {
+                $global:UnifiedCache.Configuration.Clear()
+            }
+        }
     }
 
     Context "With Profile Assignment" {

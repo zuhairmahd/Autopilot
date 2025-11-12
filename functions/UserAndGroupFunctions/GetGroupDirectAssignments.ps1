@@ -11,7 +11,9 @@ function GetGroupDirectAssignments()
         [switch]$ShowSummary,
         [switch]$IncludeIndirectAssignments,
         [Parameter(Mandatory = $false)]
-        [int] $BatchSize = 20
+        [int] $BatchSize = 20,
+        [Parameter(Mandatory = $false)]
+        [hashtable] $Settings
     )
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -28,6 +30,8 @@ function GetGroupDirectAssignments()
     Write-Verbose "[$functionName] ShowSummary: $ShowSummary"
     Write-Verbose "[$functionName] IncludeIndirectAssignments: $IncludeIndirectAssignments"
     Write-Verbose "[$functionName] BatchSize: $BatchSize"
+    Write-Verbose "[$functionName] Settings provided: $($null -ne $Settings)"
+    if ($Settings) { Write-Verbose "[$functionName] Settings.operatingSystem: $($Settings.operatingSystem)" }
     #now write-log them.
     Write-Log -logFile $LogFile -module $functionName -Message "Incoming parameters:" -logLevel "Information"
     Write-Log -logFile $LogFile -module $functionName -Message "GroupName: $GroupName" -logLevel "Information"
@@ -35,6 +39,11 @@ function GetGroupDirectAssignments()
     Write-Log -logFile $LogFile -module $functionName -Message "ShowSummary: $ShowSummary" -LogLevel "Verbose"
     Write-Log -logFile $LogFile -module $functionName -Message "IncludeIndirectAssignments: $IncludeIndirectAssignments" -logLevel "Information"
     Write-Log -logFile $LogFile -module $functionName -Message "BatchSize: $BatchSize" -logLevel "Information"
+    Write-Log -logFile $LogFile -module $functionName -Message "Settings provided: $($null -ne $Settings)" -logLevel "Information"
+    if ($Settings -and $Settings.operatingSystem)
+    {
+        Write-Log -logFile $LogFile -module $functionName -Message "Settings.operatingSystem: $($Settings.operatingSystem)" -logLevel "Information"
+    }
     $groupIds = $GroupName
     $groupIdArray = @($groupIds)
     $groupId = $groupIdArray[0]
@@ -42,25 +51,8 @@ function GetGroupDirectAssignments()
     Write-Log -logFile $LogFile -module $functionName -Message "Group ID: $($groupId.Id)" -logLevel "Information"
     #endregion
 
-    # Initialize result object early (before validation)
-    $assignments = [PSCustomObject]@{
-        GroupName                               = $groupId.displayName 
-        GroupId                                 = $groupId.Id
-        AppAssignments                          = @()
-        ConfigurationAssignments                = @()
-        ComplianceAssignments                   = @()
-        AutopilotAssignments                    = @()
-        ScriptAssignments                       = @()
-        HealthScriptAssignments                 = @()
-        AppProtectionAssignments                = @()
-        IntentAssignments                       = @()
-        ResourceAccessAssignments               = @()
-        ConfigurationPolicyAssignments          = @()
-        GroupPolicyAssignments                  = @()
-        WindowsInformationProtectionAssignments = @()
-        PolicySetAssignments                    = @()
-        AllAssignments                          = @()
-    }
+    # Initialize result object early (before validation) using common function
+    $assignments = Initialize-AssignmentResultObject -GroupName $groupId.displayName -GroupId $groupId.Id
     
     # Validate that we have a group ID to work with
     if (-not $groupId.Id)
@@ -83,255 +75,180 @@ function GetGroupDirectAssignments()
     }
     Write-Log -logFile $LogFile -module $functionName -Message "Using API version: $apiVersion with batch size: $BatchSize" -logLevel "Information"
     
-    # Helper function to process assignments using CallGraphAPI's built-in batch support
-    function Get-ResourceAssignments()
+    # Check for cached direct assignments
+    $apiVersionKey = $apiVersion
+    $directAssignmentsCacheKey = "GroupDirectAssignments_${groupIdValue}_${apiVersionKey}"
+    $cachedDirectAssignments = Get-CachedData -Key $directAssignmentsCacheKey -CacheType DirectoryObjects
+    
+    if ($cachedDirectAssignments)
     {
-        [CmdletBinding()]
-        param(
-            [array]$Resources,
-            [string]$ResourceType,
-            [string]$BaseUri,
-            [string]$AssignmentCategory
-        )
+        Write-Log -logFile $LogFile -module $functionName -Message "Using cached direct assignments for group: $($groupId.displayName)" -logLevel "Verbose"
+        Write-Verbose "[$functionName] Cache hit for direct assignments"
         
-        $functionName = $MyInvocation.MyCommand.Name
-        if (-not $Resources -or $Resources.Count -eq 0)
+        # Restore assignments from cache
+        $assignments.GroupName = $cachedDirectAssignments.GroupName
+        $assignments.GroupId = $cachedDirectAssignments.GroupId
+        $assignments.AppAssignments = $cachedDirectAssignments.AppAssignments
+        $assignments.ConfigurationAssignments = $cachedDirectAssignments.ConfigurationAssignments
+        $assignments.ComplianceAssignments = $cachedDirectAssignments.ComplianceAssignments
+        $assignments.AutopilotAssignments = $cachedDirectAssignments.AutopilotAssignments
+        $assignments.ScriptAssignments = $cachedDirectAssignments.ScriptAssignments
+        $assignments.HealthScriptAssignments = $cachedDirectAssignments.HealthScriptAssignments
+        $assignments.AppProtectionAssignments = $cachedDirectAssignments.AppProtectionAssignments
+        $assignments.IntentAssignments = $cachedDirectAssignments.IntentAssignments
+        $assignments.ResourceAccessAssignments = $cachedDirectAssignments.ResourceAccessAssignments
+        $assignments.ConfigurationPolicyAssignments = $cachedDirectAssignments.ConfigurationPolicyAssignments
+        $assignments.GroupPolicyAssignments = $cachedDirectAssignments.GroupPolicyAssignments
+        $assignments.WindowsInformationProtectionAssignments = $cachedDirectAssignments.WindowsInformationProtectionAssignments
+        $assignments.PolicySetAssignments = $cachedDirectAssignments.PolicySetAssignments
+        $assignments.WindowsFeatureUpdateAssignments = $cachedDirectAssignments.WindowsFeatureUpdateAssignments
+        $assignments.WindowsQualityUpdateAssignments = $cachedDirectAssignments.WindowsQualityUpdateAssignments
+        $assignments.WindowsDriverUpdateAssignments = $cachedDirectAssignments.WindowsDriverUpdateAssignments
+        $assignments.AllAssignments = $cachedDirectAssignments.AllAssignments
+        
+        Write-Log -logFile $LogFile -module $functionName -Message "Restored $($assignments.AllAssignments.Count) cached direct assignments" -logLevel "Information"
+        
+        # If indirect assignments requested, fetch and merge them
+        if ($IncludeIndirectAssignments.IsPresent)
         {
-            Write-Log -logFile $LogFile -module $functionName -Message "No ${ResourceType} resources to process" -logLevel "Verbose"
-            return
-        }
-        
-        Write-Log -logFile $LogFile -module $functionName -Message "Processing $($Resources.Count) ${ResourceType} resources" -LogLevel "Verbose"
-        
-        # Build array of assignment endpoint paths for CallGraphAPI batch processing
-        $assignmentPaths = @()
-        foreach ($resource in $Resources)
-        {
-            $assignmentPaths += "$BaseUri/$($resource.id)/assignments"
-        }
-        
-        # Use CallGraphAPI's native batch support
-        $batchResult = CallGraphAPI -accessToken $AccessToken -ResourcePath $assignmentPaths -APIVersion $apiVersion -Method "GET"
-        
-        if ($batchResult -and $batchResult.value)
-        {
-            Write-Log -logFile $LogFile -module $functionName -Message "Processing $($batchResult.value.Count) batch responses for ${ResourceType}" -LogLevel "Verbose"
-            for ($i = 0; $i -lt $batchResult.value.Count; $i++)
+            Write-Log -logFile $LogFile -module $functionName -Message "Retrieving indirect assignments (All Users and All Devices)" -logLevel "Information"
+            Write-Verbose "[$functionName] Retrieving indirect assignments"
+            
+            try
             {
-                $responseData = $batchResult.value[$i]
-                $resource = $Resources[$i]
+                $indirectAssignments = GetGroupIndirectAssignments -AccessToken $AccessToken -IncludeBeta:$IncludeBeta -BatchSize $BatchSize -Settings $Settings
                 
-                if ($responseData -and $responseData.value)
+                if ($indirectAssignments -and $indirectAssignments.AllAssignments.Count -gt 0)
                 {
-                    $relevantAssignments = $responseData.value | Where-Object { 
-                        $_.target.'@odata.type' -eq '#microsoft.graph.groupAssignmentTarget' -and 
-                        $_.target.groupId -eq $groupIdValue 
+                    Write-Log -logFile $LogFile -module $functionName -Message "Found $($indirectAssignments.AllAssignments.Count) indirect assignments" -logLevel "Information"
+                    
+                    # Merge indirect assignments with cached direct assignments
+                    $assignments.AppAssignments += $indirectAssignments.AppAssignments
+                    $assignments.ConfigurationAssignments += $indirectAssignments.ConfigurationAssignments
+                    $assignments.ComplianceAssignments += $indirectAssignments.ComplianceAssignments
+                    $assignments.AutopilotAssignments += $indirectAssignments.AutopilotAssignments
+                    $assignments.ScriptAssignments += $indirectAssignments.ScriptAssignments
+                    $assignments.HealthScriptAssignments += $indirectAssignments.HealthScriptAssignments
+                    $assignments.AppProtectionAssignments += $indirectAssignments.AppProtectionAssignments
+                    $assignments.IntentAssignments += $indirectAssignments.IntentAssignments
+                    $assignments.ResourceAccessAssignments += $indirectAssignments.ResourceAccessAssignments
+                    $assignments.ConfigurationPolicyAssignments += $indirectAssignments.ConfigurationPolicyAssignments
+                    $assignments.GroupPolicyAssignments += $indirectAssignments.GroupPolicyAssignments
+                    $assignments.WindowsInformationProtectionAssignments += $indirectAssignments.WindowsInformationProtectionAssignments
+                    $assignments.PolicySetAssignments += $indirectAssignments.PolicySetAssignments
+                    $assignments.WindowsFeatureUpdateAssignments += $indirectAssignments.WindowsFeatureUpdateAssignments
+                    $assignments.WindowsQualityUpdateAssignments += $indirectAssignments.WindowsQualityUpdateAssignments
+                    $assignments.WindowsDriverUpdateAssignments += $indirectAssignments.WindowsDriverUpdateAssignments
+                    $assignments.AllAssignments += $indirectAssignments.AllAssignments
+                    
+                    # Also merge FailedResources from indirect assignments
+                    if ($indirectAssignments.FailedResources -and $indirectAssignments.FailedResources.Count -gt 0)
+                    {
+                        $assignments.FailedResources += $indirectAssignments.FailedResources
                     }
                     
-                    foreach ($assignment in $relevantAssignments)
-                    {
-                        $assignmentObject = [PSCustomObject]@{
-                            Type        = $AssignmentCategory
-                            Name        = $resource.displayName
-                            Description = if ($resource.description) { $resource.description } else { "" }
-                            Id          = $resource.id
-                            Intent      = $assignment.intent
-                            Target      = $assignment.target
-                            Settings    = $assignment.settings
-                        }
-                        
-                        switch ($AssignmentCategory)
-                        {
-                            "Application" { $assignments.AppAssignments += $assignmentObject }
-                            "Configuration" { $assignments.ConfigurationAssignments += $assignmentObject }
-                            "Compliance" { $assignments.ComplianceAssignments += $assignmentObject }
-                            "AutopilotProfile" { $assignments.AutopilotAssignments += $assignmentObject }
-                            "Script" { $assignments.ScriptAssignments += $assignmentObject }
-                            "HealthScript" { $assignments.HealthScriptAssignments += $assignmentObject }
-                            "AppProtection" { $assignments.AppProtectionAssignments += $assignmentObject }
-                            "Intent" { $assignments.IntentAssignments += $assignmentObject }
-                            "ResourceAccess" { $assignments.ResourceAccessAssignments += $assignmentObject }
-                            "ConfigurationPolicy" { $assignments.ConfigurationPolicyAssignments += $assignmentObject }
-                            "GroupPolicy" { $assignments.GroupPolicyAssignments += $assignmentObject }
-                            "WindowsInformationProtection" { $assignments.WindowsInformationProtectionAssignments += $assignmentObject }
-                            "PolicySet" { $assignments.PolicySetAssignments += $assignmentObject }
-                        }
-                        $assignments.AllAssignments += $assignmentObject
-                    }
+                    Write-Log -logFile $LogFile -module $functionName -Message "After merging: Total assignments = $($assignments.AllAssignments.Count)" -logLevel "Information"
                 }
             }
+            catch
+            {
+                Write-Log -logFile $LogFile -module $functionName -Message "Error retrieving indirect assignments: $($_.Exception.Message)" -LogLevel "Warning"
+            }
         }
+        
+        # Return cached assignments (with or without indirect merge)
+        return $assignments
     }
+    
+    Write-Log -logFile $LogFile -module $functionName -Message "Cache miss - fetching direct assignments from Graph API" -logLevel "Verbose"
+    Write-Verbose "[$functionName] No cached direct assignments found, fetching from API"
     
     try
     {
-        # Get all resource lists using a single batch API call for better performance
-        Write-Log -logFile $LogFile -module $functionName -Message "Getting all resource lists for assignments using batch API" -logLevel "Information"
+        # Get all resource lists using unified helper function
+        Write-Log -logFile $LogFile -module $functionName -Message "Getting all resource lists for assignments using unified helper" -logLevel "Information"
         
-        # Create batch request for all resource lists
-        $batchRequestBody = @{
-            requests = @()
-        }
+        $resourceLists = Get-IntuneResourceLists -AccessToken $AccessToken -IncludeBeta:$IncludeBeta -Settings $Settings -ResultObject $assignments
         
-        # Define resource endpoints and their IDs (including description field)
-        $resourceEndpoints = @(
-            @{ id = "mobileApps"; url = "deviceAppManagement/mobileApps"; extraParams = "select=id,displayName,description" }
-            @{ id = "deviceConfigs"; url = "deviceManagement/deviceConfigurations"; extraParams = "select=id,displayName,description" }
-            @{ id = "compliancePolicies"; url = "deviceManagement/deviceCompliancePolicies"; extraParams = "select=id,displayName,description" }
-            @{ id = "deviceScripts"; url = "deviceManagement/deviceManagementScripts"; extraParams = "select=id,displayName,description" }
-            @{ id = "appProtectionPolicies"; url = "deviceAppManagement/managedAppPolicies"; extraParams = "select=id,displayName,description" }
-            @{ id = "intents"; url = "deviceManagement/intents"; extraParams = "select=id,displayName,description" }
-            @{ id = "resourceAccessProfiles"; url = "deviceManagement/resourceAccessProfiles"; extraParams = "select=id,displayName,description" }
-            @{ id = "policySets"; url = "deviceAppManagement/policySets"; extraParams = "select=id,displayName,description" }
-        )
+        # Extract resource lists from helper result
+        $mobileApps = $resourceLists.mobileApps
+        $deviceConfigs = $resourceLists.deviceConfigs
+        $compliancePolicies = $resourceLists.compliancePolicies
+        $autopilotProfiles = $resourceLists.autopilotProfiles
+        $deviceScripts = $resourceLists.deviceScripts
+        $healthScripts = $resourceLists.healthScripts
+        $appProtectionPolicies = $resourceLists.appProtectionPolicies
+        $intents = $resourceLists.intents
+        $resourceAccessProfiles = $resourceLists.resourceAccessProfiles
+        $configurationPolicies = $resourceLists.configurationPolicies
+        $groupPolicyConfigs = $resourceLists.groupPolicyConfigs
+        $policySets = $resourceLists.policySets
+        $wipPolicies = $resourceLists.wipPolicies
+        $mdmWipPolicies = $resourceLists.mdmWipPolicies
+        $windowsFeatureUpdates = $resourceLists.windowsFeatureUpdates
+        $windowsQualityUpdates = $resourceLists.windowsQualityUpdates
+        $windowsDriverUpdates = $resourceLists.windowsDriverUpdates
         
-        # Add beta endpoints if IncludeBeta is specified
+        Write-Log -logFile $LogFile -module $functionName -Message "Retrieved resource counts from helper - Apps: $($mobileApps.Count), Configs: $($deviceConfigs.Count), Compliance: $($compliancePolicies.Count), Autopilot: $($autopilotProfiles.Count), Scripts: $($deviceScripts.Count), HealthScripts: $($healthScripts.Count), AppProtection: $($appProtectionPolicies.Count), Intents: $($intents.Count), ResourceAccess: $($resourceAccessProfiles.Count), ConfigPolicies: $($configurationPolicies.Count), GroupPolicy: $($groupPolicyConfigs.Count), PolicySets: $($policySets.Count), WIP: $($wipPolicies.Count), MDMWIP: $($mdmWipPolicies.Count)" -logLevel "Information"
+        
+        # Process assignments using unified function from Get-GroupAssignments-Common.ps1
+        Get-ResourceAssignments -ResultObject $assignments -AccessToken $AccessToken -ApiVersion $apiVersion -GroupIdValue $groupIdValue -Resources $mobileApps -ResourceType "Mobile Apps" -BaseUri "deviceAppManagement/mobileApps" -EndpointId "mobileApps" -AssignmentMode "Direct"
+        Get-ResourceAssignments -ResultObject $assignments -AccessToken $AccessToken -ApiVersion $apiVersion -GroupIdValue $groupIdValue -Resources $deviceConfigs -ResourceType "Device Configurations" -BaseUri "deviceManagement/deviceConfigurations" -EndpointId "deviceConfigs" -AssignmentMode "Direct"
+        Get-ResourceAssignments -ResultObject $assignments -AccessToken $AccessToken -ApiVersion $apiVersion -GroupIdValue $groupIdValue -Resources $compliancePolicies -ResourceType "Compliance Policies" -BaseUri "deviceManagement/deviceCompliancePolicies" -EndpointId "compliancePolicies" -AssignmentMode "Direct"
+        Get-ResourceAssignments -ResultObject $assignments -AccessToken $AccessToken -ApiVersion $apiVersion -GroupIdValue $groupIdValue -Resources $deviceScripts -ResourceType "Device Management Scripts" -BaseUri "deviceManagement/deviceManagementScripts" -EndpointId "deviceScripts" -AssignmentMode "Direct"
+        Get-ResourceAssignments -ResultObject $assignments -AccessToken $AccessToken -ApiVersion $apiVersion -GroupIdValue $groupIdValue -Resources $appProtectionPolicies -ResourceType "App Protection Policies" -BaseUri "deviceAppManagement/managedAppPolicies" -EndpointId "appProtectionPolicies" -AssignmentMode "Direct"
+        Get-ResourceAssignments -ResultObject $assignments -AccessToken $AccessToken -ApiVersion $apiVersion -GroupIdValue $groupIdValue -Resources $intents -ResourceType "Device Management Intents" -BaseUri "deviceManagement/intents" -EndpointId "intents" -AssignmentMode "Direct"
+        Get-ResourceAssignments -ResultObject $assignments -AccessToken $AccessToken -ApiVersion $apiVersion -GroupIdValue $groupIdValue -Resources $policySets -ResourceType "Policy Sets" -BaseUri "deviceAppManagement/policySets" -EndpointId "policySets" -AssignmentMode "Direct"
+        
         if ($IncludeBeta.IsPresent)
         {
-            $resourceEndpoints += @(
-                @{ id = "autopilotProfiles"; url = "deviceManagement/windowsAutopilotDeploymentProfiles"; extraParams = "select=id,displayName,description" }
-                @{ id = "healthScripts"; url = "deviceManagement/deviceHealthScripts"; extraParams = "select=id,displayName,description" }
-                @{ id = "configurationPolicies"; url = "deviceManagement/configurationPolicies"; extraParams = "select=id,name,description" }
-                @{ id = "groupPolicyConfigs"; url = "deviceManagement/groupPolicyConfigurations"; extraParams = "select=id,displayName,description" }
-                @{ id = "wipPolicies"; url = "deviceAppManagement/windowsInformationProtectionPolicies"; extraParams = "select=id,displayName,description" }
-                @{ id = "mdmWipPolicies"; url = "deviceAppManagement/mdmWindowsInformationProtectionPolicies"; extraParams = "select=id,displayName,description" }
-            )
+            Get-ResourceAssignments -ResultObject $assignments -AccessToken $AccessToken -ApiVersion $apiVersion -GroupIdValue $groupIdValue -Resources $autopilotProfiles -ResourceType "Autopilot Profiles" -BaseUri "deviceManagement/windowsAutopilotDeploymentProfiles" -EndpointId "autopilotProfiles" -AssignmentMode "Direct"
+            Get-ResourceAssignments -ResultObject $assignments -AccessToken $AccessToken -ApiVersion $apiVersion -GroupIdValue $groupIdValue -Resources $healthScripts -ResourceType "Health Scripts" -BaseUri "deviceManagement/deviceHealthScripts" -EndpointId "healthScripts" -AssignmentMode "Direct"
+            Get-ResourceAssignments -ResultObject $assignments -AccessToken $AccessToken -ApiVersion $apiVersion -GroupIdValue $groupIdValue -Resources $resourceAccessProfiles -ResourceType "Resource Access Profiles" -BaseUri "deviceManagement/resourceAccessProfiles" -EndpointId "resourceAccessProfiles" -AssignmentMode "Direct"
+            Get-ResourceAssignments -ResultObject $assignments -AccessToken $AccessToken -ApiVersion $apiVersion -GroupIdValue $groupIdValue -Resources $configurationPolicies -ResourceType "Configuration Policies" -BaseUri "deviceManagement/configurationPolicies" -EndpointId "configurationPolicies" -AssignmentMode "Direct"
+            Get-ResourceAssignments -ResultObject $assignments -AccessToken $AccessToken -ApiVersion $apiVersion -GroupIdValue $groupIdValue -Resources $groupPolicyConfigs -ResourceType "Group Policy Configurations" -BaseUri "deviceManagement/groupPolicyConfigurations" -EndpointId "groupPolicyConfigs" -AssignmentMode "Direct"
+            Get-ResourceAssignments -ResultObject $assignments -AccessToken $AccessToken -ApiVersion $apiVersion -GroupIdValue $groupIdValue -Resources $wipPolicies -ResourceType "Windows Information Protection Policies" -BaseUri "deviceAppManagement/windowsInformationProtectionPolicies" -EndpointId "wipPolicies" -AssignmentMode "Direct"
+            Get-ResourceAssignments -ResultObject $assignments -AccessToken $AccessToken -ApiVersion $apiVersion -GroupIdValue $groupIdValue -Resources $mdmWipPolicies -ResourceType "MDM Windows Information Protection Policies" -BaseUri "deviceAppManagement/mdmWindowsInformationProtectionPolicies" -EndpointId "mdmWipPolicies" -AssignmentMode "Direct"
+            Get-ResourceAssignments -ResultObject $assignments -AccessToken $AccessToken -ApiVersion $apiVersion -GroupIdValue $groupIdValue -Resources $windowsFeatureUpdates -ResourceType "Windows Feature Update Profiles" -BaseUri "deviceManagement/windowsFeatureUpdateProfiles" -EndpointId "windowsFeatureUpdates" -AssignmentMode "Direct"
+            Get-ResourceAssignments -ResultObject $assignments -AccessToken $AccessToken -ApiVersion $apiVersion -GroupIdValue $groupIdValue -Resources $windowsQualityUpdates -ResourceType "Windows Quality Update Profiles" -BaseUri "deviceManagement/windowsQualityUpdateProfiles" -EndpointId "windowsQualityUpdates" -AssignmentMode "Direct"
+            Get-ResourceAssignments -ResultObject $assignments -AccessToken $AccessToken -ApiVersion $apiVersion -GroupIdValue $groupIdValue -Resources $windowsDriverUpdates -ResourceType "Windows Driver Update Profiles" -BaseUri "deviceManagement/windowsDriverUpdateProfiles" -EndpointId "windowsDriverUpdates" -AssignmentMode "Direct"
         }
         
-        # Build batch request
-        foreach ($endpoint in $resourceEndpoints)
+        Write-Log -logFile $LogFile -module $functionName -Message "Batch processing complete. Found assignments - Apps: $($assignments.AppAssignments.Count), Configs: $($assignments.ConfigurationAssignments.Count), Compliance: $($assignments.ComplianceAssignments.Count), Autopilot: $($assignments.AutopilotAssignments.Count), Scripts: $($assignments.ScriptAssignments.Count), HealthScripts: $($assignments.HealthScriptAssignments.Count), AppProtection: $($assignments.AppProtectionAssignments.Count), Intents: $($assignments.IntentAssignments.Count), ResourceAccess: $($assignments.ResourceAccessAssignments.Count), ConfigPolicies: $($assignments.ConfigurationPolicyAssignments.Count), GroupPolicy: $($assignments.GroupPolicyAssignments.Count), WIP: $($assignments.WindowsInformationProtectionAssignments.Count), PolicySets: $($assignments.PolicySetAssignments.Count), FeatureUpdates: $($assignments.WindowsFeatureUpdateAssignments.Count), QualityUpdates: $($assignments.WindowsQualityUpdateAssignments.Count), DriverUpdates: $($assignments.WindowsDriverUpdateAssignments.Count)" -LogLevel "Verbose"
+        
+        # Cache the direct assignments for this group (even if empty, to avoid re-fetching)
+        if ($groupIdValue)
         {
-            $requestUrl = "$($endpoint.url)?`$$($endpoint.extraParams)"
-            $batchRequestBody.requests += @{
-                id     = $endpoint.id
-                method = "GET"
-                url    = $requestUrl
+            $directAssignmentsCacheKey = "GroupDirectAssignments_${groupIdValue}_${apiVersionKey}"
+            $directAssignmentsData = @{
+                GroupName                               = $assignments.GroupName
+                GroupId                                 = $assignments.GroupId
+                AppAssignments                          = $assignments.AppAssignments
+                ConfigurationAssignments                = $assignments.ConfigurationAssignments
+                ComplianceAssignments                   = $assignments.ComplianceAssignments
+                AutopilotAssignments                    = $assignments.AutopilotAssignments
+                ScriptAssignments                       = $assignments.ScriptAssignments
+                HealthScriptAssignments                 = $assignments.HealthScriptAssignments
+                AppProtectionAssignments                = $assignments.AppProtectionAssignments
+                IntentAssignments                       = $assignments.IntentAssignments
+                ResourceAccessAssignments               = $assignments.ResourceAccessAssignments
+                ConfigurationPolicyAssignments          = $assignments.ConfigurationPolicyAssignments
+                GroupPolicyAssignments                  = $assignments.GroupPolicyAssignments
+                WindowsInformationProtectionAssignments = $assignments.WindowsInformationProtectionAssignments
+                PolicySetAssignments                    = $assignments.PolicySetAssignments
+                WindowsFeatureUpdateAssignments         = $assignments.WindowsFeatureUpdateAssignments
+                WindowsQualityUpdateAssignments         = $assignments.WindowsQualityUpdateAssignments
+                WindowsDriverUpdateAssignments          = $assignments.WindowsDriverUpdateAssignments
+                AllAssignments                          = $assignments.AllAssignments
+                FailedResources                         = $assignments.FailedResources
             }
-        }
-        
-        Write-Log -logFile $LogFile -module $functionName -Message "Sending batch request for $($resourceEndpoints.Count) resource lists" -logLevel "Information"
-        
-        # Send batch request
-        $batchResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath "`$batch" -APIVersion $apiVersion -Method "POST" -Body ($batchRequestBody | ConvertTo-Json -Depth $global:maxJSONDepth)
-        
-        # Initialize variables for all resource types
-        $mobileApps = @()
-        $deviceConfigs = @()
-        $compliancePolicies = @()
-        $autopilotProfiles = @()
-        $deviceScripts = @()
-        $healthScripts = @()
-        $appProtectionPolicies = @()
-        $intents = @()
-        $resourceAccessProfiles = @()
-        $configurationPolicies = @()
-        $groupPolicyConfigs = @()
-        $policySets = @()
-        $wipPolicies = @()
-        $mdmWipPolicies = @()
-        
-        # Process batch response
-        if ($batchResponse -and $batchResponse.responses)
-        {
-            Write-Log -logFile $LogFile -module $functionName -Message "Processing batch response for resource lists" -LogLevel "Verbose"
             
-            foreach ($response in $batchResponse.responses)
+            $cached = Set-CachedData -CacheType 'DirectoryObjects' -Key $directAssignmentsCacheKey -Data $directAssignmentsData -Metadata @{GroupId = $groupIdValue; ApiVersion = $apiVersionKey; FetchedAt = Get-Date; Type = 'DirectAssignments'}
+            if ($cached)
             {
-                if ($response.status -eq 200 -and $response.body -and $response.body.value)
-                {
-                    switch ($response.id)
-                    {
-                        "mobileApps"
-                        {
-                            $mobileApps = $response.body.value 
-                        }
-                        "deviceConfigs"
-                        {
-                            $deviceConfigs = $response.body.value 
-                        }
-                        "compliancePolicies"
-                        {
-                            $compliancePolicies = $response.body.value 
-                        }
-                        "deviceScripts"
-                        {
-                            $deviceScripts = $response.body.value 
-                        }
-                        "appProtectionPolicies"
-                        {
-                            $appProtectionPolicies = $response.body.value 
-                        }
-                        "intents"
-                        {
-                            $intents = $response.body.value 
-                        }
-                        "resourceAccessProfiles"
-                        {
-                            $resourceAccessProfiles = $response.body.value 
-                        }
-                        "autopilotProfiles"
-                        {
-                            $autopilotProfiles = $response.body.value 
-                        }
-                        "healthScripts"
-                        {
-                            $healthScripts = $response.body.value 
-                        }
-                        "configurationPolicies"
-                        { 
-                            # Configuration policies use 'name' instead of 'displayName', so we normalize it
-                            $configurationPolicies = $response.body.value | ForEach-Object { 
-                                $_ | Add-Member -NotePropertyName 'displayName' -NotePropertyValue $_.name -Force -PassThru
-                            }
-                        }
-                        "groupPolicyConfigs"
-                        {
-                            $groupPolicyConfigs = $response.body.value 
-                        }
-                        "policySets"
-                        {
-                            $policySets = $response.body.value
-                        }
-                        "wipPolicies"
-                        {
-                            $wipPolicies = $response.body.value
-                        }
-                        "mdmWipPolicies"
-                        {
-                            $mdmWipPolicies = $response.body.value
-                        }
-                    }
-                }
-                elseif ($response.status -ne 200)
-                {
-                    Write-Log -logFile $LogFile -module $functionName -Message "Failed to get resource list for $($response.id). Status: $($response.status)" -logLevel "Warning"
-                }
+                Write-Log -logFile $LogFile -module $functionName -Message "Successfully cached direct assignments for group: $($assignments.GroupName) (count: $($assignments.AllAssignments.Count))" -logLevel "Verbose"
             }
         }
-        
-        Write-Log -logFile $LogFile -module $functionName -Message "Retrieved resource counts via batch - Apps: $($mobileApps.Count), Configs: $($deviceConfigs.Count), Compliance: $($compliancePolicies.Count), Autopilot: $($autopilotProfiles.Count), Scripts: $($deviceScripts.Count), HealthScripts: $($healthScripts.Count), AppProtection: $($appProtectionPolicies.Count), Intents: $($intents.Count), ResourceAccess: $($resourceAccessProfiles.Count), ConfigPolicies: $($configurationPolicies.Count), GroupPolicy: $($groupPolicyConfigs.Count), PolicySets: $($policySets.Count), WIP: $($wipPolicies.Count), MDMWIP: $($mdmWipPolicies.Count)" -logLevel "Information"
-        
-        # Process assignments using CallGraphAPI's built-in batch support for each resource type
-        Get-ResourceAssignments -Resources $mobileApps -ResourceType "Mobile Apps" -BaseUri "deviceAppManagement/mobileApps" -AssignmentCategory "Application"
-        Get-ResourceAssignments -Resources $deviceConfigs -ResourceType "Device Configurations" -BaseUri "deviceManagement/deviceConfigurations" -AssignmentCategory "Configuration"
-        Get-ResourceAssignments -Resources $compliancePolicies -ResourceType "Compliance Policies" -BaseUri "deviceManagement/deviceCompliancePolicies" -AssignmentCategory "Compliance"
-        Get-ResourceAssignments -Resources $deviceScripts -ResourceType "Device Management Scripts" -BaseUri "deviceManagement/deviceManagementScripts" -AssignmentCategory "Script"
-        Get-ResourceAssignments -Resources $appProtectionPolicies -ResourceType "App Protection Policies" -BaseUri "deviceAppManagement/managedAppPolicies" -AssignmentCategory "AppProtection"
-        Get-ResourceAssignments -Resources $intents -ResourceType "Device Management Intents" -BaseUri "deviceManagement/intents" -AssignmentCategory "Intent"
-        Get-ResourceAssignments -Resources $resourceAccessProfiles -ResourceType "Resource Access Profiles" -BaseUri "deviceManagement/resourceAccessProfiles" -AssignmentCategory "ResourceAccess"
-        Get-ResourceAssignments -Resources $policySets -ResourceType "Policy Sets" -BaseUri "deviceAppManagement/policySets" -AssignmentCategory "PolicySet"
-        
-        if ($IncludeBeta.IsPresent)
-        {
-            Get-ResourceAssignments -Resources $autopilotProfiles -ResourceType "Autopilot Profiles" -BaseUri "deviceManagement/windowsAutopilotDeploymentProfiles" -AssignmentCategory "AutopilotProfile"
-            Get-ResourceAssignments -Resources $healthScripts -ResourceType "Device Health Scripts" -BaseUri "deviceManagement/deviceHealthScripts" -AssignmentCategory "HealthScript"
-            Get-ResourceAssignments -Resources $configurationPolicies -ResourceType "Configuration Policies" -BaseUri "deviceManagement/configurationPolicies" -AssignmentCategory "ConfigurationPolicy"
-            Get-ResourceAssignments -Resources $groupPolicyConfigs -ResourceType "Group Policy Configurations" -BaseUri "deviceManagement/groupPolicyConfigurations" -AssignmentCategory "GroupPolicy"
-            Get-ResourceAssignments -Resources $wipPolicies -ResourceType "Windows Information Protection" -BaseUri "deviceAppManagement/windowsInformationProtectionPolicies" -AssignmentCategory "WindowsInformationProtection"
-            Get-ResourceAssignments -Resources $mdmWipPolicies -ResourceType "MDM Windows Information Protection" -BaseUri "deviceAppManagement/mdmWindowsInformationProtectionPolicies" -AssignmentCategory "WindowsInformationProtection"
-        }
-        
-        Write-Log -logFile $LogFile -module $functionName -Message "Batch processing complete. Found assignments - Apps: $($assignments.AppAssignments.Count), Configs: $($assignments.ConfigurationAssignments.Count), Compliance: $($assignments.ComplianceAssignments.Count), Autopilot: $($assignments.AutopilotAssignments.Count), Scripts: $($assignments.ScriptAssignments.Count), HealthScripts: $($assignments.HealthScriptAssignments.Count), AppProtection: $($assignments.AppProtectionAssignments.Count), Intents: $($assignments.IntentAssignments.Count), ResourceAccess: $($assignments.ResourceAccessAssignments.Count), ConfigPolicies: $($assignments.ConfigurationPolicyAssignments.Count), GroupPolicy: $($assignments.GroupPolicyAssignments.Count), WIP: $($assignments.WindowsInformationProtectionAssignments.Count), PolicySets: $($assignments.PolicySetAssignments.Count)" -LogLevel "Verbose"
     }
     catch
     {
@@ -346,7 +263,7 @@ function GetGroupDirectAssignments()
         
         try
         {
-            $indirectAssignments = GetGroupIndirectAssignments -AccessToken $AccessToken -IncludeBeta:$IncludeBeta -BatchSize $BatchSize
+            $indirectAssignments = GetGroupIndirectAssignments -AccessToken $AccessToken -IncludeBeta:$IncludeBeta -BatchSize $BatchSize -Settings $Settings
             
             if ($indirectAssignments -and $indirectAssignments.AllAssignments.Count -gt 0)
             {
@@ -366,6 +283,9 @@ function GetGroupDirectAssignments()
                 $assignments.GroupPolicyAssignments += $indirectAssignments.GroupPolicyAssignments
                 $assignments.WindowsInformationProtectionAssignments += $indirectAssignments.WindowsInformationProtectionAssignments
                 $assignments.PolicySetAssignments += $indirectAssignments.PolicySetAssignments
+                $assignments.WindowsFeatureUpdateAssignments += $indirectAssignments.WindowsFeatureUpdateAssignments
+                $assignments.WindowsQualityUpdateAssignments += $indirectAssignments.WindowsQualityUpdateAssignments
+                $assignments.WindowsDriverUpdateAssignments += $indirectAssignments.WindowsDriverUpdateAssignments
                 $assignments.AllAssignments += $indirectAssignments.AllAssignments
                 
                 Write-Log -logFile $LogFile -module $functionName -Message "Merged indirect assignments with direct assignments" -logLevel "Information"
@@ -404,6 +324,9 @@ function GetGroupDirectAssignments()
             Write-Host "  Configuration Policies: $($assignments.ConfigurationPolicyAssignments.Count)" -ForegroundColor Yellow
             Write-Host "  Group Policy Configurations: $($assignments.GroupPolicyAssignments.Count)" -ForegroundColor Yellow
             Write-Host "  Windows Information Protection: $($assignments.WindowsInformationProtectionAssignments.Count)" -ForegroundColor Yellow
+            Write-Host "  Windows Feature Update Profiles: $($assignments.WindowsFeatureUpdateAssignments.Count)" -ForegroundColor Yellow
+            Write-Host "  Windows Quality Update Profiles: $($assignments.WindowsQualityUpdateAssignments.Count)" -ForegroundColor Yellow
+            Write-Host "  Windows Driver Update Profiles: $($assignments.WindowsDriverUpdateAssignments.Count)" -ForegroundColor Yellow
         }
         Write-Host "  Total: $totalAssignments" -ForegroundColor Cyan
     }

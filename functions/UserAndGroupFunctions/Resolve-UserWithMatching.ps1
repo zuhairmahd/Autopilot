@@ -1,4 +1,4 @@
-function Resolve-UserWithMatching
+function Resolve-UserWithMatching()
 {
     <#
     .SYNOPSIS
@@ -45,14 +45,11 @@ function Resolve-UserWithMatching
         [Parameter(Mandatory = $true)]
         [AllowEmptyString()]
         [string]$UserName,
-        
         [Parameter(Mandatory = $true)]
         [AllowEmptyString()]
         [string]$AccessToken,
-        
         [Parameter(Mandatory = $true)]
         [hashtable]$Settings,
-        
         [Parameter(Mandatory = $true)]
         [hashtable]$ReturnValues
     )

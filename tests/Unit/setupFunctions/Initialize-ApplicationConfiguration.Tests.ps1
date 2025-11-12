@@ -188,23 +188,35 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
         }
         
         It "Should return all configuration components" {
-            Mock Get-ConfigurationData { return @{ logLevel = "Information" } }
+            # Create settings file so it gets loaded
+            @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{}; cacheSettings = @{ enabled = $true }; repoInfo = @{ repoName = "Autopilot" } } | Export-Clixml -Path $script:SettingsFile
+            
+            Mock Get-ConfigurationData { return @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{}; cacheSettings = @{ enabled = $true }; repoInfo = @{ repoName = "Autopilot" } } }
             Mock Initialize-ConfigurationFiles { return @{ Success = $true } }
             Mock Initialize-AuthConfiguration { return @{ Auth = @{ delegated = $true }; Changed = $false } }
-            Mock Initialize-RepoInfo { return @{ RepoInfo = @{}; Changed = $false } }
-            Mock Initialize-CacheSettings { return @{ CacheSettings = @{}; Changed = $false } }
+            Mock Initialize-RepoInfo { return @{ RepoInfo = @{ repoName = "Autopilot" }; Changed = $false } }
+            Mock Initialize-CacheSettings { return @{ CacheSettings = @{ enabled = $true }; Changed = $false } }
             Mock Initialize-GlobalSettings { return @{ GlobalSettings = @{ logLevel = "Information" }; Changed = $false } }
             Mock Initialize-LocalSettings { return @{ LocalSettings = @{ domain = "contoso.com" }; Changed = $false } }
             Mock Initialize-StringsConfiguration { return @{ Strings = @{ appName = "Test" }; Changed = $false } }
             Mock Initialize-MenuConfiguration { return @{ Menu = @{ mainMenu = @{} }; Changed = $false } }
             Mock Initialize-RequiredScopes { return @{ RequiredScopes = @("User.Read", "Directory.Read.All") } }
-            Mock Import-PowerShellDataFile { return @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{} } }
+            Mock Import-PowerShellDataFile { return @{ auth = @{}; globalSettings = @{ logLevel = "Information" }; localSettings = @{}; cacheSettings = @{ enabled = $true }; repoInfo = @{ repoName = "Autopilot" } } }
             
             $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
                 -StringsFile $script:StringsFile -menuFile $script:MenuFile
             
             $result | Should -Not -BeNullOrEmpty
             $result.Success | Should -Be $true
+            $result.Auth | Should -Not -BeNullOrEmpty
+            $result.GlobalSettings | Should -Not -BeNullOrEmpty
+            $result.LocalSettings | Should -Not -BeNullOrEmpty
+            $result.RepoInfo | Should -Not -BeNullOrEmpty
+            $result.CacheSettings | Should -Not -BeNullOrEmpty
+            $result.CacheSettings.enabled | Should -Be $true
+            $result.Strings | Should -Not -BeNullOrEmpty
+            $result.Menu | Should -Not -BeNullOrEmpty
+            $result.RequiredScopes | Should -Not -BeNullOrEmpty
         }
     }
     

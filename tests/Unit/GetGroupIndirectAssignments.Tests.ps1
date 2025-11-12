@@ -13,9 +13,10 @@ BeforeAll {
     
     # Load required functions
     . "$script:RepoRoot/functions/UserAndGroupFunctions/GetGroupIndirectAssignments.ps1"
+    . "$script:RepoRoot/functions/UserAndGroupFunctions/Get-GroupAssignments-Common.ps1"
     . "$script:RepoRoot/functions/graphFunctions/CallGraphAPI.ps1"
     . "$script:RepoRoot/functions/utilityFunctions/Write-Log.ps1"
-    
+    . "$script:RepoRoot/functions/utilityFunctions/Get-CachedData.ps1"
     # Set up global variables required by functions
     $global:logFile = Join-Path $script:TestEnv.TestFolder "test.log"
     $global:maxJSONDepth = 10
@@ -25,6 +26,11 @@ BeforeAll {
 }
 
 Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
+    BeforeAll {
+        # Mock caching functions to prevent cross-test contamination
+        Mock Get-CachedData { return $null }
+        Mock Set-CachedData { }
+    }
     
     Context "Parameter Validation" {
         It "Should require accessToken parameter" {
@@ -216,16 +222,20 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
             $assignmentsResponse = @{
                 value = @(
                     @{
-                        value = @(
-                            @{
-                                id       = "assignment-1"
-                                intent   = "required"
-                                target   = @{
-                                    '@odata.type' = '#microsoft.graph.allLicensedUsersAssignmentTarget'
+                        id     = "1"
+                        status = 200
+                        body   = @{
+                            value = @(
+                                @{
+                                    id       = "assignment-1"
+                                    intent   = "required"
+                                    target   = @{
+                                        '@odata.type' = '#microsoft.graph.allLicensedUsersAssignmentTarget'
+                                    }
+                                    settings = @{}
                                 }
-                                settings = @{}
-                            }
-                        )
+                            )
+                        }
                     }
                 )
             }
@@ -274,16 +284,20 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
             $assignmentsResponse = @{
                 value = @(
                     @{
-                        value = @(
-                            @{
-                                id       = "assignment-1"
-                                intent   = "required"
-                                target   = @{
-                                    '@odata.type' = '#microsoft.graph.allDevicesAssignmentTarget'
+                        id     = "1"
+                        status = 200
+                        body   = @{
+                            value = @(
+                                @{
+                                    id       = "assignment-1"
+                                    intent   = "required"
+                                    target   = @{
+                                        '@odata.type' = '#microsoft.graph.allDevicesAssignmentTarget'
+                                    }
+                                    settings = @{}
                                 }
-                                settings = @{}
-                            }
-                        )
+                            )
+                        }
                     }
                 )
             }
@@ -332,16 +346,20 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
             $assignmentsResponse = @{
                 value = @(
                     @{
-                        value = @(
-                            @{
-                                id       = "assignment-1"
-                                intent   = "required"
-                                target   = @{
-                                    '@odata.type' = '#microsoft.graph.allLicensedUsersAssignmentTarget'
+                        id     = "1"
+                        status = 200
+                        body   = @{
+                            value = @(
+                                @{
+                                    id       = "assignment-1"
+                                    intent   = "required"
+                                    target   = @{
+                                        '@odata.type' = '#microsoft.graph.allLicensedUsersAssignmentTarget'
+                                    }
+                                    settings = @{ setting1 = "value1" }
                                 }
-                                settings = @{ setting1 = "value1" }
-                            }
-                        )
+                            )
+                        }
                     }
                 )
             }
@@ -394,16 +412,20 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
             $assignmentsResponse = @{
                 value = @(
                     @{
-                        value = @(
-                            @{
-                                id       = "assignment-1"
-                                intent   = "required"
-                                target   = @{
-                                    '@odata.type' = '#microsoft.graph.allLicensedUsersAssignmentTarget'
+                        id     = "1"
+                        status = 200
+                        body   = @{
+                            value = @(
+                                @{
+                                    id       = "assignment-1"
+                                    intent   = "required"
+                                    target   = @{
+                                        '@odata.type' = '#microsoft.graph.allLicensedUsersAssignmentTarget'
+                                    }
+                                    settings = @{}
                                 }
-                                settings = @{}
-                            }
-                        )
+                            )
+                        }
                     }
                 )
             }
@@ -445,9 +467,13 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
             
             $assignmentsResponse = @{
                 value = @(@{
-                        value = @(@{
-                                target = @{ '@odata.type' = '#microsoft.graph.allLicensedUsersAssignmentTarget' }
-                            })
+                        id     = "1"
+                        status = 200
+                        body   = @{
+                            value = @(@{
+                                    target = @{ '@odata.type' = '#microsoft.graph.allLicensedUsersAssignmentTarget' }
+                                })
+                        }
                     })
             }
             
@@ -481,9 +507,13 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
             
             $assignmentsResponse = @{
                 value = @(@{
-                        value = @(@{
-                                target = @{ '@odata.type' = '#microsoft.graph.allDevicesAssignmentTarget' }
-                            })
+                        id     = "1"
+                        status = 200
+                        body   = @{
+                            value = @(@{
+                                    target = @{ '@odata.type' = '#microsoft.graph.allDevicesAssignmentTarget' }
+                                })
+                        }
                     })
             }
             
@@ -522,9 +552,13 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
             
             $assignmentsResponse = @{
                 value = @(@{
-                        value = @(@{
-                                target = @{ '@odata.type' = '#microsoft.graph.allLicensedUsersAssignmentTarget' }
-                            })
+                        id     = "1"
+                        status = 200
+                        body   = @{
+                            value = @(@{
+                                    target = @{ '@odata.type' = '#microsoft.graph.allLicensedUsersAssignmentTarget' }
+                                })
+                        }
                     })
             }
             
@@ -561,27 +595,31 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
             $assignmentsResponse = @{
                 value = @(
                     @{
-                        value = @(
-                            @{
-                                id     = "assignment-1"
-                                target = @{
-                                    '@odata.type' = '#microsoft.graph.allLicensedUsersAssignmentTarget'
+                        id     = "1"
+                        status = 200
+                        body   = @{
+                            value = @(
+                                @{
+                                    id     = "assignment-1"
+                                    target = @{
+                                        '@odata.type' = '#microsoft.graph.allLicensedUsersAssignmentTarget'
+                                    }
                                 }
-                            }
-                            @{
-                                id     = "assignment-2"
-                                target = @{
-                                    '@odata.type' = '#microsoft.graph.groupAssignmentTarget'
-                                    groupId       = "group-123"
+                                @{
+                                    id     = "assignment-2"
+                                    target = @{
+                                        '@odata.type' = '#microsoft.graph.groupAssignmentTarget'
+                                        groupId       = "group-123"
+                                    }
                                 }
-                            }
-                            @{
-                                id     = "assignment-3"
-                                target = @{
-                                    '@odata.type' = '#microsoft.graph.allDevicesAssignmentTarget'
+                                @{
+                                    id     = "assignment-3"
+                                    target = @{
+                                        '@odata.type' = '#microsoft.graph.allDevicesAssignmentTarget'
+                                    }
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
                 )
             }
@@ -722,20 +760,26 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
                 }
                 elseif ($ResourcePath -is [array])
                 {
-                    # Only return assignments once per resource type
-                    $script:callCount++
-                    if ($script:callCount -eq 1)
+                    # Return one batch response per resource in the array
+                    $responses = @()
+                    for ($i = 0; $i -lt $ResourcePath.Count; $i++)
                     {
-                        return @{ value = @(@{ value = @(@{ target = @{ '@odata.type' = '#microsoft.graph.allLicensedUsersAssignmentTarget' } }) }) }
+                        $oDataType = if ($i -eq 1) { '#microsoft.graph.allDevicesAssignmentTarget' } else { '#microsoft.graph.allLicensedUsersAssignmentTarget' }
+                        $responses += @{
+                            id     = ($i + 1).ToString()
+                            status = 200
+                            body   = @{
+                                value = @(
+                                    @{
+                                        target = @{
+                                            '@odata.type' = $oDataType
+                                        }
+                                    }
+                                )
+                            }
+                        }
                     }
-                    elseif ($script:callCount -eq 2)
-                    {
-                        return @{ value = @(@{ value = @(@{ target = @{ '@odata.type' = '#microsoft.graph.allDevicesAssignmentTarget' } }) }) }
-                    }
-                    elseif ($script:callCount -eq 3)
-                    {
-                        return @{ value = @(@{ value = @(@{ target = @{ '@odata.type' = '#microsoft.graph.allLicensedUsersAssignmentTarget' } }) }) }
-                    }
+                    return @{ value = $responses }
                 }
                 return @{ value = @() }
             }

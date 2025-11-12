@@ -588,6 +588,8 @@ $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $sc
 # }
 #endregion Define variables
 
+$global:cacheCleared = Invoke-CacheManagement -Action Clear -ShowDetails
+
 exit 0
 #region Usage examples for GetGraphObjectMetadata
 # Example 1: Get metadata for users collection
