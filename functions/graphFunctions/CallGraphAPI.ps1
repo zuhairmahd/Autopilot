@@ -12,6 +12,7 @@ function CallGraphAPI()
         [string]$Filter = $null,
         [string]$Search = $null,
         [string]$ExtraParameters = $null,
+        $headers,
         [string]$body = $null,
         [switch]$consistencyLevel,
         [switch]$secureString
@@ -382,6 +383,11 @@ function CallGraphAPI()
         Write-Log -LogFile $logFile -Module $functionName -Message "Body parameter provided. Adding to the request." -LogLevel "Information"
         $restParams['Body'] = $body
     }
+    if ($headers)
+    {
+        Write-Log -LogFile $logFile -Module $functionName -Message "Custom headers provided. Adding to the request." -LogLevel "Information"
+        $restParams['Headers'] = $headers
+    }                                           
     #Add statusCodeVariable if we are running under powershell  7.0 or higher
     if ($PSVersionTable.PSVersion.Major -ge 7)
     {

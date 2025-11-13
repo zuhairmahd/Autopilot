@@ -95,7 +95,7 @@ Best regards,
             }
             
             # Send email
-            $emailSent = Send-EmailWithAttachments -To $supportEmail -Subject $emailSubject -Body $emailBody -AttachmentPaths $attachmentFiles
+            $emailSent = Send-EmailWithAttachments -AccessToken $accessToken -To $supportEmail -Subject $emailSubject -Body $emailBody -AttachmentPaths $attachmentFiles
             
             if ($emailSent)
             {
@@ -260,6 +260,7 @@ function Send-EmailWithAttachments()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
+    $UPN = 'zuhairmahd@arabictutor.com'
     $emailSendURI = "me/sendMail"
     $headers = @{
         "Content-Type" = "application/json"
@@ -312,9 +313,9 @@ function Send-EmailWithAttachments()
         }
     }
     
-    #prepare email message object
+    #prepare email message object - attachments MUST be inside the message object per Microsoft Graph API spec
     $emailMessage = [ordered]@{
-        message     = @{
+        message         = @{
             subject      = $Subject
             body         = @{
                 contentType = "Text"
@@ -327,20 +328,32 @@ function Send-EmailWithAttachments()
                     }
                 }
             )
-        }                                           
-        attachments = $attachments              
+            attachments  = $attachments
+        }
+        saveToSentItems = $true                                           
     } | ConvertTo-Json -Depth 5         
     # Send the email
     try 
     {
         Write-Log -Message "Calling Graph API to send email" -Module $functionName -LogLevel "Debug" -LogFile $logFile
-        $global:emailResponse = CallGraphApi -AccessToken $accessToken -Method POST -ResourcePath $emailSendURI -Body $emailMessage -Headers $headers           
+        $emailResponse = CallGraphApi -AccessToken $accessToken -Method POST -ResourcePath $emailSendURI -Body $emailMessage -Headers $headers           
+        $global:er = $emailResponse
         Write-Log -Message "Email sent successfully to $To with $($attachments.Count) attachment(s)" -Module $functionName -LogLevel "Information" -LogFile $logFile
+        if ([string]::IsNullOrEmpty($emailResponse))
+        {
+            return $true
+        }
+        else
+        {
+            Write-Log -Message "Unexpected response from email send: $emailResponse" -Module $functionName -LogLevel "Warning" -LogFile $logFile
+            return $false
+        }                           
     }
     catch
     {
         Write-Error "Failed to send email: $($_.Exception.Message)"         
         Write-Log -Message "Failed to send email: $($_.Exception.Message)" -Module $functionName -LogLevel "Error" -LogFile $logFile
+        return $false
     }
 }
 

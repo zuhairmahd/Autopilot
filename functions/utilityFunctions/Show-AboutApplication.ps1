@@ -100,8 +100,15 @@ function Show-AboutApplication()
             }
             'ShowSupportInfo'
             {
-                Show-SupportInformation
-
+                $sentEmail = Send-EmailWithAttachments -accessToken $accessToken -to 'zuhair@accesstojobs.com' -Subject 'test' -body 'this is a test' -AttachmentPaths $logfile
+                if ($sentEmail)
+                {
+                    Write-Host "Support request email sent successfully." -ForegroundColor Green
+                }
+                else
+                {
+                    Write-Host "Failed to send support request email." -ForegroundColor Red
+                }                                               
             }
         }                   
         Write-Host "Press any key to continue..."        
