@@ -110,21 +110,22 @@ function CheckForUpdates()
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Update Available: $($returnObject.updateAvailable)" -LogLevel "Information"
             return $returnObject
         }
-        catch 
-        {
-            Write-Verbose "[$functionName] Response: $($remoteVersionResponse)"
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Response: $($remoteVersionResponse)" -LogLevel "Error"
-            Write-Verbose "[$functionName] Remote version status code: $($remoteVersionResponse.StatusCode)"
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Remote version status code: $($remoteVersionResponse.StatusCode)" -LogLevel "Error"
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error: $($_.Exception.Message)" -LogLevel "Error"
-            $returnObject.Version = $null
-            $returnObject.ReleaseDate = $null
-            $returnObject.Hash = $null
-            $returnObject.success = $false
-            $returnObject.updateAvailable = $false
-            $returnObject.versionsMatch = $false
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error: $($_.Exception.Message)" -LogLevel "Error"
-            return $returnObject
-        }    
-    }   
+    }
+    catch 
+    {
+        Write-Verbose "[$functionName] Response: $($remoteVersionResponse)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Response: $($remoteVersionResponse)" -LogLevel "Error"
+        Write-Verbose "[$functionName] Remote version status code: $($remoteVersionResponse.StatusCode)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Remote version status code: $($remoteVersionResponse.StatusCode)" -LogLevel "Error"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error: $($_.Exception.Message)" -LogLevel "Error"
+        $returnObject.Version = $null
+        $returnObject.ReleaseDate = $null
+        $returnObject.Hash = $null
+        $returnObject.success = $false
+        $returnObject.updateAvailable = $false
+        $returnObject.versionsMatch = $false
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error: $($_.Exception.Message)" -LogLevel "Error"
+        return $returnObject
+    }    
+}   
 
