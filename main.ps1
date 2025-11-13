@@ -908,7 +908,9 @@ else
 }
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/lastrun.json"
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
-$updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL -localVersion $version
+$updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL -executableFileName "$scriptPath\$scriptName" 
+Write-Verbose "[$scriptName] Update available: $($updateAvailable.updateAvailable), Remote version: $($updateAvailable.version | Out-String)"
+write-log -logFile $LogFile -Module $scriptName -Message "Update available: $($updateAvailable.updateAvailable), Remote version: $($updateAvailable.version | Out-String)" -LogLevel "Information"
 $groupsToInclude = $settings.groupsToInclude
 Write-Verbose "[$scriptName] Groups to include: $($groupsToInclude | Out-String)"
 $groupsToExclude = $settings.groupsToExclude
