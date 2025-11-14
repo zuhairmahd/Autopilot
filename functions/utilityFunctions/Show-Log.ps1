@@ -8,6 +8,7 @@ function Show-Log()
         [switch]$Raw,
         [switch]$NoColor,
         [switch]$UseGrid,
+        [switch]$ViewLastSessionOnly,
         [ValidateSet('Error', 'Warning', 'Information', 'Verbose', 'Debug', 'All')] 
         [string[]]$Level = 'All',
         [int]$MenuPageSize = 25,
@@ -15,6 +16,7 @@ function Show-Log()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
+    $logSessionStartString = "============================== start of log session =============================="
     Write-Verbose "[$functionName] Invoked with parameters: Raw=$Raw, NoColor=$NoColor, Module=$($Module -join ','), Level=$($Level -join ','), UseGrid=$UseGrid, MenuPageSize=$MenuPageSize, OutputPageSize=$OutputPageSize"
 
     function Show-MenuSelection()
@@ -289,7 +291,7 @@ function Show-Log()
             Write-Verbose "[$functionName] Log file '$logFile' does not exist."     
             throw "Log file '$logFile' does not exist."
         }
-        Write-Verbose "[$functionName] Invoked with parameters: Raw=$Raw, NoColor=$NoColor, Module=$($Module -join ','), Level=$($Level -join ','), UseGrid=$UseGrid, MenuPageSize=$MenuPageSize, OutputPageSize=$OutputPageSize"
+        Write-Verbose "[$functionName] Invoked with parameters: Raw=$Raw, NoColor=$NoColor, Module=$($Module -join ','), Level=$($Level -join ','), UseGrid=$UseGrid, ViewLastSessionOnly=$ViewLastSessionOnly, MenuPageSize=$MenuPageSize, OutputPageSize=$OutputPageSize"
         Write-Host "Using log: $logFile" -ForegroundColor Green
     }
     catch
@@ -299,7 +301,43 @@ function Show-Log()
 
     # Parse file
     $parsed = New-Object System.Collections.Generic.List[object]
-    Get-Content -Path $logFile | ForEach-Object {
+    
+    # Read all lines from the log file
+    $allLines = Get-Content -Path $logFile
+    
+    # If ViewLastSessionOnly is enabled, find the last session start marker
+    if ($ViewLastSessionOnly)
+    {
+        Write-Verbose "[$functionName] ViewLastSessionOnly enabled. Searching for last session start marker."
+        $lastSessionIndex = -1
+        for ($i = $allLines.Count - 1; $i -ge 0; $i--)
+        {
+            if ($allLines[$i] -eq $logSessionStartString)
+            {
+                $lastSessionIndex = $i
+                Write-Verbose "[$functionName] Found last session start marker at line $($i + 1)."
+                break
+            }
+        }
+        
+        if ($lastSessionIndex -ge 0)
+        {
+            Write-Verbose "[$functionName] Parsing only entries from last session (lines $($lastSessionIndex + 1) to $($allLines.Count))."
+            $linesToParse = $allLines[$lastSessionIndex..($allLines.Count - 1)]
+        }
+        else
+        {
+            Write-Warning "[$functionName] No session start marker found. Parsing entire log file."
+            $linesToParse = $allLines
+        }
+    }
+    else
+    {
+        $linesToParse = $allLines
+    }
+    
+    # Parse the selected lines
+    $linesToParse | ForEach-Object {
         $obj = Convert-LogLine -Line $_
         if ($obj)
         {
