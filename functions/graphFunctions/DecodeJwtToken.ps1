@@ -1,4 +1,4 @@
-function DecodeJwtToken
+function DecodeJwtToken()
 {
     [CmdletBinding()]
     param(
@@ -9,25 +9,30 @@ function DecodeJwtToken
     )
     $functionName = $MyInvocation.MyCommand.Name
     $HRIdentifyers = @{
-        aud      = 'Audience'
-        iss      = 'Issuer'
-        wids     = 'WindowsIdentifiers'
-        roles    = 'Roles'
-        sub      = 'Subject'
-        oid      = 'Object Identifier'
-        iat      = 'IssuedAt'
-        nbf      = 'NotBefore'
-        exp      = 'ExpirationTime'
-        idp      = 'IdentityProvider'
-        appidacr = 'AuthenticationMechanism'
-        idtyp    = 'IdentityType'
-        tid      = 'TenantID'
-        uti      = 'UniqueTokenIdentifier'
-        ver      = 'Version'
+        aud                = 'Audience'
+        iss                = 'Issuer'
+        wids               = 'WindowsIdentifiers'
+        roles              = 'Roles'
+        sub                = 'Subject'
+        oid                = 'Object Identifier'
+        iat                = 'IssuedAt'
+        nbf                = 'NotBefore'
+        exp                = 'ExpirationTime'
+        idp                = 'IdentityProvider'
+        appidacr           = 'AuthenticationMechanism'
+        idtyp              = 'IdentityType'
+        tid                = 'TenantID'
+        uti                = 'UniqueTokenIdentifier'
+        ver                = 'Version'
+        preferred_username = 'UserPrincipalName'
+        email              = 'Email'
+        upn                = 'UserPrincipalName'
+        unique_name        = 'UniqueName'
+        mail               = 'Email'
     }
     $parts = $Token -split '\.'
     Write-Verbose "[$functionName] Token parts: $($parts.Length)"
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing JWT token with $($parts.Length) parts" -LogLevel "Verbose"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing JWT token with $($parts.Length) parts" -LogLevel "Verbose"
     if ($parts.Length -lt 2)
     {
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Invalid JWT token format. Expected at least 2 parts." -LogLevel "Error"

@@ -239,7 +239,7 @@ function ShowMenu()
         else
         {
             Write-Verbose "[$functionName] No previous menu available, exiting application"
-            return $null
+            return $returnValues.exitString
         }
     }
     
