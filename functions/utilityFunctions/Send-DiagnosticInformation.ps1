@@ -63,15 +63,20 @@ function Send-DiagnosticInformation()
     
     try
     {
-
         $userChoice = Read-Host -Prompt "How would you like to send diagnostic information to support? ([E]mail/[Z]ip/[C]ancel                                                  )"
-        
         Write-Log -Message "User selected diagnostic option: $userChoice" -Module $functionName -LogLevel "Information" -LogFile $logFile
-        
-        if ($userChoice -eq "E")
+        Write-Verbose "[$functionName] User selected option: $userChoice"   
+        while ($userChoice -notin @("E", "Z", "C", "e", "z", "c"))
+        {
+            Write-Host "Invalid selection. Please enter E, Z, or C." -ForegroundColor Yellow
+            [console]::beep(1000, 300)                       
+            $userChoice = Read-Host -Prompt "How would you like to send diagnostic information to support? ([E]mail/[Z]ip/[C]ancel                                                  )"
+            Write-Log -Message "User re-selected diagnostic option: $userChoice" -Module $functionName -LogLevel "Information" -LogFile $logFile
+            Write-Verbose "[$functionName] User re-selected option: $userChoice"   
+        }                                               
+        if ($userChoice -eq "E" -or $userChoice -eq "e")
         {
             Write-Log -Message "User chose to send diagnostic information via email" -Module $functionName -LogLevel "Information" -LogFile $logFile
-            
             # Prepare email content
             $emailSubject = "Intune Helpdesk Utility - Diagnostic Information"
             $emailBody = @"
@@ -106,7 +111,7 @@ Best regards,
                 Write-Log -Message "Failed to send diagnostic information email" -Module $functionName -LogLevel "Error" -LogFile $logFile                                                                          
             }
         }
-        elseif ($userChoice -eq "Z              ")
+        elseif ($userChoice -eq "Z" -or $userChoice -eq "z")
         {
             Write-Log -Message "User chose to save diagnostic information to zip file" -Module $functionName -LogLevel "Information" -LogFile $logFile
             # Collect files for zip
@@ -118,18 +123,16 @@ Best regards,
                 write-log -logFile $logFile -module $functionName -message "Preparing to create zip file: $zipFileName" -logLevel "Information"                
                 # Create zip file
                 $zipCreated = New-ZipPackage -FilePaths $zipFiles -DestinationPath $zipFileName
-                if ($zipCreated)
+                if ($null -ne $zipCreated)
                 {
-                    Write-Host "Diagnostic information saved to zip file: $zipFileName" -ForegroundColor Green
-                    Write-Log -Message "Diagnostic information saved to zip file: $zipFileName" -Module $functionName -LogLevel "Information" -LogFile $logFile                         
-                    write-log -logFile $logFile -module $functionName -message "Prompting user to open zip file location" -logLevel "Information"                                   
+                    Write-Host "Diagnostic information saved to zip file: $zipCreated" -ForegroundColor Green
+                    Write-Log -Message "Diagnostic information saved to zip file: $zipCreated" -Module $functionName -LogLevel "Information" -LogFile $logFile                         
                 }
                 else
                 {
                     write-log -logFile $logFile -module $functionName -message "Failed to create zip file for diagnostic information" -logLevel "Error"                                   
                     Write-Host "Failed to create zip file for diagnostic information" -ForegroundColor Red
                     Write-Log -Message "Failed to create zip file for diagnostic information" -Module $functionName -LogLevel "Error" -LogFile $logFile                 
-                    Write-Host "Failed to create zip file for diagnostic information" -ForegroundColor Red                          
                     Write-Host "Please manually collect the log file located at: $logFile" -ForegroundColor Yellow                      
                 }
             }
@@ -451,8 +454,15 @@ function New-ZipPackage()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Log -Message "Creating zip package at $DestinationPath" -Module $functionName -LogLevel "Information" -LogFile $logFile
-    
+    Write-Log -Message "Creating zip package at $DestinationPath with files: $($FilePaths -join ', ')" -Module $functionName -LogLevel "Information" -LogFile $logFile
+    Write-Verbose "[$functionName] Creating zip package at $DestinationPath with files: $($FilePaths -join ', ')"                       
+    #if the destination file does not have a parent, assume current directory
+    if (-not (Split-Path $DestinationPath -Parent))         
+    {
+        $DestinationPath = Join-Path -Path (Get-Location) -ChildPath $DestinationPath
+        Write-Verbose "[$functionName] Adjusted DestinationPath to include current directory: $DestinationPath"                       
+        write-log -logFile $logFile -module $functionName -message "Adjusted DestinationPath to include current directory: $DestinationPath" -logLevel "Debug"                        
+    }                                                       
     try
     {
         # Ensure destination directory exists
@@ -461,6 +471,7 @@ function New-ZipPackage()
         {
             New-Item -Path $destDir -ItemType Directory -Force | Out-Null
             write-log -logFile $logFile -module $functionName -message "Created directory for zip destination: $destDir" -logLevel "Information"                        
+            Write-Verbose "[$functionName] Created directory for zip destination: $destDir"                             
         }
         
         # Remove existing zip file if it exists
@@ -468,11 +479,14 @@ function New-ZipPackage()
         {
             Remove-Item $DestinationPath -Force
             write-log -logFile $logFile -module $functionName -message "Removed existing zip file at destination: $DestinationPath" -logLevel "Information"                                         
+            Write-Verbose "[$functionName] Removed existing zip file at destination: $DestinationPath"                  
         }
         
         # Load required assemblies for ZIP operations
         try
         {
+            Write-Verbose "[$functionName] Loading ZIP compression assemblies"                  
+            write-log -logFile $logFile -module $functionName -message "Loading ZIP compression assemblies" -logLevel "Debug"               
             Add-Type -AssemblyName System.IO.Compression
             Add-Type -AssemblyName System.IO.Compression.FileSystem
         }
@@ -483,52 +497,77 @@ function New-ZipPackage()
         }
         
         $zip = [System.IO.Compression.ZipFile]::Open($DestinationPath, [System.IO.Compression.ZipArchiveMode]::Create)
-        
+        write-log -logFile $logFile -module $functionName -message "Opened zip archive for creation: $DestinationPath" -logLevel "Information"                              
+        Write-Verbose "[$functionName] Opened zip archive for creation: $DestinationPath"                       
         foreach ($filePath in $FilePaths)
         {
+            Write-Verbose "[$functionName] Adding file to zip: $filePath"       
             if (Test-Path $filePath)
             {
-                $fileName = [System.IO.Path]::GetFileName($filePath)
+                # Copy the file to a temporary file in the system temp folder.
+                # This workaround is necessary because the original file may be locked or in use by another process,
+                # which can cause issues when attempting to add it directly to the zip archive.
+                # Copying to a temporary location ensures reliable access for zipping.
+                $tempFilePath = Join-Path -Path $env:TEMP -ChildPath ([System.IO.Path]::GetFileName($filePath))
+                Write-Verbose "[$functionName] Copying file $filePath to temporary location: $tempFilePath"                           
+                Copy-Item -Path $filePath -Destination $tempFilePath -Force
+                $fileName = [System.IO.Path]::GetFileName($tempFilePath)
+                Write-Verbose "[$functionName] Adding temporary file to zip: $tempFilePath as $fileName"            
                 $entry = $zip.CreateEntry($fileName)
                 $entryStream = $null
                 $fileStream = $null
                 try
                 {
                     $entryStream = $entry.Open()
-                    $fileStream = [System.IO.File]::OpenRead($filePath)
+                    $fileStream = [System.IO.File]::OpenRead($tempFilePath)
                     $fileStream.CopyTo($entryStream)
+                    Write-Verbose "[$functionName] Added file to zip: $filePath"                                            
+                    write-log -logFile $logFile -module $functionName -message "Added file to zip: $fileName" -logLevel "Information"                                       
                 }
                 finally
                 {
                     if ($fileStream)
                     {
                         $fileStream.Close() 
+                        Write-Verbose "[$functionName] Closed file stream for: $filePath"                   
+                        write-log -logFile $logFile -module $functionName -message "Closed file stream for: $fileName" -logLevel "Information"                                                                                                  
                     }
                     if ($entryStream)
                     {
                         $entryStream.Close() 
                     }
+                    if (Test-Path $tempFilePath)
+                    {
+                        Remove-Item -Path $tempFilePath -Force
+                        Write-Verbose "[$functionName] Removed temporary file: $tempFilePath"                   
+                        write-log -logFile $logFile -module $functionName -message "Removed temporary file: $tempFilePath" -logLevel "Information"                                                                                                  
+                    }                                               
                 }
                 Write-Log -Message "Added file to zip: $fileName" -Module $functionName -LogLevel "Information" -LogFile $logFile
+                Write-Verbose "[$functionName] Added file to zip: $filePath"                                                                            
             }
             else
             {
                 Write-Log -Message "File not found, skipping: $filePath" -Module $functionName -LogLevel "Warning" -LogFile $logFile
+                Write-Verbose "[$functionName] File not found, skipping: $filePath"                                 
             }
         }
-        
         $zip.Dispose()
         Write-Log -Message "Zip package created successfully: $DestinationPath" -Module $functionName -LogLevel "Information" -LogFile $logFile
-        return $true
+        Write-Verbose "[$functionName] Zip package created successfully: $DestinationPath"                  
+        return $DestinationPath
     }
     catch
     {
         Write-Log -Message "Failed to create zip package: $($_.Exception.Message)" -Module $functionName -LogLevel "Error" -LogFile $logFile
+        Write-Verbose "[$functionName] Failed to create zip package: $($_.Exception.Message)"                                           
         if ($zip)
         {
             $zip.Dispose()
+            Write-Verbose "[$functionName] Disposed zip archive due to error"
+            write-log -logFile $logFile -module $functionName -message "Disposed zip archive due to error" -logLevel "Information"                                                                                                                                                          
         }
-        return $false
+        return $null
     }
 }
 

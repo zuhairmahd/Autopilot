@@ -119,12 +119,6 @@ function Get-ApplicationDefaults()
             maxGroupMatchDisplay         = 10
             maxMenuItemsPerPage          = 15
             release                      = "auto"
-            repoInfo                     = [ordered]@{
-                repoName      = "Autopilot"
-                baseSourceURL = "https://raw.githubusercontent.com"
-                baseURL       = "https://www.github.com"
-                repoPath      = "zuhairmahd"
-            }
             operatingSystem              = "Windows"
             preferredBrowser             = 'Chrome'
             documentationURL             = "https://github.com/zuhairmahd/Autopilot/blob/master/readme.md"
