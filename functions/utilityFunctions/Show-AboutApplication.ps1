@@ -106,7 +106,7 @@ function Show-AboutApplication()
             {
                 Write-Host "`n================ Documentation ================`n"            
                 $browserLaunched = LaunchBrowser -url $settings.documentationURL -browser $settings.preferredBrowser
-                if ($browserSession)
+                if ($browserLaunched)
                 {
                     write-log -logFile $LogFile -Module "$FunctionName" -Message "- Launched documentation URL $($settings.documentationURL) in browser: $($settings.preferredBrowser)" -LogLevel "Information"                               
                     Write-Host "Opened documentation URL $($settings.documentationURL) in browser: $($settings.preferredBrowser)" -ForegroundColor Green
