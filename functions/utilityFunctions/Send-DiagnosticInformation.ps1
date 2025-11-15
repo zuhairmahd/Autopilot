@@ -97,8 +97,15 @@ Best regards,
                 $attachmentFiles += $logFile
             }
             
-            # Send email
-            $emailSent = Send-EmailWithAttachments -AccessToken $accessToken -To $settings.supportEmail -Subject $emailSubject -Body $emailBody -AttachmentPaths $attachmentFiles
+            # Validate supportEmail before sending
+            if ([string]::IsNullOrWhiteSpace($settings.supportEmail)) {
+                Write-Host "Support email address is not configured. Cannot send diagnostic information email." -ForegroundColor Red
+                Write-Log -Message "Support email address is not configured. Email not sent." -Module $functionName -LogLevel "Error" -LogFile $logFile
+                $emailSent = $false
+            }
+            else {
+                $emailSent = Send-EmailWithAttachments -AccessToken $accessToken -To $settings.supportEmail -Subject $emailSubject -Body $emailBody -AttachmentPaths $attachmentFiles
+            }
             
             if ($emailSent)
             {
