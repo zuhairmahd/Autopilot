@@ -63,14 +63,14 @@ function Send-DiagnosticInformation()
     
     try
     {
-        $userChoice = Read-Host -Prompt "How would you like to send diagnostic information to support? ([E]mail/[Z]ip/[C]ancel                                                  )"
+        $userChoice = Read-Host -Prompt "How would you like to send diagnostic information to support? ([E]mail/[Z]ip/[C]ancel)"
         Write-Log -Message "User selected diagnostic option: $userChoice" -Module $functionName -LogLevel "Information" -LogFile $logFile
         Write-Verbose "[$functionName] User selected option: $userChoice"   
         while ($userChoice -notin @("E", "Z", "C", "e", "z", "c"))
         {
             Write-Host "Invalid selection. Please enter E, Z, or C." -ForegroundColor Yellow
             [console]::beep(1000, 300)                       
-            $userChoice = Read-Host -Prompt "How would you like to send diagnostic information to support? ([E]mail/[Z]ip/[C]ancel                                                  )"
+            $userChoice = Read-Host -Prompt "How would you like to send diagnostic information to support? ([E]mail/[Z]ip/[C]ancel)"
             Write-Log -Message "User re-selected diagnostic option: $userChoice" -Module $functionName -LogLevel "Information" -LogFile $logFile
             Write-Verbose "[$functionName] User re-selected option: $userChoice"   
         }                                               
