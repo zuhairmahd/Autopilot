@@ -172,6 +172,7 @@ function Get-ApplicationDefaults()
             )
             domain                          = $DomainName
             companyName                     = ""
+            supportEmail                    = ""
             version                         = $Version
             validateScopes                  = $false
             useGridForLogDisplay            = $true

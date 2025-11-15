@@ -63,21 +63,19 @@ function Send-DiagnosticInformation()
     
     try
     {
-        # Show failure dialog to get user preference
-        Write-Verbose "[$functionName] Displaying failure dialog to user"
-        Write-Log -Message "Displaying failure dialog to collect user preference for diagnostic information" -Module $functionName -LogLevel "Information" -LogFile $logFile
-        $userChoice = Show-FailureDialog -ErrorMessage $ErrorMessage
+
+        $userChoice = Read-Host -Prompt "How would you like to send diagnostic information to support? ([E]mail/[Z]ip/[C]ancel                                                  )"
         
         Write-Log -Message "User selected diagnostic option: $userChoice" -Module $functionName -LogLevel "Information" -LogFile $logFile
         
-        if ($userChoice -eq "Email")
+        if ($userChoice -eq "E")
         {
             Write-Log -Message "User chose to send diagnostic information via email" -Module $functionName -LogLevel "Information" -LogFile $logFile
             
             # Prepare email content
             $emailSubject = "Intune Helpdesk Utility - Diagnostic Information"
             $emailBody = @"
-User: $currentUserName
+User: $env:USERNAME
 Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
 Computer: $env:COMPUTERNAME
 Error: $ErrorMessage
@@ -95,95 +93,63 @@ Best regards,
             }
             
             # Send email
-            $emailSent = Send-EmailWithAttachments -AccessToken $accessToken -To $supportEmail -Subject $emailSubject -Body $emailBody -AttachmentPaths $attachmentFiles
+            $emailSent = Send-EmailWithAttachments -AccessToken $accessToken -To $settings.supportEmail -Subject $emailSubject -Body $emailBody -AttachmentPaths $attachmentFiles
             
             if ($emailSent)
             {
-                [System.Windows.Forms.MessageBox]::Show(
-                    "Diagnostic information has been sent via email to $supportEmail. You will receive assistance shortly.",
-                    $formTitle,
-                    [System.Windows.Forms.MessageBoxButtons]::OK,
-                    [System.Windows.Forms.MessageBoxIcon]::Information
-                )
+                Write-Host "Diagnostic information email sent successfully" -ForegroundColor Green
+                Write-Log -Message "Diagnostic information email sent successfully" -Module $functionName -LogLevel "Information" -LogFile $logFile
             }
             else
             {
-                [System.Windows.Forms.MessageBox]::Show(
-                    "Failed to send diagnostic information via email. Please contact support manually with the error message: $ErrorMessage",
-                    $formTitle,
-                    [System.Windows.Forms.MessageBoxButtons]::OK,
-                    [System.Windows.Forms.MessageBoxIcon]::Error
-                )
+                Write-Host "Failed to send diagnostic information email" -ForegroundColor Red
+                Write-Log -Message "Failed to send diagnostic information email" -Module $functionName -LogLevel "Error" -LogFile $logFile                                                                          
             }
         }
-        elseif ($userChoice -eq "Zip")
+        elseif ($userChoice -eq "Z              ")
         {
             Write-Log -Message "User chose to save diagnostic information to zip file" -Module $functionName -LogLevel "Information" -LogFile $logFile
-            
-            # Show save dialog for zip file
-            Add-Type -AssemblyName System.Windows.Forms
-            $saveDialog = New-Object System.Windows.Forms.SaveFileDialog
-            $saveDialog.Filter = "Zip files (*.zip)|*.zip|All files (*.*)|*.*"
-            $saveDialog.Title = "Save Diagnostic Information"
-            $saveDialog.FileName = "PIV_Diagnostics_$(Get-Date -Format 'yyyyMMdd_HHmmss').zip"
-            $saveDialog.InitialDirectory = [Environment]::GetFolderPath("Desktop")
-            
-            if ($saveDialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK)
+            # Collect files for zip
+            $zipFiles = @()
+            if (Test-Path $logFile)
             {
-                # Collect files for zip
-                $zipFiles = @()
-                if (Test-Path $logFile)
-                {
-                    $zipFiles += $logFile
-                }
-                
+                $zipFiles += $logFile
+                $zipFileName = "DiagnosticInformation_$(Get-Date -Format 'yyyyMMdd_HHmmss').zip"                                                        
+                write-log -logFile $logFile -module $functionName -message "Preparing to create zip file: $zipFileName" -logLevel "Information"                
                 # Create zip file
-                $zipCreated = New-ZipPackage -FilePaths $zipFiles -DestinationPath $saveDialog.FileName
-                
+                $zipCreated = New-ZipPackage -FilePaths $zipFiles -DestinationPath $zipFileName
                 if ($zipCreated)
                 {
-                    [System.Windows.Forms.MessageBox]::Show(
-                        "Diagnostic information has been saved to: $($saveDialog.FileName)`n`nPlease send this file to support for assistance.",
-                        $formTitle,
-                        [System.Windows.Forms.MessageBoxButtons]::OK,
-                        [System.Windows.Forms.MessageBoxIcon]::Information
-                    )
+                    Write-Host "Diagnostic information saved to zip file: $zipFileName" -ForegroundColor Green
+                    Write-Log -Message "Diagnostic information saved to zip file: $zipFileName" -Module $functionName -LogLevel "Information" -LogFile $logFile                         
+                    write-log -logFile $logFile -module $functionName -message "Prompting user to open zip file location" -logLevel "Information"                                   
                 }
                 else
                 {
-                    [System.Windows.Forms.MessageBox]::Show(
-                        "Failed to create diagnostic zip file. Please contact support manually with the error message: $ErrorMessage",
-                        $formTitle,
-                        [System.Windows.Forms.MessageBoxButtons]::OK,
-                        [System.Windows.Forms.MessageBoxIcon]::Error
-                    )
+                    write-log -logFile $logFile -module $functionName -message "Failed to create zip file for diagnostic information" -logLevel "Error"                                   
+                    Write-Host "Failed to create zip file for diagnostic information" -ForegroundColor Red
+                    Write-Log -Message "Failed to create zip file for diagnostic information" -Module $functionName -LogLevel "Error" -LogFile $logFile                 
+                    Write-Host "Failed to create zip file for diagnostic information" -ForegroundColor Red                          
+                    Write-Host "Please manually collect the log file located at: $logFile" -ForegroundColor Yellow                      
                 }
             }
             else
             {
-                Write-Log -Message "User cancelled zip file save dialog" -Module $functionName -LogLevel "Information" -LogFile $logFile
-            }
+                Write-Host "No log file found to include in zip" -ForegroundColor Yellow
+                Write-Log -Message "No log file found to include in zip" -Module $functionName -LogLevel "Warning" -LogFile $logFile                 
+            }                                   
         }
         else
         {
             Write-Log -Message "User cancelled diagnostic information collection" -Module $functionName -LogLevel "Information" -LogFile $logFile
-            [System.Windows.Forms.MessageBox]::Show(
-                $ErrorMessage,
-                $formTitle,
-                [System.Windows.Forms.MessageBoxButtons]::OK,
-                [System.Windows.Forms.MessageBoxIcon]::Error
-            )
+            Write-Host "Diagnostic information collection cancelled by user" -ForegroundColor Yellow                        
         }
     }
     catch
     {
         Write-Log -Message "Error in Send-DiagnosticInformation: $($_.Exception.Message)" -Module $functionName -LogLevel "Error" -LogFile $logFile
-        [System.Windows.Forms.MessageBox]::Show(
-            "An error occurred while trying to send diagnostic information: $($_.Exception.Message)",
-            $formTitle,
-            [System.Windows.Forms.MessageBoxButtons]::OK,
-            [System.Windows.Forms.MessageBoxIcon]::Error
-        )
+        Write-Error "Failed to send diagnostic information: $($_.Exception.Message)"                    
+        
     }
 }
 
@@ -260,7 +226,39 @@ function Send-EmailWithAttachments()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    $UPN = 'zuhairmahd@arabictutor.com'
+    # Extract user info from access token to ensure we're sending from the correct mailbox
+    $tokenClaims = DecodeJwtToken -Token $accessToken -raw
+    $senderUPN = $null
+    
+    # Try to get UPN from token claims (preferred_username, upn, email, unique_name in order of preference)
+    if ($tokenClaims.preferred_username)
+    {
+        $senderUPN = $tokenClaims.preferred_username
+        Write-Log -Message "Using preferred_username from token: $senderUPN" -Module $functionName -LogLevel "Debug" -LogFile $logFile
+    }
+    elseif ($tokenClaims.upn)
+    {
+        $senderUPN = $tokenClaims.upn
+        Write-Log -Message "Using upn from token: $senderUPN" -Module $functionName -LogLevel "Debug" -LogFile $logFile
+    }
+    elseif ($tokenClaims.email)
+    {
+        $senderUPN = $tokenClaims.email
+        Write-Log -Message "Using email from token: $senderUPN" -Module $functionName -LogLevel "Debug" -LogFile $logFile
+    }
+    elseif ($tokenClaims.unique_name)
+    {
+        $senderUPN = $tokenClaims.unique_name
+        Write-Log -Message "Using unique_name from token: $senderUPN" -Module $functionName -LogLevel "Debug" -LogFile $logFile
+    }
+    else
+    {
+        # Fallback to hardcoded value if token doesn't contain user info
+        $senderUPN = 'zuhairmahd@arabictutor.com'
+        Write-Log -Message "No user identity found in token, using fallback: $senderUPN" -Module $functionName -LogLevel "Warning" -LogFile $logFile
+    }
+    
+    # Use me/sendMail since we're using the authenticated user's context
     $emailSendURI = "me/sendMail"
     $headers = @{
         "Content-Type" = "application/json"
@@ -351,8 +349,41 @@ function Send-EmailWithAttachments()
     }
     catch
     {
-        Write-Error "Failed to send email: $($_.Exception.Message)"         
-        Write-Log -Message "Failed to send email: $($_.Exception.Message)" -Module $functionName -LogLevel "Error" -LogFile $logFile
+        $errorDetails = @(
+            "Failed to send email: $($_.Exception.Message)"
+            "Error Type: $($_.Exception.GetType().FullName)"
+            "Sender UPN: $senderUPN"
+            "Recipient: $To"
+            "Attachment Count: $($attachments.Count)"
+        )
+        
+        if ($_.ErrorDetails.Message)
+        {
+            $errorDetails += "API Error Details: $($_.ErrorDetails.Message)"
+        }
+        
+        $fullErrorMessage = $errorDetails -join ' | '
+        Write-Error $fullErrorMessage
+        Write-Log -Message $fullErrorMessage -Module $functionName -LogLevel "Error" -LogFile $logFile
+        
+        # Try to decode Graph API error if available
+        if ($_.ErrorDetails.Message)
+        {
+            try
+            {
+                $graphError = $_.ErrorDetails.Message | ConvertFrom-Json
+                if ($graphError.error)
+                {
+                    Write-Log -Message "Graph API Error Code: $($graphError.error.code)" -Module $functionName -LogLevel "Error" -LogFile $logFile
+                    Write-Log -Message "Graph API Error Message: $($graphError.error.message)" -Module $functionName -LogLevel "Error" -LogFile $logFile
+                }
+            }
+            catch
+            {
+                Write-Verbose "[$functionName] Could not parse Graph API error details"
+            }
+        }
+        
         return $false
     }
 }
