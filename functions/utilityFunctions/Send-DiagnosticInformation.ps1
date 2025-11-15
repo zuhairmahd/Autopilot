@@ -268,7 +268,7 @@ function Send-EmailWithAttachments()
         write-log -logFile $logFile -module $functionName -message "Could not determine sender UPN from token claims" -logLevel "Warning" 
         $senderUPN = Read-Host -Prompt "Please enter your email address"                     
         #ensure we get a valid email address format
-        while ([string]::IsNullOrWhiteSpace($senderUPN) -or -not ($senderUPN -match '^[^@\s]+@[^@\s]+\.[^@\s]+$'))                                     
+        while (-not ($senderUPN -match '^[^@\s]+@[^@\s]+\.[^@\s]+$'))                                     
         {
             Write-Host "Incorrect email format. Please enter a valid email address." -ForegroundColor Yellow                                
             [console]::beep(1000, 300)                       
