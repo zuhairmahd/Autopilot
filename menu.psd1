@@ -582,6 +582,18 @@
                 )
             },
             @{
+                description           = 'View the application documentation'
+                name                  = 'View Documentation'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin',
+                    'advanced',
+                    'helpdesk',
+                    'registration'
+                )                                   
+            },
+            @{
                 description           = 'Send a message to support including logs'
                 name                  = 'Request support'
                 blockType             = 'action'

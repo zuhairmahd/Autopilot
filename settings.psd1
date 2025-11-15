@@ -156,6 +156,8 @@
             repoPath      = 'zuhairmahd'
         }
         operatingSystem              = 'Windows'
+        preferredBrowser             = 'Chrome'
+        documentationURL             = "https://github.com/zuhairmahd/Autopilot/blob/master/readme.md"
         migrateLegacyConfiguration   = $true
         hideEmptyMenus               = $true
         autoUpdate                   = $true

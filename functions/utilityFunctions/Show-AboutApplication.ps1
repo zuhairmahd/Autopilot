@@ -44,9 +44,13 @@ function Show-AboutApplication()
         Write-Host "`n================ Log File ================`n"   
         return 'ViewLogs'
     } -returnsValue
+    $aboutMenu = AddMenuItem -Menu $aboutMenu -Name "View Documentation" -Action {
+        Write-Host "`n================ Documentation ================`n"            
+        return 'ViewDocumentation'
+    } -returnsValue
     $aboutMenu = AddMenuItem -Menu $aboutMenu -Name "Request support" -Action {
         Write-Host "`n================ Support Information ================`n"   
-        return 'ShowSupportInfo'     
+        return 'RequestSupport'
     } -returnsValue
 
     while ($menuSelectionResultPick -ne "Back" -and $menuSelectionResultPick -ne "Main Menu" -and $menuSelectionResultPick -ne 0 -and $menuSelectionResultPick -ne "0")
@@ -98,17 +102,25 @@ function Show-AboutApplication()
                     Show-Log -logFile $logFile
                 }                                   
             }
-            'ShowSupportInfo'
+            'ViewDocumentation'
             {
-                $sentEmail = Send-EmailWithAttachments -accessToken $accessToken -to $settings.supportEmail -Subject 'test' -body 'Attached are the application logs' -AttachmentPaths $logfile
-                if ($sentEmail)
+                Write-Host "`n================ Documentation ================`n"            
+                if (LaunchBrowser -url $settings.documentationURL)
                 {
-                    Write-Host "Support request email sent successfully." -ForegroundColor Green
+                    write-log -logFile $LogFile -Module "$FunctionName" -Message "- Launched documentation URL $($settings.documentationURL) in browser: $($settings.preferredBrowser)" -LogLevel "Information"                               
+                    Write-Host "Opened documentation URL $($settings.documentationURL) in browser: $($settings.preferredBrowser)" -ForegroundColor Green
                 }
                 else
                 {
-                    Write-Host "Failed to send support request email." -ForegroundColor Red
-                }                                               
+                    Write-Host "Failed to open documentation URL: $($settings.documentationURL)" -ForegroundColor Red
+                    write-log -logFile $LogFile -Module "$FunctionName" -Message "- Failed to open documentation URL: $($settings.documentationURL)" -LogLevel "Warning"
+                }                       
+            }                                       
+            'RequestSupport'
+            {
+                Send-DiagnosticInformation
+
+
             }
         }                   
         Write-Host "Press any key to continue..."        

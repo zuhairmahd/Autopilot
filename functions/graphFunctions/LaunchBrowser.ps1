@@ -6,7 +6,7 @@ function LaunchBrowser()
         [ValidateNotNullOrEmpty()]
         [string]$url,
         [ValidateSet("Chrome", "Edge", "Firefox", "Default")]
-        [string]$browser
+        [string]$browser = $settings.preferredBrowser
     )
     
     $functionName = $MyInvocation.MyCommand.Name

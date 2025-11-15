@@ -126,6 +126,9 @@ function Get-ApplicationDefaults()
                 repoPath      = "zuhairmahd"
             }
             operatingSystem              = "Windows"
+            preferredBrowser             = 'Chrome'
+            documentationURL             = "https://github.com/zuhairmahd/Autopilot/blob/master/readme.md"
+            privateSession               = $false           
             migrateLegacyConfiguration   = $true
             hideEmptyMenus               = $true
             autoUpdate                   = $true
@@ -173,6 +176,7 @@ function Get-ApplicationDefaults()
             domain                          = $DomainName
             companyName                     = ""
             supportEmail                    = ""
+            documentationURL                = "https://github.com/zuhairmahd/Autopilot/blob/master/readme.md"
             version                         = $Version
             validateScopes                  = $false
             useGridForLogDisplay            = $true
@@ -992,6 +996,18 @@ function Get-ApplicationDefaults()
                             'helpdesk',
                             'registration'
                         )
+                    },
+                    @{
+                        description           = 'View the application documentation'
+                        name                  = 'View Documentation'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced',
+                            'helpdesk',
+                            'registration'
+                        )                                   
                     },
                     @{
                         description           = 'Send a message to support including logs'
