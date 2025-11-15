@@ -909,6 +909,128 @@ Describe "Function: CallGraphAPI" -Tags 'Unit', 'GraphFunctions' {
             Should -Invoke Invoke-RestMethod -Times 1 -Exactly
             $result.successCount | Should -Be 2
         }
+        
+        It "Should handle hashtable input with id and url properties" {
+            Mock Invoke-RestMethod {
+                param($Body)
+                $bodyObj = $Body | ConvertFrom-Json
+                $bodyObj.requests.Count | Should -Be 2
+                return @{
+                    responses = @(
+                        @{ id = "1"; status = 200; body = @{ value = @("user1") } }
+                        @{ id = "2"; status = 200; body = @{ value = @("group1") } }
+                    )
+                }
+            }
+            
+            $resources = @(
+                @{ id = "users"; url = "users" }
+                @{ id = "groups"; url = "groups" }
+            )
+            $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $resources
+            
+            $result.batchProcessed | Should -Be $true
+            $result.value.Count | Should -Be 2
+            $result.value[0].__batchMetadata.resourceId | Should -Be "users"
+            $result.value[1].__batchMetadata.resourceId | Should -Be "groups"
+        }
+        
+        It "Should map batch responses to original resource identifiers" {
+            Mock Invoke-RestMethod {
+                return @{
+                    responses = @(
+                        @{ id = "1"; status = 200; body = @{ value = @("item1") } }
+                        @{ id = "2"; status = 200; body = @{ value = @("item2") } }
+                    )
+                }
+            }
+            
+            $resources = @(
+                @{ id = "resource1"; url = "path1" }
+                @{ id = "resource2"; url = "path2" }
+            )
+            $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $resources
+            
+            $result.value[0].__batchMetadata.resourceId | Should -Be "resource1"
+            $result.value[1].__batchMetadata.resourceId | Should -Be "resource2"
+        }
+        
+        It "Should capture comprehensive error details matching single-request behavior" {
+            Mock Invoke-RestMethod {
+                return @{
+                    responses = @(
+                        @{ 
+                            id = "1"
+                            status = 403
+                            body = @{
+                                error = @{
+                                    code = "Authorization_RequestDenied"
+                                    message = "Insufficient privileges"
+                                    innerError = @{
+                                        "request-id" = "req-123"
+                                        "client-request-id" = "client-456"
+                                        date = "2025-11-14T10:00:00"
+                                    }
+                                }
+                            }
+                        }
+                    )
+                }
+            }
+            
+            $resources = @(
+                @{ id = "testResource"; url = "path1" }
+            )
+            $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $resources
+            
+            $result.errorDetails.Count | Should -Be 1
+            $result.errorDetails[0].resourceId | Should -Be "testResource"
+            $result.errorDetails[0].errorCode | Should -Be "Authorization_RequestDenied"
+            $result.errorDetails[0].errorMessage | Should -Be "Insufficient privileges"
+            $result.errorDetails[0].requestId | Should -Be "req-123"
+            $result.errorDetails[0].clientRequestId | Should -Be "client-456"
+        }
+        
+        It "Should add metadata to successful batch results" {
+            Mock Invoke-RestMethod {
+                return @{
+                    responses = @(
+                        @{ id = "1"; status = 200; body = @{ value = @("item1") } }
+                    )
+                }
+            }
+            
+            $resources = @(
+                @{ id = "testId"; url = "testUrl" }
+            )
+            $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $resources
+            
+            $result.value[0].__batchMetadata | Should -Not -BeNullOrEmpty
+            $result.value[0].__batchMetadata.resourceId | Should -Be "testId"
+            $result.value[0].__batchMetadata.resourceUrl | Should -Be "testUrl"
+            $result.value[0].__batchMetadata.status | Should -Be 200
+        }
+        
+        It "Should properly normalize string array resources" {
+            Mock Invoke-RestMethod {
+                param($Body)
+                $bodyObj = $Body | ConvertFrom-Json
+                $bodyObj.requests[0].url | Should -Match "^/users"
+                $bodyObj.requests[1].url | Should -Match "^/groups"
+                return @{
+                    responses = @(
+                        @{ id = "1"; status = 200; body = @{ value = @() } }
+                        @{ id = "2"; status = 200; body = @{ value = @() } }
+                    )
+                }
+            }
+            
+            $paths = @("users", "groups")
+            $result = CallGraphAPI -accessToken $script:testAccessToken -ResourcePath $paths
+            
+            $result.totalCount | Should -Be 2
+            Should -Invoke Invoke-RestMethod -Times 1
+        }
     }
     
     AfterAll {
