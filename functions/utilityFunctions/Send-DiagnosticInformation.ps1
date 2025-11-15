@@ -98,12 +98,14 @@ Best regards,
             }
             
             # Validate supportEmail before sending
-            if ([string]::IsNullOrWhiteSpace($settings.supportEmail)) {
+            if ([string]::IsNullOrWhiteSpace($settings.supportEmail))
+            {
                 Write-Host "Support email address is not configured. Cannot send diagnostic information email." -ForegroundColor Red
                 Write-Log -Message "Support email address is not configured. Email not sent." -Module $functionName -LogLevel "Error" -LogFile $logFile
                 $emailSent = $false
             }
-            else {
+            else
+            {
                 $emailSent = Send-EmailWithAttachments -AccessToken $accessToken -To $settings.supportEmail -Subject $emailSubject -Body $emailBody -AttachmentPaths $attachmentFiles
             }
             
@@ -263,9 +265,17 @@ function Send-EmailWithAttachments()
     }
     else
     {
-        # Fallback to hardcoded value if token doesn't contain user info
-        $senderUPN = 'zuhairmahd@arabictutor.com'
-        Write-Log -Message "No user identity found in token, using fallback: $senderUPN" -Module $functionName -LogLevel "Warning" -LogFile $logFile
+        write-log -logFile $logFile -module $functionName -message "Could not determine sender UPN from token claims" -logLevel "Warning" 
+        $senderUPN = Read-Host -Prompt "Please enter your email address"                     
+        #ensure we get a valid email address format
+        while ([string]::IsNullOrWhiteSpace($senderUPN) -or -not ($senderUPN -match '^[^@\s]+@[^@\s]+\.[^@\s]+$'))                                     
+        {
+            Write-Host "Incorrect email format. Please enter a valid email address." -ForegroundColor Yellow                                
+            [console]::beep(1000, 300)                       
+            $senderUPN = Read-Host -Prompt "Please enter your email address"                     
+        }
+        write-log -logFile $logFile -module $functionName -message "Using user-provided sender UPN: $senderUPN" -logLevel "Debug"                                           
+        Write-Verbose "[$functionName] Using user-provided sender UPN: $senderUPN"                              
     }
     
     # Use me/sendMail since we're using the authenticated user's context
@@ -577,5 +587,3 @@ function New-ZipPackage()
         return $null
     }
 }
-
-
