@@ -349,10 +349,11 @@ function CallGraphAPI()
     {
         Write-Log -LogFile $logFile -Module $functionName -Message "No extra parameters provided." -LogLevel "Information"
     }
+    # Build default headers with Authorization and Content-Type
     if ($consistencyLevel)
     {
         Write-Log -LogFile $logFile -Module $functionName -Message "Adding consistency level to the headers." -LogLevel "Information"
-        $headers = @{
+        $defaultHeaders = @{
             Authorization    = "Bearer $accessToken"
             'Content-Type'   = 'application/json'
             ConsistencyLevel = 'Eventual'
@@ -361,9 +362,19 @@ function CallGraphAPI()
     else
     {
         Write-Log -LogFile $logFile -Module $functionName -Message "No consistency level provided." -LogLevel "Information"
-        $headers = @{
+        $defaultHeaders = @{
             Authorization  = "Bearer $accessToken"
             'Content-Type' = 'application/json'
+        }
+    }
+    
+    # Merge custom headers if provided (custom headers take precedence)
+    if ($headers)
+    {
+        Write-Log -LogFile $logFile -Module $functionName -Message "Custom headers provided. Merging with default headers." -LogLevel "Information"
+        foreach ($key in $headers.Keys)
+        {
+            $defaultHeaders[$key] = $headers[$key]
         }
     }
     #endregion
@@ -374,7 +385,7 @@ function CallGraphAPI()
     $restParams = @{
         Method          = $method
         Uri             = $encodedUri
-        Headers         = $headers
+        Headers         = $defaultHeaders
         UseBasicParsing = $true
     }
     # Only add Body parameter if it exists
@@ -382,11 +393,6 @@ function CallGraphAPI()
     {
         Write-Log -LogFile $logFile -Module $functionName -Message "Body parameter provided. Adding to the request." -LogLevel "Information"
         $restParams['Body'] = $body
-    }
-    if ($headers)
-    {
-        Write-Log -LogFile $logFile -Module $functionName -Message "Custom headers provided. Adding to the request." -LogLevel "Information"
-        $restParams['Headers'] = $headers
     }                                           
     #Add statusCodeVariable if we are running under powershell  7.0 or higher
     if ($PSVersionTable.PSVersion.Major -ge 7)
@@ -412,7 +418,7 @@ function CallGraphAPI()
             $nextLink = $response.'@odata.nextLink'
             while ($nextLink)
             {
-                $nextGroup = Invoke-RestMethod -Method $method -Uri $nextLink -Headers $headers -UseBasicParsing
+                $nextGroup = Invoke-RestMethod -Method $method -Uri $nextLink -Headers $defaultHeaders -UseBasicParsing
                 Write-Log -LogFile $logFile -Module $functionName -Message "Fetched next page with $($nextGroup.value.Count) items." -LogLevel "Information"
                 if ($nextGroup.value)
                 {
