@@ -56,7 +56,7 @@ function CallGraphAPI()
     # Check if batch processing is requested (array with multiple items)
     $isBatchRequest = $isArrayInput -and $ResourcePath.Count -gt 1
     $batchThreshold = 1
-    Write-Verbose "[$functionName] isBatchRequest: $isBatchRequest with a threshold of $batchThreshold                  " 
+    Write-Verbose "[$functionName] isBatchRequest: $isBatchRequest with a threshold of $batchThreshold" 
     write-log -logFile $logFile -Module $functionName -Message "isBatchRequest: $isBatchRequest with a threshold of $batchThreshold" -LogLevel "Information"                                        
     if ($isBatchRequest -and $ResourcePath.Count -ge $batchThreshold)
     {
