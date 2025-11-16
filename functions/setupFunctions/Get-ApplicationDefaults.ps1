@@ -122,6 +122,7 @@ function Get-ApplicationDefaults()
             operatingSystem              = "Windows"
             preferredBrowser             = 'Chrome'
             documentationURL             = "https://github.com/zuhairmahd/Autopilot/blob/master/readme.md"
+            licenseURL                   = "https://github.com/zuhairmahd/Autopilot/blob/master/LICENSE"
             privateSession               = $false           
             migrateLegacyConfiguration   = $true
             hideEmptyMenus               = $true
@@ -171,6 +172,7 @@ function Get-ApplicationDefaults()
             companyName                     = ""
             supportEmail                    = ""
             documentationURL                = "https://github.com/zuhairmahd/Autopilot/blob/master/readme.md"
+            licenseURL                      = "https://github.com/zuhairmahd/Autopilot/blob/master/LICENSE"
             version                         = $Version
             validateScopes                  = $false
             useGridForLogDisplay            = $true
@@ -994,6 +996,18 @@ function Get-ApplicationDefaults()
                     @{
                         description           = 'View the application documentation'
                         name                  = 'View Documentation'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced',
+                            'helpdesk',
+                            'registration'
+                        )                                   
+                    },
+                    @{
+                        description           = 'View the application License Terms'
+                        name                  = 'View License'
                         blockType             = 'action'
                         includeInDisplayModes = @(
                             'full',
