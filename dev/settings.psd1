@@ -49,26 +49,26 @@
     requiredScopes = @(
         @{
             Scope = 'User.Read.All'
+            Reason = 'Required to read user profiles, group memberships, and registered devices.'
             Endpoints = @(
                 '/users',
                 'users/id',
                 'users/id/memberOf',
                 'users/id/registeredDevices'
             )
-            Reason = 'Required to read user profiles, group memberships, and registered devices.'
         },
         @{
             Scope = 'Device.Read.All'
-            Endpoints = @('devices')
             Reason = 'Required to read Microsoft Entra ID device objects.'
+            Endpoints = @('devices')
         },
         @{
             Scope = 'DeviceManagementApps.ReadWrite.All'
+            Reason = 'Required to read application information and manage app assignments.'
             Endpoints = @(
                 'deviceAppManagement/mobileApps',
                 'deviceAppManagement/mobileApps/id/assignments'
             )
-            Reason = 'Required to read application information and manage app assignments.'
         },
         @{
             scope = 'Mail.Send'
@@ -77,60 +77,60 @@
         },
         @{
             Scope = 'DeviceManagementConfiguration.Read.All'
-            Endpoints = @('deviceManagement/deviceConfigurations')
             Reason = 'Required to read Intune device configuration policies.'
+            Endpoints = @('deviceManagement/deviceConfigurations')
         },
         @{
             Scope = 'DeviceManagementManagedDevices.Read.All'
+            Reason = 'Required to read Intune managed device properties.'
             Endpoints = @(
                 'deviceManagement/managedDevices',
                 'deviceManagement/managedDevices/id'
             )
-            Reason = 'Required to read Intune managed device properties.'
         },
         @{
             Scope = 'DeviceManagementManagedDevices.PrivilegedOperations.All'
-            Endpoints = @('directory/deviceLocalCredentials')
             Reason = 'Required for highly privileged operations, specifically to read local admin (LAPS) passwords.'
+            Endpoints = @('directory/deviceLocalCredentials')
         },
         @{
             Scope = 'DeviceManagementServiceConfig.ReadWrite.All'
+            Reason = 'Required to read Autopilot events and to read and manage Autopilot device identities.'
             Endpoints = @(
                 'deviceManagement/autopilotEvents',
                 'deviceManagement/importedWindowsAutopilotDeviceIdentities',
                 'deviceManagement/windowsAutopilotDeviceIdentities'
             )
-            Reason = 'Required to read Autopilot events and to read and manage Autopilot device identities.'
         },
         @{
             Scope = 'BitlockerKey.Read.All'
-            Endpoints = @('informationProtection/bitlocker/recoveryKeys')
             Reason = 'Required to read BitLocker recovery keys for all devices.'
+            Endpoints = @('informationProtection/bitlocker/recoveryKeys')
         },
         @{
             scope = 'DeviceManagementConfiguration.ReadWrite.All'
-            endpoints = @('deviceManagement/deviceConfigurations')
             reason = 'Required to create, update, and delete Intune device configuration policies.'
+            endpoints = @('deviceManagement/deviceConfigurations')
         },
         @{
             scope = 'DeviceManagementApps.Read.All'
-            endpoints = @('deviceAppManagement/mobileApps')
             reason = 'Required to read application information in Intune.'
+            endpoints = @('deviceAppManagement/mobileApps')
         },
         @{
             scope = 'DeviceManagementManagedDevices.ReadWrite.All'
-            endpoints = @('deviceManagement/managedDevices')
             reason = 'Required to create, update, and delete Intune managed device properties.'
+            endpoints = @('deviceManagement/managedDevices')
         },
         @{
             scope = 'DeviceManagementScripts.Read.All'
-            endpoints = @('deviceManagement/deviceHealthScripts')
             reason = 'Required to read Intune device management scripts.'
+            endpoints = @('deviceManagement/deviceHealthScripts')
         },
         @{
             scope = 'DeviceManagementScripts.ReadWrite.All'
-            endpoints = @('deviceManagement/deviceHealthScripts')
             reason = 'Required to create, update, and delete Intune device management scripts.'
+            endpoints = @('deviceManagement/deviceHealthScripts')
         }
     )
     globalSettings = @{
@@ -152,6 +152,7 @@
         operatingSystem = 'Windows'
         preferredBrowser = 'Chrome'
         documentationURL = 'https://github.com/zuhairmahd/Autopilot/blob/master/readme.md'
+        licenseURL = 'https://github.com/zuhairmahd/Autopilot/blob/master/LICENSE'
         privateSession = $false
         migrateLegacyConfiguration = $true
         hideEmptyMenus = $true
