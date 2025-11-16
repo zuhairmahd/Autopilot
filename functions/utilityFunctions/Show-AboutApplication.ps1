@@ -48,6 +48,10 @@ function Show-AboutApplication()
         Write-Host "`n================ Documentation ================`n"            
         return 'ViewDocumentation'
     } -returnsValue
+    $aboutMenu = AddMenuItem -Menu $aboutMenu -Name "View License" -Action {
+        Write-Host "`n================ License ================`n"            
+        return 'ViewLicense'
+    } -returnsValue
     $aboutMenu = AddMenuItem -Menu $aboutMenu -Name "Request support" -Action {
         Write-Host "`n================ Support Information ================`n"   
         return 'RequestSupport'
@@ -104,6 +108,12 @@ function Show-AboutApplication()
             }
             'ViewDocumentation'
             {
+                if ([string]::IsNullOrEmpty($settings.documentationURL))
+                {
+                    Write-Host "No documentation URL configured." -ForegroundColor Yellow
+                    write-log -logFile $LogFile -Module "$FunctionName" -Message "- No documentation URL configured." -LogLevel "Warning"
+                    return
+                }                                                   
                 Write-Host "`n================ Documentation ================`n"            
                 $browserLaunched = LaunchBrowser -url $settings.documentationURL -browser $settings.preferredBrowser
                 if ($browserLaunched)
@@ -117,6 +127,27 @@ function Show-AboutApplication()
                     write-log -logFile $LogFile -Module "$FunctionName" -Message "- Failed to open documentation URL: $($settings.documentationURL)" -LogLevel "Warning"
                 }                       
             }                                       
+            'ViewLicense'
+            {
+                if ([string]::IsNullOrEmpty($settings.licenseURL))
+                {
+                    Write-Host "No license URL configured." -ForegroundColor Yellow
+                    write-log -logFile $LogFile -Module "$FunctionName" -Message "- No license URL configured." -LogLevel "Warning"
+                    return
+                }                                                           
+                Write-Host "`n================ License ================`n"            
+                $browserLaunched = LaunchBrowser -url $settings.licenseURL -browser $settings.preferredBrowser
+                if ($browserLaunched)
+                {
+                    write-log -logFile $LogFile -Module "$FunctionName" -Message "- Launched license URL $($settings.licenseURL) in browser: $($settings.preferredBrowser)" -LogLevel "Information"                               
+                    Write-Host "Opened license URL $($settings.licenseURL) in browser: $($settings.preferredBrowser)" -ForegroundColor Green
+                }
+                else
+                {
+                    Write-Host "Failed to open license URL: $($settings.licenseURL)" -ForegroundColor Red
+                    write-log -logFile $LogFile -Module "$FunctionName" -Message "- Failed to open license URL: $($settings.licenseURL      )" -LogLevel "Warning"
+                }                       
+            }                                   
             'RequestSupport'
             {
                 Send-DiagnosticInformation
