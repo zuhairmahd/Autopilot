@@ -506,7 +506,6 @@ function CallGraphAPI()
         if ($response.count)
         {
             Write-Log -LogFile $logFile -Module $functionName -Message "Number of objects returned: $($response.count)." -LogLevel "Information"
-            Write-Log -LogFile $logFile -Module $functionName -Message "Number of items returned: $($response.count)." -LogLevel "Information"                                                  
         }
         if ($response.value.Count)
         {
