@@ -75,10 +75,17 @@ function Get-DelegatedToken()
     }
     else
     {
+        Write-Verbose "[$functionName] No existing refresh token found in config."                  
+        write-log -LogFile $LogFile -Module $functionName -Message "No existing refresh token found in config."                                 
         if ($ForcedRenewal)
         {
             Write-Host "No existing refresh token found or refresh token was cleared - proceeding with new authentication flow." -ForegroundColor Yellow
             Write-Log -LogFile $LogFile -Module $functionName -Message "No existing refresh token found or refresh token was cleared - proceeding with new authentication flow."
+        }
+        else
+        {
+            Write-Verbose "[$functionName] Proceeding with new authentication flow."                            
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Proceeding with new authentication flow."                                                   
         }
     }
     # Generate a random state string
@@ -409,6 +416,7 @@ function Get-DelegatedToken()
     if (-not $automaticFlowSuccess)
     {
         Write-Log -LogFile $LogFile -Module $functionName -Message "Automatic flow was not successful, falling back to manual code input"
+        Write-Verbose "[$functionName] Automatic flow was not successful, falling back to manual code input"                        
         # Step 1: Open the authorization URL
         $authUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/authorize?client_id=$clientId&response_type=code&redirect_uri=$encodedRedirectUri&response_mode=query&scope=$encodedScopes&state=$state"
         Write-Verbose "[$functionName] Authorization URL: $authUrl"
