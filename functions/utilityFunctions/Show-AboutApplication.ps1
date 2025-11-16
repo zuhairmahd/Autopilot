@@ -108,7 +108,7 @@ function Show-AboutApplication()
             }
             'ViewDocumentation'
             {
-                if (-not [string]::IsNullOrEmpty($settings.documentationURL))
+                if ([string]::IsNullOrEmpty($settings.documentationURL))
                 {
                     Write-Host "No documentation URL configured." -ForegroundColor Yellow
                     write-log -logFile $LogFile -Module "$FunctionName" -Message "- No documentation URL configured." -LogLevel "Warning"
