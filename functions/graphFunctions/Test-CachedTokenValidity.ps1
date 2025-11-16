@@ -24,12 +24,36 @@ function Test-CachedTokenValidity()
     {
         # Token is not expired, but check if scopes match (for delegated auth)
         write-log -logFile $logFile -Module "$functionName" -Message "Validating cached token scopes for $domain in $cacheType cache"                   
-        Write-Verbose "[$functionName] Access token is not expired, validating scopes if requested"         
-        $requestedScopes = $requestedScopes -split ' '
-        if ($requestedScopes -and $requestedScopes.Count -gt 0)
+        Write-Verbose "[$functionName] Access token is not expired, validating scopes if requested"
+        
+        # Normalize requestedScopes to array first (may be passed as space-separated string or array)
+        # BUGFIX: Filter empty elements created by multiple consecutive spaces
+        # Note: Parameter is [string[]] so strings get wrapped in array automatically
+        $requestedScopesArray = @()
+        if ($requestedScopes.Count -eq 1 -and $requestedScopes[0] -match ' ')
+        {
+            # Single element array containing space-separated scopes (string was passed)
+            Write-Verbose "[$functionName] Normalizing space-separated scope string to array - VERSION 2024-11-15-FINAL"
+            $splitScopes = $requestedScopes[0] -split ' '
+            foreach ($scope in $splitScopes)
+            {
+                if (-not [string]::IsNullOrWhiteSpace($scope))
+                {
+                    $requestedScopesArray += $scope.Trim()
+                }
+            }
+        }
+        else
+        {
+            # Already an array or empty
+            $requestedScopesArray = $requestedScopes
+        }
+        Write-Verbose "[$functionName] Requested scopes after normalization (count=$($requestedScopesArray.Count)): $($requestedScopesArray -join ', ')"
+        
+        if ($requestedScopesArray -and $requestedScopesArray.Count -gt 0)
         {
             Write-Verbose "[$functionName] Validating cached token has required scopes"
-            write-log -logFile $logFile -Module "$functionName" -Message "Validating cached token has required scopes for $domain in $cacheType cache: $($requestedScopes -join ', ')"                   
+            write-log -logFile $logFile -Module "$functionName" -Message "Validating cached token has required scopes for $domain in $cacheType cache: $($requestedScopesArray -join ', ')"                   
             try
             {
                 # Decode the cached token to check its scopes
@@ -52,28 +76,6 @@ function Test-CachedTokenValidity()
                     Write-Verbose "[$functionName] Cached token has application scopes (roles): $($grantedScopes -join ', ')"
                     write-log -logFile $logFile -Module "$functionName" -Message "Cached token has application scopes (roles): $($grantedScopes -join ', ')"                    
                 }
-                
-                # Normalize requestedScopes to array (may be passed as space-separated string or array)
-                # BUGFIX: Filter empty elements created by multiple consecutive spaces
-                $requestedScopesArray = @()
-                if ($requestedScopes -is [string])
-                {
-                    Write-Verbose "[$functionName] Normalizing requested scopes from string to array - VERSION 2024-11-15-FINAL"
-                    # Split and filter using explicit foreach to ensure proper filtering
-                    $splitScopes = $requestedScopes -split ' '
-                    foreach ($scope in $splitScopes)
-                    {
-                        if (-not [string]::IsNullOrWhiteSpace($scope))
-                        {
-                            $requestedScopesArray += $scope.Trim()
-                        }
-                    }
-                }
-                else
-                {
-                    $requestedScopesArray = $requestedScopes
-                }
-                Write-Verbose "[$functionName] Requested scopes after normalization (count=$($requestedScopesArray.Count)): $($requestedScopesArray -join ', ')"
                 
                 # Check if all requested scopes are present in granted scopes
                 $missingScopes = $requestedScopesArray | Where-Object { $grantedScopes -notcontains $_ } 
