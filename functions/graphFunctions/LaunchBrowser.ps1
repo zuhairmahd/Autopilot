@@ -39,14 +39,14 @@ function LaunchBrowser()
                 Write-Verbose "[$functionName] Private session detected.  Opening $($settings.preferredBrowser) in private mode"
                 $urlParams = @{
                     FilePath     = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
-                    ArgumentList = "--inprivate", $authUrl
+                    ArgumentList = "--inprivate", $url  
                 }
             }
             else
             {
                 $urlParams = @{
                     FilePath     = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
-                    ArgumentList = $authUrl
+                    ArgumentList = $url
                 }
             }
         }
@@ -58,14 +58,14 @@ function LaunchBrowser()
                 Write-Verbose "[$functionName] Private session detected.  Opening $($settings.preferredBrowser) in private mode"
                 $urlParams = @{
                     FilePath     = "C:\Program Files\Google\Chrome\Application\chrome.exe"
-                    ArgumentList = "--incognito", $authUrl
+                    ArgumentList = "--incognito", $url
                 }
             }
             else
             {
                 $urlParams = @{
                     FilePath     = "C:\Program Files\Google\Chrome\Application\chrome.exe"
-                    ArgumentList = $authUrl
+                    ArgumentList = $url     
                 }
             }
         }
@@ -77,14 +77,14 @@ function LaunchBrowser()
                 Write-Verbose "[$functionName] Private session detected.  Opening $($settings.preferredBrowser) in private mode"
                 $urlParams = @{
                     FilePath     = "C:\Program Files\Mozilla Firefox\firefox.exe"
-                    ArgumentList = "-private-window", $authUrl
+                    ArgumentList = "-private-window", $url
                 }
             }
             else
             {
                 $urlParams = @{
                     FilePath     = "C:\Program Files\Mozilla Firefox\firefox.exe"
-                    ArgumentList = $authUrl
+                    ArgumentList = $url
                 }
             }
         }
@@ -93,7 +93,7 @@ function LaunchBrowser()
             Write-Verbose "[$functionName] Opening default browser for authentication"
             $urlParams = @{
                 FilePath     = "start"
-                ArgumentList = $authUrl
+                ArgumentList = $url     
             }
         }
     }
@@ -101,7 +101,7 @@ function LaunchBrowser()
     try
     {
         # Start the browser with the specified URL
-        Start-Process @urlParams 
+        Start-Process @urlParams
         Write-Verbose "[$functionName] Browser launched successfully."
     }
     catch

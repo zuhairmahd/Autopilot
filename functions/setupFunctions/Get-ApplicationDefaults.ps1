@@ -89,6 +89,7 @@ function Get-ApplicationDefaults()
                 "Device.ReadWrite.All",
                 "DeviceManagementApps.Read.All",
                 "DeviceManagementConfiguration.ReadWrite.All",
+                "Mail.Send",
                 "DeviceManagementScripts.Read.All",
                 "DeviceManagementManagedDevices.PrivilegedOperations.All",
                 "DeviceManagementManagedDevices.ReadWrite.All",
@@ -106,6 +107,8 @@ function Get-ApplicationDefaults()
             showLicenseBanner            = $true
             validateScopes               = $true
             deviceContactThresholdInDays = 30
+            useGridForLogDisplay         = $true     
+            DisplayManualFilterSelection = $false
             appModes                     = @(
                 "full"
             )
@@ -116,13 +119,10 @@ function Get-ApplicationDefaults()
             maxGroupMatchDisplay         = 10
             maxMenuItemsPerPage          = 15
             release                      = "auto"
-            repoInfo                     = [ordered]@{
-                repoName      = "Autopilot"
-                baseSourceURL = "https://raw.githubusercontent.com"
-                baseURL       = "https://www.github.com"
-                repoPath      = "zuhairmahd"
-            }
             operatingSystem              = "Windows"
+            preferredBrowser             = 'Chrome'
+            documentationURL             = "https://github.com/zuhairmahd/Autopilot/blob/master/readme.md"
+            privateSession               = $false           
             migrateLegacyConfiguration   = $true
             hideEmptyMenus               = $true
             autoUpdate                   = $true
@@ -169,8 +169,12 @@ function Get-ApplicationDefaults()
             )
             domain                          = $DomainName
             companyName                     = ""
+            supportEmail                    = ""
+            documentationURL                = "https://github.com/zuhairmahd/Autopilot/blob/master/readme.md"
             version                         = $Version
             validateScopes                  = $false
+            useGridForLogDisplay            = $true
+            DisplayManualFilterSelection    = $false
             hideEmptyMenus                  = $true
             maxWaitTime                     = 30
             showLicenseBanner               = $true
@@ -258,6 +262,11 @@ function Get-ApplicationDefaults()
                     "deviceAppManagement/mobileApps",
                     "deviceAppManagement/mobileApps/id/assignments"
                 )
+            },
+            @{
+                scope     = 'Mail.Send'
+                endpoints = @('me/sendMail')                                    
+                reason    = 'Required to send emails on behalf of the signed-in user.'              
             },
             @{
                 Scope     = "DeviceManagementConfiguration.Read.All"
@@ -604,8 +613,10 @@ function Get-ApplicationDefaults()
                         )
                     },
                     @{
-                        description           = 'Learn more about this application'
+                        # menuName              = 'aboutMenu'
+                        description           = 'Application information and support'
                         name                  = 'About'
+                        # blockType             = 'menu'
                         blockType             = 'action'
                         includeInDisplayModes = @(
                             'full',
@@ -928,6 +939,80 @@ function Get-ApplicationDefaults()
                             'full',
                             'admin',
                             'advanced'
+                        )
+                    }
+                )
+                type                  = 'static'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin',
+                    'advanced',
+                    'helpdesk',
+                    'registration'
+                )
+            }
+            aboutMenu                 = @{
+                Title                 = 'About'
+                Description           = 'Application information and support'
+                items                 = @(
+                    @{
+                        description           = 'View Azure app registration information'
+                        name                  = 'View Azure app registration information'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced',
+                            'helpdesk',
+                            'registration'
+                        )
+                    },
+                    @{
+                        description           = 'View the scopes available to the Access Token'
+                        name                  = 'View Access Token Scopes'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced',
+                            'helpdesk',
+                            'registration'
+                        )
+                    },
+                    @{
+                        description           = 'View the script logs'
+                        name                  = 'View logs'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced',
+                            'helpdesk',
+                            'registration'
+                        )
+                    },
+                    @{
+                        description           = 'View the application documentation'
+                        name                  = 'View Documentation'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced',
+                            'helpdesk',
+                            'registration'
+                        )                                   
+                    },
+                    @{
+                        description           = 'Send a message to support including logs'
+                        name                  = 'Request support'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced',
+                            'helpdesk',
+                            'registration'
                         )
                     }
                 )

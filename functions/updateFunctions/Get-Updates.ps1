@@ -19,9 +19,9 @@ function Get-Updates()
     {
         Write-Verbose "[$functionName] The provided executable file name '$executableFileName' does not match 'exe'."
         Write-Verbose "[$functionName] Checking whether a similar executable is found."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "The provided executable file name '$executableFileName' does not match 'exe'. Checking for similar executable." -LogLevel "Warning"
         #replace whatever the extension of $executableFileName with .exe
         $executableFileName = [System.IO.Path]::ChangeExtension($executableFileName, ".exe")
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "The provided executable file name '$executableFileName' does not match 'exe'. Checking for similar executable." -LogLevel "Warning"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Executable filename resolved to $executableFileName" -LogLevel "Information"
         if (-not (Test-Path $executableFileName))
         {
