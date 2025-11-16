@@ -1058,6 +1058,7 @@ else
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Force new refresh token: $($auth.ForceNewRefreshToken )" -LogLevel "Information"
     Write-Log -LogFile $LogFile -Module $scriptName -Message "No save refresh token: $($auth.NoSaveRefreshToken )" -LogLevel "Information"
     Write-Log -logFile $LogFile -Module $scriptName -Message "Getting access token..." -LogLevel "Information"
+
     $accessToken = GetGraphAccessToken @getTokenParams
 }
 # Clear the cached user password now that authentication is complete

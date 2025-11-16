@@ -153,15 +153,20 @@ function DecodeJwtToken()
             return $humanClaims
         }
     }
-    if ($RawJSON)
-    {
-        Write-Verbose "[$functionName] Returning raw decoded JWT payload as raw JSON."
-        return $json 
-    }
     else
     {
-        Write-Verbose "[$functionName] Returning raw decoded JWT payload."
-        return $json | ConvertFrom-Json
+        # Raw mode: Return unfiltered JWT claims
+        Write-Verbose "[$functionName] Raw mode: Returning unfiltered JWT claims"
+        if ($RawJSON)
+        {
+            Write-Verbose "[$functionName] Returning raw decoded JWT payload as raw JSON."
+            return $json 
+        }
+        else
+        {
+            Write-Verbose "[$functionName] Returning raw decoded JWT payload as object."
+            return $claims
+        }
     }
 }
 
