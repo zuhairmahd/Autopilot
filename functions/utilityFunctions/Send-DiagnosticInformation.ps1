@@ -19,7 +19,7 @@ function Send-DiagnosticInformation()
     
     Transmission Methods:
     - Email (Graph API): Automated sending via Microsoft Graph API
-    - Email (MAPI): Opens default email client for manual review and sending
+    - Email (Windows MAPI): Opens default MAPI-compatible mail client for manual review and sending
     - Zip File: Manual save to user-specified location
     - Secure handling of sensitive diagnostic data
     
@@ -217,24 +217,26 @@ function Send-EmailWithAttachments()
     - Handles large attachments efficiently
     - Sends email automatically without user interaction
     
-    MAPI/Outlook COM Integration (Optional):
-    - Opens default email client (Outlook) with pre-filled message
+    Windows Simple MAPI Integration (Optional):
+    - Opens default Windows mail client with pre-filled message
+    - Works with any MAPI-compatible mail client (Outlook, Thunderbird, eM Client, etc.)
     - Allows user to review and edit before sending
     - Works with standard user permissions
     - Does not require Graph API authentication
     
     Attachment Processing:
     - Supports multiple file attachments
-    - Automatic MIME type detection based on file extensions
+    - Automatic MIME type detection based on file extensions (Graph API)
     - Base64 encoding for secure transmission (Graph API)
-    - Direct file attachment (MAPI/Outlook)
+    - Direct file path attachment (Windows MAPI)
     - File size validation and handling
     
     Error Handling:
     - Comprehensive connection and authentication error handling
     - Graceful degradation when Graph modules are unavailable
-    - Fallback options when Outlook is not available (MAPI mode)
+    - Fallback options when MAPI-compatible mail client is not available
     - Detailed logging of email transmission attempts
+    - User-friendly error messages with MAPI error code explanations
 
 .PARAMETER AccessToken
     Access token for Microsoft Graph API authentication.
@@ -257,9 +259,10 @@ function Send-EmailWithAttachments()
     Supported file types include .txt, .log, .cer, .zip, and others.
 
 .PARAMETER UseMAPI
-    Switch parameter to use MAPI/Outlook COM automation instead of Microsoft Graph API.
-    When specified, opens the default email client with a pre-filled message,
-    allowing the user to review, edit, and send manually.
+    Switch parameter to use Windows Simple MAPI instead of Microsoft Graph API.
+    When specified, opens the default Windows mail client with a pre-filled message,
+    allowing the user to review, edit, and send manually. Works with any MAPI-compatible
+    mail client including Outlook, Thunderbird, eM Client, and others.
 
 .EXAMPLE
     $success = Send-EmailWithAttachments -AccessToken $token -To "support@company.com" -Subject "PIV Issue" -Body "Please help" -AttachmentPaths @("C:\logs\error.log")
@@ -267,7 +270,7 @@ function Send-EmailWithAttachments()
 
 .EXAMPLE
     $success = Send-EmailWithAttachments -To "support@company.com" -Subject "PIV Issue" -Body "Please help" -AttachmentPaths @("C:\logs\error.log") -UseMAPI
-    Opens Outlook with pre-filled email for user review and manual sending.
+    Opens the default Windows mail client (Outlook, Thunderbird, etc.) with pre-filled email for user review and manual sending.
 
 .OUTPUTS
     Boolean value indicating email operation success:
@@ -282,9 +285,12 @@ function Send-EmailWithAttachments()
     - AccessToken parameter
     
     Prerequisites for MAPI mode:
-    - Microsoft Outlook installed and configured
-    - Default email client set to Outlook
+    - A MAPI-compatible mail client installed and configured
+    - Mail client set as the default in Windows
     - No authentication required
+    - Supported clients include: Outlook (any version), Thunderbird, eM Client, and others
+    
+    Note: Windows 10/11 Mail app does not support Simple MAPI.
     
     The function automatically handles authentication prompts and permission requests.
     #>
@@ -307,41 +313,114 @@ function Send-EmailWithAttachments()
     $functionName = $MyInvocation.MyCommand.Name
     Write-Log -Message "Starting email send process to $To $(if ($UseMAPI) { '(MAPI mode)' } else { '(Graph API mode)' })" -Module $functionName -LogLevel "Information" -LogFile $logFile
     
-    # MAPI Mode: Use Outlook COM automation to open email client
+    # MAPI Mode: Use Windows Simple MAPI to open default mail client
     if ($UseMAPI)
     {
-        Write-Log -Message "Using MAPI/Outlook COM automation to create email" -Module $functionName -LogLevel "Information" -LogFile $logFile
-        Write-Verbose "[$functionName] Using MAPI/Outlook COM automation"
+        Write-Log -Message "Using Windows Simple MAPI to open default mail client" -Module $functionName -LogLevel "Information" -LogFile $logFile
+        Write-Verbose "[$functionName] Using Windows Simple MAPI"
         
         try
         {
-            # Attempt to create Outlook COM object
-            $outlook = New-Object -ComObject Outlook.Application -ErrorAction Stop
-            Write-Log -Message "Successfully created Outlook COM object" -Module $functionName -LogLevel "Debug" -LogFile $logFile
+            # Define MAPI structures and P/Invoke signatures using Add-Type
+            $mapiDefinition = @"
+using System;
+using System.Runtime.InteropServices;
+
+[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+public struct MapiFileDesc
+{
+    public int ulReserved;
+    public int flFlags;
+    public int nPosition;
+    public string lpszPathName;
+    public string lpszFileName;
+    public IntPtr lpFileType;
+}
+
+[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+public struct MapiRecipDesc
+{
+    public int ulReserved;
+    public int ulRecipClass;
+    public string lpszName;
+    public string lpszAddress;
+    public int ulEIDSize;
+    public IntPtr lpEntryID;
+}
+
+[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+public struct MapiMessage
+{
+    public int ulReserved;
+    public string lpszSubject;
+    public string lpszNoteText;
+    public string lpszMessageType;
+    public string lpszDateReceived;
+    public string lpszConversationID;
+    public int flFlags;
+    public IntPtr lpOriginator;
+    public int nRecipCount;
+    public IntPtr lpRecips;
+    public int nFileCount;
+    public IntPtr lpFiles;
+}
+
+public class SimpleMAPI
+{
+    [DllImport("mapi32.dll", CharSet = CharSet.Ansi)]
+    public static extern int MAPISendMail(
+        IntPtr lhSession,
+        IntPtr ulUIParam,
+        ref MapiMessage lpMessage,
+        int flFlags,
+        int ulReserved
+    );
+    
+    // MAPI Constants
+    public const int MAPI_DIALOG = 0x00000008;  // Display a send note UI
+    public const int MAPI_LOGON_UI = 0x00000001;  // Display logon UI
+    public const int MAPI_TO = 1;  // Recipient type: To
+}
+"@
             
-            # Create a new mail item
-            $mail = $outlook.CreateItem(0)
-            Write-Log -Message "Created new Outlook mail item" -Module $functionName -LogLevel "Debug" -LogFile $logFile
+            # Only add the type if it hasn't been added already
+            if (-not ([System.Management.Automation.PSTypeName]'SimpleMAPI').Type)
+            {
+                Add-Type -TypeDefinition $mapiDefinition -ErrorAction Stop
+                Write-Log -Message "MAPI types successfully loaded" -Module $functionName -LogLevel "Debug" -LogFile $logFile
+            }
             
-            # Set email properties
-            $mail.To = $To
-            $mail.Subject = $Subject
-            $mail.Body = $Body
-            Write-Log -Message "Set email properties: To=$To, Subject=$Subject" -Module $functionName -LogLevel "Debug" -LogFile $logFile
+            # Prepare recipient
+            $recip = New-Object MapiRecipDesc
+            $recip.ulRecipClass = [SimpleMAPI]::MAPI_TO
+            $recip.lpszName = $To
+            $recip.lpszAddress = "SMTP:$To"  # Use SMTP prefix for email addresses
             
-            # Add attachments
+            # Allocate unmanaged memory for recipient
+            $ptrRecip = [System.Runtime.InteropServices.Marshal]::AllocCoTaskMem([System.Runtime.InteropServices.Marshal]::SizeOf($recip))
+            [System.Runtime.InteropServices.Marshal]::StructureToPtr($recip, $ptrRecip, $false)
+            
+            # Prepare attachments
             $attachmentCount = 0
+            $attachmentPtrs = @()
             foreach ($attachmentPath in $AttachmentPaths)
             {
                 if (Test-Path $attachmentPath)
                 {
                     try
                     {
-                        $mail.Attachments.Add($attachmentPath) | Out-Null
-                        $fileName = [System.IO.Path]::GetFileName($attachmentPath)
+                        $attachment = New-Object MapiFileDesc
+                        $attachment.nPosition = -1  # -1 means not inline
+                        $attachment.lpszPathName = $attachmentPath
+                        $attachment.lpszFileName = [System.IO.Path]::GetFileName($attachmentPath)
+                        
+                        $ptrAttachment = [System.Runtime.InteropServices.Marshal]::AllocCoTaskMem([System.Runtime.InteropServices.Marshal]::SizeOf($attachment))
+                        [System.Runtime.InteropServices.Marshal]::StructureToPtr($attachment, $ptrAttachment, $false)
+                        $attachmentPtrs += $ptrAttachment
+                        
                         $attachmentCount++
-                        Write-Log -Message "Added attachment: $fileName" -Module $functionName -LogLevel "Information" -LogFile $logFile
-                        Write-Verbose "[$functionName] Added attachment: $fileName"
+                        Write-Log -Message "Added attachment: $($attachment.lpszFileName)" -Module $functionName -LogLevel "Information" -LogFile $logFile
+                        Write-Verbose "[$functionName] Added attachment: $($attachment.lpszFileName)"
                     }
                     catch
                     {
@@ -356,26 +435,84 @@ function Send-EmailWithAttachments()
                 }
             }
             
-            # Display the email for user review and sending
-            $mail.Display()
-            Write-Log -Message "Email displayed in Outlook with $attachmentCount attachment(s)" -Module $functionName -LogLevel "Information" -LogFile $logFile
-            Write-Verbose "[$functionName] Email displayed in Outlook with $attachmentCount attachment(s)"
+            # Create array of attachment pointers if we have attachments
+            $ptrFiles = [IntPtr]::Zero
+            if ($attachmentCount -gt 0)
+            {
+                # Allocate array of pointers
+                $arraySize = [System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr]) * $attachmentCount
+                $ptrFiles = [System.Runtime.InteropServices.Marshal]::AllocCoTaskMem($arraySize)
+                
+                # Copy attachment pointers to array
+                for ($i = 0; $i -lt $attachmentCount; $i++)
+                {
+                    $offset = $i * [System.Runtime.InteropServices.Marshal]::SizeOf([Type][IntPtr])
+                    [System.Runtime.InteropServices.Marshal]::WriteIntPtr($ptrFiles, $offset, $attachmentPtrs[$i])
+                }
+            }
             
-            return $true
+            # Prepare the message
+            $msg = New-Object MapiMessage
+            $msg.lpszSubject = $Subject
+            $msg.lpszNoteText = $Body
+            $msg.nRecipCount = 1
+            $msg.lpRecips = $ptrRecip
+            $msg.nFileCount = $attachmentCount
+            $msg.lpFiles = $ptrFiles
+            
+            # Call MAPISendMail with MAPI_DIALOG flag to show the compose window
+            Write-Log -Message "Calling MAPISendMail to open default mail client" -Module $functionName -LogLevel "Debug" -LogFile $logFile
+            $result = [SimpleMAPI]::MAPISendMail([IntPtr]::Zero, [IntPtr]::Zero, [ref]$msg, [SimpleMAPI]::MAPI_DIALOG, 0)
+            
+            # Free unmanaged memory
+            [System.Runtime.InteropServices.Marshal]::FreeCoTaskMem($ptrRecip)
+            foreach ($ptr in $attachmentPtrs)
+            {
+                [System.Runtime.InteropServices.Marshal]::FreeCoTaskMem($ptr)
+            }
+            if ($ptrFiles -ne [IntPtr]::Zero)
+            {
+                [System.Runtime.InteropServices.Marshal]::FreeCoTaskMem($ptrFiles)
+            }
+            
+            # Check result
+            if ($result -eq 0)
+            {
+                Write-Log -Message "Default mail client opened successfully with $attachmentCount attachment(s)" -Module $functionName -LogLevel "Information" -LogFile $logFile
+                Write-Verbose "[$functionName] Default mail client opened successfully with $attachmentCount attachment(s)"
+                return $true
+            }
+            else
+            {
+                $errorMessage = "MAPISendMail failed with error code: $result"
+                Write-Error $errorMessage
+                Write-Log -Message $errorMessage -Module $functionName -LogLevel "Error" -LogFile $logFile
+                
+                # Provide helpful error messages based on common error codes
+                switch ($result)
+                {
+                    1 { Write-Host "User cancelled the operation." -ForegroundColor Yellow }
+                    2 { Write-Host "General MAPI failure. The default mail client may not be properly configured." -ForegroundColor Red }
+                    3 { Write-Host "MAPI login failure. Please check your mail client configuration." -ForegroundColor Red }
+                    5 { Write-Host "Insufficient memory to complete the operation." -ForegroundColor Red }
+                    8 { Write-Host "Too many attachments or sessions." -ForegroundColor Red }
+                    10 { Write-Host "Too many recipients specified." -ForegroundColor Red }
+                    11 { Write-Host "One or more attachments could not be found." -ForegroundColor Red }
+                    12 { Write-Host "Attachment open failure." -ForegroundColor Red }
+                    14 { Write-Host "Invalid recipient address." -ForegroundColor Red }
+                    21 { Write-Host "Insufficient memory for attachment." -ForegroundColor Red }
+                    default { Write-Host "MAPI error code: $result. The default mail client may not support MAPI or is not properly configured." -ForegroundColor Red }
+                }
+                
+                return $false
+            }
         }
         catch
         {
-            $errorMessage = "Failed to create email using Outlook COM automation: $($_.Exception.Message)"
+            $errorMessage = "Failed to send email using Windows MAPI: $($_.Exception.Message)"
             Write-Error $errorMessage
             Write-Log -Message $errorMessage -Module $functionName -LogLevel "Error" -LogFile $logFile
-            
-            # Check if Outlook is installed
-            $outlookInstalled = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\OUTLOOK.EXE" -ErrorAction SilentlyContinue
-            if (-not $outlookInstalled)
-            {
-                Write-Log -Message "Microsoft Outlook does not appear to be installed on this system" -Module $functionName -LogLevel "Error" -LogFile $logFile
-                Write-Host "Microsoft Outlook is not installed. MAPI mode requires Outlook to be installed." -ForegroundColor Red
-            }
+            Write-Host "Windows MAPI failed. Please ensure a MAPI-compatible mail client is installed and configured as the default." -ForegroundColor Red
             
             return $false
         }
