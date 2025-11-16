@@ -382,6 +382,7 @@ function Send-EmailWithAttachments()
     }
     
     # Graph API Mode: Continue with existing implementation
+    $requiredScope = "Mail.Send"
     if (-not $accessToken)
     {
         Write-Error "AccessToken is required when not using MAPI mode"
@@ -391,6 +392,37 @@ function Send-EmailWithAttachments()
     
     # Extract user info from access token to ensure we're sending from the correct mailbox
     $tokenClaims = DecodeJwtToken -Token $accessToken -raw
+    $grantedScopes = @()
+    if ($tokenClaims.scp)
+    {
+        # Delegated auth - scp is space-separated string
+        Write-Verbose "[$functionName] Cached token has delegated scopes (scp)"
+        $grantedScopes = $tokenClaims.scp -split ' ' | Where-Object { $_ -and $_.Trim() }
+        Write-Verbose "[$functionName] Cached token has delegated scopes (scp): $($grantedScopes -join ', ')"
+        write-log -logFile $logFile -Module "$functionName" -Message "Cached token has delegated scopes (scp): $($grantedScopes -join ', ')"                                
+    }
+    elseif ($tokenClaims.roles)
+    {
+        # Application auth - roles is array
+        $grantedScopes = $tokenClaims.roles
+        Write-Verbose "[$functionName] Cached token has application scopes (roles): $($grantedScopes -join ', ')"
+        write-log -logFile $logFile -Module "$functionName" -Message "Cached token has application scopes (roles): $($grantedScopes -join ', ')"                    
+    }
+    else 
+    {
+        Write-Error "Could not determine granted scopes from access token"
+        Write-Log -Message "Could not determine granted scopes from access token" -Module $functionName -LogLevel "Error" -LogFile $logFile
+        return $false
+    }                                                               
+    
+    if (-not ($grantedScopes -contains $requiredScope))
+    {
+        Write-Error "The access token does not have the required scope '$requiredScope' to send email."
+        Write-Log -Message "The access token does not have the required scope '$requiredScope' to send email." -Module $functionName -LogLevel "Error" -LogFile $logFile
+        return $false
+    }                                                                                   
+    Write-Verbose "[$functionName] Access token has required scope: $requiredScope"                                     
+    write-log -logFile $logFile -Module "$functionName" -Message "Access token has required scope: $requiredScope"                  
     $senderUPN = $null
     
     # Try to get UPN from token claims (preferred_username, upn, email, unique_name in order of preference)
@@ -431,9 +463,6 @@ function Send-EmailWithAttachments()
     
     # Use me/sendMail since we're using the authenticated user's context
     $emailSendURI = "me/sendMail"
-    $headers = @{
-        "Content-Type" = "application/json"
-    }               
     # Prepare attachments
     $attachments = @()
     foreach ($attachmentPath in $AttachmentPaths)
@@ -504,8 +533,7 @@ function Send-EmailWithAttachments()
     try 
     {
         Write-Log -Message "Calling Graph API to send email" -Module $functionName -LogLevel "Debug" -LogFile $logFile
-        $emailResponse = CallGraphApi -AccessToken $accessToken -Method POST -ResourcePath $emailSendURI -Body $emailMessage -Headers $headers           
-        $global:er = $emailResponse
+        $emailResponse = CallGraphApi -AccessToken $accessToken -Method POST -ResourcePath $emailSendURI -Body $emailMessage
         Write-Log -Message "Email sent successfully to $To with $($attachments.Count) attachment(s)" -Module $functionName -LogLevel "Information" -LogFile $logFile
         if ([string]::IsNullOrEmpty($emailResponse))
         {
