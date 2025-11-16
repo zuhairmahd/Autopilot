@@ -3,14 +3,14 @@
     Unit tests for Send-EmailWithAttachments function
 
 .DESCRIPTION
-    Tests email sending functionality with both Microsoft Graph API and MAPI/Outlook COM automation.
+    Tests email sending functionality with both Microsoft Graph API and Outlook COM automation.
     Covers parameter validation, attachment handling, error handling, and both transmission methods.
 
 .NOTES
     Test Approach:
     - Direct dot-sourcing for PS 5.1 compatibility
     - Uses mocking for external dependencies (Graph API)
-    - Tests both Graph API and MAPI modes
+    - Tests both Graph API and Outlook COM modes
     - Validates error handling and fallback scenarios
     - Note: COM object testing is limited due to complexity; manual testing recommended
 #>
@@ -193,26 +193,26 @@ Describe "Function: Send-EmailWithAttachments" -Tags 'Unit', 'UtilityFunctions' 
         }
     }
     
-    Context "When using MAPI mode - Parameter validation" {
+    Context "When using Outlook COM mode - Parameter validation" {
         
         It "Should not require AccessToken when using MAPI switch" {
             # This test verifies the function signature accepts -UseMAPI without -AccessToken
-            # Actual COM object creation will fail in test environment, which is expected
+            # Actual Outlook COM object creation will fail in test environment, which is expected
             $result = Send-EmailWithAttachments -To "support@example.com" -Subject "Test" -Body "Test body" -UseMAPI -ErrorAction SilentlyContinue
             
             # In test environment without Outlook, this should fail gracefully and return false
             $result | Should -Be $false
         }
         
-        It "Should return false when Outlook is not available" {
+        It "Should return false when Classic Outlook is not available" {
             # In CI/test environment, Outlook COM object creation will fail
             $result = Send-EmailWithAttachments -To "support@example.com" -Subject "Test" -Body "Test" -UseMAPI -ErrorAction SilentlyContinue
             
             $result | Should -Be $false
         }
         
-        It "Should log appropriate error when Outlook is not installed" {
-            # Should return false when Outlook is not available
+        It "Should log appropriate error when Classic Outlook is not installed" {
+            # Should return false when Classic Outlook is not available
             $result = Send-EmailWithAttachments -To "support@example.com" -Subject "Test" -Body "Test" -UseMAPI -ErrorAction SilentlyContinue
             
             $result | Should -Be $false
@@ -289,7 +289,7 @@ Describe "Function: Send-EmailWithAttachments" -Tags 'Unit', 'UtilityFunctions' 
             $null = Send-EmailWithAttachments -To "support@example.com" -Subject "Test" -Body "Test" -UseMAPI -ErrorAction SilentlyContinue
             
             Should -Invoke Write-Log -ParameterFilter {
-                $Message -like "*MAPI*"
+                $Message -like "*Outlook COM*"
             }
         }
     }
