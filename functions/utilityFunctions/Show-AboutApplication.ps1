@@ -140,7 +140,7 @@ function Show-AboutApplication()
                 if ($browserLaunched)
                 {
                     write-log -logFile $LogFile -Module "$FunctionName" -Message "- Launched license URL $($settings.licenseURL) in browser: $($settings.preferredBrowser)" -LogLevel "Information"                               
-                    Write-Host "Opened license URL $($settings.licenseURL               ) in browser: $($settings.preferredBrowser)" -ForegroundColor Green
+                    Write-Host "Opened license URL $($settings.licenseURL) in browser: $($settings.preferredBrowser)" -ForegroundColor Green
                 }
                 else
                 {
