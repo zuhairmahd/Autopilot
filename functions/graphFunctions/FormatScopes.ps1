@@ -83,13 +83,13 @@ function FormatScopes()
         }
         Write-Verbose "[$functionName] Count of scopes with prefixes added: $($formattedScopesArray.count)"
         Write-Verbose "[$functionName] Adding default scopes (openid and offline_access)"
-        #If the $scopesFormatted  does not contain a scope in the $openIdScopes, add the missing scope.
+        #If the $formattedScopesArray does not contain a scope in the $openIdScopes, add the missing scope.
         foreach ($defaultScope in $openIdScopes)
         {
-            if (-not $scopesFormatted.Contains($defaultScope))
+            if ($formattedScopesArray -notcontains $defaultScope)
             {
                 Write-Verbose "[$functionName] Adding default scope: $defaultScope"
-                $scopesFormatted += " $defaultScope"
+                $formattedScopesArray += $defaultScope
             }
             else
             {

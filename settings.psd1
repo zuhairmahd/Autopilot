@@ -1,33 +1,19 @@
 ﻿@{
-    cacheSettings = @{
-        maxCacheSize = 1000
-        defaultExpirationMinutes = 15
-        enabled = $true
-        cacheTypes = @{
-            Configuration = @{
-                enabled = $true
-                expirationMinutes = 60
-            }
-            DirectoryObjects = @{
-                enabled = $true
-                expirationMinutes = 15
-            }
-            Devices = @{
-                enabled = $true
-                expirationMinutes = 15
-            }
-        }
+    repoInfo = @{
+        repoPath = 'zuhairmahd'
+        baseURL = 'https://www.github.com'
+        baseSourceURL = 'https://raw.githubusercontent.com'
+        repoName = 'Autopilot'
     }
     globalSettings = @{
         migrateLegacyConfiguration = $true
         operatingSystem = 'Windows'
-        DisplayManualFilterSelection = $false
         documentationURL = 'https://github.com/zuhairmahd/Autopilot/blob/master/readme.md'
         timeInSeconds = 60
+        maxMenuItemsPerPage = 15
         maxUserMatchDisplay = 10
         maxWaitTime = 30
         appModes = @('full')
-        showLicenseBanner = $true
         autoUpdate = $true
         strongMappingOptional = $true
         preferredBrowser = 'Chrome'
@@ -36,19 +22,33 @@
         useGridForLogDisplay = $true
         hideEmptyMenus = $true
         privateSession = $false
-        maxMenuItemsPerPage = 15
+        DisplayManualFilterSelection = $false
         release = 'auto'
         checkStrongMapping = $false
         configFile = '.\.secrets\config.json'
+        showLicenseBanner = $true
         deviceContactThresholdInDays = 30
     }
     description = 'This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.'
     version = '1.3.0.0'
-    repoInfo = @{
-        repoPath = 'zuhairmahd'
-        baseURL = 'https://www.github.com'
-        baseSourceURL = 'https://raw.githubusercontent.com'
-        repoName = 'Autopilot'
+    cacheSettings = @{
+        maxCacheSize = 1000
+        defaultExpirationMinutes = 15
+        cacheTypes = @{
+            Configuration = @{
+                expirationMinutes = 60
+                enabled = $true
+            }
+            DirectoryObjects = @{
+                expirationMinutes = 15
+                enabled = $true
+            }
+            Devices = @{
+                expirationMinutes = 15
+                enabled = $true
+            }
+        }
+        enabled = $true
     }
     requiredScopes = @(
         @{
@@ -138,11 +138,11 @@
         }
     )
     auth = @{
-        noSaveRefreshToken = $false
+        cacheType = 'Memory'
         changePwOnNextStart = $false
-        authType = 'PublicAuthFlow'
-        delegated = $true
+        noSaveRefreshToken = $false
         forceNewToken = $false
+        renewalLeadTime = 5
         scope = @(
             'Device.ReadWrite.All',
             'DeviceManagementApps.Read.All',
@@ -153,8 +153,8 @@
             'DeviceManagementManagedDevices.ReadWrite.All',
             'DeviceManagementServiceConfig.ReadWrite.All'
         )
-        cacheType = 'Memory'
+        authType = 'PublicAuthFlow'
         secureString = $false
-        renewalLeadTime = 5
+        delegated = $true
     }
 }
