@@ -388,6 +388,12 @@ function CallGraphAPI()
         Headers         = $defaultHeaders
         UseBasicParsing = $true
     }
+    #add headers parameter if it was passed
+    if ($headers)
+    {
+        Write-Log -LogFile $logFile -Module $functionName -Message "Headers provided. Adding to the request." -LogLevel "Information"
+        $restParams['Headers'] = $headers
+    }                                                               
     # Only add Body parameter if it exists
     if ($body)
     {
