@@ -14,21 +14,43 @@ function Save-TokenToCache()
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Starting token cache save operation"
     Write-Verbose "[$functionName] Cache type: $cacheType"
-    # Extract token scope from JWT token roles
-    Write-Verbose "[$functionName] Decoding JWT token to extract roles/scope"
+    
+    # Extract token scope from JWT token (scp for delegated, roles for application)
+    Write-Verbose "[$functionName] Decoding JWT token to extract scope information"
+    $decodedToken = DecodeJwtToken -Token $cachedToken.access_token -raw
+    
+    # Determine scope based on auth type
+    $tokenScope = @()
+    if ($decodedToken.scp)
+    {
+        # Delegated auth - scp is space-separated string
+        $tokenScope = $decodedToken.scp -split ' ' | Where-Object { $_ -and $_.Trim() }
+        Write-Verbose "[$functionName] Extracted delegated scopes (scp): $($tokenScope -join ', ')"
+    }
+    elseif ($decodedToken.roles)
+    {
+        # Application auth - roles is array
+        $tokenScope = $decodedToken.roles
+        Write-Verbose "[$functionName] Extracted application scopes (roles): $($tokenScope -join ', ')"
+    }
+    else
+    {
+        Write-Warning "[$functionName] No scope information found in token (neither scp nor roles claims present)"
+    }
     
     Write-Verbose "[$functionName] Successfully extracted token scope: $($tokenScope -join ', ')"
+    
     # Add scope to cached token object
     Write-Verbose "[$functionName] Adding scope property to cached token object"
     if (-not $cachedToken.scope)
     {
         Write-Verbose "[$functionName] Scope property not found in cached token, adding it"
-        $cachedToken.add('scope', (DecodeJwtToken -Token $cachedToken.access_token -raw).roles)
+        $cachedToken.add('scope', $tokenScope)
     }
     else
     {
-        Write-Verbose "[$functionName] Scope property already exists in cached token. Applying proper formatting."
-        $cachedToken.scope = FormatScopes -scopes $cachedToken.scope -Reverse
+        Write-Verbose "[$functionName] Scope property already exists in cached token. Updating with extracted scopes."
+        $cachedToken.scope = $tokenScope
     }
     
     # Save access token according to cache type
