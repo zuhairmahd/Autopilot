@@ -9,6 +9,11 @@ Describe "Function: Test-CachedTokenValidity" -Tags 'Unit' {
         . "$script:RepoRoot\functions\graphFunctions\DecodeJwtToken.ps1"
         . "$script:RepoRoot\functions\graphFunctions\Get-NormalizedExpiryTime.ps1"
         
+        # Remove function from scope if it exists (force fresh load)
+        if (Get-Command Test-CachedTokenValidity -ErrorAction SilentlyContinue) {
+            Remove-Item Function:\Test-CachedTokenValidity -ErrorAction SilentlyContinue
+        }
+        
         # Source the function under test
         . "$script:RepoRoot\functions\graphFunctions\Test-CachedTokenValidity.ps1"
         
@@ -94,6 +99,14 @@ Describe "Function: Test-CachedTokenValidity" -Tags 'Unit' {
             
             return "header.$payloadBase64.signature"
         }
+    }
+    
+    BeforeEach {
+        # Force reload function before each test to ensure latest code
+        if (Get-Command Test-CachedTokenValidity -ErrorAction SilentlyContinue) {
+            Remove-Item Function:\Test-CachedTokenValidity -ErrorAction SilentlyContinue
+        }
+        . "$script:RepoRoot\functions\graphFunctions\Test-CachedTokenValidity.ps1"
     }
     
     Context "Scope comparison with space-separated string (Bug Fix)" {
