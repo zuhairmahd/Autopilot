@@ -54,10 +54,11 @@ Describe "Function: Send-EmailWithAttachments" -Tags 'Unit', 'UtilityFunctions' 
                 return $null
             } -ModuleName $null
             
-            # Mock JWT token decoder
+            # Mock JWT token decoder - include scp (scopes) for delegated auth
             Mock DecodeJwtToken {
                 return @{
                     preferred_username = "test@example.com"
+                    scp                = "Mail.Send User.Read"
                 }
             } -ModuleName $null
         }
@@ -73,6 +74,13 @@ Describe "Function: Send-EmailWithAttachments" -Tags 'Unit', 'UtilityFunctions' 
                 return $null
             } -ModuleName $null
             
+            Mock DecodeJwtToken {
+                return @{
+                    preferred_username = "test@example.com"
+                    scp                = "Mail.Send User.Read"
+                }
+            } -ModuleName $null
+            
             $result = Send-EmailWithAttachments -AccessToken "mock-token" -To "support@example.com" -Subject "Test Subject" -Body "Test body"
             
             $result | Should -Be $true
@@ -81,6 +89,13 @@ Describe "Function: Send-EmailWithAttachments" -Tags 'Unit', 'UtilityFunctions' 
         It "Should handle single attachment" {
             Mock CallGraphApi {
                 return $null
+            } -ModuleName $null
+            
+            Mock DecodeJwtToken {
+                return @{
+                    preferred_username = "test@example.com"
+                    scp                = "Mail.Send User.Read"
+                }
             } -ModuleName $null
             
             $result = Send-EmailWithAttachments -AccessToken "mock-token" -To "support@example.com" -Subject "Test" -Body "Test" -AttachmentPaths @($script:TestAttachment)
@@ -96,6 +111,13 @@ Describe "Function: Send-EmailWithAttachments" -Tags 'Unit', 'UtilityFunctions' 
                 return $null
             } -ModuleName $null
             
+            Mock DecodeJwtToken {
+                return @{
+                    preferred_username = "test@example.com"
+                    scp                = "Mail.Send User.Read"
+                }
+            } -ModuleName $null
+            
             $result = Send-EmailWithAttachments -AccessToken "mock-token" -To "support@example.com" -Subject "Test" -Body "Test" -AttachmentPaths @($script:TestAttachment, $attachment2)
             
             $result | Should -Be $true
@@ -104,6 +126,13 @@ Describe "Function: Send-EmailWithAttachments" -Tags 'Unit', 'UtilityFunctions' 
         It "Should skip non-existent attachment files" {
             Mock CallGraphApi {
                 return $null
+            } -ModuleName $null
+            
+            Mock DecodeJwtToken {
+                return @{
+                    preferred_username = "test@example.com"
+                    scp                = "Mail.Send User.Read"
+                }
             } -ModuleName $null
             
             $result = Send-EmailWithAttachments -AccessToken "mock-token" -To "support@example.com" -Subject "Test" -Body "Test" -AttachmentPaths @($script:TestAttachment, "C:\nonexistent\file.txt")
@@ -125,6 +154,7 @@ Describe "Function: Send-EmailWithAttachments" -Tags 'Unit', 'UtilityFunctions' 
             Mock DecodeJwtToken {
                 return @{
                     preferred_username = "preferred@example.com"
+                    scp                = "Mail.Send User.Read"
                 }
             } -ModuleName $null
             
@@ -141,6 +171,7 @@ Describe "Function: Send-EmailWithAttachments" -Tags 'Unit', 'UtilityFunctions' 
             Mock DecodeJwtToken {
                 return @{
                     upn = "upn@example.com"
+                    scp = "Mail.Send User.Read"
                 }
             } -ModuleName $null
             
@@ -161,6 +192,13 @@ Describe "Function: Send-EmailWithAttachments" -Tags 'Unit', 'UtilityFunctions' 
                 return $null
             } -ModuleName $null
             
+            Mock DecodeJwtToken {
+                return @{
+                    preferred_username = "test@example.com"
+                    scp                = "Mail.Send User.Read"
+                }
+            } -ModuleName $null
+            
             $result = Send-EmailWithAttachments -AccessToken "mock-token" -To "support@example.com" -Subject "Test" -Body "Test" -AttachmentPaths @($txtFile)
             
             $result | Should -Be $true
@@ -172,6 +210,13 @@ Describe "Function: Send-EmailWithAttachments" -Tags 'Unit', 'UtilityFunctions' 
             
             Mock CallGraphApi {
                 return $null
+            } -ModuleName $null
+            
+            Mock DecodeJwtToken {
+                return @{
+                    preferred_username = "test@example.com"
+                    scp                = "Mail.Send User.Read"
+                }
             } -ModuleName $null
             
             $result = Send-EmailWithAttachments -AccessToken "mock-token" -To "support@example.com" -Subject "Test" -Body "Test" -AttachmentPaths @($logFile)
@@ -187,6 +232,13 @@ Describe "Function: Send-EmailWithAttachments" -Tags 'Unit', 'UtilityFunctions' 
                 return $null
             } -ModuleName $null
             
+            Mock DecodeJwtToken {
+                return @{
+                    preferred_username = "test@example.com"
+                    scp                = "Mail.Send User.Read"
+                }
+            } -ModuleName $null
+            
             $result = Send-EmailWithAttachments -AccessToken "mock-token" -To "support@example.com" -Subject "Test" -Body "Test" -AttachmentPaths @($zipFile)
             
             $result | Should -Be $true
@@ -194,6 +246,13 @@ Describe "Function: Send-EmailWithAttachments" -Tags 'Unit', 'UtilityFunctions' 
     }
     
     Context "When using Outlook COM mode - Parameter validation" {
+        
+        BeforeEach {
+            # Mock New-Object to simulate missing Outlook
+            Mock New-Object {
+                throw "Retrieving the COM class factory for component with CLSID failed"
+            } -ParameterFilter { $ComObject -eq 'Outlook.Application' }
+        }
         
         It "Should not require AccessToken when using MAPI switch" {
             # This test verifies the function signature accepts -UseMAPI without -AccessToken
@@ -229,6 +288,7 @@ Describe "Function: Send-EmailWithAttachments" -Tags 'Unit', 'UtilityFunctions' 
             Mock DecodeJwtToken {
                 return @{
                     preferred_username = "test@example.com"
+                    scp                = "Mail.Send User.Read"
                 }
             } -ModuleName $null
             
@@ -244,6 +304,7 @@ Describe "Function: Send-EmailWithAttachments" -Tags 'Unit', 'UtilityFunctions' 
             Mock DecodeJwtToken {
                 return @{
                     preferred_username = "test@example.com"
+                    scp                = "Mail.Send User.Read"
                 }
             } -ModuleName $null
             
@@ -263,6 +324,7 @@ Describe "Function: Send-EmailWithAttachments" -Tags 'Unit', 'UtilityFunctions' 
             Mock DecodeJwtToken {
                 return @{
                     preferred_username = "test@example.com"
+                    scp                = "Mail.Send User.Read"
                 }
             } -ModuleName $null
         }
