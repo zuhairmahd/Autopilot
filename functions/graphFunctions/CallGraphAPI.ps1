@@ -366,7 +366,7 @@ function CallGraphAPI()
         }
         Write-Log -LogFile $logFile -Module $functionName -Message "Final parameter list:" -LogLevel "Information"
         Write-Verbose "[$functionName] Final parameter list:"                                           
-        $paramsList | ForEach-Object { Write-Verbose "[$functionName] $_"                                    }
+        $paramsList | ForEach-Object { Write-Verbose "[$functionName] $_" }
         # Join the parameters with & to create a complete query string
         $queryString = $paramsList -join '&'
         Write-Log -LogFile $logFile -Module $functionName -Message "Final query string: $queryString" -LogLevel "Information"
