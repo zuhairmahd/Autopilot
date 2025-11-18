@@ -6,7 +6,7 @@ function FormatScopes()
         [switch]$Reverse
     )
     $functionName = $MyInvocation.MyCommand.Name
-    $openIdScopes = @('offline_access', 'openid')
+    $openIdScopes = @('offline_access', 'openid', 'profile')
     Write-Verbose "[$functionName] Called with Reverse=$Reverse"
     # Write-Verbose "[$functionName] Input scopes: '$scopes'"
     Write-Verbose "Passed parameter type: $($scopes.GetType().Name)"

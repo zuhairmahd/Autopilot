@@ -5,16 +5,10 @@ function Show-AboutApplication()
         $updateAvailable = $updateAvailable,
         [string]$accessToken,
         [string]$Release,
-        [string]$appId,
-        [string]$tenantId,
-        [string]$name,
-        [switch]$ShowAppRegistration,
-        [switch]$ShowScopes
+        [string]$name
     )
     
     $FunctionName = $MyInvocation.MyCommand.Name
-    # Retrieve registered application name
-    $registeredAppName = Get-RegisteredAppName -appId $appId -accessToken $accessToken
     
     # Display version information
     Show-VersionInfo
@@ -22,7 +16,7 @@ function Show-AboutApplication()
     # Display update information if available
     if ($updateAvailable.success)
     {
-        Show-UpdateInfo -updateAvailable $updateAvailable
+        Show-AppUpdateInfo -updateAvailable $updateAvailable
     }
     # Display update settings
     Write-Host "Auto Update enabled: $($settings.autoUpdate)" -ForegroundColor Cyan
@@ -32,13 +26,9 @@ function Show-AboutApplication()
     $aboutMenu = NewMenu -MenuName "aboutMenu"
     
     #Add menu items
-    $aboutMenu = AddMenuItem -Menu $aboutMenu -Name "View Azure app registration information" -Action {
+    $aboutMenu = AddMenuItem -Menu $aboutMenu -Name "View Azure App Registration and Scopes" -Action {
         Write-Host "`n================ Azure App Registration Information ================`n"   
         return 'ShowAzureAppInfo'
-    } -returnsValue
-    $aboutMenu = AddMenuItem -Menu $aboutMenu -Name "View Access Token Scopes" -Action {
-        Write-Host "`n================ Access Token Scopes ================`n"   
-        return 'ShowTokenScopes'
     } -returnsValue
     $aboutMenu = AddMenuItem -Menu $aboutMenu -Name "View logs" -Action {
         Write-Host "`n================ Log File ================`n"   
@@ -75,24 +65,12 @@ function Show-AboutApplication()
             Write-Log -logFile $LogFile -Module $functionName -Message "ShowMenu returned null, exiting function" -logLevel "Information"
             return $returnValues.exitString
         }                       
-    
         #process menu selection
         switch ($menuSelectionResultPick)
         {
             'ShowAzureAppInfo'
             {
-                Write-Host "==========================================================`n"
-                Write-Host "Domain: $domain"
-                Show-ApplicationInfo -registeredAppName $registeredAppName -name $name -appId $appId -tenantId $tenantId
-            }
-            'ShowTokenScopes'
-            {
-                Write-Host "Delegated authentication: $($auth.delegated)."    
-                Write-Host "Authentication type: $($auth.AuthType)"
-                write-log -logFile $LogFile -Module "$FunctionName" -Message "- Authentication type: $($auth.AuthType), Delegated authentication: $($auth.delegated)" -LogLevel "Information"
-        
-                # Display token scopes
-                Show-TokenScopes -accessToken $accessToken
+                Show-AzureAppInfoAndTokenScopes -accessToken $accessToken -Name $name
             }
             'ViewLogs'
             {
@@ -155,41 +133,7 @@ function Show-AboutApplication()
         }                   
         Write-Host "Press any key to continue..."        
         $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")             
-        
     }
-}
-
-function Get-RegisteredAppName()
-{
-    [CmdletBinding()]
-    param(
-        [string]$appId,
-        [string]$accessToken
-    )
-    
-    $FunctionName = $MyInvocation.MyCommand.Name
-    $uri = "applications(appId='$appId')"
-    $extraParameters = "select=displayName"
-    
-    Write-Verbose "[$FunctionName] Retrieving registered application name from Microsoft Graph"
-    write-log -logFile $LogFile -Module "$FunctionName" -Message "- Retrieving registered application name from Microsoft Graph" -LogLevel "Information"
-    
-    try
-    {
-        $appName = (CallGraphApi -ResourcePath $uri -accessToken $accessToken -extraParameters $extraParameters).displayName
-        if ($appName)
-        {
-            Write-Verbose "[$FunctionName] Retrieved registered application name: $appName"
-            write-log -logFile $LogFile -Module "$FunctionName" -Message "- Retrieved registered application name: $appName" -LogLevel "Information"
-            return $appName
-        }
-    }
-    catch
-    {
-        Write-Verbose "[$FunctionName] Failed to retrieve registered application name: $($_.Exception.Message)"
-        write-log -logFile $LogFile -Module "$FunctionName" -Message "- Failed to retrieve registered application name: $($_.Exception.Message)" -LogLevel "Warning"
-    }
-    return "Unknown (failed to retrieve from Microsoft Graph)"
 }
 
 function Show-VersionInfo()
@@ -202,7 +146,7 @@ function Show-VersionInfo()
     Write-Host "Copyright (c) $((Get-Date).Year) $($appMetaData.companyName)" -ForegroundColor Cyan
 }
 
-function Show-UpdateInfo()
+function Show-AppUpdateInfo()
 {
     [CmdletBinding()]
     param(
@@ -238,38 +182,12 @@ function Show-UpdateInfo()
     }
 }
 
-function Show-ApplicationInfo()
+function Show-AzureAppInfoAndTokenScopes()
 {
     [CmdletBinding()]
     param(
-        [string]$registeredAppName,
-        [string]$name,
-        [string]$appId,
-        [string]$tenantId
-    )
-    $FunctionName = $MyInvocation.MyCommand.Name
-    write-log -logFile $LogFile -Module "$FunctionName" -Message "- Displaying application information" -LogLevel "Information"
-    if ($registeredAppName -ne $name)
-    {
-        Write-Host "Application name from config: $name"
-        Write-Host "Registered application name: $registeredAppName"
-        write-log -logFile $LogFile -Module "$FunctionName" -Message "- Application name from config: $name, Registered application name: $registeredAppName" -LogLevel "Information"       
-    }
-    else
-    {
-        Write-Host "Application name: $name"
-        write-log -logFile $LogFile -Module "$FunctionName" -Message "- Application name: $name" -LogLevel "Information"
-    }
-    Write-Host "Application id: $appId"
-    Write-Host "Tenant id: $tenantId"
-    write-log -logFile $LogFile -Module "$FunctionName" -Message "- Application id: $appId, Tenant id: $tenantId" -LogLevel "Information"       
-}
-
-function Show-TokenScopes()
-{
-    [CmdletBinding()]
-    param(
-        [string]$accessToken
+        [string]$accessToken,
+        [string]$name
     )
     $functionName = $MyInvocation.MyCommand.Name
     try
@@ -277,7 +195,6 @@ function Show-TokenScopes()
         $decodedToken = DecodeJwtToken -Token $accessToken -raw
         $grantedScopes = @()
         $OIDScopes = @('openid', 'profile', 'email')
-        
         if ($decodedToken.scp)
         {
             # Delegated auth - scp is space-separated string
@@ -295,14 +212,50 @@ function Show-TokenScopes()
         
         # Filter out OID scopes and sort
         $displayScopes = $grantedScopes | Where-Object { $OIDScopes -notcontains $_ } | Sort-Object
-        
+        write-log -logFile $LogFile -Module "$FunctionName" -Message "- Displaying application information" -LogLevel "Information"
+        if ($decodedToken.app_displayname -ne $name)
+        {
+            Write-Host "Application name from config: $name"
+            Write-Host "Registered application name: $($decodedToken.app_displayname)"
+            write-log -logFile $LogFile -Module "$FunctionName" -Message "- Application name from config: $name, Registered application name: $decodedToken.app_displayname" -LogLevel "Information"       
+        }
+        else
+        {
+            Write-Host "Application name: $name"
+            write-log -logFile $LogFile -Module "$FunctionName" -Message "- Application name: $name" -LogLevel "Information"
+        }
+        Write-Host "Application id: $($decodedToken.appid)"
+        Write-Host "Tenant id: $($decodedToken.tid)"
+        Write-Host "Tenant Region Scope: $($decodedToken.tenant_region_scope)"
+        Write-Host "Tenant Region Subscope: $($decodedToken.tenant_region_sub_scope)"
+        write-log -logFile $LogFile -Module "$FunctionName" -Message "- Application id: $($decodedToken.appid), Tenant id: $($decodedToken.tid), Tenant Region Scope: $($decodedToken.tenant_region_scope), Tenant Region Subscope: $($decodedToken.tenant_region_sub_scope)" -LogLevel "Information"                                   
+        Write-Host "Delegated authentication: $($auth.delegated)."    
+        Write-Host "Authentication type: $($auth.AuthType)"
+        write-log -logFile $LogFile -Module "$FunctionName" -Message "- Authentication type: $($auth.AuthType), Delegated authentication: $($auth.delegated)" -LogLevel "Information"
+        Write-Host "Signed-in user: $($decodedToken.given_name) $($decodedToken.family_name) ($($decodedToken.name))"
+        Write-Host "User type: $($decodedToken.idtyp)"
+        Write-Host "User principal name: $($decodedToken.upn)"
+        Write-Host "User Unique Name: $($decodedToken.unique_name)"
+        if ($auth.delegated)
+        {
+            Write-Host "Signed-in user: $($decodedToken.given_name) $($decodedToken.family_name) ($($decodedToken.name))"
+            Write-Host "User type: $($decodedToken.idtyp)"
+            Write-Host "User principal name: $($decodedToken.upn)"
+            Write-Host "User Unique Name: $($decodedToken.unique_name)"
+            Write-Host "Signed-in IP Address: $($decodedToken.ipaddr)"
+            write-log -logFile $LogFile -Module "$FunctionName" -Message "- Signed-in user: $($decodedToken.given_name) $($decodedToken.family_name) ($($decodedToken.name)), User type: $($decodedToken.idtyp), User principal name: $($decodedToken.upn), User Unique Name: $($decodedToken.unique_name), Signed-in IP Address: $($decodedToken.ipaddr)" -LogLevel "Information"
+        }
+        else
+        {
+            Write-Host "No user information available (application-only authentication)." -ForegroundColor Yellow
+            write-log -logFile $LogFile -Module "$FunctionName" -Message "- No user information available (application-only authentication)." -LogLevel "Information"
+        }
+        # Display scopes in multi-column format
+        Write-Host "================ Granted Scopes ================"                                   
         if ($displayScopes.Count -gt 0)
         {
-            Write-Host "Acquired token scopes ($($displayScopes.Count)):"
-            write-Log -LogFile $LogFile -Module "$FunctionName" -Message "- Acquired token scopes ($($displayScopes.Count)): $($displayScopes -join ', ')" -LogLevel "Information"
-            
-            # Display scopes in multi-column format
             Format-ScopesInColumns -scopes $displayScopes
+            write-log -logFile $LogFile -Module "$FunctionName" -Message "- Displayed $($displayScopes.Count) granted scopes." -LogLevel "Information"  
         }
         else
         {

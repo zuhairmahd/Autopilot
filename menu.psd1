@@ -546,20 +546,8 @@
         type                  = 'static'
         items                 = @(
             @{
-                description           = 'View Azure app registration information'
-                name                  = 'View Azure app registration information'
-                blockType             = 'action'
-                includeInDisplayModes = @(
-                    'full',
-                    'admin',
-                    'advanced',
-                    'helpdesk',
-                    'registration'
-                )
-            },
-            @{
-                description           = 'View the scopes available to the Access Token'
-                name                  = 'View Access Token Scopes'
+                description           = 'View the Azure application information and scopes'
+                name                  = 'View Azure App Registration and Scopes'
                 blockType             = 'action'
                 includeInDisplayModes = @(
                     'full',

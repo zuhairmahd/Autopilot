@@ -2458,7 +2458,7 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Shutdown the device" -action {
 $mainMenu = AddMenuItem -menu $mainMenu -name "Group Assignments Menu" -Submenu $getGroupAssignmentsMenu
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -action {
-    $aboutMenuResult = Show-AboutApplication -accessToken $accessToken -Release $latestRelease -appId $appId -tenantId $tenantId -name $name -updateAvailable $updateAvailable
+    $aboutMenuResult = Show-AboutApplication -accessToken $accessToken -Release $latestRelease -name $name -updateAvailable $updateAvailable
     if ($aboutMenuResult -in $returnValues.Values)
     {
         return $aboutMenuResult
