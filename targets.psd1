@@ -25,7 +25,8 @@
             # Settings to apply to auth section
             authSettings    = @{
                 changePwOnNextStart = $false
-                delegated           = $false
+                cacheType           = 'File'
+                delegated           = $true
                 forceNewToken       = $false
             }
             
@@ -42,14 +43,14 @@
                     }
                 )
                 companyName                     = 'ZM Consulting'
-                maxUserMatchDisplay             = 10
+                useGridForLogDisplay            = $true
+                maxMenuItemsPerPage             = 15
                 appModes                        = @(
                     'full'
                 )
                 assignedUser                    = ''
                 minimumDevicePhysicalMemoryInGB = 8
                 maxNumberOfDevicesAllowed       = 15
-                maxGroupMatchDisplay            = 20
                 autopilotDeviceAllowedVendors   = @(
                     'vmware'
                 ) 
@@ -123,6 +124,7 @@
             authSettings    = @{
                 changePwOnNextStart = $true
                 validateScopes      = $false
+                cacheType           = 'File'
                 authType            = 'PublicAuthFlow'
                 noSaveRefreshToken  = $false
                 forceNewToken       = $false
@@ -134,10 +136,10 @@
                     'DeviceManagementConfiguration.ReadWrite.All',
                     'DeviceManagementManagedDevices.PrivilegedOperations.All',
                     'DeviceManagementManagedDevices.ReadWrite.All',
+                    'Mail.Send',
                     'DeviceManagementServiceConfig.ReadWrite.All'
                 )
                 delegated           = $false
-                cacheType           = 'Memory'
                 secureString        = $false
                 renewalLeadTime     = 5
             }
