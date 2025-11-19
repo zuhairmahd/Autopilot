@@ -87,7 +87,7 @@ function Get-Updates()
     }
     #endregion
     
-    $localVersion = (Get-FileVersion -executableFileName $executableFileName).version
+    [version]$localVersion = (Get-FileVersion -executableFileName $executableFileName).version
     
     #region get the remote version.
     Write-Verbose "[$functionName] Getting metadata from $metaDataURL"
@@ -100,7 +100,7 @@ function Get-Updates()
         Write-Verbose "Response: $fileMetaData"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Response: $fileMetaData" -LogLevel "Information"
         Write-Verbose "[$functionName] Metadata content: $($fileMetaData.Content)"
-        $remoteVersion = $fileMetaData.version
+        [version]$remoteVersion = $fileMetaData.version
         #convert $fileMetaData.date to a datetime object in local time.
         $fileMetaData.date = [datetime]::Parse($fileMetaData.date).ToLocalTime()
     }
