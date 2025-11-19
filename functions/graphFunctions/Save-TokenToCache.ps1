@@ -141,7 +141,7 @@ function Save-TokenToCache()
                             [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($randomBytes)
                             [System.IO.File]::WriteAllBytes($tempFile, $randomBytes)
                         }
-                        Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
+                        Remove-Item $tempFile -Force -ErrorAction Stop
                     }
                     catch
                     {

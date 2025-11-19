@@ -112,10 +112,26 @@ function Get-CachedTokenObject()
                     }
                     finally
                     {
-                        # Clean up temporary file
+                        # Securely clean up temporary file
                         if (Test-Path $tempFile)
                         {
-                            Remove-Item $tempFile -Force -ErrorAction SilentlyContinue | Out-Null
+                            try
+                            {
+                                # Overwrite the file with random data before deletion to prevent recovery.
+                                $fileInfo = Get-Item $tempFile
+                                if ($fileInfo.Length -gt 0)
+                                {
+                                    $randomBytes = New-Object byte[] $fileInfo.Length
+                                    [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($randomBytes)
+                                    [System.IO.File]::WriteAllBytes($tempFile, $randomBytes)
+                                }
+                                Remove-Item $tempFile -Force -ErrorAction Stop
+                            }
+                            catch
+                            {
+                                Write-Warning "[$functionName] Failed to securely delete temporary file '$($tempFile)'. Attempting regular deletion."
+                                Remove-Item $tempFile -Force -ErrorAction SilentlyContinue | Out-Null
+                            }
                         }
                     }
                 }
