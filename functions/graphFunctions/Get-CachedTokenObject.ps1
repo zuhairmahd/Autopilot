@@ -112,9 +112,31 @@ function Get-CachedTokenObject()
                     }
                     finally
                     {
-                        # Securely clean up temporary file
+                        # Securely overwrite and clean up temporary file
                         if (Test-Path $tempFile)
                         {
+                            try {
+                                $fileInfo = Get-Item $tempFile
+                                $fileSize = $fileInfo.Length
+                                if ($fileSize -gt 0) {
+                                    $randomBytes = New-Object byte[] $fileSize
+                                    [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($randomBytes)
+                                    [System.IO.File]::WriteAllBytes($tempFile, $randomBytes)
+                                }
+                            } catch {
+                                # Ignore errors during overwrite
+                            }
+                            try {
+                                $fileInfo = Get-Item $tempFile
+                                $fileSize = $fileInfo.Length
+                                if ($fileSize -gt 0) {
+                                    $randomBytes = New-Object byte[] $fileSize
+                                    [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($randomBytes)
+                                    [System.IO.File]::WriteAllBytes($tempFile, $randomBytes)
+                                }
+                            } catch {
+                                # Ignore errors during overwrite
+                            }
                             try
                             {
                                 # Overwrite the file with random data before deletion to prevent recovery.

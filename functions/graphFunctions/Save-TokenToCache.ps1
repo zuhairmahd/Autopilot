@@ -133,15 +133,22 @@ function Save-TokenToCache()
                     try
                     {
                         # Overwrite the file with random data before deletion
-                        $fileInfo = Get-Item $tempFile
-                        $fileLength = $fileInfo.Length
-                        if ($fileLength -gt 0)
+                        if (Test-Path $tempFile)
                         {
-                            $randomBytes = New-Object byte[] $fileLength
-                            [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($randomBytes)
-                            [System.IO.File]::WriteAllBytes($tempFile, $randomBytes)
+                            $fileInfo = Get-Item $tempFile
+                            $fileLength = $fileInfo.Length
+                            if ($fileLength -gt 0)
+                            {
+                                $randomBytes = New-Object byte[] $fileLength
+                                [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($randomBytes)
+                                [System.IO.File]::WriteAllBytes($tempFile, $randomBytes)
+                            }
+                            Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
                         }
-                        Remove-Item $tempFile -Force -ErrorAction Stop
+                        else
+                        {
+                            Write-Verbose "[$functionName] Temporary file $($tempFile) does not exist, skipping secure deletion."
+                        }
                     }
                     catch
                     {
