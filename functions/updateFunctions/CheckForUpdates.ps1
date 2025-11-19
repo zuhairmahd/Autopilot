@@ -38,23 +38,23 @@ function CheckForUpdates()
     }
     Write-Verbose "[$functionName] Executable File Name: $executableFileName"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Executable File Name: $executableFileName" -LogLevel "Information"
-    if ($null -ne $localVersion         )
-    {
-        Write-Verbose "[$functionName] Local Version: $localVersion"
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Local Version: $localVersion" -LogLevel "Information"
-    }
-    else
-    {
-        Write-Verbose "[$functionName] Failed to retrieve local version information."
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to retrieve local version information." -LogLevel "Error"
-        return $returnObject        
-    }               
-    
-    Write-Verbose "[$functionName] Remote Version URL: $remoteVersionURL"
-    Write-Verbose "[$functionName] Getting remote version from $remoteVersionURL"
-    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting remote version from $remoteVersionURL" -LogLevel "Information"
     try 
     {
+        [version]$localVersion = (get-FileVersion -executableFileName $executableFileName).version
+        if ($null -ne $localVersion         )
+        {
+            Write-Verbose "[$functionName] Local Version: $($localVersion | Out-String)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Local Version: $($localVersion | Out-String)" -LogLevel "Information"
+        }
+        else
+        {
+            Write-Verbose "[$functionName] Failed to retrieve local version information."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to retrieve local version information." -LogLevel "Error"
+            return $returnObject        
+        }               
+        Write-Verbose "[$functionName] Remote Version URL: $remoteVersionURL"
+        Write-Verbose "[$functionName] Getting remote version from $remoteVersionURL"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting remote version from $remoteVersionURL" -LogLevel "Information"
         $remoteVersionResponse = Invoke-RestMethod -Uri $remoteVersionURL -Method Get -ErrorAction SilentlyContinue -UseBasicParsing
         write-log -logFile $LogFile -Module "$functionName" -Message "Remote version response: $($remoteVersionResponse | Out-String)" -LogLevel "Debug"                    
         Write-Verbose "[$functionName] Remote version response: $($remoteVersionResponse | Out-String)"     
@@ -62,54 +62,47 @@ function CheckForUpdates()
         {
             write-log -logFile $LogFile -Module "$functionName" -Message "Failed to retrieve remote version information." -LogLevel "Error"
             Write-Verbose "[$functionName] Failed to retrieve remote version information."                  
-            throw "Failed to retrieve remote version information."
-            Write-Log -logFile $LogFile -Module "$functionName" -Message "Remote version response: $($remoteVersionResponse | Out-String)" -LogLevel "Debug"                    
-            Write-Verbose "[$functionName] Remote version response: $($remoteVersionResponse | Out-String)"     
-            if (-not $remoteVersionResponse)
-            {
-                Write-Log -logFile $LogFile -Module "$functionName" -Message "Failed to retrieve remote version information." -LogLevel "Error"
-                Write-Verbose "[$functionName] Failed to retrieve remote version information."
-                remoteVersion = [System.Version]::Parse($remoteVersionResponse.version)
-                ReleaseDate = $remoteVersionResponse.date
-                Hash = $remoteVersionResponse.hash
-                success = $true
-            }       
-            if ([System.Version]::Parse($remoteVersionResponse.version) -gt $localVersion)
-            {
-                Write-Verbose "[$functionName] Update available. Remote version: $($remoteVersionResponse.version), Local version: $($localVersion)"
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Update available. Remote version: $($remoteVersionResponse.version), Local version: $($localVersion)" -LogLevel "Information"         
-                $returnObject.updateAvailable = $true
-                $returnObject.versionsMatch = $false
-                $returnObject.version = $remoteVersionResponse.version          
-            }   
-            elseif ([System.Version]::Parse($remoteVersionResponse.version) -eq $localVersion)
-            {
-                Write-Verbose "[$functionName] Versions match. Remote version: $($remoteVersionResponse.version), Local version: $($localVersion)"
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Versions match. Remote version: $($remoteVersionResponse.version), Local version: $($localVersion)" -LogLevel "Information"         
-                $returnObject.versionsMatch = $true
-                $returnObject.version = $remoteVersionResponse.version
-                $returnObject.version = $localVersion
-            }                       
-            else
-            {
-                Write-Verbose "[$functionName] No update available. Remote version: $($remoteVersionResponse.version), Local version: $($localVersion)"
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "No update available. Remote version: $($remoteVersionResponse.version), Local version: $($localVersion)" -LogLevel "Information"         
-                $returnObject.updateAvailable = $false
-                $returnObject.versionsMatch = $false
-                $returnObject.version = $localVersion               
-            }
-            Write-Verbose "[$functionName] Success: $($returnObject.success)"
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Success: $($returnObject.success)" -LogLevel "Information"
-            Write-Verbose "[$functionName] Version: $($returnObject.localVersion)"
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Version: $($returnObject.localVersion)" -LogLevel "Information"
-            Write-Verbose "[$functionName] Release Date: $($returnObject.ReleaseDate)"
-            $returnObject.version = $localVersion
-            Write-Verbose "[$functionName] Hash: $($returnObject.Hash)"
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Hash: $($returnObject.Hash)" -LogLevel "Information"
-            Write-Verbose "[$functionName] Update Available: $($returnObject.updateAvailable)"
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Update Available: $($returnObject.updateAvailable)" -LogLevel "Information"
             return $returnObject
         }
+        Write-Log -logFile $LogFile -Module "$functionName" -Message "Remote version response: $($remoteVersionResponse | Out-String)" -LogLevel "Debug"                    
+        Write-Verbose "[$functionName] Remote version response: $($remoteVersionResponse | Out-String)"     
+        $returnObject.remoteVersion = [System.Version]::Parse($remoteVersionResponse.version)
+        $returnObject.localVersion = $localVersion
+        $returnObject.ReleaseDate = [datetime]::Parse($remoteVersionResponse.date).ToLocalTime()
+        $returnObject.hash = $remoteVersionResponse.hash
+        if ($returnObject.remoteVersion -gt $returnObject.localVersion)
+        {
+            Write-Verbose "[$functionName] Update available. Remote version: $($remoteVersionResponse.version), Local version: $($localVersion)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Update available. Remote version: $($remoteVersionResponse.version), Local version: $($localVersion)" -LogLevel "Information"         
+            $returnObject.updateAvailable = $true
+            $returnObject.versionsMatch = $false
+            $returnObject.version = $returnObject.remoteVersion
+        }   
+        elseif ($returnObject.remoteVersion -eq $returnObject.localVersion)
+        {
+            Write-Verbose "[$functionName] Versions match. Remote version: $($remoteVersionResponse.version), Local version: $($localVersion)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Versions match. Remote version: $($remoteVersionResponse.version), Local version: $($localVersion)" -LogLevel "Information"         
+            $returnObject.versionsMatch = $true
+            $returnObject.version = $localVersion
+        }                       
+        else
+        {
+            Write-Verbose "[$functionName] No update available. Remote version: $($remoteVersionResponse.version), Local version: $($localVersion)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "No update available. Remote version: $($remoteVersionResponse.version), Local version: $($localVersion)" -LogLevel "Information"         
+            $returnObject.updateAvailable = $false
+            $returnObject.versionsMatch = $false
+            $returnObject.version = $localVersion               
+        }
+        Write-Verbose "[$functionName] Success: $($returnObject.success)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Success: $($returnObject.success)" -LogLevel "Information"
+        Write-Verbose "[$functionName] Version: $($returnObject.localVersion)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Version: $($returnObject.localVersion)" -LogLevel "Information"
+        Write-Verbose "[$functionName] Release Date: $($returnObject.ReleaseDate)"
+        Write-Verbose "[$functionName] Hash: $($returnObject.Hash)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Hash: $($returnObject.Hash)" -LogLevel "Information"
+        Write-Verbose "[$functionName] Update Available: $($returnObject.updateAvailable)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Update Available: $($returnObject.updateAvailable)" -LogLevel "Information"
+        return $returnObject
     }
     catch 
     {
@@ -118,6 +111,8 @@ function CheckForUpdates()
         Write-Verbose "[$functionName] Remote version status code: $($remoteVersionResponse.StatusCode)"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Remote version status code: $($remoteVersionResponse.StatusCode)" -LogLevel "Error"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error: $($_.Exception.Message)" -LogLevel "Error"
+        $returnObject.localVersion = $localVersion
+        $returnObject.remoteVersion = $null
         $returnObject.Version = $null
         $returnObject.ReleaseDate = $null
         $returnObject.Hash = $null
@@ -127,5 +122,5 @@ function CheckForUpdates()
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error: $($_.Exception.Message)" -LogLevel "Error"
         return $returnObject
     }    
-}   
+}
 
