@@ -1,5 +1,34 @@
 function Create-MenuBanner()
 {
+    <#
+    .SYNOPSIS
+    Creates a formatted banner for menu display with breadcrumb navigation.
+
+    .DESCRIPTION
+    This function generates a menu banner that includes the menu title, optional description,
+    and a breadcrumb trail showing navigation history. It uses System.Text.StringBuilder for
+    efficient string building and creates a clean navigation path by removing duplicate consecutive
+    items from the history.
+
+    .PARAMETER Menu
+    The menu hashtable containing Title and optional Description properties.
+
+    .PARAMETER History
+    An ArrayList containing the navigation history for breadcrumb generation.
+
+    .OUTPUTS
+    System.String
+    Returns the formatted banner string with title, description, and breadcrumb navigation.
+
+    .EXAMPLE
+    $banner = Create-MenuBanner -Menu $currentMenu -History $navigationHistory
+
+    .NOTES
+    Uses StringBuilder for performance optimization.
+    Removes consecutive duplicate entries from history for cleaner breadcrumbs.
+    Breadcrumb format: "Item1 > Item2 > Item3"
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

@@ -1,5 +1,41 @@
 function GetUserInput()
 {
+    <#
+    .SYNOPSIS
+    Prompts the user for validated input with support for cancellation.
+
+    .DESCRIPTION
+    This function displays a message and prompt to the user, then validates their input
+    according to the specified input type (userName, serialNumber, or groupName). It
+    continuously prompts until valid input is received or the user presses Enter to cancel.
+    The function provides visual and audio feedback for invalid input.
+
+    .PARAMETER Message
+    The informational message to display to the user before prompting for input.
+
+    .PARAMETER Prompt
+    The prompt text to display when requesting input.
+
+    .PARAMETER InputType
+    The type of input to validate. Valid values: 'userName', 'serialNumber', 'groupName'.
+
+    .PARAMETER settings
+    The settings object containing validation parameters. Defaults to script-level $settings.
+
+    .OUTPUTS
+    System.String or $null
+    Returns the validated user input as a string, or $null if the user presses Enter to cancel.
+
+    .EXAMPLE
+    $userName = GetUserInput -Message "Enter user information" -Prompt "User name" -InputType "userName"
+    $serial = GetUserInput -Message "Enter device serial" -Prompt "Serial number" -InputType "serialNumber"
+
+    .NOTES
+    Pressing Enter without input returns $null to signal cancellation.
+    Invalid input triggers a beep sound and error message.
+    Uses validateInput function for validation logic.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [string]$Message,
