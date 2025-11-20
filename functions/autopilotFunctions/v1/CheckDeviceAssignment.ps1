@@ -1,5 +1,45 @@
 function CheckDeviceAssignment()
 {
+    <#
+    .SYNOPSIS
+    Checks if an Autopilot device has been assigned to a deployment profile.
+
+    .DESCRIPTION
+    This function queries Microsoft Graph to check if a device (by serial number) has been assigned
+    to an Autopilot deployment profile. It supports waiting for assignment with configurable retry
+    logic, polling intervals, and maximum wait times. Used during device import workflows to verify
+    successful profile assignment.
+
+    .PARAMETER serialNumber
+    The device serial number to check. This parameter is mandatory.
+
+    .PARAMETER AccessToken
+    The Microsoft Graph API access token. This parameter is mandatory.
+
+    .PARAMETER WaitForAssignment
+    When specified, enables polling mode to wait for profile assignment rather than single check.
+
+    .PARAMETER waitTimeInSeconds
+    (WaitForAssignment mode) Seconds to wait between assignment checks.
+
+    .PARAMETER maxWaitTime
+    (WaitForAssignment mode) Maximum number of retry attempts before giving up.
+
+    .OUTPUTS
+    System.Management.Automation.PSCustomObject
+    Returns device assignment object with deploymentProfileAssignmentStatus and related properties,
+    or $null if device not found or timeout reached.
+
+    .EXAMPLE
+    $assignment = CheckDeviceAssignment -serialNumber "ABC123" -AccessToken $token
+    $assignment = CheckDeviceAssignment -serialNumber "ABC123" -AccessToken $token -WaitForAssignment -waitTimeInSeconds 30 -maxWaitTime 10
+
+    .NOTES
+    Queries windowsAutopilotDeviceIdentities endpoint with serial number filter.
+    Polling mode checks assignment status repeatedly until assigned or timeout.
+    Returns assignment object when deploymentProfileAssignmentStatus indicates assignment.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
