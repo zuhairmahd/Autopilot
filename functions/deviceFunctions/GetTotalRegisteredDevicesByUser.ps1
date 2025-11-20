@@ -1,5 +1,31 @@
 function GetTotalRegisteredDevicesByUser()
 {
+    <#
+    .SYNOPSIS
+    Retrieves the total count of devices registered to a user.
+
+    .DESCRIPTION
+    This function queries Microsoft Graph to get the count of all devices registered
+    to a specific user account. It returns 0 if no devices are found or if the access
+    token is invalid.
+
+    .PARAMETER UserName
+    The user principal name of the user whose registered devices should be counted.
+
+    .PARAMETER AccessToken
+    The Microsoft Graph API access token for authentication.
+
+    .OUTPUTS
+    System.Int32
+    Returns the count of registered devices, or 0 if none are found or an error occurs.
+
+    .EXAMPLE
+    $deviceCount = GetTotalRegisteredDevicesByUser -UserName "john.doe@contoso.com" -AccessToken $token
+
+    .NOTES
+    Requires appropriate Microsoft Graph permissions to query user registered devices.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [parameter(Mandatory = $true)]

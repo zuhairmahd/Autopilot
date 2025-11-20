@@ -1,5 +1,39 @@
 function RestartDevice()
 {
+    <#
+    .SYNOPSIS
+    Restarts or shuts down the local device with user confirmation.
+
+    .DESCRIPTION
+    This function prompts the user to confirm a restart or shutdown operation on the local device.
+    It validates user input and executes the specified action (restart or shutdown) with appropriate
+    messaging and logging. The function provides customizable prompts and messages.
+
+    .PARAMETER action
+    The action to perform. Valid values are 'restart' (default) or 'shutdown'.
+
+    .PARAMETER question
+    Custom question to display to the user. If not provided, a default question based on the action is used.
+
+    .PARAMETER bootMessage
+    Message to display when the action is initiated. Default is 'Rebooting the device...'.
+
+    .PARAMETER reminderMessage
+    Message to display if the user declines the action. Default reminds user to reboot later.
+
+    .OUTPUTS
+    System.Boolean
+    Returns $false if the user declines the action. Does not return if the action is executed.
+
+    .EXAMPLE
+    RestartDevice -action 'restart'
+    RestartDevice -action 'shutdown' -question "Shut down now?" -bootMessage "Shutting down..."
+
+    .NOTES
+    Forces immediate restart or shutdown without delay when user confirms.
+    Plays a beep sound for invalid input.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [ValidateSet('restart', 'shutdown')]
