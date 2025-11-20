@@ -1,5 +1,33 @@
 function GetLastDeviceContactDate()
 {
+    <#
+    .SYNOPSIS
+    Determines the most recent contact date for a device across multiple sources.
+
+    .DESCRIPTION
+    This function aggregates contact dates from managed device sync, Autopilot device contacts,
+    Azure AD sign-ins, and user logons to find the latest contact date. Calculates days since
+    last contact and compares against threshold for staleness assessment.
+
+    .PARAMETER accessToken
+    Microsoft Graph API access token. This parameter is mandatory.
+
+    .PARAMETER enrollmentState
+    Enrollment state object with device contact information. This parameter is mandatory.
+
+    .OUTPUTS
+    System.Collections.Hashtable
+    Returns hashtable with latestContactDate, numberOfDaysSinceLastContact, withinThreshold, and source dates.
+
+    .EXAMPLE
+    $contactInfo = GetLastDeviceContactDate -accessToken $token -enrollmentState $state
+
+    .NOTES
+    Aggregates from: managedDevice sync, autopilot contacts, Azure AD sign-ins.
+    Compares against deviceContactThresholdInDays setting.
+    Returns $null values if no contact dates found.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

@@ -1,5 +1,32 @@
 function Export-DeviceAssignmentReport()
 {
+    <#
+    .SYNOPSIS
+    Exports comprehensive device assignment report to CSV file.
+
+    .DESCRIPTION
+    This function generates a detailed report of device assignments including profile assignments,
+    group memberships, and configuration policies. Exports data to CSV format for analysis and
+    reporting purposes.
+
+    .PARAMETER accessToken
+    Microsoft Graph API access token. This parameter is mandatory.
+
+    .PARAMETER outputPath
+    Directory path where CSV report will be saved. This parameter is mandatory.
+
+    .OUTPUTS
+    System.String
+    Returns path to generated CSV file, or error message if export fails.
+
+    .EXAMPLE
+    Export-DeviceAssignmentReport -accessToken $token -outputPath "C:\Reports"
+
+    .NOTES
+    Queries device assignments, profiles, and group memberships.
+    Creates timestamped CSV file in output directory.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

@@ -1,5 +1,39 @@
 function HandleCustomImportSettings()
 {
+    <#
+    .SYNOPSIS
+    Handles user customization of Autopilot import wait settings interactively.
+
+    .DESCRIPTION
+    This function prompts the user to customize how long to wait for profile assignment after
+    device import. It modifies wait time and retry count parameters by reference, validates
+    user input, and allows skipping the wait entirely. Used during interactive import workflows.
+
+    .PARAMETER functionName
+    The calling function name for logging. This parameter is mandatory.
+
+    .PARAMETER maxWaitTimeRef
+    Reference to maximum wait time variable (modified by this function). This parameter is mandatory.
+
+    .PARAMETER timeInSecondsRef
+    Reference to time between checks variable (modified by this function). This parameter is mandatory.
+
+    .PARAMETER returnValues
+    Return values object containing deviceImportSuccessMessage. This parameter is mandatory.
+
+    .OUTPUTS
+    System.String
+    Returns deviceImportSuccessMessage if user chooses to skip wait, otherwise returns $null to continue.
+
+    .EXAMPLE
+    $result = HandleCustomImportSettings -functionName $fn -maxWaitTimeRef ([ref]$maxWait) -timeInSecondsRef ([ref]$interval) -returnValues $rv
+
+    .NOTES
+    Modifies parameters by reference to update calling function's variables.
+    Validates user input (0-60 range for retry count).
+    Allows immediate return (skip wait) by entering 0.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

@@ -1,5 +1,29 @@
 function GetAutopilotDeviceRelevantProperties()
 {
+    <#
+    .SYNOPSIS
+    Extracts relevant properties from Autopilot device object for reporting.
+
+    .DESCRIPTION
+    This function selects and formats key properties from an Autopilot device object including
+    serial number, deployment profile, assignment status, enrollment dates, and hardware details.
+    Returns standardized property set for consistent reporting.
+
+    .PARAMETER autopilotDevice
+    Autopilot device object from Graph API. This parameter is mandatory.
+
+    .OUTPUTS
+    System.Management.Automation.PSCustomObject
+    Returns object with relevant device properties formatted for reporting.
+
+    .EXAMPLE
+    $properties = GetAutopilotDeviceRelevantProperties -autopilotDevice $device
+
+    .NOTES
+    Standardizes property names and formats.
+    Includes deployment profile and assignment status.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

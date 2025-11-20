@@ -1,5 +1,36 @@
 function ShowDeviceReport()
 {
+    <#
+    .SYNOPSIS
+    Displays formatted device report to console and optionally exports to file.
+
+    .DESCRIPTION
+    This function presents device information in a formatted, user-friendly display including
+    enrollment status, hardware details, assignments, and compliance state. Supports both
+    console output and optional file export.
+
+    .PARAMETER enrollmentState
+    Enrollment state object with device information. This parameter is mandatory.
+
+    .PARAMETER export
+    When specified, exports report to file in addition to console display.
+
+    .PARAMETER outputPath
+    Directory path for report export when export switch is used.
+
+    .OUTPUTS
+    None. Displays report to console and optionally exports to file.
+
+    .EXAMPLE
+    ShowDeviceReport -enrollmentState $state
+    ShowDeviceReport -enrollmentState $state -export -outputPath "C:\Reports"
+
+    .NOTES
+    Formatted console output with color coding.
+    Optional export to text or CSV file.
+    Comprehensive device information display.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true, ParameterSetName = 'EnrollmentState')]

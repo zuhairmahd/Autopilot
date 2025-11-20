@@ -1,5 +1,34 @@
 function GetDeviceHash()
 {
+    <#
+    .SYNOPSIS
+    Creates a hardware hash CSV file for Autopilot device import.
+
+    .DESCRIPTION
+    This function generates a CSV file containing the device hardware hash and metadata required
+    for manual Autopilot device import. The CSV includes serial number, Windows Product ID,
+    hardware hash, group tag, and assigned user in the format required by Microsoft Intune.
+
+    .PARAMETER OutputFile
+    Path where the CSV file should be created. This parameter is mandatory.
+
+    .PARAMETER device
+    Device object containing serialNumber, product, hardwareHash, GroupTag, and AssignedUser properties.
+    This parameter is mandatory.
+
+    .OUTPUTS
+    System.Boolean
+    Returns $true if CSV file created successfully, $false otherwise.
+
+    .EXAMPLE
+    GetDeviceHash -OutputFile "C:\Temp\device.csv" -device $deviceObj
+
+    .NOTES
+    Creates CSV with columns: Device Serial Number, Windows Product ID, Hardware Hash, Group Tag.
+    Removes quotes from CSV for proper Intune import format.
+    CSV can be manually uploaded to Intune portal for device import.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param
     (

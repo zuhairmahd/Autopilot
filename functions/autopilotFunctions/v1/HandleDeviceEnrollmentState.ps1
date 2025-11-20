@@ -1,5 +1,43 @@
 function HandleDeviceEnrollmentState()
 {
+    <#
+    .SYNOPSIS
+    Processes and handles different Autopilot device enrollment states.
+
+    .DESCRIPTION
+    This function interprets the enrollment state of an Autopilot device and takes appropriate
+    action based on the state (notContacted, enrolled, enrollmentFailed, etc.). It provides
+    user-friendly messages, looks up additional device information when needed, and returns
+    appropriate status codes for each state.
+
+    .PARAMETER deviceAssignment
+    Device assignment object containing enrollmentState property. This parameter is mandatory.
+
+    .PARAMETER serialNumber
+    Device serial number for logging and lookups. This parameter is mandatory.
+
+    .PARAMETER accessToken
+    Microsoft Graph API access token for additional lookups. This parameter is mandatory.
+
+    .PARAMETER returnValues
+    Return values object containing state-specific messages. This parameter is mandatory.
+
+    .PARAMETER domain
+    Optional domain for tenant-specific operations.
+
+    .OUTPUTS
+    System.String
+    Returns state-specific message from returnValues (notContactedMessage, enrollmentFailedMessage, etc.).
+
+    .EXAMPLE
+    $result = HandleDeviceEnrollmentState -deviceAssignment $assignment -serialNumber "ABC123" -accessToken $token -returnValues $rv
+
+    .NOTES
+    Handles states: notContacted, enrolled, enrollmentFailed, blocked.
+    For 'enrolled' state, looks up additional user and device information.
+    Provides context-appropriate messages for each state.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
