@@ -1,5 +1,36 @@
 function Get-NavigationPathContext()
 {
+    <#
+    .SYNOPSIS
+    Generates a context identifier based on menu navigation path.
+
+    .DESCRIPTION
+    This function analyzes the global menu history to create a context identifier that describes
+    the user's navigation path through the menu system. It creates a normalized signature from
+    menu titles and matches it against known navigation patterns (e.g., CheckMenu -> SerialNumber,
+    AutopilotMenu -> SerialNumber). For unknown patterns, it generates a generic parent-based
+    context identifier.
+
+    .OUTPUTS
+    System.String
+    Returns a navigation context string like 'ViaCheckMenu', 'ViaAutopilotMenu', 'Via[ParentMenu]',
+    'Direct', or 'Unknown' if no history is available.
+
+    .EXAMPLE
+    $navContext = Get-NavigationPathContext
+    # Returns 'ViaCheckMenu' if navigated through Check Device Status menu
+
+    .NOTES
+    Uses global $MenuHistory to track navigation path.
+    Normalizes menu titles by removing spaces and special characters for pattern matching.
+    Known patterns:
+    - MainMenu-CheckDeviceStatus-LookupbySerialNumber → ViaCheckMenu
+    - MainMenu-AutopilotMenu-CheckdeviceAutopilotstatus → ViaAutopilotMenu
+    
+    For unknown patterns, creates generic "Via[ParentMenu]" context.
+    Returns 'Unknown' if no menu history or 'Direct' for single-menu paths.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param()
     
