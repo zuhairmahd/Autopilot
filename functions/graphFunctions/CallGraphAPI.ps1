@@ -1,5 +1,67 @@
 function CallGraphAPI()
 {
+    <#
+    .SYNOPSIS
+    Executes HTTP requests to Microsoft Graph API with comprehensive error handling and pagination.
+
+    .DESCRIPTION
+    This function is the core Graph API client that handles all HTTP requests to Microsoft Graph endpoints.
+    It supports both single and batch resource path processing, automatic pagination for large result sets,
+    OData query parameters (filter, search, select), various HTTP methods (GET, POST, PATCH, DELETE),
+    consistency level headers for advanced queries, and comprehensive error handling with retry logic.
+
+    .PARAMETER accessToken
+    The Microsoft Graph API access token for authentication. This parameter is mandatory.
+
+    .PARAMETER ResourcePath
+    The Graph API resource path or array of paths. Supports single string or string array for batch processing.
+    This parameter is mandatory.
+
+    .PARAMETER APIVersion
+    The Graph API version to use. Default is 'beta'. Can be 'v1.0' or 'beta'.
+
+    .PARAMETER method
+    The HTTP method: 'get' (default), 'post', 'patch', 'put', or 'delete'.
+
+    .PARAMETER Filter
+    OData $filter query parameter for filtering results.
+
+    .PARAMETER Search
+    OData $search query parameter for searching. Requires consistencyLevel.
+
+    .PARAMETER ExtraParameters
+    Additional OData query parameters (e.g., "$select=id,displayName&$top=10").
+
+    .PARAMETER headers
+    Custom HTTP headers hashtable to include in the request.
+
+    .PARAMETER body
+    Request body for POST/PATCH/PUT operations (JSON string).
+
+    .PARAMETER consistencyLevel
+    When specified, adds ConsistencyLevel=eventual header (required for $search and some $count operations).
+
+    .PARAMETER secureString
+    When specified, returns access token as SecureString instead of plain text.
+
+    .OUTPUTS
+    System.Management.Automation.PSCustomObject or System.Array
+    Returns the API response value property (single object or array), or complete response object.
+    For batch processing, returns array of results. Returns $null on error.
+
+    .EXAMPLE
+    $users = CallGraphAPI -accessToken $token -ResourcePath "users" -Filter "startswith(displayName,'John')"
+    $device = CallGraphAPI -accessToken $token -ResourcePath "deviceManagement/managedDevices/abc123"
+    $result = CallGraphAPI -accessToken $token -ResourcePath "devices" -method "post" -body $jsonBody
+
+    .NOTES
+    Handles automatic pagination via @odata.nextLink for large result sets.
+    Supports batch resource path processing for multiple endpoints.
+    Includes retry logic with exponential backoff for transient errors.
+    Processes OData filter conditions via ProcessFilterCondition function.
+    Comprehensive error logging and verbose output for debugging.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param
     (
