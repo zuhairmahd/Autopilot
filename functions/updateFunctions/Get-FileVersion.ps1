@@ -1,5 +1,42 @@
 function Get-FileVersion()
 {
+    <#
+    .SYNOPSIS
+    Retrieves version information from an executable file.
+
+    .DESCRIPTION
+    This function extracts version information from a specified executable file including
+    product version, company name, and SHA256 file hash. It validates the file exists
+    and is not a PowerShell script, then returns detailed version metadata in a structured
+    hashtable format.
+
+    .PARAMETER executableFileName
+    The name or path of the executable file to retrieve version information from.
+
+    .OUTPUTS
+    System.Collections.Hashtable
+    Returns a hashtable with properties:
+    - major: Major version number
+    - minor: Minor version number
+    - build: Build number
+    - revision: Revision number
+    - version: Complete System.Version object
+    - companyName: Company name from file metadata
+    - hash: SHA256 hash of the file
+    
+    Returns $null if file doesn't exist, is a .ps1 file, or no version info is available.
+
+    .EXAMPLE
+    $versionInfo = Get-FileVersion -executableFileName "main.exe"
+    Write-Host "Version: $($versionInfo.version)"
+    Write-Host "Hash: $($versionInfo.hash)"
+
+    .NOTES
+    Uses Get-Item to extract VersionInfo properties.
+    Calculates SHA256 hash for file verification.
+    Validates file existence and type before processing.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]    
     param(
         [string]$executableFileName

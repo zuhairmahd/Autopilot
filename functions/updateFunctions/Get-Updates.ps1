@@ -1,5 +1,46 @@
 function Get-Updates()
 {
+    <#
+    .SYNOPSIS
+    Downloads and installs application updates from a remote URL.
+
+    .DESCRIPTION
+    This function manages the complete update process including downloading the new executable
+    from a remote URL, verifying the downloaded file, optionally verifying certificate signatures,
+    and replacing the current executable with the updated version. It supports updating multiple
+    files, user confirmation prompts, and automatic backup of the current version.
+
+    .PARAMETER executableFileName
+    The name or path of the local executable to update. Defaults to "$pwd\main.exe".
+
+    .PARAMETER updateURL
+    The base URL where update files are located. This parameter is mandatory.
+
+    .PARAMETER metaDataURL
+    The URL to retrieve update metadata. Defaults to "$updateURL/lastrun.json".
+
+    .PARAMETER filesToUpdate
+    Array of additional file names to update along with the main executable.
+
+    .PARAMETER noConfirmation
+    When specified, skips user confirmation prompts and proceeds with update automatically.
+
+    .OUTPUTS
+    System.String
+    Returns success or failure message from $returnValues.
+
+    .EXAMPLE
+    Get-Updates -updateURL "https://example.com/releases" -executableFileName "main.exe"
+    Get-Updates -updateURL "https://example.com/releases" -filesToUpdate @("config.json", "readme.txt") -noConfirmation
+
+    .NOTES
+    Downloads to temp folder before replacing current executable.
+    Creates backup of current version with .old extension.
+    Supports certificate verification for signed executables.
+    Verifies file hash after download.
+    Handles multiple file updates in batch.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $false)]

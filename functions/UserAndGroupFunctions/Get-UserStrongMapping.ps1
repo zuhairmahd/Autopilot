@@ -1,5 +1,42 @@
 function Get-UserStrongMapping()
 {
+    <#
+    .SYNOPSIS
+    Checks if a user has strong authentication mapping (certificate-based) enabled.
+
+    .DESCRIPTION
+    This function queries Microsoft Graph to retrieve a user's authorization information and
+    determines if strong authentication mapping is enabled by checking for certificate user IDs.
+    Strong mapping uses certificate-based authentication to enhance security. The function returns
+    detailed information about the user including certificate count and user details.
+
+    .PARAMETER accessToken
+    The Microsoft Graph API access token for authentication. This parameter is mandatory.
+
+    .PARAMETER UserName
+    The user principal name to check for strong mapping. This parameter is mandatory.
+
+    .OUTPUTS
+    System.Collections.Hashtable
+    Returns a hashtable with properties:
+    - StrongMapping: Boolean indicating if strong mapping is enabled
+    - UserName: The user principal name queried
+    - DisplayName: User's display name
+    - UserId: User's Graph ID
+    - Certificates: Array of certificate user IDs
+    - CertificateCount: Number of certificates found
+
+    .EXAMPLE
+    $mapping = Get-UserStrongMapping -accessToken $token -UserName "john.doe@contoso.com"
+    if ($mapping.StrongMapping) {
+        Write-Host "$($mapping.DisplayName) has $($mapping.CertificateCount) certificates configured"
+    }
+
+    .NOTES
+    Queries authorizationInfo.certificateUserIds from Microsoft Graph.
+    Requires appropriate Microsoft Graph permissions (User.Read.All or Directory.Read.All).
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true)]

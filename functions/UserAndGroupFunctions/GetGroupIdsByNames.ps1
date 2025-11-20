@@ -1,5 +1,45 @@
 function GetGroupIdsByNames()
 {
+    <#
+    .SYNOPSIS
+    Converts between Entra ID group names and IDs bidirectionally.
+
+    .DESCRIPTION
+    This function provides bidirectional conversion between Entra ID group names and IDs by
+    querying Microsoft Graph. It automatically detects whether the input contains GUIDs or
+    display names and performs the appropriate conversion. The function handles mixed inputs,
+    normalization, caching for performance, and batch processing for efficiency.
+
+    .PARAMETER AccessToken
+    The Microsoft Graph API access token for authentication.
+
+    .PARAMETER GroupNames
+    Array of group names or GUIDs to convert. Defaults to $groupsToInclude variable if not specified.
+
+    .PARAMETER DisplayNames
+    When specified, returns display names instead of IDs (for ID-to-name conversion).
+
+    .OUTPUTS
+    System.String[]
+    Returns array of group IDs (default) or display names (if DisplayNames switch is specified).
+    Returns empty array if no valid groups found or inputs are invalid.
+
+    .EXAMPLE
+    $groupIds = GetGroupIdsByNames -AccessToken $token -GroupNames @("IT-Admins", "Developers")
+    $groupNames = GetGroupIdsByNames -AccessToken $token -GroupNames $groupGuids -DisplayNames
+
+    .NOTES
+    Automatically detects input type using GUID regex pattern matching.
+    Supports three operation modes:
+    - names-to-ids: Converts display names to GUIDs
+    - ids-to-names: Converts GUIDs to display names
+    - mixed: Handles combination of both (queries Graph for all)
+    
+    Uses caching to avoid redundant API calls.
+    Batch processes multiple groups efficiently.
+    Requires appropriate Microsoft Graph permissions (Group.Read.All).
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $false)]
