@@ -1,5 +1,52 @@
 function Get-DeviceEnrollmentStatus()
 {
+    <#
+    .SYNOPSIS
+    Retrieves comprehensive enrollment status for a device by serial number.
+
+    .DESCRIPTION
+    This function queries multiple Microsoft Graph endpoints to build a complete picture of a device's
+    enrollment status including Autopilot registration, Intune management, Azure AD registration, and
+    user assignments. It handles both physical and VMware virtual machines, aggregating data from
+    imported devices, autopilot devices, managed devices, Azure AD devices, and logged-on users.
+
+    .PARAMETER serialNumber
+    The serial number of the device to query.
+
+    .PARAMETER accessToken
+    The Microsoft Graph API access token for authentication.
+
+    .PARAMETER settings
+    Optional settings object. Defaults to script-level $settings if not provided.
+
+    .OUTPUTS
+    System.Collections.Specialized.OrderedDictionary
+    Returns an ordered dictionary with comprehensive enrollment state including:
+    - imported: Boolean indicating if device has been imported
+    - inAutopilot: Boolean indicating if device is in Autopilot
+    - managed: Boolean indicating if device is managed by Intune
+    - hasDeviceObject: Boolean indicating if Azure AD device object exists
+    - hasUser: Boolean indicating if user is assigned
+    - autopilot: Autopilot device details and deployment profile
+    - managedDevice: Intune managed device details
+    - device: Azure AD device object
+    - users: Associated user objects
+    And various related properties and metadata.
+
+    .EXAMPLE
+    $status = Get-DeviceEnrollmentStatus -serialNumber "ABC123456" -accessToken $token
+    if ($status.inAutopilot) {
+        Write-Host "Device is enrolled in Autopilot"
+    }
+
+    .NOTES
+    Handles VMware virtual machines with special serial number detection.
+    Queries multiple Graph endpoints: windowsAutopilotDeviceIdentities, managedDevices, devices, users.
+    Aggregates deployment profiles, hardware information, and enrollment events.
+    Uses caching to avoid redundant API calls for the same device.
+    Requires appropriate Microsoft Graph permissions for all queried resources.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [string]$serialNumber,
