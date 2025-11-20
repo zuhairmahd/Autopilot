@@ -1,5 +1,69 @@
 function Write-Log()
 {
+    <#
+    .SYNOPSIS
+    Writes log messages to a file with support for multiple log levels and formats.
+
+    .DESCRIPTION
+    This function provides comprehensive logging capabilities with support for standard and CMTrace
+    formats, log rotation, minimum log level filtering, and multiple parameter sets (Normal, StartLogging,
+    FinishLogging). It automatically creates log directories, manages log file size, and supports
+    optional console output. The function is designed for enterprise-level logging with proper
+    error handling and validation.
+
+    .PARAMETER Message
+    The log message to write (required for Normal parameter set).
+
+    .PARAMETER LogFile
+    The path to the log file. Parent directory is created if it doesn't exist.
+
+    .PARAMETER Module
+    The name of the module or function writing the log entry (required for Normal parameter set).
+
+    .PARAMETER WriteToConsole
+    When specified, writes the message to console in addition to the log file.
+
+    .PARAMETER LogLevel
+    The severity level of the message. Valid values: Verbose, Debug, Information, Warning, Error.
+    Default is Information.
+
+    .PARAMETER CMTraceFormat
+    When specified, formats log entries for CMTrace log viewer compatibility.
+
+    .PARAMETER MaxLogSizeMB
+    Maximum log file size in megabytes before rotation. Default is 10 MB.
+
+    .PARAMETER PassThru
+    When specified, returns the log entry object after writing.
+
+    .PARAMETER StartLogging
+    Initializes logging and optionally overwrites existing log file (StartLogging parameter set).
+
+    .PARAMETER OverwriteLog
+    When used with StartLogging, overwrites the existing log file.
+
+    .PARAMETER FinishLogging
+    Writes a log completion entry (FinishLogging parameter set).
+
+    .PARAMETER MinimumLogLevel
+    Filters messages below this severity level. Uses global $MinimumLogLevel if not specified.
+
+    .OUTPUTS
+    System.Management.Automation.PSCustomObject
+    Returns log entry object when PassThru is specified.
+
+    .EXAMPLE
+    Write-Log -LogFile "C:\Logs\app.log" -Module "MyModule" -Message "Operation completed" -LogLevel "Information"
+    Write-Log -LogFile $logPath -Module "MyModule" -Message "Error occurred" -LogLevel "Error" -WriteToConsole
+    Write-Log -LogFile $logPath -StartLogging -OverwriteLog
+    Write-Log -LogFile $logPath -FinishLogging
+
+    .NOTES
+    Supports log rotation when size exceeds MaxLogSizeMB.
+    Creates log directory structure automatically.
+    Thread-safe file operations with error handling.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true, ParameterSetName = 'Normal')]

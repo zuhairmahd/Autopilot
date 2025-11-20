@@ -1,5 +1,57 @@
 function Get-RefreshToken()
 {
+    <#
+    .SYNOPSIS
+    Refreshes an expired access token using a refresh token.
+
+    .DESCRIPTION
+    This function uses a refresh token to obtain a new access token from Microsoft Graph.
+    It validates the refresh token, requests a new access token, caches the result, and
+    optionally saves the new refresh token if it has changed. The function supports both
+    file and memory caching strategies.
+
+    .PARAMETER accessTokenObject
+    The current access token object containing the refresh token.
+
+    .PARAMETER clientId
+    The Azure AD application (client) ID.
+
+    .PARAMETER clientSecret
+    The Azure AD application client secret (optional for delegated flows).
+
+    .PARAMETER tenantId
+    The Azure AD tenant ID.
+
+    .PARAMETER scopes
+    Array of permission scopes for the new token.
+
+    .PARAMETER domain
+    The domain/tenant identifier for cache key generation.
+
+    .PARAMETER cacheType
+    The cache storage type: 'file' or 'memory'.
+
+    .PARAMETER cacheTokenFile
+    Path to the cache token file (for file-based caching).
+
+    .PARAMETER cacheFolder
+    Path to the cache folder (for file-based caching).
+
+    .PARAMETER configFilePath
+    Path to configuration file for saving refresh tokens.
+
+    .OUTPUTS
+    System.String or System.Security.SecureString
+    Returns the new access token, or $null if refresh fails.
+
+    .EXAMPLE
+    $newToken = Get-RefreshToken -accessTokenObject $tokenObj -clientId $appId -tenantId $tenant -scopes $scopes -domain $domain -cacheType 'file' -cacheTokenFile $cachePath -cacheFolder $folder -configFilePath $configPath
+
+    .NOTES
+    Validates refresh token before attempting refresh.
+    Saves new refresh token only if it differs from the existing one.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

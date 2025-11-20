@@ -1,5 +1,33 @@
 function FormatDateWithTimeZone()
 {
+    <#
+    .SYNOPSIS
+    Formats a DateTime object with timezone abbreviation for display.
+
+    .DESCRIPTION
+    This function converts a DateTime value to a formatted string that includes the timezone
+    abbreviation. It handles UTC to local time conversion, validates input, and produces a
+    human-readable date format. The function accepts DateTime objects or strings that can be
+    parsed to DateTime.
+
+    .PARAMETER DateTime
+    The DateTime value to format. Can be a DateTime object or a parseable string.
+    Accepts pipeline input.
+
+    .OUTPUTS
+    System.String
+    Returns a formatted date string with timezone abbreviation (e.g., "Monday, January 1, 2024 3:45:00 PM PST"),
+    or $null if the DateTime is invalid.
+
+    .EXAMPLE
+    $formattedDate = FormatDateWithTimeZone -DateTime (Get-Date)
+    Get-Date | FormatDateWithTimeZone
+
+    .NOTES
+    Automatically converts UTC times to local time.
+    Format: "dddd, MMMM d, yyyy h:mm:ss tt [TZ]"
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [Parameter(ValueFromPipeline = $true, Position = 0, ValueFromPipelineByPropertyName = $true)]
