@@ -1,6 +1,59 @@
 function Show-Log()
 {
-    [CmdletBinding()] 
+    <#
+    .SYNOPSIS
+    Displays and filters log file content with multiple viewing options.
+
+    .DESCRIPTION
+    This function provides comprehensive log viewing capabilities with filtering by module,
+    log level, and session. It supports multiple output formats including raw text, colored
+    console output, and grid view. The function can display all log entries or filter to
+    show only the last session. It includes interactive menu selection for modules and
+    log levels when multiple options are available.
+
+    .PARAMETER logFile
+    The path to the log file to display. This parameter is mandatory and accepts pipeline input.
+
+    .PARAMETER Module
+    Array of module names to filter log entries. Default is 'All' to show all modules.
+
+    .PARAMETER Raw
+    When specified, displays raw log content without parsing or formatting.
+
+    .PARAMETER NoColor
+    When specified, disables colored output in console display.
+
+    .PARAMETER UseGrid
+    When specified, uses Out-GridView for interactive log viewing (if available).
+
+    .PARAMETER ViewLastSessionOnly
+    When specified, displays only entries from the most recent log session.
+
+    .PARAMETER Level
+    Array of log levels to display. Valid values: 'Error', 'Warning', 'Information', 'Verbose', 'Debug', 'All'.
+    Default is 'All'.
+
+    .PARAMETER MenuPageSize
+    Number of items to display per page in menu selections. Default is 25.
+
+    .PARAMETER OutputPageSize
+    Number of log entries to display per page in output. Default is 100.
+
+    .OUTPUTS
+    None. Displays log content to console or grid view.
+
+    .EXAMPLE
+    Show-Log -logFile "C:\Logs\app.log"
+    Show-Log -logFile $LogFile -Module "GraphFunctions","DeviceFunctions" -Level "Error","Warning"
+    Show-Log -logFile $LogFile -ViewLastSessionOnly -UseGrid
+
+    .NOTES
+    Supports CMTrace-formatted logs and standard text logs.
+    Provides interactive filtering through menu selections.
+    Log sessions are identified by session start markers in the log file.
+    Compatible with PowerShell 5.1.
+    #>
+    [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true)         ]
         [string]$logFile,

@@ -1,5 +1,40 @@
 function Show-AboutApplication()
 {
+    <#
+    .SYNOPSIS
+    Displays the About Application menu with version, update, and support information.
+
+    .DESCRIPTION
+    This function creates and displays an interactive About Application menu that provides
+    access to version information, Azure app registration details, logs, documentation,
+    license information, and support options. The menu continues to display until the user
+    navigates back or to the main menu.
+
+    .PARAMETER updateAvailable
+    Object containing update availability information with a success property.
+
+    .PARAMETER accessToken
+    The Microsoft Graph API access token (currently not actively used in function body).
+
+    .PARAMETER Release
+    The current release branch name (e.g., "main", "develop").
+
+    .PARAMETER name
+    The application name (currently not actively used in function body).
+
+    .OUTPUTS
+    System.String
+    Returns navigation command ("Back", "Main Menu", or exit code).
+
+    .EXAMPLE
+    Show-AboutApplication -updateAvailable $updateInfo -Release "main"
+
+    .NOTES
+    Displays version information, update settings, and auto-update status.
+    Provides menu options for viewing Azure app info, logs, documentation, license, and support.
+    Processes menu selections in a loop until user exits.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         $updateAvailable = $updateAvailable,
