@@ -1,5 +1,39 @@
 function Get-CachedTokenObject()
 {
+    <#
+    .SYNOPSIS
+    Retrieves a cached access token object from memory or file cache.
+
+    .DESCRIPTION
+    This function retrieves a cached access token for a specified domain from either memory
+    or file-based cache storage. For memory cache, it initializes the global cache if needed
+    and validates the domain matches. For file cache, it reads and deserializes the JSON token
+    file. The function includes error handling and validation of cache data.
+
+    .PARAMETER cacheType
+    The cache storage type: 'memory' or 'file'.
+
+    .PARAMETER cacheTokenFile
+    The path to the cache token file (required for file-based caching).
+
+    .PARAMETER domain
+    The domain/tenant identifier to match against the cached token.
+
+    .OUTPUTS
+    System.Management.Automation.PSCustomObject
+    Returns the cached token object if found and valid for the domain, otherwise $null.
+
+    .EXAMPLE
+    $token = Get-CachedTokenObject -cacheType 'memory' -domain "contoso.com"
+    $token = Get-CachedTokenObject -cacheType 'file' -cacheTokenFile $cachePath -domain "contoso.com"
+
+    .NOTES
+    Memory cache uses global $MemoryCache hashtable with 'accessToken' key.
+    File cache reads JSON from cacheTokenFile path.
+    Validates domain matches before returning cached token.
+    Returns $null if cache doesn't exist, is empty, or domain doesn't match.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [string]$cacheType,

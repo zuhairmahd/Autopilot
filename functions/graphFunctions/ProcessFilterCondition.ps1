@@ -1,5 +1,51 @@
 function ProcessFilterCondition()
 {
+    <#
+    .SYNOPSIS
+    Processes and encodes OData filter conditions for Microsoft Graph API queries.
+
+    .DESCRIPTION
+    This function parses OData filter condition strings and properly encodes values for use in
+    Microsoft Graph API URLs. It handles both function-based filters (startswith, contains, endswith)
+    and standard comparison operators (eq, ne, gt, lt, ge, le). The function properly encodes
+    special characters and handles null/empty string values without encoding.
+
+    .PARAMETER condition
+    The filter condition string to process (e.g., "displayName eq 'Test'", "startswith(mail,'admin')").
+
+    .OUTPUTS
+    System.String
+    Returns the processed and URL-encoded filter condition string ready for Graph API use.
+
+    .EXAMPLE
+    $filter = ProcessFilterCondition -condition "displayName eq 'John Doe'"
+    # Returns: displayName eq 'John%20Doe'
+    
+    $filter = ProcessFilterCondition -condition "startswith(userPrincipalName,'admin')"
+    # Returns: startswith(userPrincipalName,'admin')
+
+    .NOTES
+    Supported function-based filters:
+    - startswith(property, value)
+    - contains(property, value)
+    - endswith(property, value)
+    
+    Supported comparison operators:
+    - eq (equal)
+    - ne (not equal)
+    - gt (greater than)
+    - lt (less than)
+    - ge (greater than or equal)
+    - le (less than or equal)
+    
+    Special handling for:
+    - null values (not encoded)
+    - Empty strings '' or "" (not encoded)
+    - URL special characters (properly encoded)
+    
+    Removes quotes from values during processing.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [string]$condition

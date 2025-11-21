@@ -1,5 +1,42 @@
 function Start-HttpListener()
 {
+    <#
+    .SYNOPSIS
+    Starts a local HTTP listener to capture OAuth authorization code callback.
+
+    .DESCRIPTION
+    This function creates and manages a local HTTP listener that captures the OAuth authorization
+    code from the redirect callback after user authentication in the browser. It implements timeout
+    handling, extracts the authorization code from the callback URL, sends a user-friendly response
+    page to the browser, and handles errors and edge cases in the OAuth flow.
+
+    .PARAMETER redirectUri
+    The redirect URI configured in Azure AD app registration (must match exactly). Should be
+    a localhost URL like "http://localhost:8080/".
+
+    .OUTPUTS
+    System.Collections.Hashtable
+    Returns hashtable with properties:
+    - Success: Boolean indicating if authorization code was captured successfully
+    - Code: The authorization code extracted from callback URL
+    - ErrorMessage: Error message if operation failed
+
+    .EXAMPLE
+    $result = Start-HttpListener -redirectUri "http://localhost:8080/"
+    if ($result.Success) {
+        $authCode = $result.Code
+    }
+
+    .NOTES
+    Creates System.Net.HttpListener on specified localhost port.
+    Implements 5-minute timeout for user authentication.
+    Captures authorization code from query string parameter.
+    Sends HTML response page to browser confirming completion.
+    Handles listener cleanup on timeout or completion.
+    Provides diagnostic information including local IP addresses.
+    Requires redirect URI to end with trailing slash.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [string]$redirectUri

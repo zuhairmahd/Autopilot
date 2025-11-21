@@ -1,5 +1,32 @@
 function GetDeviceIdFromSerial()
 {
+    <#
+    .SYNOPSIS
+    Retrieves the device ID for a managed device by its serial number.
+
+    .DESCRIPTION
+    This function queries Microsoft Graph to get the device ID for a managed device
+    identified by its serial number. It implements caching to improve performance by
+    storing both successful lookups and "not found" results to avoid redundant API calls.
+
+    .PARAMETER SerialNumber
+    The serial number of the device to look up.
+
+    .PARAMETER AccessToken
+    The Microsoft Graph API access token for authentication.
+
+    .OUTPUTS
+    System.String
+    Returns the device ID if found, or $null if the device is not found or an error occurs.
+
+    .EXAMPLE
+    $deviceId = GetDeviceIdFromSerial -SerialNumber "ABC123456" -AccessToken $token
+
+    .NOTES
+    Uses unified device cache for performance optimization.
+    Requires appropriate Microsoft Graph permissions to query managed devices.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true)]

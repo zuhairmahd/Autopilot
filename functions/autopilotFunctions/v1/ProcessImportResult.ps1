@@ -1,5 +1,36 @@
 function ProcessImportResult()
 {
+    <#
+    .SYNOPSIS
+    Processes the result of Autopilot device import request from Microsoft Graph.
+
+    .DESCRIPTION
+    This function interprets the Graph API response from device import operation, determines
+    success or failure, provides user-friendly status messages, and returns appropriate result
+    codes for workflow continuation. It handles both immediate success and pending import states.
+
+    .PARAMETER importResult
+    Result object from Graph API import request. This parameter is mandatory.
+
+    .PARAMETER serialNumber
+    Device serial number for logging and error messages. This parameter is mandatory.
+
+    .PARAMETER returnValues
+    Return values object containing status messages. This parameter is mandatory.
+
+    .OUTPUTS
+    System.String
+    Returns status message from returnValues indicating import success, failure, or pending state.
+
+    .EXAMPLE
+    $result = ProcessImportResult -importResult $apiResponse -serialNumber "ABC123" -returnValues $rv
+
+    .NOTES
+    Validates Graph API response structure.
+    Handles successful imports and errors.
+    Provides user-friendly status messages.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

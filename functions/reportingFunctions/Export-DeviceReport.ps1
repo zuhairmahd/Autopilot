@@ -1,5 +1,35 @@
 function Export-DeviceReport()
 {
+    <#
+    .SYNOPSIS
+    Exports comprehensive device report with detailed properties and state information.
+
+    .DESCRIPTION
+    This function generates a detailed report for devices including hardware information,
+    compliance state, enrollment status, and management properties. Exports to CSV with
+    configurable property selection.
+
+    .PARAMETER accessToken
+    Microsoft Graph API access token. This parameter is mandatory.
+
+    .PARAMETER outputPath
+    Directory path for report export. This parameter is mandatory.
+
+    .PARAMETER deviceList
+    Optional pre-filtered device list to export.
+
+    .OUTPUTS
+    System.String
+    Returns path to exported report file.
+
+    .EXAMPLE
+    Export-DeviceReport -accessToken $token -outputPath "C:\Reports"
+
+    .NOTES
+    Comprehensive device report with extended properties.
+    Includes compliance, enrollment, and hardware details.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

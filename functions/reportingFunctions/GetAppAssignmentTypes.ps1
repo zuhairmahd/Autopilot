@@ -1,5 +1,40 @@
 function GetAppAssignmentTypes()
 {
+    <#
+    .SYNOPSIS
+    Retrieves and categorizes application assignments by type (required, available, unassigned).
+
+    .DESCRIPTION
+    This function queries Microsoft Graph for all mobile apps and their assignments, categorizes them
+    by assignment intent (required, available, unassigned), resolves group names for assigned groups,
+    and optionally exports results to CSV. Implements caching for efficient group name lookups.
+
+    .PARAMETER AccessToken
+    Microsoft Graph API access token. This parameter is mandatory.
+
+    .PARAMETER Export
+    When specified, exports results to CSV file.
+
+    .PARAMETER outputPath
+    Directory path for CSV export. Required when Export switch is used. This parameter is mandatory for Export parameter set.
+
+    .PARAMETER fileMode
+    CSV file mode: 'Append' or 'Overwrite' (default). Used with Export switch.
+
+    .OUTPUTS
+    System.Management.Automation.PSCustomObject, System.Boolean
+    Returns tuple: (exportSuccess boolean, categorized apps object with RequiredApps, AvailableApps, UnassignedApps, AllApps).
+
+    .EXAMPLE
+    $success, $apps = GetAppAssignmentTypes -AccessToken $token
+    $success, $apps = GetAppAssignmentTypes -AccessToken $token -Export -outputPath "C:\Reports"
+
+    .NOTES
+    Retrieves apps with assignments in single API call using $expand.
+    Caches group information to minimize API calls.
+    Categorizes by assignment intent: required, available, unassigned.
+    Compatible with PowerShell 5.1.
+    #>
     [cmdletBinding()]
     param (
         [Parameter(Mandatory = $true)]

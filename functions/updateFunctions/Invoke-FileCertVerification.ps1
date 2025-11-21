@@ -1,5 +1,41 @@
 function Invoke-FileCertVerification()
 {
+    <#
+    .SYNOPSIS
+    Verifies the digital certificate signature of a file.
+
+    .DESCRIPTION
+    This function performs comprehensive certificate verification for a digitally signed file.
+    It checks the Authenticode signature, validates the certificate is signed by the expected
+    organization (Zuhair Mahmoud), verifies the certificate chain roots to Microsoft Identity
+    Verification Root, and confirms the root certificate is trusted on the local machine.
+
+    .PARAMETER FilePath
+    The path to the file to verify. This parameter is mandatory and must not be null or empty.
+
+    .OUTPUTS
+    System.Boolean
+    Returns $true if the file signature is valid, properly chained, and trusted.
+    Returns $false if verification fails at any stage.
+
+    .EXAMPLE
+    if (Invoke-FileCertVerification -FilePath "C:\Downloads\setup.exe") {
+        Write-Host "File signature verified successfully"
+    } else {
+        Write-Host "File signature verification failed"
+    }
+
+    .NOTES
+    Verifies certificate is:
+    - Signed by organization "O=Zuhair Mahmoud"
+    - Has Valid Authenticode signature status
+    - Chains to "CN=Microsoft Identity Verification Root"
+    - Root certificate is trusted in LocalMachine\Root store
+    
+    Provides detailed logging and console output during verification.
+    No [CmdletBinding()] as this is a simple validation function.
+    Compatible with PowerShell 5.1.
+    #>
     param(
         [parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]

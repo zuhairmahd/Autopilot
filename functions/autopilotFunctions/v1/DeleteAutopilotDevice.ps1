@@ -1,5 +1,43 @@
 function DeleteAutopilotDevice()
 {
+    <#
+    .SYNOPSIS
+    Deletes an Autopilot device registration from Microsoft Intune.
+
+    .DESCRIPTION
+    This function removes an Autopilot device from Intune by serial number or device ID. It includes
+    retry logic with configurable attempts and delays to handle transient errors, validates device
+    exists before deletion, and provides comprehensive logging of the deletion process.
+
+    .PARAMETER DeviceIdentifyer
+    The device identifier (serial number or device ID). This parameter is mandatory and accepts pipeline input.
+
+    .PARAMETER IdentifyerType
+    Type of identifier: 'SerialNumber' (default) or 'DeviceId'.
+
+    .PARAMETER accessToken
+    The Microsoft Graph API access token.
+
+    .PARAMETER MaxRetries
+    Maximum number of deletion retry attempts. Default is 10.
+
+    .PARAMETER RetryDelaySeconds
+    Seconds to wait between retry attempts. Default is 20.
+
+    .OUTPUTS
+    System.Boolean
+    Returns $true if deletion succeeds, $false if deletion fails after all retries.
+
+    .EXAMPLE
+    DeleteAutopilotDevice -DeviceIdentifyer "ABC123" -accessToken $token
+    "ABC123" | DeleteAutopilotDevice -accessToken $token -MaxRetries 5
+
+    .NOTES
+    Looks up device by serial number or uses device ID directly.
+    Implements retry logic for reliability.
+    Validates device exists before attempting deletion.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]

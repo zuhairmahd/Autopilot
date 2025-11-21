@@ -1,5 +1,32 @@
 function AssessDeviceState() 
 {
+    <#
+    .SYNOPSIS
+    Assesses the current state and readiness of an Autopilot device for next user.
+
+    .DESCRIPTION
+    This function evaluates a device's enrollment state and determines readiness for next user assignment.
+    It checks enrollment status, management state, profile assignment, contact dates, and pending actions
+    to provide comprehensive assessment with specific recommendations.
+
+    .PARAMETER enrollmentState
+    Enrollment state object containing device status information. This parameter is mandatory.
+
+    .PARAMETER AssessmentType
+    Type of assessment: 'NextUserReadiness' (default) or other assessment types.
+
+    .OUTPUTS
+    System.Management.Automation.PSCustomObject
+    Returns assessment object with readiness status, issues, and recommendations.
+
+    .EXAMPLE
+    $assessment = AssessDeviceState -enrollmentState $state -AssessmentType 'NextUserReadiness'
+
+    .NOTES
+    Evaluates enrollment, management, profile assignment, contact dates, and pending actions.
+    Provides actionable recommendations for device readiness.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

@@ -1,5 +1,47 @@
 function Request-AdditionalScopes()
 {
+    <#
+    .SYNOPSIS
+    Requests additional Microsoft Graph API scopes when current token has insufficient permissions.
+
+    .DESCRIPTION
+    This function handles the process of requesting additional scopes when a token is found to be
+    missing required permissions. For delegated authentication, it re-initiates the auth flow with
+    the combined scope set (current + missing). For application authentication, it reports that
+    admin consent is required. The function provides user-friendly prompts and error handling.
+
+    .PARAMETER MissingScopes
+    Array of scope strings that are missing from the current token.
+
+    .PARAMETER AuthConfiguration
+    Hashtable containing authentication configuration including Delegated flag and current scopes.
+    This parameter is mandatory.
+
+    .PARAMETER CurrentScopes
+    Array of scopes currently available in the token.
+
+    .PARAMETER AuthParams
+    Hashtable containing authentication parameters (tenantId, clientId, etc) for token acquisition.
+    This parameter is mandatory.
+
+    .OUTPUTS
+    System.Collections.Hashtable
+    Returns hashtable with properties:
+    - Success: Boolean indicating if scope request succeeded
+    - NewAccessToken: The new access token with additional scopes (if successful)
+    - ErrorMessage: Error message if operation failed
+    - UserCancelled: Boolean indicating if user cancelled the operation
+
+    .EXAMPLE
+    $result = Request-AdditionalScopes -MissingScopes @("User.ReadWrite.All") -AuthConfiguration $authConfig -CurrentScopes $current -AuthParams $params
+
+    .NOTES
+    For delegated auth: re-authenticates with combined scope set.
+    For application auth: returns error indicating admin consent needed.
+    Handles empty missing scopes gracefully (returns success).
+    Provides clear user prompts for additional permission requests.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $false)]

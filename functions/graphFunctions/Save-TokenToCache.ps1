@@ -1,5 +1,41 @@
 function Save-TokenToCache()
 {
+    <#
+    .SYNOPSIS
+    Saves an access token to cache storage (file or memory).
+
+    .DESCRIPTION
+    This function saves a cached token object to either file-based or memory-based cache storage.
+    It extracts scope information from the JWT token (scp for delegated auth, roles for application auth)
+    and adds it to the cached token object before saving. The function supports both cache types and
+    handles JSON serialization for file storage.
+
+    .PARAMETER cachedToken
+    The cached token object to save. Must contain access_token property. This parameter is mandatory.
+
+    .PARAMETER cacheType
+    The cache storage type. Valid values: 'file', 'memory'. This parameter is mandatory.
+
+    .PARAMETER cacheTokenFile
+    Path to the cache token file (required for file-based caching).
+
+    .PARAMETER cacheFolder
+    Path to the cache folder (required for file-based caching).
+
+    .OUTPUTS
+    None. Saves token to specified cache storage.
+
+    .EXAMPLE
+    Save-TokenToCache -cachedToken $token -cacheType 'file' -cacheTokenFile $cachePath -cacheFolder $folder
+    Save-TokenToCache -cachedToken $token -cacheType 'memory'
+
+    .NOTES
+    Extracts and adds scope information from JWT token automatically.
+    Handles both delegated (scp claim) and application (roles claim) authentication.
+    File cache uses JSON format.
+    Memory cache uses script-level variable.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

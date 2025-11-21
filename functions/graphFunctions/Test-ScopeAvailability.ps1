@@ -1,5 +1,48 @@
 function Test-ScopeAvailability()
 {
+    <#
+    .SYNOPSIS
+    Validates that an access token has all required Microsoft Graph scopes.
+
+    .DESCRIPTION
+    This function validates whether an access token contains all required Microsoft Graph API scopes.
+    It decodes the JWT token to extract available scopes (scp for delegated, roles for application),
+    compares them against required scopes, and returns detailed validation results including missing
+    scopes and recommended actions. The function excludes OAuth/OIDC protocol scopes (openid, profile,
+    offline_access) from validation for application authentication.
+
+    .PARAMETER AccessToken
+    The access token string to validate. This parameter is mandatory.
+
+    .PARAMETER RequiredScopes
+    Array of required Microsoft Graph API scope strings. If empty, validation passes automatically.
+
+    .PARAMETER AuthConfiguration
+    Hashtable containing authentication configuration including delegated flag and scope array.
+    This parameter is mandatory.
+
+    .OUTPUTS
+    System.Collections.Hashtable
+    Returns a hashtable with properties:
+    - HasAllRequiredScopes: Boolean indicating if all required scopes are present
+    - MissingScopes: Array of missing scope strings
+    - AvailableScopes: Array of available scope strings
+    - ScopeSource: Source of scopes ('scp' or 'roles')
+    - UnavailableFunctionality: Array of functionality that may be unavailable
+    - RecommendedAction: String describing recommended action if scopes are missing
+
+    .EXAMPLE
+    $validation = Test-ScopeAvailability -AccessToken $token -RequiredScopes @("User.Read", "Device.Read") -AuthConfiguration $authConfig
+    if (-not $validation.HasAllRequiredScopes) {
+        Write-Host "Missing scopes: $($validation.MissingScopes -join ', ')"
+    }
+
+    .NOTES
+    Excludes OAuth/OIDC protocol scopes for application auth: openid, profile, offline_access.
+    Handles both delegated (scp claim) and application (roles claim) authentication.
+    Provides detailed validation results for troubleshooting scope issues.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

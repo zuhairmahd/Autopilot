@@ -1,5 +1,41 @@
 function Get-UniqueCallerContext()
 {
+    <#
+    .SYNOPSIS
+    Generates a unique context identifier from PowerShell call stack analysis.
+
+    .DESCRIPTION
+    This function analyzes the PowerShell call stack to create a unique context identifier based on
+    the calling function's name and characteristics. It uses pattern matching on function names
+    (Get-, Set-, New-, Remove-, etc.) to categorize the caller and generate descriptive context
+    strings used for menu navigation tracking and state management.
+
+    .PARAMETER CallStack
+    The PowerShell call stack array to analyze. This parameter is mandatory.
+
+    .PARAMETER Menu
+    Optional menu hashtable for additional context (currently not actively used in implementation).
+
+    .OUTPUTS
+    System.String
+    Returns a context string like "Getter_FunctionName", "Setter_FunctionName", "Creator_FunctionName",
+    or "Unknown" if caller cannot be determined or stack depth is insufficient.
+
+    .EXAMPLE
+    $context = Get-UniqueCallerContext -CallStack (Get-PSCallStack)
+
+    .NOTES
+    Requires call stack depth of at least 2 to analyze caller.
+    Skips Get-CallingContext (index 0) and analyzes actual caller (index 1).
+    Function name patterns recognized:
+    - Get-* → Getter_FunctionName
+    - Set-* → Setter_FunctionName
+    - New-* → Creator_FunctionName
+    - Remove-*/Delete-* → Remover_FunctionName
+    
+    Used by menu navigation system for unique context generation.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

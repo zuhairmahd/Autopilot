@@ -1,5 +1,38 @@
 function Save-RefreshTokenToConfig()
 {
+    <#
+    .SYNOPSIS
+    Saves a refresh token securely to encrypted configuration file.
+
+    .DESCRIPTION
+    This function handles the secure storage of OAuth refresh tokens in encrypted JSON configuration
+    files. It supports both creating new encrypted configs and updating existing ones, automatically
+    detects if encryption is needed, uses temporary encrypted config to avoid duplicate password
+    prompts, and handles the complete encryption workflow including user password collection and
+    secure key management.
+
+    .PARAMETER refreshToken
+    The OAuth refresh token to save securely.
+
+    .PARAMETER configFilePath
+    Path to the configuration file where the refresh token should be stored.
+
+    .OUTPUTS
+    None. Saves refresh token to encrypted configuration file.
+
+    .EXAMPLE
+    Save-RefreshTokenToConfig -refreshToken $rt -configFilePath "config.json"
+
+    .NOTES
+    Uses Invoke-JsonFileEncryption for secure encryption.
+    Avoids duplicate password prompts by reusing temporary encrypted config if available.
+    Stores refresh token in delegatedCredentials.refresh_token property.
+    Creates backup of original file before encryption.
+    Handles both new config creation and existing config updates.
+    Uses user-provided password for encryption key derivation.
+    Cleans up temporary files after encryption.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param($refreshToken, $configFilePath)
 

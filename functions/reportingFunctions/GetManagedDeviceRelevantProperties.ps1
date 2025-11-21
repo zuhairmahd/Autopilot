@@ -1,5 +1,29 @@
 function GetManagedDeviceRelevantProperties()
 {
+    <#
+    .SYNOPSIS
+    Extracts relevant properties from managed device object for reporting.
+
+    .DESCRIPTION
+    This function selects and formats key properties from an Intune managed device object including
+    device name, OS, compliance state, management state, last sync time, and user information.
+    Returns standardized property set for consistent reporting.
+
+    .PARAMETER managedDevice
+    Managed device object from Graph API. This parameter is mandatory.
+
+    .OUTPUTS
+    System.Management.Automation.PSCustomObject
+    Returns object with relevant device properties formatted for reporting.
+
+    .EXAMPLE
+    $properties = GetManagedDeviceRelevantProperties -managedDevice $device
+
+    .NOTES
+    Standardizes property names and formats.
+    Includes compliance, management, and user details.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

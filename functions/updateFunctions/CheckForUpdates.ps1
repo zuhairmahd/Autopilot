@@ -1,5 +1,45 @@
 function CheckForUpdates()
 {
+    <#
+    .SYNOPSIS
+    Checks if a newer version of the application is available remotely.
+
+    .DESCRIPTION
+    This function compares the local executable version with the remote version by retrieving
+    version information from a specified URL. It validates the executable file, retrieves
+    both local and remote version information, and determines if an update is available.
+    The function returns detailed version comparison information including hashes and release dates.
+
+    .PARAMETER remoteVersionURL
+    The URL to retrieve remote version information from. This parameter is mandatory.
+
+    .PARAMETER executableFileName
+    The name of the local executable file to check. Must have .exe extension. This parameter is mandatory.
+
+    .OUTPUTS
+    System.Collections.Hashtable
+    Returns a hashtable with properties:
+    - localVersion: Local version object
+    - remoteVersion: Remote version object
+    - version: Version string
+    - ReleaseDate: Release date of remote version
+    - Hash: Hash of remote version
+    - success: Boolean indicating successful version check
+    - updateAvailable: Boolean indicating if update is available
+    - versionsMatch: Boolean indicating if versions match
+
+    .EXAMPLE
+    $updateInfo = CheckForUpdates -remoteVersionURL "https://example.com/version.json" -executableFileName "main.exe"
+    if ($updateInfo.updateAvailable) {
+        Write-Host "Update available: $($updateInfo.remoteVersion)"
+    }
+
+    .NOTES
+    Automatically corrects file extension to .exe if not provided.
+    Compares version objects using System.Version comparison.
+    Includes comprehensive error handling and logging.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true)]

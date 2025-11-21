@@ -1,5 +1,44 @@
 function ImportAutopilotDevice() 
 {
+    <#
+    .SYNOPSIS
+    Imports a device into Windows Autopilot using hardware hash.
+
+    .DESCRIPTION
+    This function orchestrates the complete Autopilot device import process including device preparation,
+    Graph API import request, import result processing, assignment verification, and enrollment state
+    handling. It supports custom wait settings, retry logic, and comprehensive error handling throughout
+    the import workflow.
+
+    .PARAMETER device
+    Device object containing serialNumber, hardwareHash, GroupTag, and AssignedUser properties.
+    This parameter is mandatory.
+
+    .PARAMETER accessToken
+    Microsoft Graph API access token for import operations. This parameter is mandatory.
+
+    .PARAMETER settings
+    Settings object containing configuration values.
+
+    .PARAMETER returnValues
+    Return values object containing status messages.
+
+    .PARAMETER domain
+    Domain for tenant-specific operations.
+
+    .OUTPUTS
+    System.String
+    Returns import status message from returnValues indicating success, failure, or specific conditions.
+
+    .EXAMPLE
+    $result = ImportAutopilotDevice -device $deviceObj -accessToken $token -settings $settings -returnValues $rv
+
+    .NOTES
+    Complete workflow: prepare → import → verify → check assignment → handle enrollment state.
+    Supports interactive customization of wait settings.
+    Implements retry logic for profile assignment verification.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

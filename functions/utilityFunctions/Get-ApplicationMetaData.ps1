@@ -1,5 +1,44 @@
 function Get-ApplicationMetaData()
 {
+    <#
+    .SYNOPSIS
+    Retrieves and loads application metadata and configuration settings.
+
+    .DESCRIPTION
+    This function loads global application settings from the settings.psd1 file and attempts
+    to infer the domain-specific configuration file. When multiple domain configuration files
+    exist, it prompts the user to select one (unless Silent mode is enabled). The function
+    handles domain detection through pattern matching of .psd1 files.
+
+    .PARAMETER GlobalSettingsFile
+    Path to the global settings file. Defaults to "$pwd\settings.psd1".
+
+    .PARAMETER scriptPath
+    The script path for context (currently not actively used in function body).
+
+    .PARAMETER scriptName
+    The script name for context (currently not actively used in function body).
+
+    .PARAMETER domain
+    Optional domain name. If not specified, the function attempts to infer it from available .psd1 files.
+
+    .PARAMETER Silent
+    When specified, automatically selects the first domain configuration file if multiple are found,
+    without prompting the user.
+
+    .OUTPUTS
+    System.Management.Automation.PSObject
+    Returns metadata object with application configuration, or $null if user cancels selection.
+
+    .EXAMPLE
+    $metadata = Get-ApplicationMetaData
+    $metadata = Get-ApplicationMetaData -domain "contoso.com" -Silent
+
+    .NOTES
+    Searches for domain-specific configuration files matching pattern: [domain].psd1
+    Displays interactive menu when multiple domain configurations are found (unless Silent).
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [string]$GlobalSettingsFile = "$pwd\settings.psd1",
