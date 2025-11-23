@@ -85,8 +85,9 @@ Describe "Function: AssessDeviceState" -Tags 'Unit', 'reportingFunctions' {
         
         # Mock settings
         $script:settings = @{
-            MinimumDevicePhysicalMemoryInGB = 16
-            deviceContactThresholdInDays    = 7
+            MinimumDevicePhysicalMemoryInGB           = 16
+            deviceContactThresholdInDays              = 7
+            includeEnrolledDevicesInNextUserReadiness = $true
         }
         
         # Mock global variables
@@ -551,6 +552,214 @@ Describe "Function: AssessDeviceState" -Tags 'Unit', 'reportingFunctions' {
         }
     }
     
+    Context "When includeEnrolledDevicesInNextUserReadiness setting is TRUE (default behavior)" {
+        BeforeEach {
+            $script:enrollmentState = @{
+                inAutopilot   = $true
+                managed       = $true
+                autopilot     = @{
+                    device = @{
+                        id              = 'autopilot-device-id-123'
+                        enrollmentState = 'enrolled'
+                        managedDeviceId = 'managed-device-id-123'
+                    }
+                }
+                managedDevice = @{
+                    device = @{
+                        id     = 'managed-device-id-123'
+                        userId = ''
+                    }
+                    memory = 16
+                }
+            }
+            
+            # Ensure setting is TRUE
+            $script:settings.includeEnrolledDevicesInNextUserReadiness = $true
+        }
+        
+        It "Should mark enrolled device as ready when all checks pass" {
+            # Act
+            $result = AssessDeviceState -enrollmentState $script:enrollmentState -settings $script:settings -AssessmentType 'NextUserReadiness'
+            
+            # Assert
+            $result.ReadinessState | Should -Be $script:deviceStates.ready
+            $result.IsReady | Should -Be $true
+            $result.IssueCount | Should -Be 0
+        }
+        
+        It "Should perform full validation on enrolled devices" {
+            # Arrange - device with issues
+            $script:enrollmentState.managedDevice.memory = 8  # Below minimum
+            
+            Mock GetManagedDeviceRelevantProperties {
+                return @{
+                    OrphanDevice     = $false
+                    CorrectRam       = $false
+                    HasUser          = $true
+                    ValidUser        = $true
+                    LastLogonDate    = $null
+                    ReadyForNextUser = $false
+                }
+            }
+            
+            # Act
+            $result = AssessDeviceState -enrollmentState $script:enrollmentState -settings $script:settings -AssessmentType 'NextUserReadiness'
+            
+            # Assert - should check RAM and user association
+            $result.IsReady | Should -Be $false
+            $result.AllIssues | Should -Contain 'The managed device is associated with a user.'
+            ($result.AllIssues -join '; ') | Should -Match 'The device has only.*GB of RAM'
+        }
+        
+        It "Should check contact date for enrolled devices" {
+            # Arrange
+            Mock GetLastDeviceContactDate {
+                return @{
+                    latestContactDate            = (Get-Date).AddDays(-30)
+                    numberOfDaysSinceLastContact = 30
+                    withinThreshold              = $false
+                }
+            }
+            
+            # Act
+            $result = AssessDeviceState -enrollmentState $script:enrollmentState -settings $script:settings -AssessmentType 'NextUserReadiness'
+            
+            # Assert
+            $result.IsReady | Should -Be $false
+            $result.AllIssues | Should -Match 'The device has not contacted Intune in \d+ days\.'
+            $result.Action | Should -Be $script:deviceActions.connectToNetwork
+        }
+    }
+    
+    Context "When includeEnrolledDevicesInNextUserReadiness setting is FALSE (new behavior)" {
+        BeforeEach {
+            $script:enrollmentState = @{
+                inAutopilot   = $true
+                managed       = $true
+                autopilot     = @{
+                    device = @{
+                        id              = 'autopilot-device-id-123'
+                        enrollmentState = 'enrolled'
+                        managedDeviceId = 'managed-device-id-123'
+                    }
+                }
+                managedDevice = @{
+                    device = @{
+                        id     = 'managed-device-id-123'
+                        userId = ''
+                    }
+                    memory = 16
+                }
+            }
+            
+            # Set setting to FALSE
+            $script:settings.includeEnrolledDevicesInNextUserReadiness = $false
+        }
+        
+        It "Should mark enrolled device as NOT ready even when all checks would pass" {
+            # Act
+            $result = AssessDeviceState -enrollmentState $script:enrollmentState -settings $script:settings -AssessmentType 'NextUserReadiness'
+            
+            # Assert
+            $result.ReadinessState | Should -Be $script:deviceStates.notReady
+            $result.IsReady | Should -Be $false
+            $result.IssueCount | Should -BeGreaterThan 0
+            $result.AllIssues | Should -Contain 'The device appears to have already been enrolled. Devices must not be enrolled to be considered ready for the next user.'
+        }
+        
+        It "Should recommend WipeOrClean action for enrolled devices" {
+            # Act
+            $result = AssessDeviceState -enrollmentState $script:enrollmentState -settings $script:settings -AssessmentType 'NextUserReadiness'
+            
+            # Assert
+            $result.Action | Should -Be $script:deviceActions.WipeOrClean
+            $result.AllActions | Should -Contain $script:deviceActions.WipeOrClean
+        }
+        
+        It "Should still mark notContacted devices as ready when not managed" {
+            # Arrange - notContacted state
+            $script:enrollmentState.autopilot.device.enrollmentState = 'notContacted'
+            $script:enrollmentState.managed = $false
+            $script:enrollmentState.managedDevice = $null
+            
+            # Act
+            $result = AssessDeviceState -enrollmentState $script:enrollmentState -settings $script:settings -AssessmentType 'NextUserReadiness'
+            
+            # Assert
+            $result.ReadinessState | Should -Be $script:deviceStates.ready
+            $result.IsReady | Should -Be $true
+        }
+        
+        It "Should not perform detailed validation checks on enrolled devices" {
+            # Arrange - device that would fail checks
+            Mock GetManagedDeviceRelevantProperties {
+                return @{
+                    OrphanDevice     = $true
+                    CorrectRam       = $false
+                    HasUser          = $true
+                    ValidUser        = $false
+                    LastLogonDate    = $null
+                    ReadyForNextUser = $false
+                }
+            }
+            
+            Mock GetLastDeviceContactDate {
+                return @{
+                    latestContactDate            = (Get-Date).AddDays(-30)
+                    numberOfDaysSinceLastContact = 30
+                    withinThreshold              = $false
+                }
+            }
+            
+            # Act
+            $result = AssessDeviceState -enrollmentState $script:enrollmentState -settings $script:settings -AssessmentType 'NextUserReadiness'
+            
+            # Assert - should only have the enrollment issue
+            $result.IssueCount | Should -Be 1
+            $result.AllIssues[0] | Should -Be 'The device appears to have already been enrolled. Devices must not be enrolled to be considered ready for the next user.'
+            # Should NOT have issues about orphan, RAM, user association, or contact date
+            $result.AllIssues | Should -Not -Contain 'The device is an orphan device.'
+            $result.AllIssues | Should -Not -Match 'The device has only.*GB of RAM'
+            $result.AllIssues | Should -Not -Contain 'The managed device is associated with a user.'
+        }
+        
+        It "Should still check autopilot assignment issues even when setting is false" {
+            # Arrange - bad autopilot assignment
+            Mock GetAutopilotDeviceRelevantProperties {
+                return @{
+                    CorrectProfile          = $false
+                    ProfileAssigned         = $true
+                    RemediationStateGood    = $true
+                    EnrollmentStateGood     = $true
+                    AutopilotAssignmentGood = $false
+                }
+            }
+            
+            # Act
+            $result = AssessDeviceState -enrollmentState $script:enrollmentState -settings $script:settings -AssessmentType 'NextUserReadiness'
+            
+            # Assert - should have both autopilot and enrollment issues
+            $result.IsReady | Should -Be $false
+            $result.IssueCount | Should -BeGreaterThan 1
+            $result.AllIssues | Should -Contain 'The device is not assigned to the correct autopilot profile.'
+            $result.AllIssues | Should -Contain 'The device appears to have already been enrolled. Devices must not be enrolled to be considered ready for the next user.'
+        }
+        
+        It "Should handle device not managed (managed=false) correctly" {
+            # Arrange - device in autopilot but not yet enrolled/managed
+            $script:enrollmentState.managed = $false
+            $script:enrollmentState.managedDevice = $null
+            $script:enrollmentState.autopilot.device.enrollmentState = 'notContacted'
+            
+            # Act
+            $result = AssessDeviceState -enrollmentState $script:enrollmentState -settings $script:settings -AssessmentType 'NextUserReadiness'
+            
+            # Assert - should be ready since it's not managed yet (notContacted state)
+            $result.IsReady | Should -Be $true
+            $result.ReadinessState | Should -Be $script:deviceStates.ready
+        }
+    }
+    
     Context "When using different assessment types" {
         BeforeEach {
             $script:enrollmentState = @{
@@ -560,14 +769,20 @@ Describe "Function: AssessDeviceState" -Tags 'Unit', 'reportingFunctions' {
                     device = @{
                         enrollmentState = 'enrolled'
                         id              = 'autopilot-device-id-123'
+                        managedDeviceId = 'managed-device-id-123'
                     }
                 }
                 managedDevice = @{
                     device = @{
-                        id = 'managed-device-id-123'
+                        id     = 'managed-device-id-123'
+                        userId = ''
                     }
+                    memory = 16
                 }
             }
+            
+            # Reset setting to default TRUE for this context
+            $script:settings.includeEnrolledDevicesInNextUserReadiness = $true
         }
         
         It "Should handle PropperEnrollmentVerification assessment type" {
