@@ -144,6 +144,7 @@ function GetAutopilotDeviceRelevantProperties()
     Write-Host "Autopilot profile Deployment status: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)."
     Write-Host "Assigned profile name: $($enrollmentState.autopilot.device.deploymentProfile.displayname)"
     Write-Host "Assignment date: $($enrollmentState.autopilot.device.deploymentProfileAssignedDateTime |FormatDateWithTimeZone)"
+
     #Check remediation state.
     $lastRemediationDate = $enrollmentState.autopilot.device.remediationStateLastModifiedDateTime | FormatDateWithTimeZone
     if ($null -ne $enrollmentState.autopilot.device.remediationState -and $enrollmentState.autopilot.device.remediationState -in @('noRemediationRequired', 'unknownFutureValue'))
@@ -163,7 +164,14 @@ function GetAutopilotDeviceRelevantProperties()
     Write-Host "Remediation state: $($enrollmentState.autopilot.device.remediationState)"
     Write-Host "Remediation state last modified date: $lastRemediationDate"
     #Now check enrollment status.
-    if ($null -ne $enrollmentState.autopilot.device.enrollmentState -and $enrollmentState.autopilot.device.enrollmentState -in @('enrolled', 'notContacted'))
+    if ($null -ne $enrollmentState.autopilot.device.enrollmentState -and $enrollmentState.autopilot.device.enrollmentState -eq 'notContacted')
+    {
+        Write-Host "The device has not yet contacted Autopilot service for enrollment."
+        Write-Host "This is normal for new devices that have not yet been powered on."      
+        write-log -LogFile $LogFile -Module "$functionName" -Message "The device has not yet contacted Autopilot service for enrollment. This is normal for new devices that have not yet been powered on." -LogLevel "Information"     
+        $enrollmentStateGood = $true
+    }           
+    elseif ($enrollmentState.autopilot.device.enrollmentState -eq 'enrolled')
     {
         Write-Verbose "[$functionName] The device enrollment state is valid: $($enrollmentState.autopilot.device.enrollmentState)."
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device enrollment state is valid: $($enrollmentState.autopilot.device.enrollmentState)." -LogLevel "Information"
