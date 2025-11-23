@@ -102,31 +102,32 @@ function Get-ApplicationDefaults()
         
         # Global settings defaults - single source of truth
         Global         = [ordered]@{
-            configFile                   = ".\.secrets\config.json"
-            maxWaitTime                  = 30
-            showLicenseBanner            = $true
-            validateScopes               = $true
-            deviceContactThresholdInDays = 30
-            useGridForLogDisplay         = $true     
-            DisplayManualFilterSelection = $false
-            appModes                     = @(
+            configFile                                = ".\.secrets\config.json"
+            maxWaitTime                               = 30
+            showLicenseBanner                         = $true
+            validateScopes                            = $true
+            deviceContactThresholdInDays              = 30
+            includeEnrolledDevicesInNextUserReadiness = $true
+            useGridForLogDisplay                      = $true     
+            DisplayManualFilterSelection              = $false
+            appModes                                  = @(
                 "full"
             )
-            timeInSeconds                = 60
-            maxUserMatchDisplay          = 10
-            checkStrongMapping           = $false
-            strongMappingOptional        = $true
-            maxGroupMatchDisplay         = 10
-            maxMenuItemsPerPage          = 15
-            release                      = "auto"
-            operatingSystem              = "Windows"
-            preferredBrowser             = 'Chrome'
-            documentationURL             = "https://github.com/zuhairmahd/Autopilot/blob/master/readme.md"
-            licenseURL                   = "https://github.com/zuhairmahd/Autopilot/blob/master/LICENSE"
-            privateSession               = $false           
-            migrateLegacyConfiguration   = $true
-            hideEmptyMenus               = $true
-            autoUpdate                   = $true
+            timeInSeconds                             = 60
+            maxUserMatchDisplay                       = 10
+            checkStrongMapping                        = $false
+            strongMappingOptional                     = $true
+            maxGroupMatchDisplay                      = 10
+            maxMenuItemsPerPage                       = 15
+            release                                   = "auto"
+            operatingSystem                           = "Windows"
+            preferredBrowser                          = 'Chrome'
+            documentationURL                          = "https://github.com/zuhairmahd/Autopilot/blob/master/readme.md"
+            licenseURL                                = "https://github.com/zuhairmahd/Autopilot/blob/master/LICENSE"
+            privateSession                            = $false           
+            migrateLegacyConfiguration                = $true
+            hideEmptyMenus                            = $true
+            autoUpdate                                = $true
         }
 
         #cache settings defaults - single source of truth   
@@ -160,39 +161,40 @@ function Get-ApplicationDefaults()
     
         # Domain template defaults - single source of truth for domain structure
         Domain         = [ordered]@{
-            groupsToInclude                 = @()
-            knownProblemGraphEndpoints      = @()
-            groupsToExclude                 = @()
-            autopilotProfilesToInclude      = @()
-            autopilotDeviceAllowedVendors   = @(
+            groupsToInclude                           = @()
+            knownProblemGraphEndpoints                = @()
+            groupsToExclude                           = @()
+            autopilotProfilesToInclude                = @()
+            autopilotDeviceAllowedVendors             = @(
                 "Dell",
                 "VMWare"
             )
-            domain                          = $DomainName
-            companyName                     = ""
-            supportEmail                    = ""
-            documentationURL                = "https://github.com/zuhairmahd/Autopilot/blob/master/readme.md"
-            licenseURL                      = "https://github.com/zuhairmahd/Autopilot/blob/master/LICENSE"
-            version                         = $Version
-            validateScopes                  = $false
-            useGridForLogDisplay            = $true
-            DisplayManualFilterSelection    = $false
-            hideEmptyMenus                  = $true
-            maxWaitTime                     = 30
-            showLicenseBanner               = $true
-            deviceContactThresholdInDays    = 30
-            checkStrongMapping              = $false
-            strongMappingOptional           = $true
-            migrateLegacyConfiguration      = $true
-            appModes                        = @(
+            domain                                    = $DomainName
+            companyName                               = ""
+            supportEmail                              = ""
+            documentationURL                          = "https://github.com/zuhairmahd/Autopilot/blob/master/readme.md"
+            licenseURL                                = "https://github.com/zuhairmahd/Autopilot/blob/master/LICENSE"
+            version                                   = $Version
+            validateScopes                            = $false
+            useGridForLogDisplay                      = $true
+            DisplayManualFilterSelection              = $false
+            hideEmptyMenus                            = $true
+            includeEnrolledDevicesInNextUserReadiness = $true
+            maxWaitTime                               = 30
+            showLicenseBanner                         = $true
+            deviceContactThresholdInDays              = 30
+            checkStrongMapping                        = $false
+            strongMappingOptional                     = $true
+            migrateLegacyConfiguration                = $true
+            appModes                                  = @(
                 "full"
             )
-            timeInSeconds                   = 60
-            maxUserMatchDisplay             = 20
-            maxGroupMatchDisplay            = 20
-            maxMenuItemsPerPage             = 20
-            release                         = "master"
-            cacheSettings                   = [ordered]@{
+            timeInSeconds                             = 60
+            maxUserMatchDisplay                       = 20
+            maxGroupMatchDisplay                      = 20
+            maxMenuItemsPerPage                       = 20
+            release                                   = "master"
+            cacheSettings                             = [ordered]@{
                 enabled                  = $true
                 defaultExpirationMinutes = 15
                 maxCacheSize             = 1000
@@ -211,31 +213,31 @@ function Get-ApplicationDefaults()
                     }
                 }
             }
-            repoInfo                        = [ordered]@{
+            repoInfo                                  = [ordered]@{
                 repoName      = "Autopilot"
                 baseSourceURL = "https://raw.githubusercontent.com"
                 baseURL       = "https://www.github.com"
                 repoPath      = "zuhairmahd"
             }
-            autoUpdate                      = $true
-            deviceNamePrefix                = ""
-            operatingSystem                 = "Windows"
-            minUsernameLength               = 3
-            maxUserNameLength               = 50
-            maxSerialNumberLength           = 50
-            minSerialNumberLength           = 7
-            minimumDevicePhysicalMemoryInGB = 8
-            maxNumberOfDevicesAllowed       = 15
-            preferredBrowser                = "Chrome"
-            privateSession                  = $false
-            userPatternsToExclude           = @( 
+            autoUpdate                                = $true
+            deviceNamePrefix                          = ""
+            operatingSystem                           = "Windows"
+            minUsernameLength                         = 3
+            maxUserNameLength                         = 50
+            maxSerialNumberLength                     = 50
+            minSerialNumberLength                     = 7
+            minimumDevicePhysicalMemoryInGB           = 8
+            maxNumberOfDevicesAllowed                 = 15
+            preferredBrowser                          = "Chrome"
+            privateSession                            = $false
+            userPatternsToExclude                     = @( 
                 "-test",
                 "onmicrosoft.com"
             )
-            groupPatternsToExclude          = @()  
-            groupTag                        = ''
-            assignedUser                    = ''
-            additionalScopes                = @()
+            groupPatternsToExclude                    = @()  
+            groupTag                                  = ''
+            assignedUser                              = ''
+            additionalScopes                          = @()
         }
         
         # Required scopes for Microsoft Graph API

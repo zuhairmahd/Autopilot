@@ -89,7 +89,7 @@ function AssessDeviceState()
                 Write-Verbose "Autopilot assignment good: $($autopilotReadiness.AutopilotAssignmentGood)"
                 Write-Verbose "Managed device readiness good: $($managedDeviceReadiness.ReadyForNextUser)"
                 Write-Verbose "within threshold: $($deviceLastContactDate.withinThreshold)"
-                if (($autopilotReadiness.AutopilotAssignmentGood -and $managedDeviceReadiness.ReadyForNextUser -and $deviceLastContactDate.withinThreshold) -or ($autopilotReadiness.AutopilotAssignmentGood -and $enrollmentState.autopilot.device.enrollmentState -eq 'notContacted' -and $enrollmentState.managed -eq $false))
+                if (($settings.includeEnrolledDevicesInNextUserReadiness -and $autopilotReadiness.AutopilotAssignmentGood -and $managedDeviceReadiness.ReadyForNextUser -and $deviceLastContactDate.withinThreshold) -or ($autopilotReadiness.AutopilotAssignmentGood -and $enrollmentState.autopilot.device.enrollmentState -eq 'notContacted' -and $enrollmentState.managed -eq $false))
                 {
                     Write-Host "The device is ready for the next user."
                     Write-Host $memoryMessage
@@ -164,46 +164,56 @@ function AssessDeviceState()
                         $allIssues += $issue
                         $actionsPriority[$deviceActions.contactAdmin] = 3
                     }
-                    if ($managedDeviceReadiness.OrphanDevice -eq $true)
+                    if ($settings.includeEnrolledDevicesInNextUserReadiness -and $enrollmentState.Managed)
                     {
-                        $issue = "The device is an orphan device."
-                        Write-Host $issue
-                        $allIssues += $issue
-                        $actionsPriority[$deviceActions.contactAdmin] = 3
+                        if ($managedDeviceReadiness.OrphanDevice -eq $true)
+                        {
+                            $issue = "The device is an orphan device."
+                            Write-Host $issue
+                            $allIssues += $issue
+                            $actionsPriority[$deviceActions.contactAdmin] = 3
+                        }
+                        if ($managedDeviceReadiness.CorrectRam -eq $false)
+                        {
+                            $issue = "The device has only $($enrollmentState.managedDevice.memory)GB of RAM, which is below the $($settings.MinimumDevicePhysicalMemoryInGB)GB desired requirement."
+                            Write-Host $issue
+                            Write-Host "Contact Hardware and Logistics."
+                            $allIssues += $issue
+                            $actionsPriority[$deviceActions.contactAdmin] = 3
+                        }
+                        if ($managedDeviceReadiness.HasUser)
+                        {
+                            $issue = "The managed device is associated with a user."
+                            Write-Host $issue
+                            Write-Host "It is advisable to remove the managed device from Intune prior to having the user enroll the device."
+                            $allIssues += $issue
+                            $actionsPriority[$deviceActions.WipeOrClean] = 2  # Higher priority action
+                        }
+                        if ($managedDeviceReadiness.ValidUser -eq $false)
+                        {
+                            $issue = "The device appears to be associated with an SPN or a user that no longer exists in Azure AD."
+                            Write-Host $issue
+                            Write-Host "It is advisable to remove the managed device from Intune prior to having the user enroll the device."
+                            $allIssues += $issue
+                            $actionsPriority[$deviceActions.WipeOrClean] = 2  # Higher priority action
+                        }
+                        if ($deviceLastContactDate.withinThreshold -eq $false -and -not ($enrollmentState.autopilot.device.enrollmentState -eq 'notContacted'))
+                        {
+                            $issue = "The device has not contacted Intune in $($deviceLastContactDate.numberOfDaysSinceLastContact) days."
+                            Write-Host $issue
+                            Write-Host "Please check the device's network connectivity and ensure it can reach Intune."
+                            $allIssues += $issue
+                            $actionsPriority[$deviceActions.connectToNetwork] = 1  # Highest priority - fix connectivity first
+                        }
                     }
-                    if ($managedDeviceReadiness.CorrectRam -eq $false)
+                    elseif (-not $settings.includeEnrolledDevicesInNextUserReadiness -and $enrollmentState.Managed)
                     {
-                        $issue = "The device has only $($enrollmentState.managedDevice.memory)GB of RAM, which is below the $($settings.MinimumDevicePhysicalMemoryInGB)GB desired requirement."
+                        $issue = "The device appears to have already been enrolled. Devices must not be enrolled to be considered ready for the next user."
                         Write-Host $issue
-                        Write-Host "Contact Hardware and Logistics."
-                        $allIssues += $issue
-                        $actionsPriority[$deviceActions.contactAdmin] = 3
-                    }
-                    if ($managedDeviceReadiness.HasUser)
-                    {
-                        $issue = "The managed device is associated with a user."
-                        Write-Host $issue
-                        Write-Host "It is advisable to remove the managed device from Intune prior to having the user enroll the device."
-                        $allIssues += $issue
-                        $actionsPriority[$deviceActions.WipeOrClean] = 2  # Higher priority action
-                    }
-                    if ($managedDeviceReadiness.ValidUser -eq $false)
-                    {
-                        $issue = "The device appears to be associated with an SPN or a user that no longer exists in Azure AD."
-                        Write-Host $issue
-                        Write-Host "It is advisable to remove the managed device from Intune prior to having the user enroll the device."
-                        $allIssues += $issue
-                        $actionsPriority[$deviceActions.WipeOrClean] = 2  # Higher priority action
-                    }
-                    if ($deviceLastContactDate.withinThreshold -eq $false -and -not ($enrollmentState.autopilot.device.enrollmentState -eq 'notContacted'))
-                    {
-                        $issue = "The device has not contacted Intune in $($deviceLastContactDate.numberOfDaysSinceLastContact) days."
-                        Write-Host $issue
-                        Write-Host "Please check the device's network connectivity and ensure it can reach Intune."
-                        $allIssues += $issue
-                        $actionsPriority[$deviceActions.connectToNetwork] = 1  # Highest priority - fix connectivity first
-                    }
-                    
+                        $allIssues += $issue                            
+                        $actionsPriority[$deviceActions.WipeOrClean] = 2
+                    }                           
+
                     # Determine the primary action based on priority (lower number = higher priority)
                     if ($actionsPriority.Count -gt 0)
                     {
