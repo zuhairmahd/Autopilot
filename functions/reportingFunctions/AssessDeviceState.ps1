@@ -64,10 +64,15 @@ function AssessDeviceState()
             if ($enrollmentState.inAutopilot)
             {
                 $autopilotReadiness = GetAutopilotDeviceRelevantProperties -enrollmentState $enrollmentState
+                
+                # Initialize variables to avoid null reference errors
+                $managedDeviceReadiness = $null
+                $deviceLastContactDate = $null
+                
                 if ($enrollmentState.autopilot.device.enrollmentState -ne 'notContacted')
                 {   
                     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting managed device properties." -LogLevel "Information"
-                    $managedDeviceReadiness = GetManagedDeviceRelevantProperties -enrollmentState $enrollmentState
+                    $managedDeviceReadiness = GetManagedDeviceRelevantProperties -enrollmentState $enrollmentState -settings $settings
                     $deviceLastContactDate = GetLastDeviceContactDate -accessToken $accessToken -enrollmentState $enrollmentState
                     if ($deviceLastContactDate.withinThreshold)
                     {
@@ -80,6 +85,8 @@ function AssessDeviceState()
                         Write-Host "Please check the device's network connectivity and ensure it can reach Intune."
                     }    
                     $memoryMessage = "`n"
+                    Write-Verbose "Managed device readiness good: $($managedDeviceReadiness.ReadyForNextUser)"
+                    Write-Verbose "within threshold: $($deviceLastContactDate.withinThreshold)"
                 }
                 else 
                 {
@@ -87,9 +94,20 @@ function AssessDeviceState()
                     $memoryMessage = "We could not determine whether the device has the required $($settings.MinimumDevicePhysicalMemoryInGB ) GB of RAM. `n Please manually verify that the device has $($settings.MinimumDevicePhysicalMemoryInGB ) GB of RAM before proceeding."
                 }
                 Write-Verbose "Autopilot assignment good: $($autopilotReadiness.AutopilotAssignmentGood)"
-                Write-Verbose "Managed device readiness good: $($managedDeviceReadiness.ReadyForNextUser)"
-                Write-Verbose "within threshold: $($deviceLastContactDate.withinThreshold)"
-                if (($settings.includeEnrolledDevicesInNextUserReadiness -and $autopilotReadiness.AutopilotAssignmentGood -and $managedDeviceReadiness.ReadyForNextUser -and $deviceLastContactDate.withinThreshold) -or ($autopilotReadiness.AutopilotAssignmentGood -and $enrollmentState.autopilot.device.enrollmentState -eq 'notContacted' -and $enrollmentState.managed -eq $false))
+                
+                # Determine readiness - handle notContacted devices separately to avoid null reference errors
+                $isNotContactedReady = $autopilotReadiness.AutopilotAssignmentGood -and 
+                $enrollmentState.autopilot.device.enrollmentState -eq 'notContacted' -and 
+                $enrollmentState.managed -eq $false
+                
+                $isEnrolledReady = $settings.includeEnrolledDevicesInNextUserReadiness -and 
+                $autopilotReadiness.AutopilotAssignmentGood -and 
+                $null -ne $managedDeviceReadiness -and
+                $managedDeviceReadiness.ReadyForNextUser -and 
+                $null -ne $deviceLastContactDate -and
+                $deviceLastContactDate.withinThreshold
+                
+                if ($isEnrolledReady -or $isNotContactedReady)
                 {
                     Write-Host "The device is ready for the next user."
                     Write-Host $memoryMessage
@@ -164,7 +182,7 @@ function AssessDeviceState()
                         $allIssues += $issue
                         $actionsPriority[$deviceActions.contactAdmin] = 3
                     }
-                    if ($settings.includeEnrolledDevicesInNextUserReadiness -and $enrollmentState.Managed)
+                    if ($settings.includeEnrolledDevicesInNextUserReadiness -and $enrollmentState.Managed -and $null -ne $managedDeviceReadiness)
                     {
                         if ($managedDeviceReadiness.OrphanDevice -eq $true)
                         {
@@ -218,7 +236,7 @@ function AssessDeviceState()
                     if ($actionsPriority.Count -gt 0)
                     {
                         $action = ($actionsPriority.GetEnumerator() | Sort-Object Value)[0].Key
-                        $allActions = $actionsPriority.Keys
+                        $allActions = @($actionsPriority.Keys)  # Force array with @()
                     }
                     else
                     {

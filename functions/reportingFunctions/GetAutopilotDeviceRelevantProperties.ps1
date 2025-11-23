@@ -171,7 +171,7 @@ function GetAutopilotDeviceRelevantProperties()
         write-log -LogFile $LogFile -Module "$functionName" -Message "The device has not yet contacted Autopilot service for enrollment. This is normal for new devices that have not yet been powered on." -LogLevel "Information"     
         $enrollmentStateGood = $true
     }           
-    elseif ($null -ne $enrollmentState.autopilot.device.enrollmentState -and $enrollmentState.autopilot.device.enrollmentState -eq 'enrolled')
+    elseif ($enrollmentState.autopilot.device.enrollmentState -eq 'enrolled')
     {
         Write-Verbose "[$functionName] The device enrollment state is valid: $($enrollmentState.autopilot.device.enrollmentState)."
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device enrollment state is valid: $($enrollmentState.autopilot.device.enrollmentState)." -LogLevel "Information"
