@@ -13,6 +13,7 @@
                 NoVersionUpdate = $false
                 Overwrite       = $true
                 noCleanup       = $false
+                skipModuleCheck = $true
             }
             
             # Settings to apply to global settings.psd1
@@ -113,6 +114,7 @@
                 OutputPath      = 'lhm'
                 NoVersionUpdate = $false
                 Overwrite       = $true
+                skipModuleCheck = $true
             }
             
             globalSettings  = @{
@@ -230,7 +232,7 @@
                 deviceNamePrefix                          = 'w11-'
             }
             
-            description     = 'Government build for gao.gov with enhanced security and compliance settings'
+            description     = 'LHM build for gao.gov'
         }
         
         # Production build target
