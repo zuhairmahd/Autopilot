@@ -1408,6 +1408,8 @@ $successMessage = "$OutputFile written"
 $parentFolder = Split-Path -Parent $OutputFile
 $SettingsFile = "$parentFolder\settings.psd1"
 $zipFilePath = Join-Path $parentFolder "script.zip"
+$toolsFolder = Join-Path -Path $PWD -ChildPath "tools"
+$toolsToCopy = (Get-ChildItem -Path "$toolsFolder\reset.*" | ForEach-Object { $_.FullName })             
 #endregion
 
 #region initial checks
@@ -1727,6 +1729,7 @@ else
     exit 1
 }
 
+
 if (-not $SkipSigning)
 {
     Write-Host "Signing executable at $OutputFile"
@@ -1790,6 +1793,29 @@ else
 {
     Write-Host "No secrets were copied."
 }
+
+if ($toolsToCopy.Count -gt 0)
+{
+    Write-Host "Copying $($toolsToCopy.Count ) tool files to $parentFolder'"
+    foreach ($tool in $toolsToCopy)
+    {
+        Write-Verbose "[$scriptName] Copying tool file: $tool to $parentFolder"
+        try
+        {
+            Copy-Item -Path $tool -Destination $parentFolder -Force
+            Write-Host "Copied tool file: $tool"                    
+        }
+        catch
+        {
+            Write-Host "Failed to copy tool file: $tool"
+            Write-Error $_
+        }                       
+    }
+}
+else
+{
+    Write-Host "No tool files to copy."
+}                                       
 
 if (-not $SkipZipArchive)
 {
