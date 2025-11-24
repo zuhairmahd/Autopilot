@@ -276,14 +276,23 @@ function New-ZipArchive()
         [Parameter(Mandatory = $true)]
         [string]$inputPath,
         [Parameter(Mandatory = $true)]
-        [string]$outputPath
+        [string]$outputPath,
+        [switch]$Overwrite
     )
-    
+    $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "Creating zip archive from $inputPath to $outputPath"
     $tempZipFilePath = Join-Path -Path $env:TEMP -ChildPath "script_$(New-Guid).zip"
     try
     {
         Write-Host "Creating temporary zip archive at: $tempZipFilePath"
+        if ($Overwrite)
+        {
+            Write-Verbose "[$functionName] Overwrite is enabled. Existing zip file at $outputPath will be overwritten."
+            if (Test-Path -Path $outputPath)
+            {
+                Remove-Item -Path $outputPath -Force
+            }                                   
+        }
         if (Test-Path -Path $inputPath -PathType Container  )
         {
             Compress-Archive -Path "$inputPath\*" -DestinationPath $tempZipFilePath -Force
@@ -1439,6 +1448,8 @@ if ($updateHash)
 if ($CreateZipFileOnly)
 {
     Write-Host "Creating zip file only: $zipFilePath"
+    $zipCreated = New-ZipArchive -inputPath $parentFolder -outputPath $zipFilePath -Overwrite
+    if ($zipCreated)
     {
         Write-Host "Zip file created successfully at $zipFilePath"
         Write-Log -logFile $logFile -Message "Zip file created successfully at $zipFilePath" -module $scriptName
@@ -1782,12 +1793,8 @@ else
 
 if (-not $SkipZipArchive)
 {
-    # Ensure any existing zip file is deleted before creating a new one
-    if (Test-Path $zipFilePath) {
-        Remove-Item $zipFilePath -Force
-    }
     Write-Verbose "[$scriptName] Creating zip archive of output folder: $parentFolder"
-    $zipCreated = New-ZipArchive -inputPath $parentFolder -outputPath $zipFilePath
+    $zipCreated = New-ZipArchive -inputPath $parentFolder -outputPath $zipFilePath -Overwrite
     if ($zipCreated)
     {
         Write-Host "Zip archive created successfully at $zipFilePath"
