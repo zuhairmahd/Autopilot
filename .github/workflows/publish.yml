@@ -172,7 +172,7 @@ jobs:
           $branchName = "$env:BRANCH_NAME"
           switch ($branchName) {
             "dev" { $target = "dev"; $targetDescription = "development" }
-            "lhm" { $target = "government"; $targetDescription = "government" }
+            "lhm" { $target = "lhm"; $targetDescription = "lhm" }
             default { $target = $branchName; $targetDescription = $branchName }
           }
           Write-Host "Branch: $branchName, Target: $target, Description: $targetDescription"
