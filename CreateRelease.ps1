@@ -71,7 +71,9 @@ param(
     [switch]$noCleanup,
     [switch]$SkipSigning,
     [switch]$skipModuleCheck,
+    [switch]$SkipZipArchive,
     [switch]$updateHash,
+    [switch]$CreateZipFileOnly,
     [switch]$Overwrite,
     [switch]$NoVersionUpdate,
     [switch]$AddDebug,
@@ -266,9 +268,49 @@ else
 }
 #endregion import functions.
 
-Write-Log -logFile $logFile -startLogging
-
 #region helper functions
+function New-ZipArchive()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$inputPath,
+        [Parameter(Mandatory = $true)]
+        [string]$outputPath
+    )
+    
+    Write-Verbose "Creating zip archive from $inputPath to $outputPath"
+    $tempZipFilePath = Join-Path -Path $env:TEMP -ChildPath "script_$(New-Guid).zip"
+    try
+    {
+        Write-Host "Creating temporary zip archive at: $tempZipFilePath"
+        if (Test-Path -Path $inputPath -PathType Container  )
+        {
+            Compress-Archive -Path "$inputPath\*" -DestinationPath $tempZipFilePath -Force
+            Write-Verbose "[$functionName] Compressed folder $inputPath into $tempZipFilePath"  
+        }
+        elseif (Test-Path -Path $inputPath -PathType Leaf)      
+        {
+            Compress-Archive -Path $inputPath -DestinationPath $tempZipFilePath -Force
+            Write-Verbose "[$functionName] Compressed file $inputPath into $tempZipFilePath"                
+        }                   
+        else
+        {
+            throw "Input path '$inputPath' does not exist."
+        }       
+        Write-Host "Zip archive created successfully: $tempZipFilePath"
+        Move-Item -Path $tempZipFilePath -Destination $outputPath -Force       
+        Write-Host "Moved zip archive to final destination: $outputPath"    
+        return $true        
+    }
+    catch
+    {   
+        Write-Host "Failed to create zip archive: $tempZipFilePath"
+        Write-Error $_
+        return $false
+    }
+}
+
 function Get-LastRunObject()
 {
     [CmdletBinding()]
@@ -1250,6 +1292,8 @@ function Set-ParametersFromTarget()
 }
 #endregion helper functions
 
+Write-Log -logFile $logFile -startLogging
+
 #region Apply script parameters and target settings
 Write-Host "Applying scritt parameters..."
 Write-Log -logFile $logFile -Message "Applying script parameters..." -module $scriptName
@@ -1354,6 +1398,7 @@ Write-Host "Output file resolved to: $OutputFile"
 $successMessage = "$OutputFile written"
 $parentFolder = Split-Path -Parent $OutputFile
 $SettingsFile = "$parentFolder\settings.psd1"
+$zipFilePath = Join-Path $parentFolder "script.zip"
 #endregion
 
 #region initial checks
@@ -1390,6 +1435,27 @@ if ($updateHash)
         exit 1
     }
 }
+
+if ($CreateZipFileOnly)
+{
+    Write-Host "Creating zip file only: $zipFilePath"
+    $zipCreated = New-ZipArchive -inputPath $parentFolder -outputPath $zipFilePath
+    if ($zipCreated)
+    {
+        Write-Host "Zip file created successfully at $zipFilePath"
+        Write-Log -logFile $logFile -Message "Zip file created successfully at $zipFilePath" -module $scriptName
+        Write-Log -logFile $logFile -finishLogging
+        exit 0
+    }
+    else
+    {
+        Write-Host "Failed to create zip file at $zipFilePath"
+        Write-Log -logFile $logFile -Message "Failed to create zip file at $zipFilePath" -module $scriptName -LogLevel 'Error'
+        Write-Log -logFile $logFile -finishLogging
+        exit 1
+    }
+}
+
 Write-Verbose "[$scriptName] Updating last run version..."
 $updatedVersion = Update-LastRunVersion -version $version -PartToIncrement 'Revision' -LastRun $LastRun
 Write-Verbose "[$scriptName] Last run version after update: $($updatedVersion.version)"
@@ -1716,6 +1782,22 @@ else
     Write-Host "No secrets were copied."
 }
 
+if (-not $SkipZipArchive)
+{
+    Write-Verbose "[$scriptName] Creating zip archive of output folder: $parentFolder"
+    $zipCreated = New-ZipArchive -inputPath $parentFolder -outputPath $zipFilePath
+    if ($zipCreated)
+    {
+        Write-Host "Zip archive created successfully at $zipFilePath"
+        Write-Log -logFile $logFile -Message "Zip archive created successfully at $zipFilePath" -module $scriptName
+    }
+    else
+    {
+        Write-Host "Failed to create zip archive at $zipFilePath"
+        Write-Log -logFile $logFile -Message "Failed to create zip archive at $zipFilePath" -module $scriptName -LogLevel 'Error'
+    }
+}
+
 if (-not $noCleanup)
 {
     Write-Host "Cleaning up..."
@@ -1768,7 +1850,6 @@ else
 }
 Write-Host "Build process completed successfully."
 Write-Host "Executable and files are located in $parentFolder"
-
 $response = $null
 if (-not $Overwrite)
 {

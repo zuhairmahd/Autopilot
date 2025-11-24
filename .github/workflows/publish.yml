@@ -280,6 +280,14 @@ jobs:
           copy-item -path .\main.exe -destination "$branchDir\main.exe" -Force
           Write-Host "Updated hash in lastrun.json."
 
+      - name: recreate zip
+        shell: pwsh
+        run: |
+          $branchDir = ".\$env:BRANCH_NAME"
+          #copy lastrun to the root folder from the current directory if it exists.
+          if (Test-Path -Path "$branchDir\lastrun.json") { Copy-Item -Path "$branchDir\lastrun.json" -Destination .\lastrun.json -Force }
+          .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName $env:TARGET_NAME -Overwrite -CreateZipFileOnly
+
       - name: Commit signed artifacts to repository
         if: env.AZURE_TENANT_ID != '' && env.AZURE_CLIENT_ID != '' && env.AZURE_CLIENT_SECRET != ''
         shell: pwsh
