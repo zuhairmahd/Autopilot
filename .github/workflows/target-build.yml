@@ -4,17 +4,35 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: 'Target name from targets.psd1 to build'
+        description: "Target name from targets.psd1 to build"
         required: true
-        default: 'dev'
+        default: "dev"
         type: choice
         options:
           - dev
           - production
           - government
           - ci_test
+      test_suite:
+        description: "Tests to run before build"
+        required: true
+        default: "All"
+        type: choice
+        options:
+          - All
+          - Unit
+          - Integration
+          - Comprehensive
+          - Unit + Integration
+          - Unit + Comprehensive
+          - Integration + Comprehensive
+      enable_code_coverage:
+        description: "Enable code coverage analysis"
+        required: false
+        default: false
+        type: boolean
       skip_signing:
-        description: 'Skip code signing'
+        description: "Skip code signing"
         required: false
         default: false
         type: boolean
@@ -26,7 +44,7 @@ jobs:
   test:
     name: Test (pwsh on Windows)
     runs-on: windows-latest
-    timeout-minutes: 10
+    timeout-minutes: 45
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -37,13 +55,75 @@ jobs:
           Write-Host "Using PowerShell version: $($PSVersionTable.PSVersion)"
           if ($PSVersionTable.PSVersion.Major -lt 7) { Write-Error "PowerShell 7+ is required."; exit 1 }
 
-      - name: Run tests - syntax
-        shell: pwsh
-        run: .\TestScripts\Test-Runner.ps1 -TestCategory syntax
+      - name: Cache Pester module
+        uses: actions/cache@v4
+        with:
+          path: ~\Documents\PowerShell\Modules\Pester
+          key: ${{ runner.os }}-pester-${{ hashFiles('**/Invoke-PesterTests.ps1') }}
+          restore-keys: |
+            ${{ runner.os }}-pester-
 
-      - name: Run tests - core
+      - name: Install Pester
         shell: pwsh
-        run: .\TestScripts\Test-Runner.ps1 -TestCategory core
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name Pester -MinimumVersion 5.0.0 -Scope CurrentUser -Force -SkipPublisherCheck
+
+      - name: Run all Tests
+        if: github.event.inputs.test_suite == 'All'
+        shell: pwsh
+        run: |
+          Write-Host "Running all test suites..."
+          $coverageFlag = if ('${{ github.event.inputs.enable_code_coverage }}' -eq 'true') { '-EnableCodeCoverage' } else { '' }
+          $cmd = ".\Invoke-PesterTests.ps1 -TestType All -CI $coverageFlag -OutputVerbosity Detailed"
+          Write-Host "Executing: $cmd"
+          Invoke-Expression $cmd
+
+      - name: Run Unit Tests
+        if: |
+          github.event.inputs.test_suite == 'Unit' ||
+          contains(github.event.inputs.test_suite, 'Unit')
+        shell: pwsh
+        run: |
+          Write-Host "Running unit tests..."
+          $coverageFlag = if ('${{ github.event.inputs.enable_code_coverage }}' -eq 'true') { '-EnableCodeCoverage' } else { '' }
+          $cmd = ".\Invoke-PesterTests.ps1 -TestType Unit -CI $coverageFlag -OutputVerbosity Detailed"
+          Write-Host "Executing: $cmd"
+          Invoke-Expression $cmd
+
+      - name: Run Integration Tests
+        if: |
+          github.event.inputs.test_suite == 'Integration' ||
+          contains(github.event.inputs.test_suite, 'Integration')
+        shell: pwsh
+        run: |
+          Write-Host "Running integration tests..."
+          $coverageFlag = if ('${{ github.event.inputs.enable_code_coverage }}' -eq 'true') { '-EnableCodeCoverage' } else { '' }
+          $cmd = ".\Invoke-PesterTests.ps1 -TestType Integration -CI $coverageFlag -OutputVerbosity Detailed"
+          Write-Host "Executing: $cmd"
+          Invoke-Expression $cmd
+
+      - name: Run Comprehensive Tests
+        if: |
+          github.event.inputs.test_suite == 'Comprehensive' ||
+          contains(github.event.inputs.test_suite, 'Comprehensive')
+        shell: pwsh
+        run: |
+          Write-Host "Running comprehensive tests..."
+          $coverageFlag = if ('${{ github.event.inputs.enable_code_coverage }}' -eq 'true') { '-EnableCodeCoverage' } else { '' }
+          $cmd = ".\Invoke-PesterTests.ps1 -TestType Comprehensive -CI $coverageFlag -OutputVerbosity Detailed"
+          Write-Host "Executing: $cmd"
+          Invoke-Expression $cmd
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ github.event.inputs.test_suite }}
+          path: |
+            TestResults*.xml
+            coverage.xml
+          retention-days: 7
 
   build:
     name: Build (${{ github.event.inputs.target }} target)
@@ -85,7 +165,7 @@ jobs:
           $outputPath = $targetConfig.buildParameters.OutputPath
           Write-Host "Target output path: $outputPath"
           echo "output_path=$outputPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          
+
           # Create artifact name based on target
           $artifactName = "autopilot-build-${{ github.event.inputs.target }}"
           echo "artifact_name=$artifactName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
@@ -194,7 +274,7 @@ jobs:
             Write-Host "Signed artifacts committed and pushed to $branch"
           }
           else { Write-Host "No changes to commit." }
-          
+
       - name: Upload signed artifacts
         if: env.AZURE_TENANT_ID != '' && env.AZURE_CLIENT_ID != '' && env.AZURE_CLIENT_SECRET != ''
         uses: actions/upload-artifact@v4

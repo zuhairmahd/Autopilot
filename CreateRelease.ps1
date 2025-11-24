@@ -62,7 +62,7 @@ param(
     [ValidateSet('Major', 'Minor', 'Build', 'Revision')]
     [string]$versionPartToIncrement = 'Revision',
     [Alias('outputFile')]
-    [string]$OutputPath = '',
+    [string]$OutputPath = 'build',
     [string]$SettingsFile = (Join-Path -Path $PWD -ChildPath "settings.psd1"),
     [string]$Log = (Join-Path -Path $PWD -ChildPath "logs" | Join-Path -ChildPath "createRelease.log"),
     [string]$CompanyName = 'Zuhair Mahmoud',
@@ -70,6 +70,7 @@ param(
     [switch]$CreateModule,
     [switch]$noCleanup,
     [switch]$SkipSigning,
+    [switch]$skipModuleCheck,
     [switch]$updateHash,
     [switch]$Overwrite,
     [switch]$NoVersionUpdate,
@@ -82,6 +83,62 @@ param(
 
 $scriptName = $MyInvocation.MyCommand.Name
 $logFile = $Log
+
+#region Module Dependencies
+# Check for required modules and install if missing
+if (-not $skipModuleCheck)
+{
+    $requiredModules = @(
+        @{ Name = 'ps2exe'; MinimumVersion = '1.0.0' },
+        @{ Name = 'TrustedSigning'; MinimumVersion = '0.0.1' }
+    )
+    Write-Host "Checking required modules..." -ForegroundColor Cyan
+    foreach ($module in $requiredModules)
+    {
+        $installed = Get-Module -ListAvailable -Name $module.Name | Where-Object {
+            $_.Version -ge [Version]$module.MinimumVersion
+        }
+    
+        if (-not $installed)
+        {
+            Write-Host "Module '$($module.Name)' (version $($module.MinimumVersion) or higher) is not installed." -ForegroundColor Yellow
+            Write-Host "Attempting to install $($module.Name)..." -ForegroundColor Cyan
+        
+            try
+            {
+                # Try installing from PSGallery first
+                Install-Module -Name $module.Name -MinimumVersion $module.MinimumVersion -Scope CurrentUser -Force -AllowClobber -SkipPublisherCheck -ErrorAction Stop
+                Write-Host "Successfully installed $($module.Name)" -ForegroundColor Green
+            }
+            catch
+            {
+                Write-Host "Failed to install $($module.Name): $($_.Exception.Message)" -ForegroundColor Red
+            
+                # Special handling for modules that might not be in PSGallery
+                if ($module.Name -eq 'TrustedSigning')
+                {
+                    Write-Host "Note: TrustedSigning may require Azure Trusted Signing setup." -ForegroundColor Yellow
+                    Write-Host "For testing/development, you can use -SkipSigning parameter to bypass code signing." -ForegroundColor Yellow
+                }
+            
+                Write-Host "Please install manually: Install-Module -Name $($module.Name) -MinimumVersion $($module.MinimumVersion) -Scope CurrentUser" -ForegroundColor Yellow
+                Write-Host "Or use -SkipSigning if you don't need code signing functionality." -ForegroundColor Yellow
+                exit 1
+            }
+        }
+        else
+        {
+            Write-Verbose "[$scriptName] Module '$($module.Name)' is already installed (version $($installed[0].Version))"
+        }
+    }
+    Write-Host "All required modules are available." -ForegroundColor Green
+    Write-Host ""
+}
+else
+{
+    Write-Verbose "[$scriptName] Module check is skipped as per user request."
+}       
+#endregion Module Dependencies
 
 $targetConfig = $null
 if ($PSCmdlet.ParameterSetName -eq 'TargetBuild')
@@ -1076,19 +1133,37 @@ function Update-TargetSettings()
             Write-Log -LogFile $logFile -Message "Processing domain settings for: $($TargetConfig.domain)" -Module $functionName -LogLevel "Information"
             
             # Load or create domain configuration
-            $global:domainConfig = Get-DomainConfigurationFromFiles -DomainName $TargetConfig.domain -ConfigurationPath $ConfigurationPath
-            #remove the first element of the domainConfig if it is not a hashtable
-            if ($domainConfig -and $domainConfig.Count -gt 0 -and -not ($domainConfig[0] -is [hashtable]))
+            $domainConfig = Get-DomainConfigurationFromFiles -DomainName $TargetConfig.domain -ConfigurationPath $ConfigurationPath
+            
+            # Ensure we have a proper hashtable or ordered dictionary
+            if ($null -eq $domainConfig)
             {
-                for ($i = 0; $i -lt $domainConfig.Count; $i++)
+                Write-Verbose "[$functionName] No existing domain config found, creating new ordered dictionary"
+                $domainConfig = [ordered]@{}
+            }
+            elseif ($domainConfig -is [array] -and $domainConfig.Count -gt 0)
+            {
+                # If array returned, find the first hashtable/ordered dictionary element
+                Write-Verbose "[$functionName] Domain config is an array, extracting dictionary"
+                $foundDict = $null
+                foreach ($item in $domainConfig)
                 {
-                    if ($domainConfig[$i] -is [hashtable] -or $i -eq $domainConfig.Count - 1)
+                    if ($item -is [hashtable] -or $item -is [System.Collections.Specialized.OrderedDictionary])
                     {
-                        $global:domainConfig = $domainConfig[$i]
+                        $foundDict = $item
                         break
                     }
                 }
+                $domainConfig = if ($foundDict) { $foundDict } else { [ordered]@{} }
             }
+            elseif ($domainConfig -isnot [hashtable] -and $domainConfig -isnot [System.Collections.Specialized.OrderedDictionary])
+            {
+                Write-Warning "[$functionName] Domain config is not a hashtable or ordered dictionary (type: $($domainConfig.GetType().Name)), creating new ordered dictionary"
+                $domainConfig = [ordered]@{}
+            }
+            
+            Write-Verbose "[$functionName] Domain config type after validation: $($domainConfig.GetType().Name)"
+            
             # Apply domain settings
             foreach ($key in $TargetConfig.domainSettings.Keys)
             {
@@ -1096,10 +1171,12 @@ function Update-TargetSettings()
                 if ($domainConfig.Keys -contains $key)
                 {
                     $domainConfig[$key] = $TargetConfig.domainSettings[$key]
+                    Write-Verbose "[$functionName] Updated existing domain setting: $key = $($TargetConfig.domainSettings[$key])"
                 }
                 else
                 {
                     $domainConfig.Add($key, $TargetConfig.domainSettings[$key])
+                    Write-Verbose "[$functionName] Added new domain setting: $key = $($TargetConfig.domainSettings[$key])"
                 }
                 Write-Verbose "[$functionName] Applied domain setting: $key = $($TargetConfig.domainSettings[$key])"
             }

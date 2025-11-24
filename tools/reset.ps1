@@ -1,12 +1,77 @@
 [CmdletBinding()]
 param(
     [string]$Log = "$PSScriptRoot\logs\reset.log",
-    [string]$ScriptArchive = "$pwd\script.zip",
+    [string[]]$ScriptArchivePaths = @("\\prod\ISTS\Data_Drop\win11\Scripts\Source\script.zip", "$pwd\script.zip"),
+    [switch]$SkipNetworkCheck,
     [switch]$fullReset
 )
 
 function Write-Log()
 {
+    <#
+    .SYNOPSIS
+    Writes log messages to a file with support for multiple log levels and formats.
+
+    .DESCRIPTION
+    This function provides comprehensive logging capabilities with support for standard and CMTrace
+    formats, log rotation, minimum log level filtering, and multiple parameter sets (Normal, StartLogging,
+    FinishLogging). It automatically creates log directories, manages log file size, and supports
+    optional console output. The function is designed for enterprise-level logging with proper
+    error handling and validation.
+
+    .PARAMETER Message
+    The log message to write (required for Normal parameter set).
+
+    .PARAMETER LogFile
+    The path to the log file. Parent directory is created if it doesn't exist.
+
+    .PARAMETER Module
+    The name of the module or function writing the log entry (required for Normal parameter set).
+
+    .PARAMETER WriteToConsole
+    When specified, writes the message to console in addition to the log file.
+
+    .PARAMETER LogLevel
+    The severity level of the message. Valid values: Verbose, Debug, Information, Warning, Error.
+    Default is Information.
+
+    .PARAMETER CMTraceFormat
+    When specified, formats log entries for CMTrace log viewer compatibility.
+
+    .PARAMETER MaxLogSizeMB
+    Maximum log file size in megabytes before rotation. Default is 10 MB.
+
+    .PARAMETER PassThru
+    When specified, returns the log entry object after writing.
+
+    .PARAMETER StartLogging
+    Initializes logging and optionally overwrites existing log file (StartLogging parameter set).
+
+    .PARAMETER OverwriteLog
+    When used with StartLogging, overwrites the existing log file.
+
+    .PARAMETER FinishLogging
+    Writes a log completion entry (FinishLogging parameter set).
+
+    .PARAMETER MinimumLogLevel
+    Filters messages below this severity level. Uses global $MinimumLogLevel if not specified.
+
+    .OUTPUTS
+    System.Management.Automation.PSCustomObject
+    Returns log entry object when PassThru is specified.
+
+    .EXAMPLE
+    Write-Log -LogFile "C:\Logs\app.log" -Module "MyModule" -Message "Operation completed" -LogLevel "Information"
+    Write-Log -LogFile $logPath -Module "MyModule" -Message "Error occurred" -LogLevel "Error" -WriteToConsole
+    Write-Log -LogFile $logPath -StartLogging -OverwriteLog
+    Write-Log -LogFile $logPath -FinishLogging
+
+    .NOTES
+    Supports log rotation when size exceeds MaxLogSizeMB.
+    Creates log directory structure automatically.
+    Thread-safe file operations with error handling.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true, ParameterSetName = 'Normal')]
@@ -59,6 +124,7 @@ function Write-Log()
         [ValidateSet('Error', 'Warning', 'Information', 'Verbose', 'Debug')]
         [string]$MinimumLogLevel
     )
+    
     try
     {
         # Use global minimum log level if not provided
@@ -87,8 +153,15 @@ function Write-Log()
             $Module = $MyInvocation.MyCommand.Name
             $LogLevel = "Information"
             
-            # Create separator line
-            $separatorLine = "=" * 80
+            # Create separator line with appropriate message
+            if ($StartLogging)
+            {
+                $separatorLine = "=" * 30 + " start of log session " + "=" * 30
+            }
+            else
+            {
+                $separatorLine = "=" * 30 + " end of log session " + "=" * 30
+            }
             
             # Ensure log directory exists
             $logDir = Split-Path $LogFile -Parent
@@ -99,7 +172,7 @@ function Write-Log()
             
             if ($OverwriteLog)
             {
-                Remove-Item -Path $LogFile -Force -ErrorAction SilentlyContinue
+                Remove-Item -Path $LogFile -Force -ErrorAction SilentlyContinue | Out-Null
             }   
             
             # Check for log rotation if file exists and is too large
@@ -358,17 +431,72 @@ function Write-Log()
 
 $scriptName = $MyInvocation.MyCommand.Name
 $script:logFile = $Log
+$localScriptArchive = Join-Path $PSScriptRoot "script.zip"
+$scriptArchive = $null
 $secretsFolderName = '.secrets'
+
 Write-Log -logFile $logFile -StartLogging
+write-log -LogFile $logFile -Module $scriptName -Message "Parameters received: ScriptArchivePaths=$($ScriptArchivePaths -join ', '), fullReset=$fullReset"
 Write-Host "Resetting the script configuration..."
-Write-Log -LogFile $logFile -Message "Starting reset process..." -Module $scriptName -LogLevel "Information"
-if (-not (Test-Path -LiteralPath $ScriptArchive)) 
-{ 
-    Write-Error "[$scriptName] Archive not found: $ScriptArchive" 
-    Write-Log -LogFile $logFile -Message "Archive not found: $ScriptArchive" -Module $scriptName -LogLevel "Error"
-    Write-Log -logFile $logFile -FinishLogging
-    exit 1 
+
+foreach ($ScriptArchivePath in $ScriptArchivePaths)
+{
+    write-log -LogFile $logFile -Module $scriptName -Message "Checking for archive at path: $ScriptArchivePath"
+    #If this is a network path and the $SkipNetworkCheck is true, skip it.
+    if ($ScriptArchivePath.StartsWith('\\') -and $SkipNetworkCheck)
+    {
+        Write-Verbose "[$scriptName] Skipping network path check for: $ScriptArchivePath as per user request.       "
+        write-log -LogFile $logFile -Module $scriptName -Message "Skipping network path check for: $ScriptArchivePath as per user request."
+    }                                   
+    elseif (Test-Path -LiteralPath $ScriptArchivePath)
+    {
+        $ScriptArchive = $ScriptArchivePath
+        Write-Verbose "[$scriptName] Found archive at path: $ScriptArchivePath"
+        write-log -LogFile $logFile -Module $scriptName -Message "Found archive at path: $ScriptArchivePath"            
+        break
+    }
+    else
+    {
+        Write-Verbose "[$scriptName] No archive found at path: $ScriptArchivePath"
+        write-log -LogFile $logFile -Module $scriptName -Message "No archive found at path: $ScriptArchivePath" -LogLevel "Debug"                               
+    }
 }
+
+if ([string]::IsNullOrWhiteSpace($ScriptArchive))
+{
+    Write-Error "No script found in the provided paths."
+    write-log -LogFile $logFile -Message "No script found in the provided paths." -Module $scriptName -LogLevel "Error"
+    Write-Log -logFile $logFile -FinishLogging
+    exit 1
+}
+
+if ($ScriptArchive.StartsWith('\\'))
+{
+    Write-Host "Copying the latest script archive from network location..."             
+    Write-Host "This may take a few moments depending on your network speed."
+    Write-Log -LogFile $logFile -Message "Accessing network location for script archive: $ScriptArchive" -Module $scriptName -LogLevel "Information"
+    try
+    {
+        #If we have a local script archive, rename it.
+        if (Test-Path -LiteralPath $localScriptArchive)
+        {
+            Write-Host "Renaming existing local script archive to backup..."
+            write-log -LogFile $logFile -Message "Renaming existing local script archive to backup." -Module $scriptName -LogLevel "Information"        
+            Rename-Item -Path $localScriptArchive -NewName ("script_backup_" + (Get-Date -Format "yyyyMMdd_HHmmss") + ".zip") -Force        
+        }                                       
+        #copy the new archive from the network.
+        Copy-Item -LiteralPath $ScriptArchive -Destination $localScriptArchive -Force -ErrorAction Stop 
+        $ScriptArchive = $localScriptArchive                
+    }
+    catch
+    {
+        Write-Error "[$scriptName] Failed to copy script archive from network location: $($_.Exception.Message)"
+        Write-Log -LogFile $logFile -Message "Failed to copy script archive from network location: $($_.Exception.Message)" -Module $scriptName -LogLevel "Error"
+        Write-Log -logFile $logFile -FinishLogging
+        exit 1                      
+    }
+}
+
 $temp = Join-Path ([IO.Path]::GetTempPath()) ("reset-secrets-" + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $temp -Force | Out-Null
 Write-Verbose "[$scriptName] Extracting to $temp" 

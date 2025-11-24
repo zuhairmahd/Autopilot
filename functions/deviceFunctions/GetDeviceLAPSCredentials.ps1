@@ -1,5 +1,29 @@
 function GetDeviceLAPSCredentials()
 {
+    <#
+    .SYNOPSIS
+    Retrieves and displays Local Administrator Password Solution (LAPS) credentials for a device.
+
+    .DESCRIPTION
+    This function extracts LAPS credentials from the enrollment state object for a managed device.
+    When multiple credentials exist, it returns the most recent one based on backup date time.
+    The function decodes the Base64-encoded password and displays all credential details.
+
+    .PARAMETER enrollmentState
+    The enrollment state object containing device information and LAPS credentials.
+
+    .OUTPUTS
+    System.String
+    Returns a newline character on success, or a predefined return value if no LAPS credentials are found.
+
+    .EXAMPLE
+    GetDeviceLAPSCredentials -enrollmentState $deviceEnrollmentState
+
+    .NOTES
+    Displays account name, backup date/time, clear text password, and next password change date.
+    Requires appropriate Microsoft Graph permissions to access LAPS credentials.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         $enrollmentState
@@ -25,15 +49,17 @@ function GetDeviceLAPSCredentials()
         }
         $clearTextPassword = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($latestCredential.passwordBase64))
         $returnObject = @{
-            AccountName       = $latestCredential.accountName
-            BackupDateTime    = $latestCredential.backupDateTime
-            ClearTextPassword = $clearTextPassword
+            AccountName        = $latestCredential.accountName
+            BackupDateTime     = $latestCredential.backupDateTime
+            ClearTextPassword  = $clearTextPassword
+            NextPasswordChange = $enrollmentState.managedDevice.laps.refreshDateTime
         }
         #display the LAPS credentials
         Write-Host "LAPS Credentials for device: $DeviceId" -ForegroundColor Cyan
         Write-Host "Account Name: $($returnObject.AccountName)" -ForegroundColor Cyan
         Write-Host "Backup DateTime: $($returnObject.BackupDateTime | FormatDateWithTimeZone)" -ForegroundColor Cyan
         Write-Host "Clear Text Password: $($returnObject.ClearTextPassword)" -ForegroundColor Cyan
+        Write-Host "Next Password Change: $($returnObject.NextPasswordChange | FormatDateWithTimeZone)" -ForegroundColor Cyan
         # return $lapsCredentials 
         return "`n"
     }

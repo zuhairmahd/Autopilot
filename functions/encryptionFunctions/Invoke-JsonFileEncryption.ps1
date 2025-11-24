@@ -1,5 +1,50 @@
 function Invoke-JsonFileEncryption()
 {
+    <#
+    .SYNOPSIS
+    Encrypts or decrypts JSON configuration files using AES encryption.
+
+    .DESCRIPTION
+    This function provides secure encryption and decryption of JSON configuration files using
+    AES-256 encryption. It supports in-memory operations, automatic backup creation, and
+    comprehensive error handling. The function validates file accessibility, manages encryption
+    keys securely, and provides detailed logging throughout the operation.
+
+    .PARAMETER FilePath
+    The path to the JSON file to encrypt or decrypt. Must be a valid file path. This parameter is mandatory.
+
+    .PARAMETER Key
+    The encryption/decryption key. Must be a non-empty string. This parameter is mandatory.
+
+    .PARAMETER Decrypt
+    When specified, decrypts the file instead of encrypting it.
+
+    .PARAMETER BackupOriginal
+    When specified, creates a backup of the original file before performing the operation.
+
+    .PARAMETER InMemoryOnly
+    When specified, performs the operation in memory only without modifying the file on disk.
+
+    .OUTPUTS
+    System.Collections.Hashtable
+    Returns a hashtable with properties:
+    - Success: Boolean indicating operation success
+    - Content: The encrypted/decrypted content (if InMemoryOnly or error)
+    - Operation: 'ENCRYPT' or 'DECRYPT'
+    - InMemoryOnly: Boolean indicating if operation was in-memory only
+    - ErrorMessage: Error details if operation failed
+
+    .EXAMPLE
+    Invoke-JsonFileEncryption -FilePath "config.json" -Key $encryptionKey
+    Invoke-JsonFileEncryption -FilePath "config.json" -Key $encryptionKey -Decrypt -BackupOriginal
+
+    .NOTES
+    Uses AES-256 encryption with SHA-256 key derivation.
+    Creates temporary files during operation and cleans them up automatically.
+    Securely clears encryption keys from memory after use.
+    Comprehensive logging and error handling throughout.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

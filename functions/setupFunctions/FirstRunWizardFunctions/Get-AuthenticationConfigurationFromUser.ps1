@@ -94,6 +94,7 @@ function Get-AuthenticationConfigurationFromUser()
                 Write-Host "Choose your credential type:" -ForegroundColor White
                 Write-Host "1. App Secret" -ForegroundColor White
                 Write-Host "2. Certificate (Thumbprint)" -ForegroundColor White
+                Write-Host "3. Certificate first (with Secret Key as backup)" -ForegroundColor White
             }
             
             $credType = ""
@@ -106,12 +107,13 @@ function Get-AuthenticationConfigurationFromUser()
             {
                 do
                 {
-                    $credType = Read-Host "Enter your choice (1 or 2)"
-                    if ($credType -in @("1", "2"))
+                    $credType = Read-Host "Enter your choice (1, 2, or 3)"
+                    if ($credType -in @("1", "2", "3"))
                     {
                         break
                     }
-                    Write-Host "Invalid choice. Please enter 1 or 2." -ForegroundColor Red
+                    Write-Host "Invalid choice. Please enter 1, 2, or 3." -ForegroundColor Red
+                    [console]::beep(500, 300)
                 } while ($true)
             }
             
@@ -141,7 +143,7 @@ function Get-AuthenticationConfigurationFromUser()
                     } while ($true)
                 }
             }
-            else
+            elseif ($credType -eq "2")
             {
                 # Certificate
                 if ($Silent)
@@ -162,6 +164,44 @@ function Get-AuthenticationConfigurationFromUser()
                         }
                         
                         $authConfig.Thumbprint = $thumbprint
+                        break
+                    } while ($true)
+                }
+            }
+            elseif ($credType -eq "3")
+            {
+                # Certificate first with Secret Key as backup
+                if ($Silent)
+                {
+                    $authConfig.Thumbprint = "0000000000000000000000000000000000000000"
+                    $authConfig.AppSecret = "default_app_secret_placeholder"
+                    Write-SafeLog "Using default certificate and app secret for application authentication in silent mode" "Information"
+                }
+                else
+                {
+                    do
+                    {
+                        $thumbprint = Read-Host "Enter your Certificate Thumbprint"
+
+                        if ([string]::IsNullOrWhiteSpace($thumbprint))
+                        {
+                            Write-Host "Certificate Thumbprint cannot be empty. Please try again." -ForegroundColor Red
+                            continue
+                        }
+                        $authConfig.Thumbprint = $thumbprint
+                        break
+                    } while ($true)
+
+                    do
+                    {
+                        $appSecret = Read-Host "Enter your App Secret (used as backup)" -AsSecureString
+                        $appSecretPlain = ConvertFrom-SecureString-ToPlainText -SecureString $appSecret
+                        if ([string]::IsNullOrWhiteSpace($appSecretPlain))
+                        {
+                            Write-Host "App Secret cannot be empty. Please try again." -ForegroundColor Red
+                            continue
+                        }
+                        $authConfig.AppSecret = $appSecretPlain
                         break
                     } while ($true)
                 }

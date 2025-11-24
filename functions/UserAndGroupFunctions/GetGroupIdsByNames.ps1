@@ -1,5 +1,45 @@
 function GetGroupIdsByNames()
 {
+    <#
+    .SYNOPSIS
+    Converts between Entra ID group names and IDs bidirectionally.
+
+    .DESCRIPTION
+    This function provides bidirectional conversion between Entra ID group names and IDs by
+    querying Microsoft Graph. It automatically detects whether the input contains GUIDs or
+    display names and performs the appropriate conversion. The function handles mixed inputs,
+    normalization, caching for performance, and batch processing for efficiency.
+
+    .PARAMETER AccessToken
+    The Microsoft Graph API access token for authentication.
+
+    .PARAMETER GroupNames
+    Array of group names or GUIDs to convert. Defaults to $groupsToInclude variable if not specified.
+
+    .PARAMETER DisplayNames
+    When specified, returns display names instead of IDs (for ID-to-name conversion).
+
+    .OUTPUTS
+    System.String[]
+    Returns array of group IDs (default) or display names (if DisplayNames switch is specified).
+    Returns empty array if no valid groups found or inputs are invalid.
+
+    .EXAMPLE
+    $groupIds = GetGroupIdsByNames -AccessToken $token -GroupNames @("IT-Admins", "Developers")
+    $groupNames = GetGroupIdsByNames -AccessToken $token -GroupNames $groupGuids -DisplayNames
+
+    .NOTES
+    Automatically detects input type using GUID regex pattern matching.
+    Supports three operation modes:
+    - names-to-ids: Converts display names to GUIDs
+    - ids-to-names: Converts GUIDs to display names
+    - mixed: Handles combination of both (queries Graph for all)
+    
+    Uses caching to avoid redundant API calls.
+    Batch processes multiple groups efficiently.
+    Requires appropriate Microsoft Graph permissions (Group.Read.All).
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $false)]
@@ -24,34 +64,26 @@ function GetGroupIdsByNames()
     Write-Log -LogFile $LogFile -Module $functionName -Message "Normalized group names: $($inputs -join ', ')" -LogLevel "Information"
     if ($inputs.Count -eq 0)
     {
-Write-Log -LogFile $LogFile -Module $functionName -Message "No valid group names found after normalization." -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "No valid group names found after normalization." -LogLevel "Verbose"
         return @()
-    }
-    
-    # Initialize session cache if needed
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Initializing group cache." -LogLevel "Information"
-    if (-not $script:GroupCache)
-    {
-Write-Log -LogFile $LogFile -Module $functionName -Message "Group cache not found, creating new cache." -LogLevel "Verbose"
-        $script:GroupCache = @{}
     }
     
     # Determine if inputs are GUIDs or names
     $guidRegex = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
     $inputIds = @()
     $inputNames = @()
-Write-Log -LogFile $LogFile -Module $functionName -Message "Processing inputs." -LogLevel "Verbose" 
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Processing inputs." -LogLevel "Verbose" 
     foreach ($inputName in $inputs)
     {
-Write-Log -LogFile $LogFile -Module $functionName -Message "Processing input: $inputName" -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Processing input: $inputName" -LogLevel "Verbose"
         if ($inputName -match $guidRegex)
         {
-Write-Log -LogFile $LogFile -Module $functionName -Message "Found GUID: $inputName" -LogLevel "Verbose"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Found GUID: $inputName" -LogLevel "Verbose"
             $inputIds += $inputName.ToLower()
         }
         else
         {
-Write-Log -LogFile $LogFile -Module $functionName -Message "Found Name: $inputName" -LogLevel "Verbose"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Found Name: $inputName" -LogLevel "Verbose"
             $inputNames += $inputName
         }
     }
@@ -79,7 +111,7 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Found Name: $inputNa
     $missingItems = @()
     
     # Check cache first
-Write-Log -LogFile $LogFile -Module $functionName -Message "Checking cache for group IDs and names." -LogLevel "Verbose"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Checking cache for group IDs and names." -LogLevel "Verbose"
     switch ($mode)
     {
         "ids-to-names"
@@ -87,16 +119,17 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Checking cache for g
             Write-Log -LogFile $LogFile -Module $functionName -Message "Operation mode: IDs to Names" -LogLevel "Information"
             foreach ($id in $inputIds)
             {
-Write-Log -LogFile $LogFile -Module $functionName -Message "Checking cache for ID: $id" -LogLevel "Verbose"
-                $cacheKey = "id:$id"
-                if ($script:GroupCache.ContainsKey($cacheKey))
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Checking cache for ID: $id" -LogLevel "Verbose"
+                $cacheKey = "group:id:$id"
+                $cachedName = Get-CachedData -CacheType 'DirectoryObjects' -Key $cacheKey -CacheSettings $global:cacheSettings
+                if ($null -ne $cachedName)
                 {
-Write-Log -LogFile $LogFile -Module $functionName -Message "Found ID in cache: $id" -LogLevel "Verbose"
-                    $result += $script:GroupCache[$cacheKey]
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Found ID in cache: $id" -LogLevel "Verbose"
+                    $result += $cachedName
                 }
                 else
                 {
-Write-Log -LogFile $LogFile -Module $functionName -Message "ID not found in cache: $id" -LogLevel "Verbose"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "ID not found in cache: $id" -LogLevel "Verbose"
                     $needApiCall = $true
                     $missingItems += $id
                 }
@@ -107,16 +140,17 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "ID not found in cach
             Write-Log -LogFile $LogFile -Module $functionName -Message "Operation mode: Names to IDs" -LogLevel "Information"
             foreach ($name in $inputNames)
             {
-Write-Log -LogFile $LogFile -Module $functionName -Message "Checking cache for Name: $name" -LogLevel "Verbose"
-                $cacheKey = "name:$($name.ToLower())"
-                if ($script:GroupCache.ContainsKey($cacheKey))
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Checking cache for Name: $name" -LogLevel "Verbose"
+                $cacheKey = "group:name:$($name.ToLower())"
+                $cachedId = Get-CachedData -CacheType 'DirectoryObjects' -Key $cacheKey -CacheSettings $global:cacheSettings
+                if ($null -ne $cachedId)
                 {
-Write-Log -LogFile $LogFile -Module $functionName -Message "Found Name in cache: $name" -LogLevel "Verbose"
-                    $result += $script:GroupCache[$cacheKey]
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Found Name in cache: $name" -LogLevel "Verbose"
+                    $result += $cachedId
                 }
                 else
                 {
-Write-Log -LogFile $LogFile -Module $functionName -Message "Name not found in cache: $name" -LogLevel "Verbose"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Name not found in cache: $name" -LogLevel "Verbose"
                     $needApiCall = $true
                     $missingItems += $name
                 }
@@ -137,17 +171,17 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Name not found in ca
             $resourceURI = "groups"
             foreach ($item in $missingItems)
             {
-Write-Log -LogFile $LogFile -Module $functionName -Message "Processing missing item: $item" -LogLevel "Verbose"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Processing missing item: $item" -LogLevel "Verbose"
                 if ($item -match $guidRegex)
                 {
-Write-Log -LogFile $LogFile -Module $functionName -Message "Found GUID in missing items: $item" -LogLevel "Verbose"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Found GUID in missing items: $item" -LogLevel "Verbose"
                     # For GUID types, OData filter should NOT quote the GUID
                     # For GUID types, OData filter should quote the GUID
                     $filterConditions += "id eq '$item'"
                 }
                 else
                 {
-Write-Log -LogFile $LogFile -Module $functionName -Message "Found Name in missing items: $item" -LogLevel "Verbose"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Found Name in missing items: $item" -LogLevel "Verbose"
                     # Escape single quotes in OData string literals by doubling them
                     $escapedName = $item -replace "'", "''"
                     $filterConditions += "displayName eq '$escapedName'"
@@ -169,22 +203,31 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Found Name in missin
                     Write-Log -LogFile $LogFile -Module $functionName -Message "API response received with groups: $($apiResponse.value.Count)" -LogLevel "Information"
                     foreach ($group in $apiResponse.value)
                     {
-Write-Log -LogFile $LogFile -Module $functionName -Message "Processing group: $($group.id) - $($group.displayName)" -LogLevel "Verbose"
+                        Write-Log -LogFile $LogFile -Module $functionName -Message "Processing group: $($group.id) - $($group.displayName)" -LogLevel "Verbose"
                         if ($group.id -and $group.displayName)
                         {
-                            # Cache both directions
+                            # Cache both directions using unified cache
                             Write-Log -LogFile $LogFile -Module $functionName -Message "Caching group: $($group.id) - $($group.displayName)" -LogLevel "Information"
-                            $idKey = "id:$($group.id.ToLower())"
-                            $nameKey = "name:$($group.displayName.ToLower())"
-                            $script:GroupCache[$idKey] = $group.displayName
-                            $script:GroupCache[$nameKey] = $group.id.ToLower()
+                            $idKey = "group:id:$($group.id.ToLower())"
+                            $nameKey = "group:name:$($group.displayName.ToLower())"
+                            
+                            $metadata = @{
+                                GroupId     = $group.id
+                                DisplayName = $group.displayName
+                            }
+                            
+                            # Cache ID -> Name mapping
+                            Set-CachedData -CacheType 'DirectoryObjects' -Key $idKey -Data $group.displayName -Metadata $metadata -CacheSettings $global:cacheSettings | Out-Null
+                            # Cache Name -> ID mapping
+                            Set-CachedData -CacheType 'DirectoryObjects' -Key $nameKey -Data $group.id.ToLower() -Metadata $metadata -CacheSettings $global:cacheSettings | Out-Null
+                            
                             # Add to result if it was requested
                             foreach ($item in $missingItems)
                             {
-Write-Log -LogFile $LogFile -Module $functionName -Message "Checking item: $item" -LogLevel "Verbose"
+                                Write-Log -LogFile $LogFile -Module $functionName -Message "Checking item: $item" -LogLevel "Verbose"
                                 if ($item -match $guidRegex -and $item.ToLower() -eq $group.id.ToLower())
                                 {
-Write-Log -LogFile $LogFile -Module $functionName -Message "Found matching item (ID): $item" -LogLevel "Verbose"
+                                    Write-Log -LogFile $LogFile -Module $functionName -Message "Found matching item (ID): $item" -LogLevel "Verbose"
                                     if ($mode -eq "ids-to-names" -or $mode -eq "mixed-to-names")
                                     {
                                         Write-Log -LogFile $LogFile -Module $functionName -Message "Mapping ID to Name: $item -> $($group.displayName)" -LogLevel "Information"
@@ -193,7 +236,7 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Found matching item 
                                 }
                                 elseif ($item -notmatch $guidRegex -and $item.ToLower() -eq $group.displayName.ToLower())
                                 {
-Write-Log -LogFile $LogFile -Module $functionName -Message "Found matching item (Name): $item" -LogLevel "Verbose"
+                                    Write-Log -LogFile $LogFile -Module $functionName -Message "Found matching item (Name): $item" -LogLevel "Verbose"
                                     if ($mode -eq "names-to-ids" -or $mode -eq "mixed-to-ids")
                                     {
                                         Write-Log -LogFile $LogFile -Module $functionName -Message "Mapping Name to ID: $item -> $($group.id.ToLower())" -LogLevel "Information"
@@ -216,6 +259,7 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Found matching item 
             Write-Log -LogFile $LogFile -Module $functionName -Message "API call failed: $($_.Exception.Message)" -LogLevel "Error"
         }
     }
-Write-Log -LogFile $LogFile -Module $functionName -Message "Completed processing" -LogLevel "Verbose"
-    return $result
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Completed processing" -LogLevel "Verbose"
+    # Ensure we always return an array (even if empty or single element)
+    return , @($result)
 }

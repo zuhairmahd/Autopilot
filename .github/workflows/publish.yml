@@ -1,25 +1,25 @@
 name: test-build-release
 
+# This workflow runs on direct pushes to dev/lhm branches
+# For pull requests, use pr-checks.yml instead to avoid duplicate test runs
 on:
   push:
     branches:
-      - '**'
-  pull_request:
-    branches:
-      - '**'
+      - dev
+      - lhm
+    # Exclude pushes that are part of pull requests by checking commit message
+    # PR syncs will have [skip ci] or we can filter by not running on PR branches
 
 permissions:
   contents: write
 
 jobs:
-  test:
-    name: Test (pwsh on Windows)
+  test-unit:
+    name: Unit Tests (pwsh on Windows)
     runs-on: windows-latest
     # Skip CI loop commits
-    if: >
-      github.event_name != 'push' ||
-      !contains((github.event.head_commit.message || github.event.pull_request.title || ''), '[skip ci]')
-    timeout-minutes: 10
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    timeout-minutes: 20
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -30,32 +30,121 @@ jobs:
           Write-Host "Using PowerShell version: $($PSVersionTable.PSVersion)"
           if ($PSVersionTable.PSVersion.Major -lt 7) { Write-Error "PowerShell 7+ is required."; exit 1 }
 
-      - name: Run tests - syntax
-        shell: pwsh
-        run: .\TestScripts\Test-Runner.ps1 -TestCategory syntax
+      - name: Cache Pester module
+        uses: actions/cache@v4
+        with:
+          path: ~\Documents\PowerShell\Modules\Pester
+          key: ${{ runner.os }}-pester-${{ hashFiles('**/Invoke-PesterTests.ps1') }}
+          restore-keys: |
+            ${{ runner.os }}-pester-
 
-      - name: Run tests - core
+      - name: Install Pester
         shell: pwsh
-        run: .\TestScripts\Test-Runner.ps1 -TestCategory core
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name Pester -MinimumVersion 5.0.0 -Scope CurrentUser -Force -SkipPublisherCheck
 
-      - name: Run tests - unit
+      - name: Run Unit Tests
         shell: pwsh
-        run: .\TestScripts\Test-Runner.ps1 -TestCategory unit
+        run: |
+          .\Invoke-PesterTests.ps1 -TestType Unit -CI -OutputVerbosity Detailed
 
-      - name: Run tests - integration
+      - name: Upload unit test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: |
+            TestResults*.xml
+            coverage.xml
+          retention-days: 30
+
+  test-comprehensive:
+    name: Comprehensive Tests (pwsh on Windows)
+    runs-on: windows-latest
+    needs: test-unit
+    #skip CI for PR syncs
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache Pester module
+        uses: actions/cache@v4
+        with:
+          path: ~\Documents\PowerShell\Modules\Pester
+          key: ${{ runner.os }}-pester-${{ hashFiles('**/Invoke-PesterTests.ps1') }}
+          restore-keys: |
+            ${{ runner.os }}-pester-
+
+      - name: Install Pester
         shell: pwsh
-        run: .\TestScripts\Test-Runner.ps1 -TestCategory integration
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name Pester -MinimumVersion 5.0.0 -Scope CurrentUser -Force -SkipPublisherCheck
+
+      - name: Run Comprehensive Tests
+        shell: pwsh
+        run: |
+          .\Invoke-PesterTests.ps1 -TestType Comprehensive -CI -OutputVerbosity Detailed
+
+      - name: Upload comprehensive test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: comprehensive-test-results
+          path: |
+            TestResults*.xml
+            coverage.xml
+          retention-days: 30
+
+  test-integration:
+    name: Integration Tests (pwsh on Windows)
+    runs-on: windows-latest
+    needs: [test-unit, test-comprehensive]
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache Pester module
+        uses: actions/cache@v4
+        with:
+          path: ~\Documents\PowerShell\Modules\Pester
+          key: ${{ runner.os }}-pester-${{ hashFiles('**/Invoke-PesterTests.ps1') }}
+          restore-keys: |
+            ${{ runner.os }}-pester-
+
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name Pester -MinimumVersion 5.0.0 -Scope CurrentUser -Force -SkipPublisherCheck
+
+      - name: Run Integration Tests
+        shell: pwsh
+        run: |
+          .\Invoke-PesterTests.ps1 -TestType Integration -CI -OutputVerbosity Detailed
+
+      - name: Upload integration test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: |
+            TestResults*.xml
+            coverage.xml
+          retention-days: 30
 
   # ===================== DYNAMIC BRANCH BUILD & SIGN =====================
   build:
     name: Build (${{ github.ref_name }} branch)
     runs-on: windows-latest
     timeout-minutes: 25
-    needs: test
-    if: >
-      github.event_name == 'push' &&
-      (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/lhm') &&
-      !contains((github.event.head_commit.message || ''), '[skip ci]')
+    needs: [test-unit, test-integration, test-comprehensive]
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
     env:
       BRANCH_NAME: ${{ github.ref_name }}
     steps:
@@ -115,16 +204,14 @@ jobs:
         with:
           name: autopilot-build-${{ github.ref_name }}
           path: ${{ github.ref_name }}
+          retention-days: 14
 
   sign:
     name: Code Signing (${{ github.ref_name }})
     runs-on: windows-latest
     timeout-minutes: 20
     needs: build
-    if: >
-      github.event_name == 'push' &&
-      (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/lhm') &&
-      !contains((github.event.head_commit.message || ''), '[skip ci]')
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
     env:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}

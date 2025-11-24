@@ -13,11 +13,12 @@ Desktop.ini
 release/
 test/
 build/
-test/
 TestReports/
 TestResults/
 .claude/
 
+# Prevent accidental GUID-named folders (created by cache operations)
+[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]/
 
 # PowerShell-specific files
 
@@ -40,6 +41,11 @@ TestResults/
 
 # Misc. files.
 *.csv
+*.xls
+*.xlsx
+*.htm
+*.html
+*.xml
 *.backup.*
 config.json
 *.zuh
@@ -54,3 +60,7 @@ temp*
 gemini.md
 .gemini/
 gha-creds-*.json
+arabictutor.com.psd1
+gao.gov.psd1
+*.txt
+*.zip

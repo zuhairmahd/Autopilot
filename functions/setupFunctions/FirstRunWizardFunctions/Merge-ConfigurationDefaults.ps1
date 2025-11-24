@@ -65,7 +65,6 @@ function Merge-ConfigurationDefaults()
             [System.Collections.Hashtable]$defaults,
             [bool]$preserveExisting
         )
-
         $functionName = $MyInvocation.MyCommand.Name
         Write-Verbose "[$functionName] Starting hashtable merge"
         Write-Log -logFile $logFile -module $functionName -Message "Starting hashtable merge"
@@ -112,13 +111,20 @@ function Merge-ConfigurationDefaults()
             elseif (-not $preserveExisting)
             {
                 # Overwrite existing value with default if PreserveExisting is false
-                Write-Verbose
                 Write-Verbose "[$functionName] Overwriting existing key: $key"
                 Write-Log -logFile $logFile -module $functionName -Message "Overwriting existing key: $key"
                 $merged[$key] = $defaults[$key]
                 $changesMade = $true
             }
-            # If PreserveExisting is true, keep the existing value
+            #If the key is 'domain' and it has a string or whitespace, we consider it a change
+            if ($key -eq 'domain' -and $merged[$key] -is [string] -and ([string]::IsNullOrWhiteSpace($merged[$key]) -or $merged[$key] -ne $domain))
+            {
+                Write-Verbose "[$functionName] Domain key is empty or whitespace"
+                Write-Log -logFile $logFile -module $functionName -Message "Domain key is empty or whitespace"
+                #set the value of the key to $domain
+                $merged[$key] = $domain
+                $changesMade = $true
+            }
         }
         Write-Verbose "[$functionName] Hashtable merge completed"
         Write-Verbose "[$functionName] Changes made: $changesMade"

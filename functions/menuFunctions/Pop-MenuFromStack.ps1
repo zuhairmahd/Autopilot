@@ -1,5 +1,33 @@
 function Pop-MenuFromStack()
 {
+    <#
+    .SYNOPSIS
+    Removes and returns the current menu from the navigation stack.
+
+    .DESCRIPTION
+    This function implements the pop operation for the menu navigation stack. It removes the
+    current menu from both the History and MenuHistory global stacks and returns the previous
+    menu that is now at the top of the stack. The function includes comprehensive error handling
+    and detailed verbose logging for debugging navigation issues.
+
+    .OUTPUTS
+    System.Collections.Hashtable
+    Returns the previous menu hashtable that is now at the top of the stack after popping,
+    or $null if the stack is empty or an error occurs.
+
+    .EXAMPLE
+    $previousMenu = Pop-MenuFromStack
+    if ($previousMenu) {
+        Write-Host "Returning to: $($previousMenu.Title)"
+    }
+
+    .NOTES
+    Uses global $History and $MenuHistory stacks for navigation tracking.
+    Removes one entry from each stack during pop operation.
+    Returns $null if stack is empty or contains invalid data.
+    Includes fallback error handling for stack corruption scenarios.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param()
     

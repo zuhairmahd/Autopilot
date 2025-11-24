@@ -1,13 +1,6 @@
-#region help
-<#PSScriptInfo
-.VERSION 1.2.0
-.GUID c4205f1e-35d8-4f3a-bc41-a03d7c2c70d3
-.AUTHOR Zuhair Mahmoud
-.DESCRIPTION Parses OData metadata from Microsoft Graph API responses
-.COMPANYNAME Government Accountability Office
-.COPYRIGHT GPL
-.PROJECTURI https://github.com/zuhairmahd/Autopilot
-.EXTERNALMODULEDEPENDENCIES Microsoft.Graph.Authentication
+function GetGraphObjectMetadata()
+{
+    <#
 .SYNOPSIS
 Parses the @odata.context from Graph API responses to extract metadata.
 .DESCRIPTION
@@ -48,14 +41,9 @@ Parses the @odata.context from Graph API responses to extract metadata.
 .NOTES
     This function depends on the CallGraphAPI function for making additional API calls to
     retrieve metadata information.
-#>
-#endregion help
-
-function GetGraphObjectMetadata()
-{
+    #>
     [CmdletBinding()]
-    param
-    (
+    param(
         [Parameter(Mandatory = $true, Position = 0)]
         [ValidateNotNull()]
         [object]$ApiResponse,
@@ -72,22 +60,12 @@ function GetGraphObjectMetadata()
         [Parameter(Mandatory = $false)]
         [string]$CustomMetadataUrl
     )
-    #region variables and logs
-    function Write-Log {
-        param(
-            [string]$Message,
-            [string]$Level = 'Information'
-        )
-        switch ($Level) {
-            'Error' { Write-Error $Message }
-            'Warning' { Write-Warning $Message }
-            'Verbose' { Write-Verbose $Message }
-            default { Write-Host $Message }
-        }
-    }
-    Write-Log "Starting GetGraphObjectMetadata function with RecursionDepth=$RecursionDepth" 'Verbose'
-    if (-not $ApiResponse) {
-        Write-Log "ApiResponse parameter is null or empty." 'Error'
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -logFile $logFile -module $functionName -Message "Starting GetGraphObjectMetadata function with RecursionDepth=$RecursionDepth" -logLevel "Verbose"
+    if (-not $ApiResponse)
+    {
+        Write-Log -logFile $logFile -module $functionName -Message "ApiResponse parameter is null or empty." -logLevel "Error"
         return $null
     }
     
@@ -179,12 +157,15 @@ function GetGraphObjectMetadata()
 
     #region fetch metadata document
     # Construct the metadata URL
-    if ($CustomMetadataUrl) {
+    if ($CustomMetadataUrl)
+    {
         $metadataUrl = $CustomMetadataUrl
-        Write-Log "Using custom metadata URL: $metadataUrl" 'Verbose'
-    } else {
+        Write-Log -logFile $logFile -module $functionName -Message "Using custom metadata URL: $metadataUrl" -logLevel "Verbose"
+    }
+    else
+    {
         $metadataUrl = "https://graph.microsoft.com/$apiVersion/`$metadata"
-        Write-Log "Metadata URL: $metadataUrl" 'Verbose'
+        Write-Log -logFile $logFile -module $functionName -Message "Metadata URL: $metadataUrl"
     }
     
     # Determine the access token to use
@@ -208,24 +189,24 @@ function GetGraphObjectMetadata()
     try 
     {
         # Make a request to the metadata endpoint
-    Write-Log "Requesting metadata document from $metadataUrl" 'Verbose'
+        Write-Log -logFile $logFile -module $functionName -Message "Requesting metadata document from $metadataUrl"
         $headers = @{
             "Authorization" = "Bearer $AccessToken"
             "Accept"        = "application/xml"
         }
         
-    $metadataResponse = Invoke-RestMethod -Uri $metadataUrl -Headers $headers -Method Get -ErrorAction Stop
-    Write-Log "Successfully retrieved metadata document" 'Verbose'
+        $metadataResponse = Invoke-RestMethod -Uri $metadataUrl -Headers $headers -Method Get -ErrorAction Stop
+        Write-Log -logFile $logFile -module $functionName -Message "Successfully retrieved metadata document" -logLevel "Verbose"       
         
         # The metadata is an XML document that contains the full service definition
         # We need to parse it to find details about our entity
     }
     catch 
     {
-    Write-Log "Error retrieving metadata: $_" 'Error'
-    Write-Log "Limited metadata will be available" 'Warning'
-    # Return partial metadata even if we couldn't fetch the full document
-    return $metadata
+        Write-Log -logFile $logFile -module $functionName -Message "Error retrieving metadata: $_" -logLevel "Error"
+        Write-Log -logFile $logFile -module $functionName -Message "Limited metadata will be available" -logLevel "Warning" 
+        # Return partial metadata even if we couldn't fetch the full document
+        return $metadata
     }
     #endregion
     
@@ -235,7 +216,8 @@ function GetGraphObjectMetadata()
         Write-Verbose "Parsing metadata XML document"
         
         # Add helper functions for processing complex types
-        function Get-ComplexTypeDetails {
+        function Get-ComplexTypeDetails
+        {
             param (
                 [Parameter(Mandatory = $true)]
                 [object]$TypeElement,
@@ -251,17 +233,19 @@ function GetGraphObjectMetadata()
             )
             
             # Check if we've already processed this type
-            if ($script:processedTypes.ContainsKey($TypeName)) {
+            if ($script:processedTypes.ContainsKey($TypeName))
+            {
                 Write-Verbose "Type '$TypeName' already processed, returning reference"
                 return $script:processedTypes[$TypeName]
             }
             
             # Check recursion depth
-            if ($CurrentDepth -gt $RecursionDepth) {
+            if ($CurrentDepth -gt $RecursionDepth)
+            {
                 Write-Verbose "Maximum recursion depth reached for type: $TypeName"
                 return @{
-                    Name = $TypeName
-                    Properties = @()
+                    Name            = $TypeName
+                    Properties      = @()
                     MaxDepthReached = $true
                 }
             }
@@ -270,16 +254,17 @@ function GetGraphObjectMetadata()
             
             # Create complex type details
             $complexTypeDetails = @{
-                Name = $TypeName
+                Name       = $TypeName
                 Properties = @()
-                BaseType = $null
+                BaseType   = $null
             }
             
             # Store reference to prevent recursion loops
             $script:processedTypes[$TypeName] = $complexTypeDetails
             
             # Extract base type if any
-            if ($TypeElement.BaseType) {
+            if ($TypeElement.BaseType)
+            {
                 $baseTypeFull = $TypeElement.BaseType
                 $baseTypeName = $baseTypeFull -replace "^$Namespace\.", ""
                 $complexTypeDetails.BaseType = $baseTypeName
@@ -287,51 +272,61 @@ function GetGraphObjectMetadata()
             }
             
             # Extract properties
-            foreach ($prop in $TypeElement.Property) {
+            foreach ($prop in $TypeElement.Property)
+            {
                 $propDetails = @{
-                    Name = $prop.Name
-                    Type = $prop.Type
-                    Nullable = $prop.Nullable -eq 'true'
+                    Name          = $prop.Name
+                    Type          = $prop.Type
+                    Nullable      = $prop.Nullable -eq 'true'
                     Documentation = $null
                 }
                 
                 # Extract property documentation if available
-                if ($prop.Annotation) {
+                if ($prop.Annotation)
+                {
                     $docAnnotation = $prop.Annotation | Where-Object { $_.Term -eq 'Org.OData.Core.V1.Description' }
-                    if ($docAnnotation -and $docAnnotation.String) {
+                    if ($docAnnotation -and $docAnnotation.String)
+                    {
                         $propDetails.Documentation = $docAnnotation.String
                     }
                 }
                 
                 # Identify if this is a complex type reference
-                if ($prop.Type -notmatch "^Edm\.") {
+                if ($prop.Type -notmatch "^Edm\.")
+                {
                     # Handle collection types
                     $isCollection = $prop.Type -match "^Collection\((.*)\)$"
-                    if ($isCollection) {
+                    if ($isCollection)
+                    {
                         $innerTypeName = $matches[1] -replace "^$Namespace\.", ""
                         $propDetails.IsCollection = $true
                         $propDetails.ElementType = $innerTypeName
                         
                         # If it's not a primitive type, try to process it recursively
-                        if ($innerTypeName -notmatch "^Edm\.") {
+                        if ($innerTypeName -notmatch "^Edm\.")
+                        {
                             $innerTypeElement = $metadataResponse.Edmx.DataServices.Schema.ComplexType | 
                                 Where-Object { $_.Name -eq $innerTypeName }
                                 
-                            if ($innerTypeElement) {
+                            if ($innerTypeElement)
+                            {
                                 $propDetails.ElementTypeDetails = Get-ComplexTypeDetails -TypeElement $innerTypeElement -TypeName $innerTypeName -CurrentDepth ($CurrentDepth + 1) -Namespace $Namespace
                             }
                         }
                     }
-                    else {
+                    else
+                    {
                         # It's a direct reference to another complex type
                         $referencedTypeName = $prop.Type -replace "^$Namespace\.", ""
                         
-                        if ($referencedTypeName -ne $prop.Type) {
+                        if ($referencedTypeName -ne $prop.Type)
+                        {
                             # Try to find and process the referenced complex type
                             $referencedTypeElement = $metadataResponse.Edmx.DataServices.Schema.ComplexType | 
                                 Where-Object { $_.Name -eq $referencedTypeName }
                                 
-                            if ($referencedTypeElement) {
+                            if ($referencedTypeElement)
+                            {
                                 $propDetails.ComplexTypeDetails = Get-ComplexTypeDetails -TypeElement $referencedTypeElement -TypeName $referencedTypeName -CurrentDepth ($CurrentDepth + 1) -Namespace $Namespace
                             }
                         }
@@ -346,7 +341,8 @@ function GetGraphObjectMetadata()
         }
         
         # Helper function to extract type mappings for query construction
-        function Get-TypeMappings {
+        function Get-TypeMappings
+        {
             param (
                 [Parameter(Mandatory = $true)]
                 [string]$TypeName,
@@ -356,20 +352,20 @@ function GetGraphObjectMetadata()
             )
             
             $typeInfo = @{
-                Name = $TypeName
+                Name           = $TypeName
                 PrimitiveTypes = @{
-                    'Edm.String' = 'string'
-                    'Edm.Int32' = 'integer'
-                    'Edm.Int64' = 'long integer'
-                    'Edm.Boolean' = 'boolean'
+                    'Edm.String'         = 'string'
+                    'Edm.Int32'          = 'integer'
+                    'Edm.Int64'          = 'long integer'
+                    'Edm.Boolean'        = 'boolean'
                     'Edm.DateTimeOffset' = 'datetime'
-                    'Edm.Date' = 'date'
-                    'Edm.TimeOfDay' = 'time'
-                    'Edm.Guid' = 'GUID'
-                    'Edm.Binary' = 'binary data'
-                    'Edm.Decimal' = 'decimal number'
-                    'Edm.Double' = 'double-precision number'
-                    'Edm.Single' = 'single-precision number'
+                    'Edm.Date'           = 'date'
+                    'Edm.TimeOfDay'      = 'time'
+                    'Edm.Guid'           = 'GUID'
+                    'Edm.Binary'         = 'binary data'
+                    'Edm.Decimal'        = 'decimal number'
+                    'Edm.Double'         = 'double-precision number'
+                    'Edm.Single'         = 'single-precision number'
                 }
             }
             
@@ -377,28 +373,32 @@ function GetGraphObjectMetadata()
             $entityType = $metadataResponse.Edmx.DataServices.Schema.EntityType | 
                 Where-Object { $_.Name -eq $TypeName }
                 
-            if ($entityType) {
+            if ($entityType)
+            {
                 $typeInfo.Properties = @{
                 }
                 
-                foreach ($prop in $entityType.Property) {
+                foreach ($prop in $entityType.Property)
+                {
                     $propType = $prop.Type
                     $isCollection = $propType -match "^Collection\((.*)\)$"
                     
-                    if ($isCollection) {
+                    if ($isCollection)
+                    {
                         $innerType = $matches[1]
                         $typeInfo.Properties[$prop.Name] = @{
-                            Type = $propType
+                            Type         = $propType
                             IsCollection = $true
-                            ElementType = $innerType
-                            Filterable = $prop.Name -notin @('id', '@odata.type', '@odata.context')
+                            ElementType  = $innerType
+                            Filterable   = $prop.Name -notin @('id', '@odata.type', '@odata.context')
                         }
                     }
-                    else {
+                    else
+                    {
                         $typeInfo.Properties[$prop.Name] = @{
-                            Type = $propType
+                            Type         = $propType
                             IsCollection = $false
-                            Filterable = $prop.Name -notin @('id', '@odata.type', '@odata.context')
+                            Filterable   = $prop.Name -notin @('id', '@odata.type', '@odata.context')
                         }
                     }
                 }
@@ -408,7 +408,8 @@ function GetGraphObjectMetadata()
         }
         
         # Helper function to generate sample queries
-        function Get-SampleQueries {
+        function Get-SampleQueries
+        {
             param (
                 [Parameter(Mandatory = $true)]
                 [string]$EntityType,
@@ -424,53 +425,57 @@ function GetGraphObjectMetadata()
             
             # Basic select query
             $selectableProps = $Properties | Where-Object { $_.Name -notlike '@*' } | Select-Object -First 5 -ExpandProperty Name
-            if ($selectableProps.Count -gt 0) {
+            if ($selectableProps.Count -gt 0)
+            {
                 $samples += @{
-                    Name = "Basic Select"
-                    Template = "/$EntityType?`$select=$($selectableProps -join ',')"
+                    Name        = "Basic Select"
+                    Template    = "/$EntityType?`$select=$($selectableProps -join ',')"
                     Description = "Retrieves specific fields from $EntityType entities"
                 }
             }
             
             # Filter query if we have string properties
             $stringProps = $Properties | Where-Object { $_.Type -eq 'Edm.String' -and $_.Name -notlike '@*' } | Select-Object -First 3 -ExpandProperty Name
-            if ($stringProps.Count -gt 0) {
+            if ($stringProps.Count -gt 0)
+            {
                 $samples += @{
-                    Name = "Filter by String Property"
-                    Template = "/$EntityType?`$filter=$($stringProps[0]) eq '{value}'"
+                    Name        = "Filter by String Property"
+                    Template    = "/$EntityType?`$filter=$($stringProps[0]) eq '{value}'"
                     Description = "Filters $EntityType entities by $($stringProps[0]) equality"
                 }
                 
                 $samples += @{
-                    Name = "Filter with startsWith"
-                    Template = "/$EntityType?`$filter=startswith($($stringProps[0]), '{prefix}')"
+                    Name        = "Filter with startsWith"
+                    Template    = "/$EntityType?`$filter=startswith($($stringProps[0]), '{prefix}')"
                     Description = "Filters $EntityType entities where $($stringProps[0]) starts with a specific value"
                 }
             }
             
             # Expand navigation property if available
-            if ($NavigationProperties.Count -gt 0) {
+            if ($NavigationProperties.Count -gt 0)
+            {
                 $navProp = $NavigationProperties[0].Name
                 $samples += @{
-                    Name = "Expand Navigation Property"
-                    Template = "/$EntityType?`$expand=$navProp"
+                    Name        = "Expand Navigation Property"
+                    Template    = "/$EntityType?`$expand=$navProp"
                     Description = "Retrieves $EntityType entities with expanded $navProp relationships"
                 }
             }
             
             # Combined query
-            if ($selectableProps.Count -gt 0 -and $stringProps.Count -gt 0) {
+            if ($selectableProps.Count -gt 0 -and $stringProps.Count -gt 0)
+            {
                 $samples += @{
-                    Name = "Combined Query"
-                    Template = "/$EntityType?`$select=$($selectableProps -join ',')&`$filter=$($stringProps[0]) eq '{value}'&`$orderby=$($selectableProps[0]) asc&`$top=10"
+                    Name        = "Combined Query"
+                    Template    = "/$EntityType?`$select=$($selectableProps -join ',')&`$filter=$($stringProps[0]) eq '{value}'&`$orderby=$($selectableProps[0]) asc&`$top=10"
                     Description = "Combined query with select, filter, orderby and top"
                 }
             }
             
             # Count query
             $samples += @{
-                Name = "Count Entities"
-                Template = "/$EntityType/`$count"
+                Name        = "Count Entities"
+                Template    = "/$EntityType/`$count"
                 Description = "Returns the total count of $EntityType entities"
             }
             
@@ -1054,10 +1059,13 @@ function GetGraphObjectMetadata()
         }
     }
     
-    Write-Log "Metadata extraction complete with enhanced navigation properties" 'Verbose'
-    if ($OutputFormat -eq 'json') {
+    Write-Log -logFile $logFile -module $functionName -Message "Metadata extraction complete with enhanced navigation properties" -logLevel "Verbose"
+    if ($OutputFormat -eq 'json')
+    {
         return $formattedResults | ConvertTo-Json -Depth 10
-    } else {
+    }
+    else
+    {
         return $formattedResults
     }
     #endregion

@@ -7,6 +7,7 @@ function GetAutopilotProfile()
     .DESCRIPTION
         Retrieves Windows Autopilot deployment profiles from Microsoft Graph API with exact match 
         and similarity search capabilities. Supports caching and filtering similar to GetEntraGroup.
+        Includes client-side case-insensitive filtering as fallback when API filters fail.
         
     .PARAMETER AccessToken
         Microsoft Graph access token with appropriate permissions.
@@ -17,6 +18,9 @@ function GetAutopilotProfile()
     .PARAMETER FindSimilar
         Switch to enable similarity search if exact match is not found.
         
+    .PARAMETER GetAll
+        Switch to retrieve all Autopilot profiles without filtering.
+        
     .OUTPUTS
         Returns a tuple: (API Response Object, Boolean indicating if substring search was used)
         
@@ -26,42 +30,105 @@ function GetAutopilotProfile()
     .EXAMPLE
         $result, $wasSubstringSearch = GetAutopilotProfile -AccessToken $token -ProfileName "Corp" -FindSimilar
         
+    .EXAMPLE
+        $result, $wasSubstringSearch = GetAutopilotProfile -AccessToken $token -GetAll
+        
     .NOTES
         - Requires DeviceManagementServiceConfig.Read.All or higher permissions
         - Uses caching to improve performance on repeated searches
+        - Implements client-side case-insensitive filtering when Graph API filters fail
         - Maintains PowerShell 5.1 compatibility
         - Uses beta endpoint for full autopilot profile features
     #>
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $false)]
         [string]$AccessToken,
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $false)]
         [string]$ProfileName,
-        [switch]$FindSimilar
+        [switch]$FindSimilar,
+        [switch]$GetAll
     )
 
     $functionName = $MyInvocation.MyCommand.Name
     $substringSearch = $false
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting function to get Autopilot profile from Microsoft Graph" -LogLevel "Verbose"
-    Write-Verbose "[$functionName] Searching for Autopilot profile: $ProfileName"
     
-    # Initialize autopilot profile cache if it doesn't exist
-    if (-not $global:AutopilotProfileCache)
+    # Handle GetAll mode - retrieve all profiles without filtering
+    if ($GetAll)
     {
-        $global:AutopilotProfileCache = @{}
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Initialized Autopilot profile cache" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Retrieving all Autopilot profiles"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Retrieving all Autopilot profiles (GetAll mode)" -LogLevel "Information"
+        
+        # Validate access token
+        if (-not $AccessToken)
+        {
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "AccessToken is null or empty. Cannot proceed." -LogLevel "Warning"
+            Write-Warning "[$functionName] Access token is required"
+            return $null, $false
+        }
+        
+        # Check cache for GetAll (uses empty ProfileName)
+        $getAllCacheKey = "autopilot:|False"
+        $cachedGetAll = Get-CachedData -CacheType 'Configuration' -Key $getAllCacheKey -CacheSettings $global:cacheSettings
+        if ($null -ne $cachedGetAll)
+        {
+            Write-Verbose "[$functionName] Found cached GetAll result"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found cached GetAll result" -LogLevel "Verbose"
+            return $cachedGetAll
+        }
+        
+        $Uri = "deviceManagement/windowsAutopilotDeploymentProfiles"
+        $ExtraParameters = "select=id,displayName,description,createdDateTime,lastModifiedDateTime"
+        
+        try
+        {
+            $Info = CallGraphAPI -AccessToken $AccessToken -ResourcePath $Uri -ExtraParameters $ExtraParameters -APIVersion 'beta'
+            
+            if ($Info -notin 400, 401, 403, 404 -and $Info.value)
+            {
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Retrieved $($Info.value.Count) total Autopilot profiles" -LogLevel "Information"
+                Write-Verbose "[$functionName] Successfully retrieved $($Info.value.Count) profiles"
+                
+                # Cache GetAll result
+                $result = $Info, $false
+                $metadata = @{
+                    ProfileName  = ""
+                    SearchType   = 'GetAll'
+                    ProfileCount = $Info.value.Count
+                }
+                $cached = Set-CachedData -CacheType 'Configuration' -Key $getAllCacheKey -Data $result -Metadata $metadata -CacheSettings $global:cacheSettings
+                if ($cached)
+                {
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cached GetAll result" -LogLevel "Verbose"
+                }
+                return $result
+            }
+            else
+            {
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to retrieve profiles (Error code: $Info)" -LogLevel "Error"
+                return $null, $false
+            }
+        }
+        catch
+        {
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error retrieving all profiles: $($_.Exception.Message)" -LogLevel "Error"
+            return $null, $false
+        }
     }
     
-    # Create cache key including FindSimilar flag for different search types
-    $cacheKey = "$ProfileName|$FindSimilar"
+    Write-Verbose "[$functionName] Searching for Autopilot profile: $ProfileName"
     
-    # Check cache first
-    if ($global:AutopilotProfileCache.ContainsKey($cacheKey))
+    # Create cache key including FindSimilar flag for different search types
+    $cacheKey = "autopilot:$ProfileName|$FindSimilar"
+    
+    # Check unified cache first
+    $cachedResult = Get-CachedData -CacheType 'Configuration' -Key $cacheKey -CacheSettings $global:cacheSettings
+    if ($null -ne $cachedResult)
     {
         Write-Verbose "[$functionName] Found cached result for Autopilot profile: $ProfileName (FindSimilar: $FindSimilar)"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found cached result for Autopilot profile: $ProfileName" -LogLevel "Verbose"
-        return $global:AutopilotProfileCache[$cacheKey]
+        return $cachedResult
     }
     
     # Validate access token
@@ -96,8 +163,16 @@ function GetAutopilotProfile()
             
             # Cache the result before returning
             $result = $Info, $substringSearch
-            $global:AutopilotProfileCache[$cacheKey] = $result
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cached result for Autopilot profile: $ProfileName" -LogLevel "Verbose"
+            $metadata = @{
+                ProfileName = $ProfileName
+                SearchType  = 'ExactMatch'
+                ProfileId   = $Info.value[0].id
+            }
+            $cached = Set-CachedData -CacheType 'Configuration' -Key $cacheKey -Data $result -Metadata $metadata -CacheSettings $global:cacheSettings
+            if ($cached)
+            {
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cached result for Autopilot profile: $ProfileName" -LogLevel "Verbose"
+            }
             return $result
         }
     }
@@ -244,15 +319,97 @@ function GetAutopilotProfile()
                 
                 # Cache the similarity search result before returning
                 $result = $filteredResponse, $substringSearch
-                $global:AutopilotProfileCache[$cacheKey] = $result
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cached similarity search result for Autopilot profile: $ProfileName" -LogLevel "Verbose"
+                $metadata = @{
+                    ProfileName = $ProfileName
+                    SearchType  = 'FuzzyMatch'
+                    ResultCount = $filteredResponse.value.Count
+                }
+                $cached = Set-CachedData -CacheType 'Configuration' -Key $cacheKey -Data $result -Metadata $metadata -CacheSettings $global:cacheSettings
+                if ($cached)
+                {
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cached similarity search result for Autopilot profile: $ProfileName" -LogLevel "Verbose"
+                }
                 return $result
             }
             else        
             {
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Similarity search failed (Error code: $fallbackResults)" -LogLevel "Error"
-                Write-Verbose "[$functionName] Similarity search returned no results"
-                return $null, $false
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Similarity search failed (Error code: $fallbackResults). Attempting client-side filtering." -LogLevel "Verbose"
+                Write-Verbose "[$functionName] Similarity search returned no results, trying client-side case-insensitive search"
+                
+                # Step 3: If API-based searches fail, retrieve ALL profiles and filter client-side
+                # This works around Graph API case-sensitivity issues
+                try
+                {
+                    Write-Verbose "[$functionName] Retrieving all Autopilot profiles for client-side filtering"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Retrieving all Autopilot profiles for client-side case-insensitive filtering" -LogLevel "Information"
+                    
+                    $allProfilesResult = CallGraphAPI -AccessToken $AccessToken -ResourcePath $Uri -ExtraParameters $ExtraParameters -APIVersion 'beta'
+                    
+                    if ($allProfilesResult -notin 400, 401, 403, 404 -and $allProfilesResult.value -and $allProfilesResult.value.Count -gt 0)
+                    {
+                        Write-Verbose "[$functionName] Retrieved $($allProfilesResult.value.Count) profiles, performing client-side filtering"
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Retrieved $($allProfilesResult.value.Count) profiles for client-side filtering" -LogLevel "Information"
+                        
+                        # Client-side case-insensitive filtering using PowerShell
+                        $searchTermLower = $searchTerm.ToLower()
+                        $matchedProfiles = @()
+                        
+                        foreach ($autopilotProfile in $allProfilesResult.value)
+                        {
+                            $displayNameLower = if ($autopilotProfile.displayName) { $autopilotProfile.displayName.ToLower() } else { "" }
+                            
+                            # Match if display name contains the search term (case-insensitive)
+                            if ($displayNameLower.Contains($searchTermLower))
+                            {
+                                $matchedProfiles += $autopilotProfile
+                            }
+                        }
+                        
+                        if ($matchedProfiles.Count -gt 0)
+                        {
+                            Write-Verbose "[$functionName] Client-side filtering found $($matchedProfiles.Count) matching profiles"
+                            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Client-side filtering found $($matchedProfiles.Count) matches" -LogLevel "Information"
+                            
+                            # Create filtered response
+                            $clientFilteredResponse = [PSCustomObject]@{
+                                '@odata.context' = $allProfilesResult.'@odata.context'
+                                value            = @($matchedProfiles | Sort-Object -Property displayName -Unique)
+                            }
+                            
+                            $substringSearch = $true
+                            $result = $clientFilteredResponse, $substringSearch
+                            $metadata = @{
+                                ProfileName = $ProfileName
+                                SearchType  = 'ClientSideFilter'
+                                ResultCount = $clientFilteredResponse.value.Count
+                            }
+                            $cached = Set-CachedData -CacheType 'Configuration' -Key $cacheKey -Data $result -Metadata $metadata -CacheSettings $global:cacheSettings
+                            if ($cached)
+                            {
+                                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cached client-side filtered result" -LogLevel "Verbose"
+                            }
+                            return $result
+                        }
+                        else
+                        {
+                            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Client-side filtering found no matches for: $ProfileName" -LogLevel "Verbose"
+                            Write-Verbose "[$functionName] Client-side filtering found no matches"
+                            return $null, $false
+                        }
+                    }
+                    else
+                    {
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to retrieve all profiles for client-side filtering (Error code: $allProfilesResult)" -LogLevel "Error"
+                        Write-Verbose "[$functionName] Failed to retrieve all profiles"
+                        return $null, $false
+                    }
+                }
+                catch
+                {
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error during client-side filtering: $($_.Exception.Message)" -LogLevel "Error"
+                    Write-Verbose "[$functionName] Error during client-side filtering: $($_.Exception.Message)"
+                    return $null, $false
+                }
             }
         }
         catch

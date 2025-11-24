@@ -25,7 +25,8 @@
             # Settings to apply to auth section
             authSettings    = @{
                 changePwOnNextStart = $false
-                delegated           = $false
+                cacheType           = 'File'
+                delegated           = $true
                 forceNewToken       = $false
             }
             
@@ -42,12 +43,14 @@
                     }
                 )
                 companyName                     = 'ZM Consulting'
-                maxUserMatchDisplay             = 10
-                appMode                         = 'full'
+                useGridForLogDisplay            = $true
+                maxMenuItemsPerPage             = 15
+                appModes                        = @(
+                    'full'
+                )
                 assignedUser                    = ''
                 minimumDevicePhysicalMemoryInGB = 8
                 maxNumberOfDevicesAllowed       = 15
-                maxGroupMatchDisplay            = 10
                 autopilotDeviceAllowedVendors   = @(
                     'vmware'
                 ) 
@@ -70,6 +73,7 @@
                 maxUserNameLength               = 50
                 validateScopes                  = $false
                 showLicenseBanner               = $false
+                migrateLegacyConfiguration      = $true
                 checkStrongMapping              = $true
                 strongMappingOptional           = $true
                 timeInSeconds                   = 60
@@ -88,7 +92,6 @@
                     repoName      = 'Autopilot'
                 }
                 release                         = 'dev'
-                updateLocalSettings             = $true
                 deviceContactThresholdInDays    = 30
                 additionalScopes                = @()
                 userPatternsToExclude           = @(
@@ -121,6 +124,136 @@
             authSettings    = @{
                 changePwOnNextStart = $true
                 validateScopes      = $false
+                cacheType           = 'File'
+                authType            = 'PublicAuthFlow'
+                noSaveRefreshToken  = $false
+                forceNewToken       = $false
+                scope               = @(
+                    'offline_access',
+                    'openid',
+                    'Device.ReadWrite.All',
+                    'DeviceManagementApps.Read.All',
+                    'DeviceManagementConfiguration.ReadWrite.All',
+                    'DeviceManagementManagedDevices.PrivilegedOperations.All',
+                    'DeviceManagementManagedDevices.ReadWrite.All',
+                    'Mail.Send',
+                    'DeviceManagementServiceConfig.ReadWrite.All'
+                )
+                delegated           = $false
+                secureString        = $false
+                renewalLeadTime     = 5
+            }
+            
+            domain          = 'gao.gov'
+            
+            domainSettings  = @{
+                privateSession                            = $true
+                appModes                                  = @(
+                    'registration',
+                    'helpdesk'
+                )
+                autopilotDeviceAllowedVendors             = @(
+                    'Dell'
+                )
+                autopilotProfilesToInclude                = @(
+                    @{
+                        id   = '20f6050d-263f-401b-847c-3a399e6aa8ac'
+                        name = 'msb'
+                    }
+                )
+                userPatternsToExclude                     = @(
+                    '-test',
+                    'onmicrosoft.com',
+                    '-cma',
+                    '-a',
+                    '-rsa',
+                    '-sup'
+                )
+                minimumDevicePhysicalMemoryInGB           = 16
+                maxWaitTime                               = 30
+                autoUpdate                                = $true
+                checkStrongMapping                        = $true
+                strongMappingOptional                     = $false
+                preferredBrowser                          = 'Chrome'
+                maxSerialNumberLength                     = 11
+                minUsernameLength                         = 3
+                version                                   = '1.3.0.0'
+                operatingSystem                           = 'Windows'
+                minSerialNumberLength                     = 7
+                maxUserNameLength                         = 50
+                validateScopes                            = $false
+                groupsToInclude                           = @(
+                    @{
+                        id   = 'be87a9ef-3e44-4e6b-8a9e-d1696e2f7db5'
+                        name = 'sg_passwrd_hash_stage'
+                    },
+                    @{
+                        id   = '74d8cfe5-7934-4bd7-bcf3-593dcc6639ed'
+                        name = 'sg_Office_365_License_G5_wth_windows_pilot'
+                    },
+                    @{
+                        id   = '27d943bc-77cc-44eb-9f81-13c76841129b'
+                        name = 'ITN-USR-CON-WIN-ENROLLMENT-PROD-ALLMSB'
+                    },
+                    @{
+                        id   = '27d943bc-77cc-44eb-9f81-13c76841129b'
+                        name = 'ITN-USR-CON-WIN-ENROLLMENT-PROD-ALLMSB'
+                    },
+                    @{
+                        id   = '42f5dcb5-5ba1-4e98-8c9c-1a4c758d2572'
+                        name = 'zscaler_zpa_users'
+                    },
+                    @{
+                        id   = 'b5f9b2da-ab81-4927-beaa-88f64fa86cd5'
+                        name = 'zscaler_zia_users'
+                    }
+                )
+                groupTag                                  = 'MSB01'
+                repoInfo                                  = @{
+                    repoPath      = 'zuhairmahd'
+                    baseURL       = 'https://www.github.com'
+                    baseSourceURL = 'https://raw.githubusercontent.com'
+                    repoName      = 'Autopilot'
+                }
+                companyName                               = 'Government Accountability Office'
+                release                                   = 'lhm'
+                deviceContactThresholdInDays              = 30
+                additionalScopes                          = @()
+                maxNumberOfDevicesAllowed                 = 20
+                includeEnrolledDevicesInNextUserReadiness = $false
+                supportEmail                              = 'mahmoudz@gao.gov'
+                maxMenuItemsPerPage                       = 15
+                migrateLegacyConfiguration                = $true
+                timeInSeconds                             = 60
+                showLicenseBanner                         = $false
+                domain                                    = 'gao.gov'
+                deviceNamePrefix                          = 'w11-'
+            }
+            
+            description     = 'Government build for gao.gov with enhanced security and compliance settings'
+        }
+        
+        # Production build target
+        production = @{
+            # Build parameters that are passed to CreateRelease.ps1
+            buildParameters = @{
+                inputFile       = 'main.ps1'
+                OutputPath      = 'hd'
+                NoVersionUpdate = $false
+                Overwrite       = $true
+                noCleanup       = $false
+            }
+            
+            # Settings to apply to global settings.psd1
+            globalSettings  = @{
+                autoUpdate        = $true
+                showLicenseBanner = $true
+                validateScopes    = $true
+            }
+            
+            authSettings    = @{
+                changePwOnNextStart = $true
+                validateScopes      = $false
                 authType            = 'PublicAuthFlow'
                 noSaveRefreshToken  = $false
                 forceNewToken       = $false
@@ -140,13 +273,18 @@
                 renewalLeadTime     = 5
             }
             
-            domain          = 'gao.gov'
+            # Domain to use for domain-specific settings (optional)
+            domain          = 'gao.gov'            
             
+            # Settings to apply to domain configuration (when domain is specified)
             domainSettings  = @{
                 privateSession                  = $true
                 groupsToExclude                 = @()
                 maxUserMatchDisplay             = 10
-                appMode                         = 'registration'
+                appModes                        = @(
+                    'registration',
+                    'helpdesk'
+                )
                 autopilotDeviceAllowedVendors   = @(
                     'Dell'
                 )
@@ -169,7 +307,6 @@
                 maxGroupMatchDisplay            = 20
                 maxWaitTime                     = 30
                 autoUpdate                      = $true
-                updateLocalSettings             = $true
                 checkStrongMapping              = $true
                 strongMappingOptional           = $false
                 preferredBrowser                = 'Chrome'
@@ -217,7 +354,7 @@
                 deviceNamePrefix                = 'w11-'
             }
             
-            description     = 'Government build for gao.gov with enhanced security and compliance settings'
+            description     = 'Production build with full settings and signing enabled'
         }
         
         # Testing target for CI/CD validation

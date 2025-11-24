@@ -44,7 +44,7 @@ function Show-SettingsEditor()
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [ValidateSet('Global', 'Domain', 'Auth')]
+        [ValidateSet('Global', 'Domain', 'Auth', 'cacheSettings', 'repoInfo')]
         [string]$SettingsType,
         [string]$SettingsFile = "settings.psd1",
         [string]$DomainName,
@@ -86,7 +86,7 @@ function Show-SettingsEditor()
         # Get default settings structure from Get-ApplicationDefaults
         Write-Log -LogFile $logFile -Module $functionName -Message "Retrieving default settings structure" -LogLevel "Verbose"
         Write-Verbose "[$functionName] Retrieving default settings structure"
-        $defaultSettings = Get-DefaultSettingsStructure
+        $defaultSettings = Get-ApplicationDefaults -DefaultType "Settings"
         if (-not $defaultSettings)
         {
             Write-Log -LogFile $logFile -Module $functionName -Message "Failed to get default settings structure" -LogLevel "Error"
@@ -133,6 +133,30 @@ function Show-SettingsEditor()
                 Write-Host "`n── Authentication Settings Editor ──" -ForegroundColor Cyan
                 Write-Host "Modify authentication and authorization settings." -ForegroundColor White
                 Write-Host "These settings control how the application authenticates with Microsoft Graph API." -ForegroundColor Gray
+            }
+        }
+        elseif ($SettingsType -eq 'cacheSettings')
+        {
+            $settingsTemplate = Get-ApplicationDefaults -DefaultType "cacheSettings"
+            $currentValues = $currentSettings.cacheSettings
+            Write-Log -LogFile $logFile -Module $functionName -Message "Editing cache settings" -LogLevel "Information"
+            Write-Verbose "[$functionName] Editing cache settings"
+            if (-not $Silent)
+            {
+                Write-Host "`n── Cache Settings Editor ──" -ForegroundColor Cyan
+                Write-Host "Manage caching behavior, expiration times, and size limits." -ForegroundColor White
+            }
+        }
+        elseif ($SettingsType -eq 'repoInfo')
+        {
+            $settingsTemplate = Get-ApplicationDefaults -DefaultType "repoInfo"
+            $currentValues = $currentSettings.repoInfo
+            Write-Log -LogFile $logFile -Module $functionName -Message "Editing repository info settings" -LogLevel "Information"
+            Write-Verbose "[$functionName] Editing repository info settings"
+            if (-not $Silent)
+            {
+                Write-Host "`n── Repository Information Editor ──" -ForegroundColor Cyan
+                Write-Host "Manage repository configuration settings for updates and source references." -ForegroundColor White
             }
         }
         else
@@ -219,8 +243,9 @@ function Show-SettingsEditor()
         $hasChanges = $false
         
         # Process each setting in the template - with support for nested objects
-        # Exclude GroupsToInclude and GroupsToExclude as they have dedicated editors
-        $excludeSettings = @('groupsToInclude', 'groupsToExclude', 'GroupsToInclude', 'GroupsToExclude', 'autopilotProfilesToInclude', 'appMode')
+        # Exclude GroupsToInclude, GroupsToExclude, autopilotProfilesToInclude, appMode and appModes as they have dedicated editors
+        # Note: cacheSettings and repoInfo are now top-level sections, not nested in globalSettings
+        $excludeSettings = @('groupsToInclude', 'groupsToExclude', 'GroupsToInclude', 'GroupsToExclude', 'autopilotProfilesToInclude', 'appMode', 'appModes', 'cacheSettings', 'repoInfo', 'assignedUser')
         $processedSettings = Get-FlattenedSettingsForProcessing -SettingsTemplate $settingsTemplate -CurrentValues $currentValues -ExcludeSettings $excludeSettings
         
         foreach ($settingInfo in $processedSettings)
@@ -234,6 +259,13 @@ function Show-SettingsEditor()
             Write-Log -LogFile $logFile -Module $functionName -Message "Processing setting: '$settingPath', Current: '$currentValue', Default: '$defaultValue', IsNested: $isNested" -LogLevel "Verbose"
             Write-Verbose "[$functionName] Processing setting: '$settingPath', Current: '$currentValue', Default: '$defaultValue', IsNested: $isNested"
             
+            # Skip the cacheTypes container object - its nested settings are displayed individually
+            if ($settingName -eq 'cacheTypes' -and ($defaultValue -is [hashtable] -or $defaultValue -is [PSCustomObject] -or $defaultValue -is [System.Collections.Specialized.OrderedDictionary]))
+            {
+                Write-Verbose "[$functionName] Skipping cacheTypes container - nested settings will be shown individually"
+                continue
+            }
+            
             # Skip nested container objects that should not be edited directly
             if ($isNested -and ($defaultValue -is [hashtable] -or $defaultValue -is [PSCustomObject]))
             {
@@ -243,17 +275,11 @@ function Show-SettingsEditor()
             
             if (-not $Silent)
             {
-                # Display setting with path for nested values
-                $displayName = if ($isNested)
-                {
-                    $settingPath 
-                }
-                else
-                {
-                    $settingName 
-                }
+                # Display setting with human-readable name
+                $displayName = Get-SettingDisplayName -SettingPath $settingPath -SettingName $settingName
+                
                 Write-Host "Setting: $displayName" -ForegroundColor Yellow
-                Write-Host "Description: $(Get-SettingDescription -SettingName $settingName)" -ForegroundColor Gray
+                Write-Host "Description: $(Get-SettingDescription -SettingName $settingName -SettingPath $settingPath)" -ForegroundColor Gray
                 Write-Host "Current value: $(Format-SettingValueForDisplay -Value $currentValue)" -ForegroundColor Cyan
             }
             
@@ -331,6 +357,16 @@ function Show-SettingsEditor()
                 Write-Log -LogFile $logFile -Module $functionName -Message "Saving auth settings" -LogLevel "Verbose"
                 Save-AuthSettings -Settings $updatedSettings -SettingsFile $SettingsFile
             }
+            elseif ($SettingsType -eq 'cacheSettings')
+            {
+                Write-Log -LogFile $logFile -Module $functionName -Message "Saving cache settings" -LogLevel "Verbose"
+                Save-CacheSettings -Settings $updatedSettings -SettingsFile $SettingsFile
+            }
+            elseif ($SettingsType -eq 'repoInfo')
+            {
+                Write-Log -LogFile $logFile -Module $functionName -Message "Saving repository info settings" -LogLevel "Verbose"
+                Save-RepoInfoSettings -Settings $updatedSettings -SettingsFile $SettingsFile
+            }
             else
             {
                 Write-Log -LogFile $logFile -Module $functionName -Message "Saving domain settings for: '$DomainName'" -LogLevel "Verbose"
@@ -379,59 +415,6 @@ function Show-SettingsEditor()
     }
 }
 
-function Get-DefaultSettingsStructure()
-{
-    <#
-    .SYNOPSIS
-        Retrieves the default settings structure efficiently from centralized defaults.
-    
-    .DESCRIPTION
-        Uses the centralized Get-ApplicationDefaults function to retrieve default settings.
-        This ensures consistency and eliminates duplicate default value definitions.
-    #>
-    [CmdletBinding()]
-    param()
-
-    $functionName = $MyInvocation.MyCommand.Name
-    
-    Write-Log -LogFile $logFile -Module $functionName -Message "Retrieving default settings structure from centralized defaults" -LogLevel "Verbose"
-    Write-Verbose "[$functionName] Retrieving default settings structure from centralized defaults"
-    
-    try
-    {
-        # Use centralized default values - single source of truth
-        Write-Log -LogFile $logFile -Module $functionName -Message "Getting defaults from Get-ApplicationDefaults" -LogLevel "Debug"
-        Write-Verbose "[$functionName] Getting defaults from Get-ApplicationDefaults"
-        
-        $defaultSettings = Get-ApplicationDefaults -DefaultType "Settings"
-        
-        if (-not $defaultSettings)
-        {
-            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to get default settings from centralized function" -LogLevel "Error"
-            Write-Verbose "[$functionName] Failed to get default settings from centralized function"
-            return $null
-        }
-        
-        Write-Log -LogFile $logFile -Module $functionName -Message "Default settings structure retrieved successfully from centralized source" -LogLevel "Information"
-        Write-Verbose "[$functionName] Default settings structure retrieved successfully from centralized source"
-        
-        # Convert to PSCustomObject to match the JSON structure behavior expected by consuming functions
-        $jsonString = $defaultSettings | ConvertTo-Json -Depth $global:maxJSONDepth
-        $defaultStructure = $jsonString | ConvertFrom-Json
-        
-        Write-Log -LogFile $logFile -Module $functionName -Message "Default settings structure converted to PSCustomObject format" -LogLevel "Verbose"
-        Write-Verbose "[$functionName] Default settings structure converted to PSCustomObject format"
-        
-        return $defaultStructure
-    }
-    catch
-    {
-        Write-Log -LogFile $logFile -Module $functionName -Message "Error retrieving default settings structure: $($_.Exception.Message)" -LogLevel "Error"
-        Write-Verbose "[$functionName] Error retrieving default settings structure: $($_.Exception.Message)"
-        return $null
-    }
-}
-
 function Get-CurrentSettings()
 {
     <#
@@ -461,7 +444,6 @@ function Get-CurrentSettings()
         {
             Write-Log -LogFile $logFile -Module $functionName -Message "Settings file not found, creating with defaults" -LogLevel "Verbose"
             Write-Verbose "Settings file not found, creating with defaults"
-            # Create default settings file using Get-ConfigurationData which will handle defaults
             try
             {
                 $defaultSettings = Get-ApplicationDefaults -DefaultType "Settings"
@@ -489,6 +471,100 @@ function Get-CurrentSettings()
         Write-Verbose "Error loading current settings: $($_.Exception.Message)"
         return $null
     }
+}
+
+function Get-SettingDisplayName()
+{
+    <#
+    .SYNOPSIS
+        Converts a technical setting path to a human-readable display name.
+    
+    .DESCRIPTION
+        Transforms dot-notation paths (e.g., 'cacheTypes.Devices.enabled') into
+        user-friendly names (e.g., 'Device Cache: Enabled'). Handles special cases
+        for cache types, repository info, and other nested structures.
+    
+    .PARAMETER SettingPath
+        The technical path to the setting (e.g., 'cacheTypes.Configuration.expirationMinutes')
+    
+    .PARAMETER SettingName
+        The leaf name of the setting (e.g., 'enabled', 'expirationMinutes')
+    
+    .EXAMPLE
+        Get-SettingDisplayName -SettingPath 'cacheTypes.Devices.enabled' -SettingName 'enabled'
+        Returns: 'Device Cache: Enabled'
+    
+    .EXAMPLE
+        Get-SettingDisplayName -SettingPath 'repoInfo.companyName' -SettingName 'companyName'
+        Returns: 'Repository: Company Name'
+    #>
+    [CmdletBinding()]
+    param(
+        [string]$SettingPath,
+        [string]$SettingName
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Converting path '$SettingPath' to display name"
+    
+    # Handle non-nested settings - return as-is
+    if (-not $SettingPath.Contains('.'))
+    {
+        return $SettingName
+    }
+    
+    # Parse the path components
+    $pathParts = $SettingPath -split '\.'
+    
+    # Handle cacheTypes nested settings
+    if ($pathParts[0] -eq 'cacheTypes' -and $pathParts.Count -eq 3)
+    {
+        $cacheType = $pathParts[1]  # e.g., 'Devices', 'Configuration', 'DirectoryObjects'
+        $property = $pathParts[2]    # e.g., 'enabled', 'expirationMinutes'
+        
+        # Convert property name to readable format
+        $propertyDisplay = switch ($property)
+        {
+            'enabled' { 'Enabled' }
+            'expirationMinutes' { 'Expiration (minutes)' }
+            'maxSize' { 'Max Size' }
+            default { $property }
+        }
+        
+        # Return formatted name: "[CacheType] Cache: [Property]"
+        return $cacheType + ' Cache: ' + $propertyDisplay
+    }
+    
+    # Handle repoInfo nested settings
+    if ($pathParts[0] -eq 'repoInfo' -and $pathParts.Count -eq 2)
+    {
+        $property = $pathParts[1]
+        
+        # Convert camelCase to Title Case with spaces
+        $propertyDisplay = $property -creplace '([A-Z])', ' $1'
+        $propertyDisplay = (Get-Culture).TextInfo.ToTitleCase($propertyDisplay.Trim())
+        
+        return 'Repository: ' + $propertyDisplay
+    }
+    
+    # Handle other nested settings generically
+    if ($pathParts.Count -ge 2)
+    {
+        $section = $pathParts[0]
+        $property = $pathParts[-1]
+        
+        # Convert camelCase to Title Case
+        $sectionDisplay = $section -creplace '([A-Z])', ' $1'
+        $sectionDisplay = (Get-Culture).TextInfo.ToTitleCase($sectionDisplay.Trim())
+        
+        $propertyDisplay = $property -creplace '([A-Z])', ' $1'
+        $propertyDisplay = (Get-Culture).TextInfo.ToTitleCase($propertyDisplay.Trim())
+        
+        return $sectionDisplay + ': ' + $propertyDisplay
+    }
+    
+    # Fallback to original name
+    return $SettingName
 }
 
 function Format-SettingValueForDisplay()
@@ -613,12 +689,55 @@ function Get-SettingDescription()
     <#
     .SYNOPSIS
         Returns a user-friendly description for a setting.
+    
+    .DESCRIPTION
+        Provides context-aware descriptions for settings, including nested settings.
+        Uses the full path for nested settings to provide more specific descriptions.
+    
+    .PARAMETER SettingName
+        The leaf name of the setting (e.g., 'enabled', 'expirationMinutes')
+    
+    .PARAMETER SettingPath
+        The full path to the setting (e.g., 'cacheTypes.Devices.enabled')
     #>
     [CmdletBinding()]
-    param([string]$SettingName)
+    param(
+        [string]$SettingName,
+        [string]$SettingPath = ''
+    )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Log -LogFile $logFile -Module $functionName -Message "Getting description for setting: '$SettingName'" -LogLevel "Verbose"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Getting description for setting: '$SettingName' (path: '$SettingPath')" -LogLevel "Verbose"
+    
+    # Handle nested cache settings with context-specific descriptions
+    if ($SettingPath -like 'cacheTypes.*')
+    {
+        $pathParts = $SettingPath -split '\.'
+        if ($pathParts.Count -eq 3)
+        {
+            $cacheType = $pathParts[1]
+            $property = $pathParts[2]
+            
+            switch ($property)
+            {
+                'enabled' { return "Enable or disable caching for $cacheType data" }
+                'expirationMinutes' { return "How long to cache $cacheType data before refreshing (in minutes)" }
+                'maxSize' { return "Maximum number of $cacheType items to store in cache" }
+            }
+        }
+    }
+    
+    # Handle nested repoInfo settings
+    if ($SettingPath -like 'repoInfo.*')
+    {
+        $pathParts = $SettingPath -split '\.'
+        if ($pathParts.Count -eq 2)
+        {
+            $property = $pathParts[1]
+            # Use the base descriptions table below for repoInfo properties
+            # Fall through to general lookup
+        }
+    }
     
     $descriptions = @{
         'configFile'                      = 'Path to the configuration file storing encrypted authentication data'
@@ -629,7 +748,8 @@ function Get-SettingDescription()
         'strongMappingOptional'           = 'Whether strong mapping is optional for the user. If set to false, the user is not considered ready to receive a device'
         'appMode'                         = 'Application mode controlling which features are available'
         'timeInSeconds'                   = 'Default timeout to wait between retries in seconds'
-        'maxUserMatchDisplay'             = 'Maximum number of user matches to display in search results'
+        'maxUserMatchDisplay'             = '[Deprecated] Maximum number of user matches to display in search results'
+        'maxGroupMatchDisplay'            = '[Deprecated] Maximum number of group matches to display in search results'
         'release'                         = 'Release branch or version to track for updates'
         'testMode'                        = 'Enable test mode with additional debugging features'
         'operatingSystem'                 = 'Target operating system (Windows/macOS/Linux)'
@@ -648,6 +768,8 @@ function Get-SettingDescription()
         'userPatternsToExclude'           = 'Username patterns to exclude from operations'
         'desiredAutopilotProfiles'        = 'Autopilot profiles to assign to devices'
         'changePwOnNextStart'             = 'Force password change on next application start'
+        migrateLegacyConfiguration        = 'Migrate settings from the JSON legacy configuration file format'
+        maxMenuItemsPerPage               = 'Maximum number of menu items to display per page in interactive mode'     
         'authType'                        = 'Authentication method (PublicAuthFlow, PrivateAuthFlow, etc.)'
         'noSaveRefreshToken'              = 'Prevent saving refresh tokens to disk'
         'forceNewToken'                   = 'Force acquisition of new authentication token'
@@ -667,6 +789,13 @@ function Get-SettingDescription()
         'supportEmail'                    = 'Support contact email address'
         'supportPhone'                    = 'Support contact phone number'
         'helpDeskURL'                     = 'URL for help desk or support portal'
+        # Global cache settings descriptions (top-level cacheSettings)
+        'enabled'                         = 'Enable or disable caching globally across all cache types'
+        'defaultExpirationMinutes'        = 'Default expiration time for cache entries (in minutes) when not overridden by cache type'
+        'maxCacheSize'                    = 'Global maximum number of items to store across all caches'
+        'cacheTypes'                      = 'Cache type-specific configurations'
+        # Property-level descriptions (used when path-specific lookup doesn't match)
+        'expirationMinutes'               = 'Cache expiration time in minutes'
     }
     
     if ($descriptions.ContainsKey($SettingName))
@@ -766,7 +895,7 @@ function Get-SettingInputType()
     Write-Log -LogFile $logFile -Module $functionName -Message "Determining input type for setting '$SettingName' with value type: $($Value.GetType().Name)" -LogLevel "Verbose"
     
     # Check for specific known enumerated types
-    if ($SettingName -eq 'appMode')
+    if ($SettingName -eq 'appMode' -or $SettingName -eq 'appModes')
     { 
         Write-Verbose "[$functionName] Detected AppMode setting"
         return 'AppMode' 
@@ -870,56 +999,6 @@ function Get-BooleanInput()
                 Write-Log -LogFile $logFile -Module $functionName -Message "Invalid choice entered: '$choice'" -LogLevel "Warning"
             }
         }
-    } while ($true)
-}
-
-function Get-AppModeInput()
-{
-    <#
-    .SYNOPSIS
-        Gets app mode input from user.
-    #>
-    param($CurrentValue)
-    
-    $functionName = $MyInvocation.MyCommand.Name
-    Write-Log -LogFile $logFile -Module $functionName -Message "Getting app mode input. Current value: '$CurrentValue'" -LogLevel "Verbose"
-    
-    $modes = @('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom')
-    
-    Write-Host "Available app modes:" -ForegroundColor White
-    for ($i = 0; $i -lt $modes.Count; $i++)
-    {
-        $mode = $modes[$i]
-        if ($mode -eq $CurrentValue)
-        {
-            Write-Host "$($i + 1). $mode (Current)" -ForegroundColor Green
-        }
-        else
-        {
-            Write-Host "$($i + 1). $mode" -ForegroundColor White
-        }
-    }
-    Write-Host "Press Enter to keep current value" -ForegroundColor Yellow
-    
-    do
-    {
-        $choice = Read-Host "Enter choice (1-$($modes.Count))"
-        
-        if ([string]::IsNullOrWhiteSpace($choice))
-        {
-            Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current app mode: '$CurrentValue'" -LogLevel "Verbose"
-            return $CurrentValue
-        }
-        
-        if ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $modes.Count)
-        {
-            $selectedMode = $modes[[int]$choice - 1]
-            Write-Log -LogFile $logFile -Module $functionName -Message "User selected app mode: '$selectedMode'" -LogLevel "Information"
-            return $selectedMode
-        }
-        
-        Write-Host "Invalid choice. Please enter a number between 1 and $($modes.Count)." -ForegroundColor Red
-        Write-Log -LogFile $logFile -Module $functionName -Message "Invalid choice entered: '$choice'" -LogLevel "Warning"
     } while ($true)
 }
 
@@ -1262,6 +1341,47 @@ function Save-GlobalSettings()
             $value = $Settings[$key]
             Write-Log -LogFile $logFile -Module $functionName -Message "Updating global setting: $key = $value" -LogLevel "Verbose"
             
+            # Special handling for app mode settings
+            if ($key -eq 'appMode' -or $key -eq 'appModes')
+            {
+                Write-Log -LogFile $logFile -Module $functionName -Message "Using specialized app mode settings handler for: $key" -LogLevel "Debug"
+                
+                # Load the Update-AppModeSettings function if not available
+                if (-not (Get-Command Update-AppModeSettings -ErrorAction SilentlyContinue))
+                {
+                    try
+                    {
+                        . "$PWD/functions/setupFunctions/Update-AppModeSettings.ps1"
+                    }
+                    catch
+                    {
+                        Write-Log -LogFile $logFile -Module $functionName -Message "Could not load Update-AppModeSettings function: $($_.Exception.Message)" -LogLevel "Warning"
+                        # Fall back to regular Update-Setting
+                        $success = Update-Setting -SettingType "Global" -SettingsFile $SettingsFile -SettingName $key -SettingValue $value
+                        if (-not $success)
+                        {
+                            Write-Warning "[$functionName] Failed to update global setting: $key"
+                            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to update global setting: $key" -LogLevel "Error"
+                            return $false
+                        }
+                        continue
+                    }
+                }
+                
+                # Use specialized app mode settings update
+                $success = Update-AppModeSettings -Configuration $value -SettingsFile $SettingsFile 
+                
+                if (-not $success)
+                {
+                    Write-Warning "[$functionName] Failed to update app mode setting: $key"
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Failed to update app mode setting: $key" -LogLevel "Error"
+                    return $false
+                }
+                
+                # Skip the regular processing for this setting
+                continue
+            }
+            
             # Handle nested settings (e.g., repoInfo.repoPath)
             if ($key.Contains('.'))
             {
@@ -1383,6 +1503,106 @@ function Save-AuthSettings()
     }
 }
 
+function Save-CacheSettings()
+{
+    <#
+    .SYNOPSIS
+        Saves cache settings using unified Update-Setting function.
+    #>
+    [CmdletBinding()]
+    param(
+        [hashtable]$Settings,
+        [string]$SettingsFile
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -LogFile $logFile -Module $functionName -Message "Saving cache settings to: $SettingsFile" -LogLevel "Information"
+    
+    try
+    {
+        foreach ($key in $Settings.Keys)
+        {
+            Write-Log -LogFile $logFile -Module $functionName -Message "Updating cache setting: $key = $($Settings[$key])" -LogLevel "Verbose"
+            
+            # Handle nested settings (e.g., cacheTypes.Configuration.enabled)
+            if ($key.Contains('.'))
+            {
+                $success = Update-NestedSetting -SettingType "cacheSettings" -SettingsFile $SettingsFile -SettingPath $key -SettingValue $Settings[$key]
+            }
+            else
+            {
+                $success = Update-Setting -SettingType "cacheSettings" -SettingsFile $SettingsFile -SettingName $key -SettingValue $Settings[$key]
+            }
+            
+            if (-not $success)
+            {
+                Write-Warning "[$functionName] Failed to update cache setting: $key"
+                Write-Log -LogFile $logFile -Module $functionName -Message "Failed to update cache setting: $key" -LogLevel "Error"
+                return $false
+            }
+            Write-Log -LogFile $logFile -Module $functionName -Message "Successfully updated cache setting: $key = $($Settings[$key])" -LogLevel "Information"
+        }
+        Write-Log -LogFile $logFile -Module $functionName -Message "All cache settings saved successfully" -LogLevel "Information"
+        return $true
+    }
+    catch
+    {
+        Write-Warning "[$functionName] Error saving cache settings: $($_.Exception.Message)"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Error saving cache settings: $($_.Exception.Message)" -LogLevel "Error"
+        return $false
+    }
+}
+
+function Save-RepoInfoSettings()
+{
+    <#
+    .SYNOPSIS
+        Saves repository information settings using unified Update-Setting function.
+    #>
+    [CmdletBinding()]
+    param(
+        [hashtable]$Settings,
+        [string]$SettingsFile
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -LogFile $logFile -Module $functionName -Message "Saving repository info settings to: $SettingsFile" -LogLevel "Information"
+    
+    try
+    {
+        foreach ($key in $Settings.Keys)
+        {
+            Write-Log -LogFile $logFile -Module $functionName -Message "Updating repoInfo setting: $key = $($Settings[$key])" -LogLevel "Verbose"
+            
+            # Handle nested settings (if any in future)
+            if ($key.Contains('.'))
+            {
+                $success = Update-NestedSetting -SettingType "repoInfo" -SettingsFile $SettingsFile -SettingPath $key -SettingValue $Settings[$key]
+            }
+            else
+            {
+                $success = Update-Setting -SettingType "repoInfo" -SettingsFile $SettingsFile -SettingName $key -SettingValue $Settings[$key]
+            }
+            
+            if (-not $success)
+            {
+                Write-Warning "[$functionName] Failed to update repoInfo setting: $key"
+                Write-Log -LogFile $logFile -Module $functionName -Message "Failed to update repoInfo setting: $key" -LogLevel "Error"
+                return $false
+            }
+            Write-Log -LogFile $logFile -Module $functionName -Message "Successfully updated repoInfo setting: $key = $($Settings[$key])" -LogLevel "Information"
+        }
+        Write-Log -LogFile $logFile -Module $functionName -Message "All repoInfo settings saved successfully" -LogLevel "Information"
+        return $true
+    }
+    catch
+    {
+        Write-Warning "[$functionName] Error saving repoInfo settings: $($_.Exception.Message)"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Error saving repoInfo settings: $($_.Exception.Message)" -LogLevel "Error"
+        return $false
+    }
+}
+
 function Save-DomainSettings()
 {
     <#
@@ -1451,7 +1671,17 @@ function Update-NestedSetting()
             return $false
         }
         
-        $settings = Import-PowerShellDataFile -Path $SettingsFile
+        $settingsObj = Import-PowerShellDataFile -Path $SettingsFile
+        
+        # Convert to hashtable for easier manipulation
+        if (-not $settingsObj -is [hashtable])
+        {
+            $settings = ConvertTo-HashtableOptimized -InputObject $settingsObj -Context "nested settings"
+        }
+        else
+        {
+            $settings = $settingsObj
+        }
         
         # Parse the setting path
         $pathParts = $SettingPath.Split('.')
@@ -1462,19 +1692,35 @@ function Update-NestedSetting()
         {
             'Global'
             {
-                if (-not $settings.globalSettings)
+                if (-not $settings.ContainsKey('globalSettings'))
                 {
-                    $settings | Add-Member -MemberType NoteProperty -Name "globalSettings" -Value (New-Object PSObject)
+                    $settings['globalSettings'] = @{}
                 }
-                $currentLevel = $settings.globalSettings
+                $currentLevel = $settings['globalSettings']
             }
             'Auth'
             {
-                if (-not $settings.auth)
+                if (-not $settings.ContainsKey('auth'))
                 {
-                    $settings | Add-Member -MemberType NoteProperty -Name "auth" -Value (New-Object PSObject)
+                    $settings['auth'] = @{}
                 }
-                $currentLevel = $settings.auth
+                $currentLevel = $settings['auth']
+            }
+            'cacheSettings'
+            {
+                if (-not $settings.ContainsKey('cacheSettings'))
+                {
+                    $settings['cacheSettings'] = @{}
+                }
+                $currentLevel = $settings['cacheSettings']
+            }
+            'repoInfo'
+            {
+                if (-not $settings.ContainsKey('repoInfo'))
+                {
+                    $settings['repoInfo'] = @{}
+                }
+                $currentLevel = $settings['repoInfo']
             }
             'Domain'
             {
@@ -1489,28 +1735,45 @@ function Update-NestedSetting()
             }
         }
         
-        # Navigate through the path, creating objects as needed
+        # Ensure currentLevel is a hashtable
+        if ($currentLevel -isnot [hashtable])
+        {
+            $currentLevel = ConvertTo-HashtableOptimized -InputObject $currentLevel -Context "current level"
+            # Update the parent reference
+            switch ($SettingType)
+            {
+                'Global' { $settings['globalSettings'] = $currentLevel }
+                'Auth' { $settings['auth'] = $currentLevel }
+                'cacheSettings' { $settings['cacheSettings'] = $currentLevel }
+                'repoInfo' { $settings['repoInfo'] = $currentLevel }
+            }
+        }
+        
+        # Navigate through the path, creating hashtables as needed
         for ($i = 0; $i -lt $pathParts.Count - 1; $i++)
         {
             $part = $pathParts[$i]
             
-            if (-not ($currentLevel.PSObject.Properties.Name -contains $part))
+            if (-not $currentLevel.ContainsKey($part))
             {
-                $currentLevel | Add-Member -MemberType NoteProperty -Name $part -Value (New-Object PSObject)
+                $currentLevel[$part] = @{}
             }
-            $currentLevel = $currentLevel.$part
+            elseif ($currentLevel[$part] -isnot [hashtable])
+            {
+                # Convert nested objects to hashtables
+                $currentLevel[$part] = ConvertTo-HashtableOptimized -InputObject $currentLevel[$part] -Context "nested level $part"
+            }
+            $currentLevel = $currentLevel[$part]
         }
         
         # Set the final value
         $finalProperty = $pathParts[-1]
-        if ($currentLevel.PSObject.Properties.Name -contains $finalProperty)
-        {
-            $currentLevel.$finalProperty = $SettingValue
-        }
-        else
-        {
-            $currentLevel | Add-Member -MemberType NoteProperty -Name $finalProperty -Value $SettingValue
-        }
+        $currentLevel[$finalProperty] = $SettingValue
+        
+        # Create backup before saving
+        $backupFile = "$SettingsFile.backup.$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+        Copy-Item -Path $SettingsFile -Destination $backupFile -Force
+        Write-Verbose "[$functionName] Created backup: $backupFile"
         
         # Save the updated settings using Export-PowerShellDataFile
         $null = Export-PowerShellDataFile -InputObject $settings -Path $SettingsFile -Force

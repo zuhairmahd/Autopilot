@@ -1,5 +1,32 @@
 function GetVMAutopilotDeviceIdBySerialNumber() 
 {
+    <#
+    .SYNOPSIS
+    Retrieves the Autopilot device ID for a virtual machine by its serial number.
+
+    .DESCRIPTION
+    This function queries Microsoft Graph to retrieve all Windows Autopilot device identities
+    and searches for a matching serial number. It handles whitespace normalization in serial
+    numbers to ensure accurate matching for virtual machines.
+
+    .PARAMETER serialNumber
+    The serial number of the virtual machine to search for in Autopilot.
+
+    .PARAMETER accessToken
+    The Microsoft Graph API access token for authentication.
+
+    .OUTPUTS
+    System.String
+    Returns the Autopilot device ID if found, or $null if no matching device is found.
+
+    .EXAMPLE
+    $autopilotId = GetVMAutopilotDeviceIdBySerialNumber -serialNumber "VMSerial123" -accessToken $token
+
+    .NOTES
+    Strips whitespace from both input and device serial numbers for comparison.
+    Requires appropriate Microsoft Graph permissions to query Autopilot device identities.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [string]$serialNumber,

@@ -1,5 +1,44 @@
 function Test-MenuItemIncluded()
 {
+    <#
+    .SYNOPSIS
+    Determines if a menu item should be included based on application mode configuration.
+
+    .DESCRIPTION
+    This function checks whether a specific menu item should be included in the current menu
+    based on the active application modes and menu configuration. It loads menu configuration
+    from file if not provided, maps the current menu to its configuration, and checks the
+    item's includeInDisplayModes property against effective app modes. The function supports
+    hierarchical app mode checking through inheritance.
+
+    .PARAMETER MenuItemName
+    The name of the menu item to check for inclusion. This parameter is mandatory.
+
+    .PARAMETER Menus
+    Optional array of menu configuration objects. If not provided, loads from menu.psd1.
+
+    .PARAMETER CurrentMenu
+    Optional hashtable representing the current menu context for more accurate lookups.
+
+    .OUTPUTS
+    System.Boolean
+    Returns $true if the menu item should be included based on app modes, $false otherwise.
+    Returns $true by default if no app mode restrictions are found.
+
+    .EXAMPLE
+    if (Test-MenuItemIncluded -MenuItemName "Advanced Features" -CurrentMenu $menu) {
+        # Show advanced features menu item
+    }
+
+    .NOTES
+    Uses Get-EffectiveAppModes to determine active application modes.
+    Loads menu configuration from Get-CachedMenuConfiguration if not provided.
+    Supports menu title pattern matching to identify current menu type.
+    Checks includeInDisplayModes property for app mode filtering.
+    Includes hierarchical app mode checking (e.g., "reporting" includes "reporting.devices").
+    Returns $true by default if no app mode configuration exists.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -12,8 +51,10 @@ function Test-MenuItemIncluded()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Checking if menu item '$MenuItemName' should be included"
-    Write-Verbose "[$functionName] App mode: $($settings.appMode)"  
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting menu item inclusion check for '$MenuItemName' with app mode: $($settings.appMode)" -LogLevel "Verbose"
+    # Get effective app modes (handle both single and multiple modes)
+    $effectiveAppModes = Get-EffectiveAppModes -Settings $settings
+    Write-Verbose "[$functionName] Effective app modes: [$($effectiveAppModes -join ', ')]"  
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting menu item inclusion check for '$MenuItemName' with effective app modes: [$($effectiveAppModes -join ', ')]" -LogLevel "Verbose"
 
     # If $Menus parameter is null, check if we can load menu configuration from file
     if ($null -eq $Menus)
@@ -84,9 +125,17 @@ function Test-MenuItemIncluded()
         return $true
     }
     
-    # Get app mode hierarchy from menu configuration
-    $hierarchyAllowed = Get-AppModeHierarchy -CurrentAppMode $settings.appMode
-    Write-Log -LogFile $LogFile -Module $functionName -Message "App mode hierarchy for '$($settings.appMode)': [$($hierarchyAllowed -join ', ')]" -LogLevel "Debug"
+    # Get combined app mode hierarchy from menu configuration for all effective modes
+    $hierarchyResult = Get-CombinedAppModeHierarchy -AppModes $effectiveAppModes
+    
+    # Extract the actual allowed modes array from the result
+    $hierarchyAllowed = if ($hierarchyResult -is [hashtable] -and $hierarchyResult.AllowedModes) {
+        $hierarchyResult.AllowedModes
+    } else {
+        $hierarchyResult
+    }
+    
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Combined app mode hierarchy for [$($effectiveAppModes -join ', ')]: [$($hierarchyAllowed -join ', ')]" -LogLevel "Debug"
 
     # If the $settings.appMode hierarchy includes '*', assume the menu needs to be displayed (full mode)
     if ($hierarchyAllowed -contains '*')

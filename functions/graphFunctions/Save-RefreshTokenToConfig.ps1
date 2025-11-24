@@ -1,5 +1,39 @@
 function Save-RefreshTokenToConfig()
 {
+    <#
+    .SYNOPSIS
+    Saves a refresh token securely to encrypted configuration file.
+
+    .DESCRIPTION
+    This function handles the secure storage of OAuth refresh tokens in encrypted JSON configuration
+    files. It supports both creating new encrypted configs and updating existing ones, automatically
+    detects if encryption is needed, uses temporary encrypted config to avoid duplicate password
+    prompts, and handles the complete encryption workflow including user password collection and
+    secure key management.
+
+    .PARAMETER refreshToken
+    The OAuth refresh token to save securely.
+
+    .PARAMETER configFilePath
+    Path to the configuration file where the refresh token should be stored.
+
+    .OUTPUTS
+    None. Saves refresh token to encrypted configuration file.
+
+    .EXAMPLE
+    Save-RefreshTokenToConfig -refreshToken $rt -configFilePath "config.json"
+
+    .NOTES
+    Uses Invoke-JsonFileEncryption for secure encryption.
+    Avoids duplicate password prompts by reusing temporary encrypted config if available.
+    Stores refresh token in delegatedCredentials.refresh_token property.
+    Creates backup of original file before encryption.
+    Handles both new config creation and existing config updates.
+    Uses user-provided password for encryption key derivation.
+    Cleans up temporary files after encryption.
+    Compatible with PowerShell 5.1.
+    #>
+    [CmdletBinding()]
     param($refreshToken, $configFilePath)
 
     $functionName = $MyInvocation.MyCommand.Name
@@ -7,7 +41,7 @@ function Save-RefreshTokenToConfig()
     $userPassword = $null
     $usingTempConfig = $false
     
-Write-Log -LogFile $LogFile -Module $functionName -Message "Starting refresh token save operation" -LogLevel "Verbose"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting refresh token save operation" -LogLevel "Verbose"
     Write-Verbose "[$functionName] Called with configFilePath=$configFilePath, refreshToken provided=$($null -ne $refreshToken)"
     
     if (-not $refreshToken)
@@ -52,7 +86,7 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Starting refresh tok
         {
             if (Test-Path $tempFile)
             {
-                Remove-Item $tempFile -Force
+                Remove-Item $tempFile -Force | Out-Null
             }
         }
     }
@@ -61,13 +95,13 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Starting refresh tok
     if (-not $usingTempConfig)
     {
         Write-Verbose "[$functionName] Temporary config not available, reading from disk"
-Write-Log -LogFile $LogFile -Module $functionName -Message "Temporary config not available, reading from disk file" -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Temporary config not available, reading from disk file" -LogLevel "Verbose"
         
         # Read the current config from disk (it should be encrypted)
         try
         {
             $encryptedContent = Get-Content -Raw -Path $configFilePath -ErrorAction Stop
-Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully read config file from disk" -LogLevel "Information"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully read config file from disk" -LogLevel "Information"
         }
         catch
         {
@@ -194,7 +228,7 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully read co
         {
             if (Test-Path $tempFile)
             {
-                Remove-Item $tempFile -Force
+                Remove-Item $tempFile -Force | Out-Null
             }
         }
     }
@@ -226,7 +260,7 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully read co
                 if ($tempEncryptResult.Success)
                 {
                     $script:TempEncryptedConfig = $tempEncryptResult.Content
-Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully updated temporary encrypted config" -LogLevel "Information"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully updated temporary encrypted config" -LogLevel "Information"
                 }
                 else
                 {
@@ -238,7 +272,7 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully updated
             {
                 if (Test-Path $tempFile)
                 {
-                    Remove-Item $tempFile -Force
+                    Remove-Item $tempFile -Force | Out-Null
                 }
             }
         }

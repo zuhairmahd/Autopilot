@@ -97,14 +97,18 @@ function Get-FlattenedSettingsForProcessing()
     #>
     [CmdletBinding()]
     param(
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
         $SettingsTemplate,
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]  
         $CurrentValues,
         [string[]]$ExcludeSettings = @()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Flattening settings for processing with $($ExcludeSettings.Count) exclusions"
-    
+    Write-Verbose "[$functionName] Flattening settings for processing with $($ExcludeSettings.Count) exclusions and $($SettingsTemplate.GetType().Name) template"
+    write-log -logFile $logFile -module $functionName -message "Flattening settings for processing with $($ExcludeSettings.Count) exclusions and $($SettingsTemplate.GetType().Name) template"
     $flattenedSettings = @()
     
     if ($SettingsTemplate -is [hashtable] -or $SettingsTemplate -is [System.Collections.Specialized.OrderedDictionary])
@@ -112,37 +116,50 @@ function Get-FlattenedSettingsForProcessing()
         # Handle hashtable and OrderedDictionary (auth settings and PSD1 native format)
         # Filter out system properties that aren't actual settings
         $systemProperties = @('Count', 'Keys', 'Values', 'IsReadOnly', 'IsFixedSize', 'SyncRoot', 'IsSynchronized')
-        $settingsKeys = $SettingsTemplate.Keys | Where-Object { $_ -notin $systemProperties }
-        
+        $settingsKeys = $SettingsTemplate.Keys | Where-Object { $_ -notin $systemProperties }   
+        Write-Verbose "[$functionName] Removed system properties, processing the remaining $($settingsKeys.Count) settings"
+        write-log -logFile $logFile -module $functionName -message "Removed system properties, processing the remaining $($settingsKeys.Count) settings"
         foreach ($key in $settingsKeys)
         {
             # Skip excluded settings
             if ($ExcludeSettings -contains $key)
             {
                 Write-Verbose "[$functionName] Excluding setting: $key"
+                write-log -logFile $logFile -module $functionName -message "Excluding setting: $key"
                 continue
             }
             
             $defaultValue = $SettingsTemplate[$key]
             $currentValue = Get-NestedValue -Object $CurrentValues -Path $key
+            Write-Verbose "[$functionName] Processing setting: $key with the default value $defaultValue and current value $currentValue"
+            write-log -logFile $logFile -module $functionName -message "Processing setting: $key with the default value $defaultValue and current value $currentValue"
             if ($null -eq $currentValue)
             {
+                Write-Verbose "[$functionName] Current value for $key is null, using default value"
+                write-log -logFile $logFile -module $functionName -message "Current value for $key is null, using default value"
                 $currentValue = $defaultValue 
             }
             
-            if ($defaultValue -is [hashtable] -or $defaultValue -is [PSCustomObject])
+            if ($defaultValue -is [hashtable] -or $defaultValue -is [PSCustomObject] -or $defaultValue -is [System.Collections.Specialized.OrderedDictionary])
             {
+                Write-Verbose "[$functionName] Processing nested settings for: $key"
+                write-log -logFile $logFile -module $functionName -message "Processing nested settings for: $key"
                 # Process nested object recursively
                 $nestedSettings = Get-FlattenedSettingsForProcessing -SettingsTemplate $defaultValue -CurrentValues $currentValue -ExcludeSettings $ExcludeSettings
+                Write-Verbose "[$functionName] Retrieved $($nestedSettings.Count) nested settings for: $key"
+                write-log -logFile $logFile -module $functionName -message "Retrieved $($nestedSettings.Count) nested settings for: $key"
                 foreach ($nestedSetting in $nestedSettings)
                 {
                     $nestedSetting.Path = "$key.$($nestedSetting.Path)"
                     $nestedSetting.IsNested = $true
+                    write-log -logFile $logFile -module $functionName -message "Processing nested setting: $($nestedSetting.Path)"              
                 }
                 $flattenedSettings += $nestedSettings
             }
             else
             {
+                Write-Verbose "[$functionName] Processing simple value: $key with the default value $defaultValue and current value $currentValue"
+                write-log -logFile $logFile -module $functionName -message "Processing simple value: $key with the default value $defaultValue and current value $currentValue"
                 # Simple value
                 $flattenedSettings += @{
                     Name         = $key
@@ -156,6 +173,8 @@ function Get-FlattenedSettingsForProcessing()
     }
     else
     {
+        Write-Verbose "[$functionName] Processing PSCustomObject properties"
+        write-log -logFile $logFile -module $functionName -message "Processing PSCustomObject properties"                                   
         # Handle PSCustomObject (legacy compatibility)
         foreach ($property in $SettingsTemplate.PSObject.Properties)
         {
@@ -175,7 +194,7 @@ function Get-FlattenedSettingsForProcessing()
                 $currentValue = $defaultValue 
             }
             
-            if ($defaultValue -is [hashtable] -or $defaultValue -is [PSCustomObject])
+            if ($defaultValue -is [hashtable] -or $defaultValue -is [PSCustomObject] -or $defaultValue -is [System.Collections.Specialized.OrderedDictionary])
             {
                 # Process nested object recursively
                 $nestedSettings = Get-FlattenedSettingsForProcessing -SettingsTemplate $defaultValue -CurrentValues $currentValue -ExcludeSettings $ExcludeSettings
@@ -201,6 +220,7 @@ function Get-FlattenedSettingsForProcessing()
     }
     
     Write-Verbose "[$functionName] Flattened $($flattenedSettings.Count) settings for processing"
+    write-log -logFile $logFile -module $functionName -message "Flattened $($flattenedSettings.Count) settings for processing"              
     return $flattenedSettings
 }
 

@@ -1,5 +1,28 @@
 function ConvertUserDisplayName()
 {
+    <#
+    .SYNOPSIS
+    Converts a user display name from "Lastname, Firstname Middle (nickname)" format to "Firstname Middle Lastname (nickname)" format.
+
+    .DESCRIPTION
+    This function parses a user display name string and rearranges it from the format "Lastname, Firstname Middle (nickname)" 
+    to "Firstname Middle Lastname (nickname)". It also handles cases with middle initials and optional nicknames.
+    The function returns a hashtable containing the processed full name, first name, last name, middle initial, and nickname.
+
+    .PARAMETER UserDisplayName
+    The display name of the user to convert. Must be in the format "Lastname, Firstname Middle (nickname)" or similar.
+
+    .OUTPUTS
+    [hashtable] Returns a hashtable with keys: FullName, FirstName, LastName, MiddleInitial, Nickname.
+
+    .EXAMPLE
+    $result = ConvertUserDisplayName -UserDisplayName "Doe, John A. (Johnny)"
+    # $result['FullName'] = "John A. Doe (Johnny)"
+
+    .NOTES
+    Logging is performed at various stages for diagnostics. 
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true)]
@@ -26,7 +49,7 @@ function ConvertUserDisplayName()
         else
         {
             $null 
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "No middle initial found." -LogLevel "Verbose"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "No middle initial found." -LogLevel "Verbose"
         }
         $nickname = $matches[4]
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Nickname: $nickname" -LogLevel "Information"
@@ -42,20 +65,20 @@ Write-Log -LogFile $LogFile -Module "$functionName" -Message "No middle initial 
         }
         if ($nickname)
         {
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "Nickname found: $nickname" -LogLevel "Verbose"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Nickname found: $nickname" -LogLevel "Verbose"
             $currentUser = "$fullName ($nickname)"
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "Current user with nickname: $currentUser" -LogLevel "Debug"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Current user with nickname: $currentUser" -LogLevel "Debug"
         }
         else
         {
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "No nickname found." -LogLevel "Verbose"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "No nickname found." -LogLevel "Verbose"
             $currentUser = $fullName
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "Current user without nickname: $currentUser" -LogLevel "Debug"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Current user without nickname: $currentUser" -LogLevel "Debug"
         }
     }
     else
     {
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "No match found for user display name format." -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No match found for user display name format." -LogLevel "Verbose"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning original display name." -LogLevel "Information"
         $currentUser = $UserDisplayName
     }

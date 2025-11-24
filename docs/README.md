@@ -18,6 +18,9 @@ This directory contains comprehensive technical documentation for the Windows Au
 ### [APP_MODE_CONFIGURATION.md](APP_MODE_CONFIGURATION.md)
 **Application modes guide** - Role-based interface configurations, app mode definitions, and user permission management.
 
+### [APPMODE_FUNCTIONS_TESTING.md](APPMODE_FUNCTIONS_TESTING.md)
+**App mode testing documentation** - Comprehensive test suite for app mode functions, including 70+ test cases covering hierarchy resolution, conflict detection, and settings persistence. See also [APPMODE_FUNCTIONS_TESTING_SUMMARY.md](APPMODE_FUNCTIONS_TESTING_SUMMARY.md) for quick reference.
+
 ### [GITHUB_ACTIONS_INTEGRATION.md](GITHUB_ACTIONS_INTEGRATION.md)
 **CI/CD documentation** - GitHub Actions workflows, build automation, and deployment procedures.
 

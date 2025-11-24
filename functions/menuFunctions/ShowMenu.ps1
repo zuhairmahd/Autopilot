@@ -1,5 +1,58 @@
 function ShowMenu()
 {
+    <#
+    .SYNOPSIS
+    Core menu display and navigation function with stack management and user interaction.
+
+    .DESCRIPTION
+    This function is the central menu display engine that handles menu rendering, user interaction,
+    navigation stack management, and routing to appropriate handlers. It manages global menu history
+    for breadcrumb navigation, initializes menu state, determines calling context, and processes
+    stack operations (push/pop/none) based on navigation patterns. The function implements the main
+    menu interaction loop.
+
+    .PARAMETER Menu
+    The menu hashtable to display containing Title, Description, and Items. This parameter is mandatory.
+
+    .PARAMETER StackOperation
+    Stack operation mode: 'Auto' (default), 'Push', 'Pop', or 'None'. Auto determines operation from context.
+
+    .PARAMETER CalledBy
+    Calling context: 'Unknown' (default), 'Direct', 'Action', 'Submenu', or 'Navigation'.
+    When 'Unknown', automatically determined via Get-CallingContext.
+
+    .OUTPUTS
+    System.Object
+    Returns result from menu item action execution, navigation command, or exit code.
+
+    .EXAMPLE
+    ShowMenu -Menu $mainMenu
+    ShowMenu -Menu $settingsMenu -CalledBy 'Submenu' -StackOperation 'Push'
+
+    .NOTES
+    Initializes global $MenuHistory and $History ArrayLists if not present.
+    Stack operations:
+    - Auto: Automatically determines push/pop based on CalledBy context
+      - Direct/Action → None (no stack change)
+      - Submenu → Push (add to stack)
+      - Navigation → Based on navigation type
+    - Push: Explicitly adds menu to stack
+    - Pop: Removes current menu from stack
+    - None: No stack modification
+    
+    CalledBy contexts:
+    - Direct: Called directly from script
+    - Action: Called from menu item action
+    - Submenu: Called from submenu navigation
+    - Navigation: Called from back/main menu navigation
+    
+    Manages breadcrumb navigation through $Global:History.
+    Filters menu items by app mode using FilterMenuItemsByAppMode.
+    Creates banner with Create-MenuBanner including navigation breadcrumbs.
+    Handles user selection through DisplayNumericMenu.
+    Processes selection via Handle-MenuItemSelection.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true)]
@@ -239,7 +292,7 @@ function ShowMenu()
         else
         {
             Write-Verbose "[$functionName] No previous menu available, exiting application"
-            return $null
+            return $returnValues.exitString
         }
     }
     

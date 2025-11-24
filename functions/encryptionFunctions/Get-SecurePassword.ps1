@@ -17,23 +17,43 @@ function Get-SecurePassword()
     .PARAMETER MinLength
     The minimum length required for the password (default: 8).
     
+    .PARAMETER Silent
+    If specified, uses a pre-stored password from script/global scope instead of prompting.
+    Useful for automated testing scenarios.
+    
     .OUTPUTS
     Returns the password as a SecureString.
     
     .EXAMPLE
     $password = Get-SecurePassword -Message "Enter your password" -RequireConfirmation
+    
+    .EXAMPLE
+    $password = Get-SecurePassword -Message "Enter your password" -Silent
     #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
         [string]$Message,
         [switch]$RequireConfirmation,
-        [int]$MinLength = 8
+        [int]$MinLength = 8,
+        [switch]$Silent
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-Write-Log -LogFile $LogFile -Module $functionName -Message "Starting secure password prompt. RequireConfirmation: $RequireConfirmation, MinLength: $MinLength" -LogLevel "Verbose"
-    Write-Verbose "[$functionName] Prompting user for secure password"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting secure password prompt. RequireConfirmation: $RequireConfirmation, MinLength: $MinLength, Silent: $Silent" -LogLevel "Verbose"
+    Write-Verbose "[$functionName] Prompting user for secure password (Silent: $Silent)"
+    
+    # If Silent mode and we have a stored password, use it
+    if ($Silent -and ($script:UserEncryptionPassword -or $global:UserEncryptionPassword))
+    {
+        $storedPassword = if ($script:UserEncryptionPassword) { $script:UserEncryptionPassword } else { $global:UserEncryptionPassword }
+        Write-Verbose "[$functionName] Silent mode: Using stored password from session"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Silent mode: Using stored password from session" -LogLevel "Debug"
+        
+        # Convert plain text to SecureString
+        $securePassword = ConvertTo-SecureString -String $storedPassword -AsPlainText -Force
+        return $securePassword
+    }
     
     $attemptCount = 0
     do
@@ -71,7 +91,7 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Starting secure pass
                 continue
             }
             
-Write-Log -LogFile $LogFile -Module $functionName -Message "Password confirmation successful" -LogLevel "Information"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Password confirmation successful" -LogLevel "Information"
         }
         
         # Clear plain text passwords from memory

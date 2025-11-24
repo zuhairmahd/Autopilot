@@ -1,9 +1,51 @@
 function Get-ApplicationMetaData()
 {
+    <#
+    .SYNOPSIS
+    Retrieves and loads application metadata and configuration settings.
+
+    .DESCRIPTION
+    This function loads global application settings from the settings.psd1 file and attempts
+    to infer the domain-specific configuration file. When multiple domain configuration files
+    exist, it prompts the user to select one (unless Silent mode is enabled). The function
+    handles domain detection through pattern matching of .psd1 files.
+
+    .PARAMETER GlobalSettingsFile
+    Path to the global settings file. Defaults to "$pwd\settings.psd1".
+
+    .PARAMETER scriptPath
+    The script path for context (currently not actively used in function body).
+
+    .PARAMETER scriptName
+    The script name for context (currently not actively used in function body).
+
+    .PARAMETER domain
+    Optional domain name. If not specified, the function attempts to infer it from available .psd1 files.
+
+    .PARAMETER Silent
+    When specified, automatically selects the first domain configuration file if multiple are found,
+    without prompting the user.
+
+    .OUTPUTS
+    System.Management.Automation.PSObject
+    Returns metadata object with application configuration, or $null if user cancels selection.
+
+    .EXAMPLE
+    $metadata = Get-ApplicationMetaData
+    $metadata = Get-ApplicationMetaData -domain "contoso.com" -Silent
+
+    .NOTES
+    Searches for domain-specific configuration files matching pattern: [domain].psd1
+    Displays interactive menu when multiple domain configurations are found (unless Silent).
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [string]$GlobalSettingsFile = "$pwd\settings.psd1",
-        [string]$domain
+        [string]$scriptPath,
+        $scriptName,
+        [string]$domain,
+        [switch]$Silent
     )
 
     $functionName = $MyInvocation.MyCommand.Name
@@ -28,23 +70,32 @@ function Get-ApplicationMetaData()
         {
             Write-Verbose "[$functionName] Found multiple domain settings files."
             Write-Log -logFile $logFile -module $functionName -Message "Found multiple domain settings files."
-            Write-Host "Multiple domain settings files found."
-            for ($i = 0; $i -lt $domainsSettingsFiles.Count; $i++)
+            if (-not $Silent)
             {
-                $list += @( ($domainsSettingsFiles[$i].Name) -replace '.psd1', '' )
-                Write-Verbose "[$functionName] $($domainsSettingsFiles[$i].Name)"
-            }
-            $result = DisplayNumericMenu -choices $list -banner "Please choose a domain" -Prompt "Choose the correct number and press enter" -RequireEnter
-            Write-Verbose "[$functionName] User selected domain settings file: $($domainSettingsFile.Name)"
-            if ($result -eq 0)
-            {
-                Write-Verbose "[$functionName] User cancelled the selection."
-                Write-Log -logFile $logFile -module $functionName -Message "User cancelled the selection."
-                return $null
+                Write-Host "Multiple domain settings files found."
+                for ($i = 0; $i -lt $domainsSettingsFiles.Count; $i++)
+                {
+                    $list += @( ($domainsSettingsFiles[$i].Name) -replace '.psd1', '' )
+                    Write-Verbose "[$functionName] $($domainsSettingsFiles[$i].Name)"
+                }
+                $result = DisplayNumericMenu -choices $list -banner "Please choose a domain" -Prompt "Choose the correct number and press enter" -RequireEnter
+                Write-Verbose "[$functionName] User selected domain settings file: $($domainSettingsFile.Name)"
+                if ($result -eq 0)
+                {
+                    Write-Verbose "[$functionName] User cancelled the selection."
+                    Write-Log -logFile $logFile -module $functionName -Message "User cancelled the selection."
+                    return $null
+                }
+                else
+                {
+                    $domainSettingsFile = "$result.psd1"
+                }
             }
             else
             {
-                $domainSettingsFile = "$result.psd1"
+                Write-Verbose "[$functionName] Silent mode enabled. Choosing the first found domain."
+                Write-Log -logFile $logFile -module $functionName -Message "Silent mode enabled. Choosing the first found domain."  
+                $domainSettingsFile = $domainsSettingsFiles | Select-Object -First 1    
             }
         }
         else 
@@ -81,7 +132,7 @@ function Get-ApplicationMetaData()
         Write-Log -logFile $logFile -module $functionName -Message "Loading global settings from: $GlobalSettingsFile"
         try
         {
-            $globalSettings = Import-PowerShellDataFile -Path $GlobalSettingsFile
+            $globalSettings = Import-PowerShellDataFile -Path $GlobalSettingsFile -ErrorAction SilentlyContinue
             Write-Verbose "[$functionName] Successfully loaded global settings."
             Write-Log -logFile $logFile -module $functionName -Message "Successfully loaded global settings."
         }
@@ -96,7 +147,55 @@ function Get-ApplicationMetaData()
         Write-Verbose "[$functionName] No global settings file specified."
         Write-Log -logFile $logFile -module $functionName -Message "No global settings file specified."
     }
-    if (-not $globalSettings -and -not $domainSettings)
+    
+    #Get the version.  Check if the script name exists
+    if ($scriptName -and $scriptName.endswith('.ps1'))
+    {
+        $scriptName = $scriptName -replace '\.ps1$', '.exe'
+    }
+    Write-Verbose "[$functionName] Retrieving file version for script: $scriptName"
+    Write-Log -logFile $logFile -module $functionName -Message "Retrieving file version for script: $scriptName"
+    if ($scriptName -and (Test-Path $scriptName))
+    {
+        Write-Verbose "[$functionName] Executable file exists: $scriptName. Getting version."
+        Write-Log -logFile $logFile -module $functionName -Message "Script file exists: $scriptName. Getting version."
+        $fileVersionInfo = Get-FileVersion -executableFileName $scriptName
+    }    
+    if ($null -eq $fileVersionInfo)
+    {
+        Write-Verbose "[$functionName] Could not retrieve version information for script: $scriptName.  Let us check lastrun.json"
+        Write-Log -logFile $logFile -module $functionName -Message "Could not retrieve version information for script: $scriptName" -logLevel 'Error'
+        if (Test-Path "$scriptPath\lastrun.json")
+        {
+            Write-Verbose "[$functionName] lastrun.json found. Attempting to read version from it."
+            Write-Log -logFile $logFile -module $functionName -Message "lastrun.json found. Attempting to read version from it."
+            try
+            {
+                $lastrunData = Get-Content "$scriptPath\lastrun.json" | ConvertFrom-Json
+                if ($lastrunData.version)
+                {
+                    $fileVersionInfo = @{
+                        version     = $lastrunData.version
+                        companyName = $null
+                    }
+                    Write-Verbose "[$functionName] Successfully retrieved version information from lastrun.json."
+                    Write-Log -logFile $logFile -module $functionName -Message "Successfully retrieved version information from lastrun.json."
+                }
+                else
+                {
+                    Write-Verbose "[$functionName] No version information found in lastrun.json."
+                    Write-Log -logFile $logFile -module $functionName -Message "No version information found in lastrun.json." -logLevel 'Error'
+                }
+            }
+            catch
+            {
+                Write-Verbose "[$functionName] Error reading lastrun.json: $($_.Exception.Message)"
+                Write-Log -logFile $logFile -module $functionName -Message "Error reading lastrun.json: $($_.Exception.Message)" -logLevel 'Error'
+            }
+        }                           
+    }
+    
+    if (-not $globalSettings -and -not $domainSettings -and -not $fileVersionInfo)
     {
         Write-Verbose "[$functionName] No settings files could be loaded. Cannot retrieve application metadata."
         Write-Log -logFile $logFile -module $functionName -Message "No settings files could be loaded. Cannot retrieve application metadata." -logLevel "Error"
@@ -112,21 +211,29 @@ function Get-ApplicationMetaData()
         {
             $globalSettings.companyName 
         }
+        elseif ($fileVersionInfo.companyName)
+        {
+            $fileVersionInfo.companyName
+        }
         else
         {
-            $null 
+            'Zuhair Mahmoud'
         }
-        version     = if ($domainSettings.version)
+        version     = if ($fileVersionInfo.version)
         {
-            $domainSettings.version 
+            [version]$fileVersionInfo.version
+        }
+        elseif ($domainSettings.version)
+        {
+            [version]$domainSettings.version 
         }
         elseif ($globalSettings.version)
         {
-            $globalSettings.version 
+            [version]$globalSettings.version 
         }
         else
         {
-            $null 
+            [version]"1.0.0.0"
         }
         release     = if ($domainSettings.release)
         {
@@ -140,9 +247,11 @@ function Get-ApplicationMetaData()
         {
             $null 
         }
+        domain      = if ($domainSettings.domain)
+        {
+            $domainSettings.domain 
+        }
     }
-    Write-Verbose "[$functionName] Application metadata for domain '$($domainSettings.domain)' retrieved successfully."
-    Write-Log -logFile $logFile -module $functionName -Message "Application metadata for domain '$($domainSettings.domain)' retrieved successfully."
     #print verbose all the values that are not null.
     foreach ($key in $appMetaData.Keys)
     {

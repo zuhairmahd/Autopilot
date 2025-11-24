@@ -85,6 +85,33 @@
 .PARAMETER LogLevel
     Logging level for the application. Valid values: 'Error', 'Warning', 'Information', 'Verbose', 'Debug'
 
+.PARAMETER testMode
+    Enable test mode to skip interactive prompts and menu display. Used primarily for automated testing.
+
+.PARAMETER testModeMetadata
+    Test mode: Enable metadata initialization phase (default: true). Only effective with -testMode.
+
+.PARAMETER testModeCleanup
+    Test mode: Enable temporary file cleanup phase (default: true). Only effective with -testMode.
+
+.PARAMETER testModeMigration
+    Test mode: Enable settings migration check phase (default: true). Only effective with -testMode.
+
+.PARAMETER testModeConfig
+    Test mode: Enable configuration loading phase (default: true). Only effective with -testMode.
+
+.PARAMETER testModeAuth
+    Test mode: Enable authentication phase (default: false). Only effective with -testMode.
+
+.PARAMETER testModeLegacyMigration
+    Test mode: Enable legacy migration phase (default: false). Only effective with -testMode.
+
+.PARAMETER testModeExitAfter
+    Test mode: Exit after initialization phases complete (default: true). Only effective with -testMode.
+
+.PARAMETER TestPassword
+    Test password for encryption operations during test mode. Only works with -testMode.
+
 .EXAMPLE
     .\main.ps1
     Run the application with default settings and display the main menu.
@@ -116,6 +143,10 @@
 .EXAMPLE
     .\main.ps1 -ForceNewToken -CacheType memory
     Force a new access token and store it in memory only (not on disk).
+
+.EXAMPLE
+    .\main.ps1 -testMode -testModeMetadata -testModeExitAfter
+    Run in test mode, only testing metadata initialization phase then exit.
 
 .LINK
     Project Repository: https://github.com/zuhairmahd/autopilot
@@ -154,11 +185,23 @@ param(
     [int]$timeInSeconds,
     [String] $GroupTag,
     [switch]$showLicenseBanner,
+    [switch]$HideEmptyMenus,
     [switch]$showAuth,
+    [switch]$clearCache,                    
     [switch]$showVersion,
     [switch]$showSettings,
     [switch]$OverwriteLogs,
     [switch]$SecureString,
+    [bool]$autoUpdate,
+    [switch]$testMode,
+    [switch]$testModeMetadata,
+    [switch]$testModeCleanup,
+    [switch]$testModeMigration,
+    [switch]$testModeConfig,
+    [switch]$testModeAuth,
+    [switch]$testModeLegacyMigration,
+    [switch]$testModeExitAfter,
+    [string]$TestPassword,
     [switch]$ResetAuth,
     [switch]$ForceNewToken,
     [parameter(parameterSetName = 'delegated')]
@@ -174,7 +217,7 @@ param(
     [string]$AuthType,
     [ValidateSet('file', 'memory')]
     [string]$CacheType,
-    [ValidateSet('github', 'gitlab')]
+    [ValidateSet('github')]
     [string]$Repo,
     [string]$Release,
     [ValidateSet('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom')]
@@ -184,6 +227,53 @@ param(
     [string]$LogLevel = 'Information'
 )
 
+#region Initialize test mode
+# Store test password in script scope if provided (only works with testMode for security)
+if ($testMode -and $TestPassword)
+{
+    $script:UserEncryptionPassword = $TestPassword
+    $global:UserEncryptionPassword = $TestPassword
+}
+
+# Initialize testModeOptions with defaults if testMode is enabled
+function Get-TestModeOption()
+{
+    param(
+        [string]$ParameterName,
+        $DefaultValue
+    )
+    if ($PSBoundParameters.ContainsKey($ParameterName))
+    {
+        return (Get-Variable -Name $ParameterName -Scope 1).Value.IsPresent
+    }
+    else
+    {
+        return $DefaultValue
+    }
+}
+
+if ($testMode)
+{
+    # Default test mode options - only execute essential phases unless specified
+    $defaultTestModeOptions = @{
+        metadata        = Get-TestModeOption -ParameterName 'testModeMetadata' -DefaultValue $true
+        cleanup         = Get-TestModeOption -ParameterName 'testModeCleanup' -DefaultValue $true
+        migration       = Get-TestModeOption -ParameterName 'testModeMigration' -DefaultValue $true
+        config          = Get-TestModeOption -ParameterName 'testModeConfig' -DefaultValue $true
+        auth            = Get-TestModeOption -ParameterName 'testModeAuth' -DefaultValue $false
+        legacyMigration = Get-TestModeOption -ParameterName 'testModeLegacyMigration' -DefaultValue $false
+        menu            = $false  # Never show menu in test mode
+        exitAfter       = Get-TestModeOption -ParameterName 'testModeExitAfter' -DefaultValue $true
+    }
+    
+    # Store in script scope
+    $script:testModeOptions = $defaultTestModeOptions
+    
+    Write-Verbose "[$scriptName] Test mode options initialized: $($script:testModeOptions | ConvertTo-Json -Compress)"
+}
+#endregion Initialize test mode
+
+#region Initialize script variables
 $scriptName = $MyInvocation.MyCommand.Name
 if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
 {
@@ -206,6 +296,7 @@ else
         Write-Verbose "[$scriptName] Full script path: $fullScriptPath"
     }
 }
+#endregion Initialize script variables
 
 #region import functions.
 function Find-FolderPath()
@@ -302,7 +393,8 @@ else
 }
 #endregion import functions.
 
-#region Initialize script
+#region Initialize script parameters
+Write-Host "Starting script..."
 $global:maxJSONDepth = 20
 # Set global log level for all Write-Log calls
 $global:LogFile = $logFilePath
@@ -317,76 +409,126 @@ else
     Write-Verbose "[$scriptName] Starting logging to file: $LogFile"
     Write-Log -LogFile $LogFile -StartLogging
 }
-#If the scriptname is a Powershell, change the extension to an exe.
-if ($scriptName -match '\.ps1$' -and $MyInvocation.MyCommand.CommandType -eq "ExternalScript")
+
+if ($testMode)
 {
-    Write-Log -logFile $LogFile -module $scriptName -Message "Script name ends with .ps1, changing to .exe for version check." -logLevel "Verbose"
-    $scriptNameExe = $scriptName -replace '\.ps1$', '.exe'
-    if (Test-Path "$pwd\$scriptNameExe")
+    Write-Verbose "[$scriptName] Test mode enabled: Initializing application metadata in silent mode"   
+    write-log -logFile $logFile -module $scriptName -message "Test mode enabled: Initializing application metadata in silent mode"
+    
+    # Check if metadata phase should be executed
+    if ($script:testModeOptions.metadata)
     {
-        Write-Log -logFile $LogFile -module $scriptName -Message "Found executable file: $scriptNameExe" -logLevel "Verbose"
-        $version = GetFileVersion -executableFileName "$scriptPath\$scriptNameExe"
+        $appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile -scriptName $scriptName -scriptPath $ScriptPath -Silent
     }
     else
     {
-        Write-Log -logFile $LogFile -module $scriptName -Message "Executable file '$scriptNameExe' not found." -LogLevel "Warning"
+        Write-Verbose "[$scriptName] Test mode: Skipping metadata initialization (testModeOptions.metadata = false)"
+        write-log -logFile $logFile -module $scriptName -message "Test mode: Skipping metadata initialization"
+        # Set minimal metadata for scripts that need it
+        $appMetaData = @{
+            version     = New-Object System.Version 0, 0, 0, 0
+            companyName = "Test"
+            release     = "test"
+        }
     }
 }
 else
 {
-    Write-Log -logFile $LogFile -module $scriptName -Message "Script file '$scriptName' found." -LogLevel "Verbose"
-    $version = GetFileVersion -executableFileName "$scriptPath\$scriptName"
+    Write-Verbose "[$scriptName] Initializing application metadata"
+    write-log -logFile $logFile -module $scriptName -message "Initializing application metadata"
+    $appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile -scriptName $scriptName -scriptPath $ScriptPath
 }
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Version: $($version | Out-String)" -LogLevel "Information"
-$appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile
-Write-Log -LogFile $LogFile -Module $scriptName -Message "Application metadata retrieved successfully." -LogLevel "Information"
-if (-not $version.version)
+$version = if ($null -ne $appMetaData.version)
 {
-    Write-Verbose "[$scriptName] Unable to get file version."
-    #see if you can find it in the metadata.
-    if ($appMetaData -and $appMetaData.version)
-    {
-        $version = $appMetaData.version
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Found version in metadata: $($version | Out-String)" -LogLevel "Verbose"
-    }
-    else
-    {
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Unable to find version information. Defaulting to 1.0.0.0." -LogLevel "Warning"
-        $version = @{
-            version     = [System.Version]::Parse('1.0.0.0')
-            companyName = 'Zuhair Mahmoud'
-            major       = 1
-            minor       = 0
-            build       = 0
-            revision    = 0
-        }
-    }
+    $appMetaData.version
 }
-if (-not ([string]::IsNullOrWhiteSpace($appMetaData.companyName)) -and $appMetaData.companyName -ne $version.companyName)
+else
 {
-    Write-Log -LogFile $LogFile -Module $scriptName -Message "Company name mismatch: $($appMetaData.companyName) vs $($version.companyName)" -LogLevel "Warning"
-    $version.companyName = $appMetaData.companyName
-    Write-Verbose "[$scriptName] Updated company name: $($version.companyName)"
+    New-Object System.Version 0, 0, 0, 0
 }
 if ($ShowVersion)
 {
     Write-Verbose "[$scriptName] Version: $version"
     Write-Host "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -ForegroundColor Green
-    Write-Host "Copyright (c) $((Get-Date).Year) $($version.companyName)" -ForegroundColor Cyan
+    Write-Host "Copyright (c) $((Get-Date).Year) $($appMetaData.companyName)" -ForegroundColor Cyan
     Write-Host "Update branch: $($appMetaData.release)" -ForegroundColor Cyan
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -LogLevel "Information"
     Write-Log -LogFile $LogFile -finishLogging
     exit 0
 }
-$oldExecutableFileName = 'main.exe.old'
-if (Test-Path $oldExecutableFileName)
+
+#run cleanup of temp files from previous runs
+if ($testMode -and -not $script:testModeOptions.cleanup)
 {
-    Write-Verbose "[$scriptName] Old backup executable file found: $oldExecutableFileName"
-    Write-Verbose "[$scriptName] removing old executable file: $oldExecutableFileName."
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Removing old executable file: $oldExecutableFileName" -LogLevel "Information"
-    Remove-Item -Path $oldExecutableFileName -Force -ErrorAction SilentlyContinue
+    Write-Verbose "[$scriptName] Test mode: Skipping temporary file cleanup (testModeOptions.cleanup = false)"
+    write-log -logFile $logFile -module $scriptName -message "Test mode: Skipping temporary file cleanup"
+    # Create minimal cleanup result
+    $filesCleaned = @{
+        AllRemoved        = $true
+        RemovedFilesCount = 0
+        FailedFilesCount  = 0
+    }
 }
-#endregion Initialize script
+else
+{
+    $filesCleaned = cleanupTempFiles
+    if ($filesCleaned.AllRemoved)
+    {
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
+    }
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
+}
+
+#Check for settings migration
+if ($testMode -and -not $script:testModeOptions.migration)
+{
+    Write-Verbose "[$scriptName] Test mode: Skipping settings migration check (testModeOptions.migration = false)"
+    write-log -logFile $logFile -module $scriptName -message "Test mode: Skipping settings migration check"
+    $migrationCheck = @{ MigrationNeeded = $false }
+}
+else
+{
+    write-log -logFile $logFile -module $scriptName -message "Checking for settings migration need." -LogLevel "Information"
+    Write-Verbose "[$scriptName] Checking for settings migration need."
+    $migrationCheck = Invoke-SettingsMigration -RemoveJsonFiles -Force
+}
+write-log -logFile $logFile -module $scriptName -message "Migration needed: $($migrationCheck.migrationNeeded), Success: $($migrationCheck.success)" -LogLevel "Information"
+if ($migrationCheck.success -and $migrationCheck.migrationNeeded)
+{
+    Write-Host "Migration completed successfully." -ForegroundColor Green
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Migration completed successfully." -LogLevel "Information"
+    Write-Verbose "[$scriptName] Legacy Autopilot profiles present: $legacyAutopilotProfilesPresent"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Migration completed successfully." -LogLevel "Information"
+}
+elseif ($migrationCheck.migrationNeeded -and -not $migrationCheck.success)
+{
+    $migrationCheck.errorMessages | ForEach-Object { Write-Host $_ -ForegroundColor Red }
+    Write-Host "Please rerun the script or contact support." -ForegroundColor Yellow
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Migration failed with errors: $($migrationCheck.errorMessages -join '; ')" -LogLevel "Error"
+    Write-Log -LogFile $LogFile -FinishLogging
+    exit 1
+}
+else
+{
+    Write-Verbose "[$scriptName] No migration needed."
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "No migration needed." -LogLevel "Information" 
+}
+
+#clear cache if requested
+if ($clearCache)
+{
+    $clearedCache = Invoke-CacheManagement -Action Clear -ShowDetails
+    if ($clearedCache.Action -eq 'Clear' -and $clearedCache.CachesCleared -ge 0)
+    {
+        Write-Host "Cache cleared." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "No cache files to clear." -ForegroundColor Yellow                           
+    }
+}
+#endregion  Initialize script parameters
 
 #region Process login
 Write-Verbose "[$scriptName] Checking configuration file: $configFile"
@@ -397,15 +539,35 @@ if (-not (Test-Path $secretsDir))
     Write-Verbose "[$scriptName] Creating secrets directory: $secretsDir"
     New-Item -Path $secretsDir -ItemType Directory -Force | Out-Null
 }
-
 # Initialize variables for encryption handling
 $configContent = $null
 $script:maxRetries = 6
-
-if (Test-Path $configFile)
+# Skip config loading entirely if testMode and config flag is false
+if ($testMode -and -not $script:testModeOptions.config)
 {
-    # Initialize configuration session
-    $sessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -PasswordPrompt "Enter your password"
+    Write-Verbose "[$scriptName] Test mode: Skipping configuration loading (testModeOptions.config = false)"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode: Skipping configuration loading" -LogLevel "Information"
+    # Set minimal test values
+    $domain = "test.contoso.com"
+    $appId = "00000000-0000-0000-0000-000000000000"
+    $tenantId = "00000000-0000-0000-0000-000000000000"
+    $name = "Test Application"
+}
+# In test mode without a test password and config file exists, skip config loading
+elseif ($testMode -and -not $TestPassword -and (Test-Path $configFile))
+{
+    Write-Verbose "[$scriptName] Test mode enabled without test password, skipping encrypted config file loading"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode enabled without test password, skipping encrypted config file loading" -LogLevel "Information"
+    # Set dummy values for required variables
+    $domain = "test.local"
+    $appId = "test-app-id"
+    $tenantId = "test-tenant-id"
+    $name = "Test Configuration"
+}
+elseif (Test-Path $configFile)
+{
+    # Initialize configuration session (use Silent mode if testMode is active)
+    $sessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -PasswordPrompt "Enter your password" -Silent:$testMode
     
     if (-not $sessionResult.Success)
     {
@@ -422,43 +584,6 @@ if (Test-Path $configFile)
     $tenantId = $sessionResult.TenantId
     $name = $sessionResult.Name
     
-    # Check if password change is required
-    # Create empty defaults for init file - structure will be created by Get-ConfigurationData if needed
-    $initDefaults = @{}
-    $initFileContent = Get-ConfigurationData -ConfigurationPath $InitFile -DefaultValues $initDefaults
-    if ($initFileContent -and $initFileContent.auth -and $initFileContent.auth.changePWOnNextStart -eq $true)
-    {
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change required (changePWOnNextStart=true)" -LogLevel "Information"
-        
-        # Invoke password change process
-        $passwordChangeResult = Invoke-PasswordChangeProcess -ConfigFile $configFile -ConfigContent $configContent -SettingsFile $InitFile
-        
-        if ($passwordChangeResult)
-        {
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change completed successfully" -LogLevel "Information"
-            
-            # Reload the configuration with new password
-            Write-Host "Reloading configuration with new password..." -ForegroundColor Cyan
-            $reloadResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword
-            if ($reloadResult.Success)
-            {
-                # Update configContent for this session
-                $configContent = $reloadResult.ConfigContent
-            }
-            else
-            {
-                Write-Host "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -ForegroundColor Red
-                Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -LogLevel "Error"
-                exit 1
-            }
-        }
-        else
-        {
-            Write-Host "Password change failed. Continuing with current password." -ForegroundColor Yellow
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change failed. Continuing with current password." -LogLevel "Warning"
-        }
-    }
-    
     if (-not ($sessionResult.encrypted))
     {
         Write-Host "You need to set a new password to use this application."
@@ -471,6 +596,7 @@ if (Test-Path $configFile)
         {
             Write-Host "Failed to set password. Exiting script." -ForegroundColor Red
             Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to set password after initialization" -LogLevel "Error"
+            write-log -logFile $logFile -finishLogging
             exit 1
         }
     }
@@ -484,112 +610,127 @@ if (Test-Path $configFile)
 }
 else
 {
-    # Configuration file not found - launch first run wizard
-    Write-Host "Configuration file $configFile not found." -ForegroundColor Yellow
-    Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file not found. Starting first run wizard" -LogLevel "Verbose"
-    
-    Write-Host "Starting first run wizard to set up your configuration..." -ForegroundColor Green
-    
-    # Launch the first run wizard
-    $wizardResult = Start-FirstRunWizard -ConfigFile $configFile -SettingsFile $InitFile -StringsFile "$PWD\strings.psd1"
-    
+    # Configuration file not found
+    if ($testMode)
+    {
+        # In test mode, skip first run wizard and create minimal configuration
+        Write-Verbose "[$scriptName] Test mode enabled: Skipping first run wizard and using default test configuration"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode: Skipping first run wizard" -LogLevel "Information"
+        
+        # Set default test values
+        $domain = "test.contoso.com"
+        $appId = "00000000-0000-0000-0000-000000000000"
+        $tenantId = "00000000-0000-0000-0000-000000000000"
+        $name = "Test Application"
+        
+        # Skip config file loading in test mode
+        Write-Verbose "[$scriptName] Test mode: Using default test configuration without config file"
+        $wizardResult = $true
+    }
+    else
+    {
+        # Configuration file not found - launch first run wizard
+        Write-Host "Configuration file $configFile not found." -ForegroundColor Yellow
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file not found. Starting first run wizard" -LogLevel "Verbose"
+        
+        Write-Host "Starting first run wizard to set up your configuration..." -ForegroundColor Green
+        
+        # Launch the first run wizard (pass Silent switch if testMode is active)
+        $wizardResult = Start-FirstRunWizard -ConfigFile $configFile -SettingsFile $InitFile -StringsFile "$PWD\strings.psd1" -Silent:$testMode
+    }
     if ($wizardResult)
     {
-        Write-Host "First run wizard completed successfully." -ForegroundColor Green
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "First run wizard completed successfully" -LogLevel "Information"
-        
-        # Now try to load the newly created configuration
-        Write-Host "Loading the newly created configuration..." -ForegroundColor Cyan
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Loading newly created configuration file" -LogLevel "Information"
-        
-        # Re-run the configuration loading logic
-        if (Test-Path $configFile)
+        if (-not $testMode)
         {
-            # Initialize configuration session after wizard
-            $sessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword -PasswordPrompt "Enter your password"
+            Write-Host "First run wizard completed successfully." -ForegroundColor Green
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "First run wizard completed successfully" -LogLevel "Information"
             
-            if (-not $sessionResult.Success)
+            # Now try to load the newly created configuration
+            Write-Host "Loading the newly created configuration..." -ForegroundColor Cyan
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Loading newly created configuration file" -LogLevel "Information"
+            
+            # Re-run the configuration loading logic
+            if (Test-Path $configFile)
             {
-                Write-Host "Configuration file exists but cannot be read: $($sessionResult.ErrorMessage)" -ForegroundColor Red
-                Write-Host "Please check file permissions and try again." -ForegroundColor Red
-                Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file cannot be read: $($sessionResult.ErrorMessage)" -LogLevel "Warning"
+                # Initialize configuration session after wizard (use Silent mode if testMode is active)
+                $sessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword -PasswordPrompt "Enter your password" -Silent:$testMode
+                
+                if (-not $sessionResult.Success)
+                {
+                    Write-Host "Configuration file exists but cannot be read: $($sessionResult.ErrorMessage)" -ForegroundColor Red
+                    Write-Host "Please check file permissions and try again." -ForegroundColor Red
+                    Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file cannot be read: $($sessionResult.ErrorMessage)" -LogLevel "Warning"
+                    write-log -logFile $logFile -finishLogging
+                    exit 1
+                }
+                
+                $configContent = $sessionResult.ConfigContent
+                $domain = $sessionResult.Domain
+                $appId = $sessionResult.AppId
+                $tenantId = $sessionResult.TenantId
+                $name = $sessionResult.Name
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully for domain: $domain" -LogLevel "Information"
+                # Clear the config content from memory
+                $configContent = $null
+            }
+            else
+            {
+                Write-Host "Configuration file was not created successfully." -ForegroundColor Red
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file was not created by wizard" -LogLevel "Error"
+                write-log -logFile $logFile -finishLogging
                 exit 1
             }
-            
-            $configContent = $sessionResult.ConfigContent
-            $domain = $sessionResult.Domain
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully for domain: $domain" -LogLevel "Information"
-            
-            # Check if password change is required (wizard path)
-            if (Test-Path $InitFile)
-            {
-                try 
-                {
-                    $initDefaults = @{}
-                    $initFileContent = Get-ConfigurationData -ConfigurationPath $InitFile -DefaultValues $initDefaults
-                    if ($initFileContent.auth -and $initFileContent.auth.changePWOnNextStart -eq $true)
-                    {
-                        Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change required after wizard (changePWOnNextStart=true)" -LogLevel "Information"
-                        
-                        # Invoke password change process
-                        $passwordChangeResult = Invoke-PasswordChangeProcess -ConfigFile $configFile -ConfigContent $configContent -SettingsFile $InitFile
-                        
-                        if ($passwordChangeResult)
-                        {
-                            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change completed successfully after wizard" -LogLevel "Information"
-                            
-                            # Reload the configuration with new password
-                            Write-Host "Reloading configuration with new password..." -ForegroundColor Cyan
-                            $reloadResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword
-                            
-                            if ($reloadResult.Success)
-                            {
-                                # Update configContent for this session
-                                $configContent = $reloadResult.ConfigContent
-                            }
-                            else
-                            {
-                                Write-Host "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -ForegroundColor Red
-                                Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -LogLevel "Error"
-                                exit 1
-                            }
-                        }
-                        else
-                        {
-                            Write-Host "Password change failed. Continuing with current password." -ForegroundColor Yellow
-                            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change failed after wizard. Continuing with current password." -LogLevel "Warning"
-                        }
-                    }
-                }
-                catch
-                {
-                    Write-Warning "Failed to check password change requirement after wizard: $($_.Exception.Message)"
-                    Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to check password change requirement after wizard: $($_.Exception.Message)" -LogLevel "Warning"
-                }
-            }
-            
-            # Clear the config content from memory
-            $configContent = $null
         }
         else
         {
-            Write-Host "Configuration file was not created successfully." -ForegroundColor Red
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file was not created by wizard" -LogLevel "Error"
+            Write-Verbose "[$scriptName] Test mode: Skipping configuration file loading"
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode: Using default test configuration" -LogLevel "Information"
+        }
+        
+        #reload settings since they likely have changed.
+        Write-Verbose "[$scriptName] Initializing application configuration since the earlier initialization attempt failed or did not take place."
+        write-log -logFile $logFile -module $scriptName -message "Initializing application configuration since earlier attempt failed or did not take place."
+        $configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domain -BoundParameters $PSBoundParameters
+        if (-not $configResult.Success)
+        {
+            Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration initialization failed: $($configResult.ErrorMessage)" -LogLevel "Error"
+            write-log -logFile $logFile -finishLogging
             exit 1
         }
+        # Extract configuration results
+        $auth = $configResult.Auth
+        $globalSettings = $configResult.GlobalSettings
+        $localSettings = $configResult.LocalSettings
+        $requiredScopes = $configResult.RequiredScopes
+        $repoInfo = $configResult.RepoInfo
+        $global:cacheSettings = $configResult.CacheSettings            
+        # Merge global and local settings into a single settings object
+        Write-Verbose "[$scriptName] Merging global and local settings"
+        $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+        Write-Verbose "[$scriptName] Settings merged successfully. Final settings count: $($settings.Count)"
+        Write-Verbose "[$scriptName] Configuration initialization completed successfully"
+        Write-Verbose "[$scriptName] Auth settings count: $($auth.Count)"
+        Write-Verbose "[$scriptName] Global settings count: $($globalSettings.Count)"
+        Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
+        Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
+        Write-Verbose "[$scriptName] Menus count: $($menus.Count)"
+        Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
     }
     else
     {
         Write-Host "First run wizard failed or was cancelled." -ForegroundColor Red
         Write-Log -LogFile $LogFile -Module $scriptName -Message "First run wizard failed or was cancelled" -LogLevel "Error"
-        Write-Host "Please create a configuration file manually or run the script with the -Reconfigure parameter." -ForegroundColor Yellow
+        Write-Host "Please create a configuration file manually." -ForegroundColor Yellow
+        write-log -logFile $logFile -finishLogging
         exit 1
     }
 }
 #endregion Process login
 
-#region Initialize application configuration
-Write-Verbose "[$scriptName] Initializing application configuration"
+#region initialize script objects
+Write-Host "Loading configuration..."
 # Use domain if available, otherwise default to contoso.com
 $domainForDefaults = if ($domain)
 {
@@ -599,70 +740,148 @@ else
 {
     "contoso.com"
 }
-$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -PSBoundParameters $PSBoundParameters
+
+$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -BoundParameters $PSBoundParameters
 if (-not $configResult.Success)
 {
     Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration initialization failed: $($configResult.ErrorMessage)" -LogLevel "Error"
+    write-log -logFile $logFile -finishLogging
     exit 1
 }
-
 # Extract configuration results
 $auth = $configResult.Auth
 $globalSettings = $configResult.GlobalSettings
 $localSettings = $configResult.LocalSettings
 $requiredScopes = $configResult.RequiredScopes
-
-# Set auth as a script variable so it can be accessed by functions
-$script:Auth = $auth
-
+$repoInfo = $configResult.RepoInfo
+$global:cacheSettings = $configResult.CacheSettings            
+        
 # Merge global and local settings into a single settings object
 Write-Verbose "[$scriptName] Merging global and local settings"
 $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+
+if ($settings.domain -ne $domain)
+{
+    Write-Verbose "[$scriptName] Updating settings domain from $($settings.domain) to $domain"
+    write-log -logFile $logFile -module $scriptName -message "Updating settings domain from $($settings.domain) to $domain"     
+    Write-Warning "[$scriptName] Settings domain updated from $($settings.domain) to $domain"
+    $settings.domain = $domain
+}
 Write-Verbose "[$scriptName] Settings merged successfully. Final settings count: $($settings.Count)"
 Write-Verbose "[$scriptName] Configuration initialization completed successfully"
 Write-Verbose "[$scriptName] Auth settings count: $($auth.Count)"
 Write-Verbose "[$scriptName] Global settings count: $($globalSettings.Count)"
 Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
 Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
-Write-Verbose "[$scriptName] Menus count: $($menus.Count)"
+Write-Verbose "[$scriptName] Menus count: $($configResult.menu.Count)"
 Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
-#endregion  Initialize application configuration
+if (-not $version.version)
+{
+    Write-Verbose "[$scriptName] Unable to get file version."
+    #see if you can find it in the metadata.
+    if ($appMetaData -and $appMetaData.version)
+    {
+        $version = $appMetaData.version
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Found version in metadata: $($version | Out-String)" -LogLevel "Verbose"
+        Write-Verbose "[$scriptName] Found version in metadata: $($version | Out-String)"
+    }
+    else
+    {
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Unable to find version information. Defaulting to 1.0.0.0." -LogLevel "Warning"
+        Write-Verbose "[$scriptName] Defaulting version to 1.0.0.0"
+        $version = @{
+            version     = [System.Version]::Parse('1.0.0.0')
+            companyName = 'Zuhair Mahmoud'
+            major       = 1
+            minor       = 0
+            build       = 0
+            revision    = 0
+        }
+    }
+}
+#endregion Initialize script objects
+
+#region Check for password change requirement
+if ($testMode)
+{
+    Write-Verbose "[$scriptName] Test mode enabled, skipping password change check."
+    write-log -logFile $logFile -Module $scriptName -Message "Test mode enabled, skipping password change check." -LogLevel "Information"
+}
+else 
+{
+    if ((Test-Path $configFile) -and $auth.changePWOnNextStart -eq $true)
+    {
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change required (changePWOnNextStart=true)" -LogLevel "Information"
+    
+        # Need to reload configContent for password change process
+        $tempSessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword -PasswordPrompt "Enter your password" -Silent:$testMode
+        if ($tempSessionResult.Success)
+        {
+            $configContent = $tempSessionResult.ConfigContent
+        
+            # Invoke password change process
+            $passwordChangeResult = Invoke-PasswordChangeProcess -ConfigFile $configFile -ConfigContent $configContent -SettingsFile $InitFile
+            if ($passwordChangeResult)
+            {
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change completed successfully" -LogLevel "Information"
+                Write-Host "Password changed successfully. Please restart the application and log in with your new password." -ForegroundColor Green
+                Write-Host "To do so, type 'main' and press enter when you see the command prompt." -ForegroundColor Green
+                Write-Log -LogFile $LogFile -FinishLogging
+                exit 0
+            }
+            else
+            {
+                Write-Host "Password change failed. Continuing with current password." -ForegroundColor Yellow
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change failed. Continuing with current password." -LogLevel "Warning"
+            }
+        
+            # Clear the config content from memory
+            $configContent = $null
+        }
+        else
+        {
+            Write-Host "Failed to reload configuration for password change: $($tempSessionResult.ErrorMessage)" -ForegroundColor Red
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to reload configuration for password change: $($tempSessionResult.ErrorMessage)" -LogLevel "Error"
+        }
+    }
+}
+#endregion Check for password change requirement
 
 #region Define variables
 #define repo parameters
 $defaultBranch = 'master'
-$baseSourceURL = if ($settings.baseSourceURL)
+$baseSourceURL = if ($repoInfo.baseSourceURL)
 {
-    $settings.baseSourceURL
+    $repoInfo.baseSourceURL
 }
 else
 {
     'https://raw.githubusercontent.com'
 }
 Write-Log -logFile $LogFile -Module $scriptName -Message "Base source URL: $baseSourceURL" -LogLevel "Information"
-$baseURL = if ($settings.baseURL)
-{
-    $settings.baseURL
+$baseURL = if ($repoInfo.baseURL)
+{       
+    $repoInfo.baseURL
 }
 else
 {
     "https://www.github.com"
 }
 Write-Log -logFile $LogFile -Module $scriptName -Message "Base URL: $baseURL" -LogLevel "Information"
-$repoPath = if ($settings.repoPath)
+$repoPath = if ($repoInfo.repoPath)
 {
-    $settings.repoPath
+    $repoInfo.repoPath
 }
 else
 {
     'zuhairmahd'
 }
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Repository path: $repoPath" -LogLevel "Information"
-$repoName = if ($settings.repoName)
+$repoName = if ($repoInfo.repoName)
 {
-    $settings.repoName
+    $repoInfo.repoName
 }
 else
 {
@@ -689,7 +908,9 @@ else
 }
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/lastrun.json"
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
-$updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL
+$updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL -executableFileName "$scriptPath\$scriptName" 
+Write-Verbose "[$scriptName] Update available: $($updateAvailable.updateAvailable), Remote version: $($updateAvailable.version | Out-String)"
+write-log -logFile $LogFile -Module $scriptName -Message "Update available: $($updateAvailable.updateAvailable), Remote version: $($updateAvailable.version | Out-String)" -LogLevel "Information"
 $groupsToInclude = $settings.groupsToInclude
 Write-Verbose "[$scriptName] Groups to include: $($groupsToInclude | Out-String)"
 $groupsToExclude = $settings.groupsToExclude
@@ -708,15 +929,16 @@ $getTokenParams = BuildAuthSplatTable -auth $auth
 foreach ($key in $getTokenParams.Keys)
 {
     Write-Verbose "[$scriptName] $($key): $($getTokenParams[$key])"
-    if ($showAuth)
-    {
-        Write-Host "$($key): $($getTokenParams[$key])" -ForegroundColor Cyan
-    }
+}
+if ($showAuth)
+{
+    Write-Host "$($key): $($getTokenParams[$key])" -ForegroundColor Cyan
+    $global:previousMenu = New-Object System.Collections.Hashtable
+    # Device enrollment state cache content has been migrated to the unified cache system.
 }
 Write-Verbose "[$scriptName] Using authentication parameters: $($getTokenParams | ConvertTo-Json -Depth $maxJSONDepth)"
 Write-Verbose "[$scriptName] Loading strings from: $stringsFile"
-$stringsDefaults = Get-ApplicationDefaults -DefaultType "Strings"
-$loadedStrings = Get-ConfigurationData -ConfigurationPath $stringsFile -DefaultValues $stringsDefaults
+$loadedStrings = $configResult.strings
 $global:returnValues = $loadedStrings.returnValues
 $deviceStates = $loadedStrings.deviceStates
 $deviceActions = $loadedStrings.deviceActions
@@ -725,45 +947,11 @@ Write-Verbose "[$scriptName] Loaded $($returnValues.Count) return values, $($dev
 $Global:History = [System.Collections.ArrayList]::new()
 $Global:MenuHistory = [System.Collections.ArrayList]::new()
 $global:previousMenu = New-Object System.Collections.Hashtable
-# Device enrollment state cache content
-$script:DeviceEnrollmentCache = @{}
 #endregion Define variables
-
-#region logging
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Received the following parameters: $($PSBoundParameters | ConvertTo-Json)" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "The current parameter set is $($PSCmdlet.ParameterSetName)" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Configuration file: $configFile" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Initialization file: $InitFile" -LogLevel "Information"
-Write-Verbose "Log filename: $LogFile"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Log filename: $LogFile" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Show settings: $showSettings" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Show auth: $showAuth" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Log level: $LogLevel" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Group tag: $settings.GroupTag" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Assigned user: $AssignedUser" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Reconfigure: $Reconfigure" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Repository: $settings.Repo" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Release: $settings.Release" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Domain: $domain" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Max wait time: $settings.maxWaitTime" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Time in seconds: $settings.timeInSeconds" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Auth type: $auth.AuthType" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Cache type: $auth.CacheType" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Force new token: $auth.ForceNewToken" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Force new refresh token: $auth.ForceNewRefreshToken" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "No save refresh token: $auth.NoSaveRefreshToken" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "delegated: $auth.delegated" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Scope: $auth.Scope" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Secure string: $auth.SecureString" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "App mode: $settings.appMode" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Functions folder: $functionsFolder" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Base source URL: $baseSourceURL" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Remote version URL: $remoteVersionURL" -LogLevel "Information"
-#endregion logging
 
 #region banner
 Write-Host "Welcome to the Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -ForegroundColor Green
-Write-Host "Copyright (c) $((Get-Date).Year) $($version.companyName)" -ForegroundColor Cyan
+Write-Host "Copyright (c) $((Get-Date).Year) $($appMetaData.companyName)" -ForegroundColor Cyan
 if ($settings.showLicenseBanner)
 {
     Write-Host "==========================================================`n" -ForegroundColor White
@@ -779,30 +967,19 @@ if ($settings.showLicenseBanner)
     Write-Host "Use at your own risk. The author is not responsible for any damage or data loss." -ForegroundColor Red
     Write-Host "==========================================================`n" -ForegroundColor White
 }
-if ($updateAvailable.success -eq $true -and $updateAvailable.version -gt $version.version)
+if ($updateAvailable.success -and $updateAvailable.updateAvailable)
 {
     Write-Verbose "[$scriptName] An update is available: $($updateAvailable.version.major).$($updateAvailable.version.minor).$($updateAvailable.version.build) ($($updateAvailable.version.revision))"
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "An update is available: $($updateAvailable.version.major).$($updateAvailable.version.minor).$($updateAvailable.version.build) (revision $($updateAvailable.version.revision))"
     Write-Host "==========================================================`n" -ForegroundColor Yellow
     Write-Host "An update is available to version $($updateAvailable.version.major).$($updateAvailable.version.minor).$($updateAvailable.version.build) (revision $($updateAvailable.version.revision))" -ForegroundColor Yellow
-    Write-Host "Release date: $($updateAvailable.ReleaseDate)" -ForegroundColor Yellow
+    Write-Host "Release date: $($updateAvailable.ReleaseDate | FormatDateWithTimeZone)" -ForegroundColor Yellow
     if ($settings.autoUpdate)
     {
         Write-Host "Automatic updates are enabled." -ForegroundColor Green
         Write-Host "The script will now attempt to update itself." -ForegroundColor Yellow
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Automatic updates are enabled. The script will now attempt to update itself." -LogLevel "Information"
-        if ($settings.updateLocalSettings)
-        {
-            Write-Verbose "[$scriptName] Including local settings file ($($settings.domain)) in update check."
-            Write-Log -logFile $logFile -Module "$scriptName" -Message "Including local settings file ($($settings.domain)) in update check." -LogLevel "Information"
-            $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -SupportingFiles @($menuFile, $stringsFile, $settings.domain) -noConfirmation
-        }
-        else
-        {
-            Write-Verbose "[$scriptName] Not including local settings file ($($settings.domain)) in update check."
-            Write-Log -logFile $logFile -Module "$scriptName" -Message "Not including local settings file ($($settings.domain)) in update check." -LogLevel "Information"
-            $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -SupportingFiles @($menuFile, $stringsFile) -noConfirmation
-        }
+        $updateResult = Get-Updates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -filesToUpdate @($stringsFile, $menuFile) -noConfirmation
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Update result: $updateResult" -LogLevel "Information"
         switch ($updateResult)
         {
@@ -859,13 +1036,31 @@ if ($ResetAuth)
         exit 1
     }
 }
+Write-Host "Retrieving access token..."
 Write-Verbose "[$scriptName] Initialization block started."
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Initialization block started" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module $scriptName -Message "Force new token: $($auth.ForceNewToken )" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module $scriptName -Message "Force new refresh token: $($auth.ForceNewRefreshToken )" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module $scriptName -Message "No save refresh token: $($auth.NoSaveRefreshToken )" -LogLevel "Information"
-Write-Log -logFile $LogFile -Module $scriptName -Message "Getting access token..." -LogLevel "Information"
-$accessToken = GetGraphAccessToken @getTokenParams
+
+if ($testMode -and -not $script:testModeOptions.auth)
+{
+    Write-Verbose "[$scriptName] Test mode: Skipping Graph API token retrieval (testModeOptions.auth = false)"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode: Skipping Graph API authentication" -LogLevel "Information"
+    $accessToken = "test-mode-fake-token"
+}
+elseif ($testMode)
+{
+    Write-Verbose "[$scriptName] Test mode: Skipping Graph API token retrieval but auth testing enabled"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode: Skipping Graph API authentication" -LogLevel "Information"
+    $accessToken = "test-mode-fake-token"
+}
+else
+{
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Force new token: $($auth.ForceNewToken )" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Force new refresh token: $($auth.ForceNewRefreshToken )" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "No save refresh token: $($auth.NoSaveRefreshToken )" -LogLevel "Information"
+    Write-Log -logFile $LogFile -Module $scriptName -Message "Getting access token..." -LogLevel "Information"
+
+    $accessToken = GetGraphAccessToken @getTokenParams
+}
 # Clear the cached user password now that authentication is complete
 if ($script:UserEncryptionPassword)
 {
@@ -878,27 +1073,23 @@ if ($accessToken)
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Access token retrieved successfully." -LogLevel "Information"
     
     # Validate scope availability for the retrieved access token
-    if ($settings.validateScopes)
+    if ($settings.validateScopes -and $auth.delegated)
     {
         Write-Verbose "[$scriptName] Validating Microsoft Graph API scope availability..."
+        Write-Host "Validating Microsoft Graph API scope availability..."
         Write-Log -LogFile $LogFile -Module $scriptName -Message "Starting scope validation for retrieved access token" -LogLevel "Verbose"
         try
         {
             # Get the current requested scopes for delegated authentication
             Write-Log -logFile $LogFile -Module $scriptName -Message "Getting current requested scopes for delegated authentication" -LogLevel "Information"
-            $currentRequestedScopes = @()
-            if ($auth.Delegated -eq $true)
-            {
-                $currentRequestedScopes = $requiredScopes | ForEach-Object { $_.Scope }
-                Write-Log -LogFile $LogFile -Module $scriptName -Message "Delegated authentication - using required scopes as requested scopes" -LogLevel "Information"
-            }
-        
             # Perform scope validation
             Write-Log -LogFile $LogFile -Module $scriptName -Message "Performing scope validation..." -LogLevel "Information"
-            $scopeValidation = Test-ScopeAvailability -AccessToken $accessToken -RequiredScopes $requiredScopes -AuthConfiguration $auth -RequestedScopes $currentRequestedScopes
+            $scopeValidation = Test-ScopeAvailability -AccessToken $accessToken -RequiredScopes $requiredScopes -AuthConfiguration $auth
             if ($scopeValidation.HasAllRequiredScopes)
             {
                 Write-Log -LogFile $LogFile -Module $scriptName -Message "All required Microsoft Graph scopes are available" -LogLevel "Information"
+                Write-Verbose "[$scriptName] All required Microsoft Graph scopes are available."
+                Write-Host "All required Microsoft Graph scopes are available." -ForegroundColor Green
             }
             else
             {
@@ -919,8 +1110,7 @@ if ($accessToken)
                         Write-Log -LogFile $LogFile -Module $scriptName -Message "  - $($missingScope.Scope)`n    Impact: $($missingScope.Reason)" -LogLevel "Information"
                     }
                 }
-            
-                Write-Host "`nRecommended action: $($scopeValidation.RecommendedAction)" -ForegroundColor Cyan
+                Write-Host "`nRecommended action:`n $($scopeValidation.RecommendedAction)" -ForegroundColor Cyan
                 Write-Log -LogFile $LogFile -Module $scriptName -Message "Recommended action: $($scopeValidation.RecommendedAction)" -LogLevel "Information"
                 # For delegated authentication, offer to request additional scopes
                 if ($auth.Delegated -eq $true -and -not ($auth.ForceNewToken -or $auth.ForceNewRefreshToken -or $auth.NoSaveRefreshToken))
@@ -945,7 +1135,8 @@ if ($accessToken)
                         Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to obtain additional scopes: $($scopeRequest.ErrorMessage)" -LogLevel "Warning"
                     }
                 }
-            
+                Write-Host "Press any key to continue..."
+                $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
                 Write-Host ""
                 Write-Log -LogFile $LogFile -Module $scriptName -Message "Scope validation completed with $($scopeValidation.MissingScopes.Count) missing scopes" -LogLevel "Warning"
             }
@@ -962,8 +1153,12 @@ if ($accessToken)
         Write-Host "Forced new token retrieval due to parameters." -ForegroundColor Cyan
         Write-Host "The script will now exit."
         Write-Host "You can run the script again without these parameters to use the new token."
+        Write-Verbose "[$scriptName] Exiting script due to forced new token retrieval."
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Exiting script due to forced new token retrieval." -LogLevel "Information"
+        write-log -logFile $logFile -finishLogging
         exit 0
     }
+    Write-Host "Access token retrieved successfully." -ForegroundColor Green
 }
 else
 {
@@ -997,13 +1192,140 @@ else
     else
     {
         Write-Host "Exiting script due to authentication failure." -ForegroundColor Red
+        write-log -logFile $logFile -module $scriptName -message "Exiting script due to authentication failure." -LogLevel "Error"
+        write-log -logFile $logFile -finishLogging
         exit 1
     }
+}
+if ($testMode -and -not $script:testModeOptions.legacyMigration)
+{
+    Write-Verbose "[$scriptName] Test mode: Skipping legacy configuration migration (testModeOptions.legacyMigration = false)"
+    write-log -logFile $logFile -module $scriptName -message "Test mode: Skipping legacy configuration migration" -LogLevel "Information"
+}
+elseif ($testMode)
+{
+    Write-Verbose "[$scriptName] Test mode enabled, skipping legacy configuration migration."
+    write-log -logFile $logFile -module $scriptName -message "Test mode enabled, skipping legacy configuration migration." -LogLevel "Information"
+}
+else 
+{
+    Write-Verbose "[$scriptName] Migrate legacy configuration: $($settings.migrateLegacyConfiguration)"
+    write-log -logFile $logFile -module $scriptName -message "Migrate legacy configuration: $($settings.migrateLegacyConfiguration)" -LogLevel "Information"
+    if ($settings.migrateLegacyConfiguration)
+    {
+        Write-Verbose "Starting migration of legacy configuration"
+        write-log -logFile $logFile -module $scriptName -message "Starting migration of legacy configuration." -LogLevel "Information"
+        $resolvedLegacyObjects = Resolve-MigratedLegacyObjects -accessToken $accessToken -settings $settings -domain $domain -SettingsFile $InitFile
+        write-log -logFile $logFile -module $scriptName -message "Resolved migrated legacy objects: $($resolvedLegacyObjects | Out-String)" -LogLevel "Information"
+        $newSetting = @{
+            migrateLegacyConfiguration = $settings.migrateLegacyConfiguration
+        }
+        # Check if resolution was not needed (all objects already have IDs or no objects exist)
+        if ($resolvedLegacyObjects.resolutionNeeded -eq $false)
+        {
+            Write-Verbose "[$scriptName] No legacy object resolution needed. All objects already resolved or no objects found."
+            write-log -logFile $logFile -module $scriptName -message "No legacy object resolution needed. Setting migrateLegacyConfiguration to false." -LogLevel "Information"
+            # Turn off the migration flag since no work is needed
+            $newSetting = @{
+                migrateLegacyConfiguration = $false
+            }
+        }
+        # Check if user deferred the resolution
+        elseif ($resolvedLegacyObjects.userDeferred)
+        {
+            Write-Host "Legacy object resolution has been deferred." -ForegroundColor Yellow
+            Write-Host "You will be prompted again the next time the script starts." -ForegroundColor Yellow
+            write-log -logFile $logFile -module $scriptName -message "User deferred legacy object resolution. Will prompt on next start." -LogLevel "Information"
+            # Keep migrateLegacyConfiguration as true so user is prompted next time
+            $newSetting = @{
+                migrateLegacyConfiguration = $true
+            }
+        }
+        elseif ($resolvedLegacyObjects.success)
+        {
+            Write-Host "Successfully resolved $($resolvedLegacyObjects.totalResolved) legacy objects"
+            write-log -logFile $logFile -module $scriptName -message "Successfully resolved $($resolvedLegacyObjects.totalResolved) legacy objects." -LogLevel "Information"
+            $newSetting = @{
+                migrateLegacyConfiguration = $false
+            }
+        }
+        else
+        {
+            Write-Host "Failed to resolve legacy objects." -ForegroundColor Red
+            write-log -logFile $logFile -module $scriptName -message "Failed to resolve legacy objects." -LogLevel "Error"
+            $retry = Read-Host "Would you like to be prompted to resolve them the next time the script starts? (yes/no)"
+            write-log -logFile $logFile -module $scriptName -message "User chose to be prompted to resolve legacy objects on next start: $retry" -LogLevel "Information"
+            Write-Verbose "User chose to be prompted to resolve legacy objects on next start: $retry"
+            while ($retry -notin @('yes', 'no', 'y', 'n'))
+            {
+                Write-Host "Invalid choice. Please enter 'yes' or 'no'."
+                [console]::beep()
+                $retry = Read-Host "Would you like to be prompted to resolve them the next time the script starts? (yes/no)"
+            }
+            if ($retry -in @('no', 'n'))
+            {
+                Write-Verbose "User chose not to be prompted to resolve legacy objects on next start."
+                write-log -logFile $logFile -module $scriptName -message "User chose not to be prompted to resolve legacy objects on next start." -LogLevel "Information"
+                $newSetting = @{
+                    migrateLegacyConfiguration = $false
+                }
+            }
+            else
+            {
+                Write-Host "You will be prompted to resolve them the next time the script starts."
+                write-log -logFile $logFile -module $scriptName -message "User chose to be prompted to resolve legacy objects on next start." -LogLevel "Information"
+                $newSetting = @{
+                    migrateLegacyConfiguration = $true
+                }
+            }
+        }
+        if ($newSetting.migrateLegacyConfiguration -ne $settings.migrateLegacyConfiguration)
+        {
+            $updatedSetting = Update-Setting -SettingType "Domain" -DomainName $domain -Settings $newSetting -SettingsFile $InitFile -MergeSettings
+            write-log -logFile $logFile -module $scriptName -message "Settings updated: $($updatedSetting | Out-String)" -LogLevel "Information"
+            if ($updatedSetting)
+            {
+                Write-Host "Settings updated successfully." -ForegroundColor Green
+                write-log -logFile $logFile -module $scriptName -message "Settings updated successfully." -LogLevel "Information"
+                Write-Host "`nPress any key to continue"
+                $null = $Host.UI.RawUI.ReadKey("NoEcho, IncludeKeyDown")
+            }
+            else
+            {
+                Write-Host "Failed to update settings." -ForegroundColor Red
+                write-log -logFile $logFile -module $scriptName -message "Failed to update settings." -LogLevel "Error"
+                Write-Host "`nPress any key to continue"
+                $null = $Host.UI.RawUI.ReadKey("NoEcho, IncludeKeyDown")
+            }
+        }
+        else
+        {
+            Write-Verbose "No changes made to migrateLegacyConfiguration setting."
+            write-log -logFile $logFile -module $scriptName -message "No changes made to migrateLegacyConfiguration setting." -LogLevel "Information"
+        }
+    }
+}
+
+# Early exit point for test mode when exitAfter is true
+if ($testMode -and $script:testModeOptions.exitAfter)
+{
+    Write-Verbose "[$scriptName] Test mode: Exiting after initialization phases (testModeOptions.exitAfter = true)"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode: Exiting after initialization phases complete" -LogLevel "Information"
+    Write-Host "Test mode: Initialization phases completed successfully" -ForegroundColor Green
+    
+    # Cleanup before exit
+    Clear-SecureMemory -ClearScriptVariables
+    Write-Log -LogFile $LogFile -FinishLogging
+    exit 0
 }
 #endregion initialization block with access token
 
 #region Create menus
-$menuConfig = Import-PowerShellDataFile -Path $menuFile -ErrorAction SilentlyContinue
+# Clear menu configuration cache to ensure fresh menu loading
+# Write-Verbose "[$scriptName] Clearing menu configuration cache"
+# Invoke-CacheManagement -Action ClearSpecific -CacheType Menu 
+#Now load the menu configuration            
+$menuConfig = $configResult.menu
 if ($menuConfig)
 {
     # Convert the flat menu.psd1 structure to array format for Test-MenuItemIncluded
@@ -1026,57 +1348,60 @@ $settingsMenu = NewMenu -MenuName "settingsMenu"
 $autopilotMenu = NewMenu -MenuName "autopilotMenu"
 $environmentMenu = NewMenu -MenuName "environmentMenu"
 $inclusionExclusionMenu = NewMenu -MenuName "inclusionExclusionMenu"
+$deviceReportsMenu = NewMenu -MenuName "deviceReportsMenu"
+$getGroupAssignmentsMenu = NewMenu -MenuName "getGroupAssignmentsMenu"
 #endregion Create menus
 
 #region export menu
+$exportMenu = addMenuItem -menu $exportMenu -name 'Export Device Assignment Reports' -SubMenu $deviceReportsMenu
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Autopilot Devices" -Action {
-    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'autopilot'
-    if ($exported)
+    $exported = Export-DeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'autopilot'
+    if ($exported.success)
     {
-        Write-Host "Exported Autopilot devices to $($outputFile)." -ForegroundColor Green
+        Write-Host $exported.message -ForegroundColor Green             
     }
     else
     {
-        Write-Host "Failed to export Autopilot devices." -ForegroundColor Red
+        Write-Host $exported.message -ForegroundColor Red
     }
 }
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Imported Autopilot Devices" -Action {
-    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'imported'
-    if ($exported)
+    $exported = Export-DeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'imported'
+    if ($exported.success)
     {
-        Write-Host "Exported Imported Autopilot devices to $($outputFile)." -ForegroundColor Green
+        Write-Host $exported.message -ForegroundColor Green
     }
     else
     {
-        Write-Host "Failed to export Imported Autopilot devices." -ForegroundColor Red
+        Write-Host $exported.message -ForegroundColor Red
     }
 }
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Managed Windows Devices" -Action {
-    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'managed'
-    if ($exported)
+    $exported = Export-DeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'managed'
+    if ($exported.success)
     {
-        Write-Host "Exported Managed devices to $($outputFile)." -ForegroundColor Green
+        Write-Host $exported.message -ForegroundColor Green
     }
     else
     {
-        Write-Host "Failed to export Managed devices." -ForegroundColor Red
+        Write-Host $exported.message -ForegroundColor Red
     }
 }
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Unmanaged Windows Devices" -Action {
-    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'unmanaged'
-    if ($exported)
+    $exported = Export-DeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'unmanaged'
+    if ($exported.success)
     {
-        Write-Host "Exported Unmanaged devices to $($outputFile)." -ForegroundColor Green
+        Write-Host $exported.message -ForegroundColor Green
     }
     else
     {
-        Write-Host "Failed to export Unmanaged devices." -ForegroundColor Red
+        Write-Host $exported.message -ForegroundColor Red
     }
 }
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export device storage report" -Action {
     $dateTime = Get-Date -Format "yyyyMMdd_HHmm"
     $storageOutputFileName = "DeviceStorageReport-$dateTime.csv"
-    if (ExportDeviceStorage -AccessToken $accessToken -OutputFile $storageOutputFileName -IncludeStorageInfo)
+    if (ExportDeviceStorage -AccessToken $accessToken -OutputFile $storageOutputFileName)
     {
         Write-Host "Exported device storage report to $($storageOutputFileName)." -ForegroundColor Green
     }
@@ -1106,6 +1431,57 @@ $exportMenu = AddMenuItem -menu $exportMenu -name "Export Application Assignment
     }
 }
 #endregion export menu
+
+#region device reports menu
+$deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Assigned Windows Devices" -Action {
+    Write-Host "Exporting assigned device report..."
+    $exportedDeviceAssignment = Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'Assigned' -fileMode 'Overwrite'
+    if ($exportedDeviceAssignment.success)
+    {
+        Write-Host "Assigned device report exported successfully to $($exportedDeviceAssignment.outputFile) with $($exportedDeviceAssignment.deviceCount) devices." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host $exportedDeviceAssignment.message -ForegroundColor Red
+    }           
+}
+$deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Unassigned Windows Devices" -Action {
+    Write-Host "Exporting unassigned device report..."
+    $exportedDeviceAssignment = Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'Unassigned' -fileMode 'Overwrite'
+    if ($exportedDeviceAssignment.success)
+    {
+        Write-Host "Unassigned device report exported successfully to $($exportedDeviceAssignment.outputFile) with $($exportedDeviceAssignment.deviceCount) devices." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host $exportedDeviceAssignment.message -ForegroundColor Red
+    }               
+}
+$deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Pre-provisioned Windows Devices" -Action {
+    Write-Host "Exporting pre-provisioned device report..."
+    $exportedDeviceAssignment = Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'PreProvisioned' -fileMode 'Overwrite'
+    if ($exportedDeviceAssignment.success)
+    {
+        Write-Host "Pre-provisioned device report exported successfully to $($exportedDeviceAssignment.outputFile) with $($exportedDeviceAssignment.deviceCount) devices." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host $exportedDeviceAssignment.message -ForegroundColor Red
+    }                                       
+}
+$deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "All Windows Devices" -Action {
+    Write-Host "Exporting all devices with their assignment status..."
+    $exportedDeviceAssignment = Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'All' -fileMode 'Overwrite'
+    if ($exportedDeviceAssignment.success)
+    {
+        Write-Host "All devices report exported successfully to $($exportedDeviceAssignment.outputFile) with $($exportedDeviceAssignment.deviceCount) devices." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host $exportedDeviceAssignment.message -ForegroundColor Red
+    }                           
+}
+#endregion device reports menu
 
 #region serial number menu
 $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial number" -Action {
@@ -1405,7 +1781,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Download and install la
         return $null
     }
     Write-Host 'Downloading and installing the latest Windows updates...'
-    $updateResult = ApplyWindowsUpdates
+    $updateResult = Apply-WindowsUpdates
     Write-Host $returnValues.$updateResult
 }
 $autopilotMenu = AddMenuItem -Menu $autopilotMenu -Name "Check device Autopilot status" -Submenu $SerialNumberMenu
@@ -1544,7 +1920,7 @@ $inclusionExclusionMenu = AddMenuItem -menu $inclusionExclusionMenu -Name "Chang
 #endregion Environment menu
 
 #region Settings menu
-$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment Settings" -subMenu $environmentMenu
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment settings" -subMenu $environmentMenu
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Entra Credentials" -Action {
     Write-Host "This will change the authentication information used by the script and will allow you to set a new password."
     $choice = Read-Host "Are you sure you want to change the authentication information? (yes/no)"
@@ -1629,50 +2005,91 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings"
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User selected the same app mode that is already set." -LogLevel "Information"
         return $returnValues.backoutText
     }
-    $newAppMode = $result.appMode
-    Write-Host "`nYou selected: $newAppMode" -ForegroundColor Green
-    Write-Host "`nChanging the app mode will affect which menu items and features are available." -ForegroundColor Yellow
-    Write-Host "The application will need to restart to apply the new app mode." -ForegroundColor Yellow
-    Write-Host ""
-    $confirmChoice = Read-Host "Are you sure you want to change the app mode? (yes/no)"
-    while ($confirmChoice -notin @('yes', 'no', 'y', 'n'))
+    # Use Update-AppModeSettings for specialized handling with storage preference
+    try
     {
-        Write-Host "Invalid choice. Please enter 'yes' or 'no'." -ForegroundColor Red
-        [console]::beep(1000, 500)
-        $confirmChoice = Read-Host "Are you sure you want to change the app mode? (yes/no)"
+        if ($result.useGlobalStorage)
+        {
+            $storageType = "Global settings"
+            $saveResult = Update-AppModeSettings -Configuration $result.appModes -SettingsFile $initFile -UseGlobalSettings
+        }
+        else
+        {
+            $storageType = "Domain settings"
+            $saveResult = Update-AppModeSettings -Configuration $result.appModes -SettingsFile $initFile -Settings $settings
+        }
+        if ($saveResult)
+        {
+            Write-Log -LogFile $logFile -Module $functionName -Message "Successfully saved app mode configuration to $storageType" -LogLevel "Information"
+            Write-Host "App mode configuration saved successfully to $storageType" -ForegroundColor Green
+        }
+        else
+        {
+            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to save app mode configuration" -LogLevel "Error"
+            Write-Host "Failed to save app mode configuration" -ForegroundColor Red
+        }
     }
-    if ($confirmChoice -in @('no', 'n'))
+    catch
     {
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User chose not to change app mode setting." -LogLevel "Information"
-        Write-Host "`nApp mode change cancelled." -ForegroundColor Yellow
+        $errorMessage = "Error saving app mode configuration: $($_.Exception.Message)"
+        Write-Log -LogFile $logFile -Module $functionName -Message $errorMessage -LogLevel "Error"
+        Write-Host $errorMessage -ForegroundColor Red
+        return $null
+    }
+}
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change repository information" -Action {
+    Write-Host "Launching repository information editor..." -ForegroundColor Cyan
+    Write-Host "These settings control repository URLs and paths used for updates." -ForegroundColor Gray
+    $result = Show-RepoInfoEditor -SettingsFile $InitFile
+    if ($result -eq "Back" -or $result -eq "back")
+    {
+        Write-Verbose "[$scriptName] User selected Back from repository info editor"
         return $returnValues.backoutText
     }
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Updating app mode setting from '$($settings.appMode)' to '$newAppMode'" -LogLevel "Information"
-    if (Update-Setting -SettingType "Global" -SettingsFile $initFile -SettingName "appMode" -SettingValue $newAppMode)
+    elseif ($result -eq "Main Menu" -or $result -eq "main menu")
     {
-        Write-Host "`nApp Mode settings saved successfully." -ForegroundColor Green
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "App Mode settings saved successfully." -LogLevel "Information"
-        $filesCleaned = cleanupTempFiles
-        if ($filesCleaned.AllRemoved)
-        {
-            Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
-        }
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
-        Write-Host "`nThe app mode has been changed to: $newAppMode" -ForegroundColor Green
-        Write-Host "Please restart the application for the changes to take effect." -ForegroundColor Yellow
-        Write-Host ""
-        Write-Log -logFile $logFile -finishLogging
-        exit 0
+        Write-Verbose "[$scriptName] User selected Main Menu from repository info editor"
+        return $returnValues.mainMenuText
     }
     else
     {
-        Write-Host "`nFailed to update app mode setting" -ForegroundColor Red
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Failed to update app mode setting" -LogLevel "Error"
+        return $result
     }
 }
-
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change cache settings" -Action {
+    Write-Host "Launching cache settings editor..." -ForegroundColor Cyan
+    Write-Host "These settings control caching behavior, expiration times, and size limits." -ForegroundColor Gray
+    $result = Show-CacheSettingsEditor -SettingsFile $InitFile
+    if ($result -eq "Back" -or $result -eq "back")
+    {
+        Write-Verbose "[$scriptName] User selected Back from cache settings editor"
+        return $returnValues.backoutText
+    }
+    elseif ($result -eq "Main Menu" -or $result -eq "main menu")
+    {
+        Write-Verbose "[$scriptName] User selected Main Menu from cache settings editor"
+        return $returnValues.mainMenuText
+    }
+    else
+    {
+        return $result
+    }
+}
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Restore application defaults" -Action {
+    Write-Host "Restoring application default settings..." -ForegroundColor Cyan
+    $restoreResult = Show-RestoreApplicationDefaultsResults -FilesToDelete @($InitFile, $stringsFile, $menuFile) -Domain $domain -ScriptPath $scriptPath
+    if ($restoreResult -in $returnValues.Values)
+    {
+        return $restoreResult
+    }                                           
+    else
+    {
+        Write-Host $restoreResult
+    }
+}
 #endregion Settings menu
 
+#region Check menu
 $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by Serial Number" -Submenu $serialNumberMenu
 $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action {
     $userName = GetUserInput -Message "Enter the username (Email address) of the user whose device you want to look up." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
@@ -1683,93 +2100,21 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
     }
     Write-Verbose "[$scriptName] Got user name: $userName"
     
-    #region Check if the user exists first.
-    $userInfo = GetEntraUser -UserName $userName -AccessToken $accessToken -findSimilar
-    Write-Verbose "[$scriptName] Substring search: $($userInfo)"
-    Write-Verbose "[$scriptName] User info returned: $($userInfo[0].value.count) users."
-    Write-Verbose "[$scriptName] User info: $($userInfo | ConvertTo-Json -Depth $maxJSONDepth)"
-    if ($null -ne $userInfo -and $userInfo[1] -eq $false)
+    #region Resolve user with matching support
+    $userName = Resolve-DirectoryObject -EntityName $userName -AccessToken $accessToken -Settings $settings -ReturnValues $returnValues -EntityType "User"
+    # Check if user resolution returned a navigation command
+    if ($userName -in $returnValues.Values -or $userName -in @("Main Menu", "EXIT_APPLICATION"))
     {
-        Write-Host "Found user: $($userInfo[0].value.displayName) ($($userInfo[0].value.userPrincipalName))"
-        $userName = $userInfo[0].value.userPrincipalName
-        Write-Verbose "[$scriptName] User name set to: $userName"
+        Write-Verbose "[$scriptName] User resolution returned navigation command: $userName"
+        return $userName
     }
-    elseif ($null -ne $userInfo -and $userInfo[1] -eq $true)
-    {
-        Write-Host "Could not find an exact match for user $($userName)."
-        if ($userInfo[0].value.count -eq 1)
-        {
-            Write-Host "Found a user with a similar name."
-        }
-        else
-        {
-            Write-Host "Found $($($userInfo[0].value.count)) users with similar names:"
-        }
-        if ($($userInfo[0].value.count) -gt [int]$settings.maxUserMatchDisplay)
-        {
-            Write-Host "Displaying the first $($settings.maxUserMatchDisplay) matches:"
-        }
-        elseif ($($userInfo[0].value.count) -eq 1)
-        {
-            Write-Host "Is this the correct user?"
-        }
-        else
-        {
-            Write-Host "Displaying all $($userInfo[0].value.count) matches:"
-        }
-        $possibleUserName = DisplayUserList -UserList $userInfo[0].value -maxDisplay $settings.maxUserMatchDisplay
-        Write-Verbose "[$scriptName] User name selected: $possibleUserName"
-        # Handle navigation options returned from DisplayUserList
-        if ($possibleUserName -in $returnValues.Values)
-        {
-            Write-Verbose "[$scriptName] DisplayUserList returned a message: $possibleUserName"
-            return $possibleUserName
-        }
-        elseif ($possibleUserName -eq "Back" -or $possibleUserName -eq "back")
-        {
-            Write-Verbose "[$scriptName] User selected 'Back'. Returning $($returnValues.backoutText)."
-            return $returnValues.backoutText
-        }
-        elseif ($possibleUserName -eq "Main Menu" -or $possibleUserName -eq "main menu")
-        {
-            Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
-            return "Main Menu"
-        }
-        elseif ($possibleUserName -eq 0 -or $possibleUserName -eq "0")
-        {
-            Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
-            return "EXIT_APPLICATION"
-        }
-        else
-        {
-            Write-Verbose "[$scriptName] User selected: $possibleUserName"
-            $userName = $possibleUserName
-        }
-    }
-    elseif ($userInfo -eq $returnValues.noUserFoundInDirectoryMessage)
-    {
-        return $userInfo
-    }
-    else
-    {
-        return $returnValues.noUserFoundInDirectoryMessage
-    }
-    #endregion Check if the user exists first.
+    #endregion Resolve user with matching support
     
     # Call GetDeviceByUser to find devices for the specified user
     Write-Verbose "[$scriptName] Calling GetDeviceByUser for user: $userName"
     $serialNumber = GetDeviceByUser -UserName $userName -OperatingSystem 'Windows' -AccessToken $accessToken
     Write-Verbose "[$scriptName] GetDeviceByUser returned: $serialNumber"
-    Write-Host "Found device for user $userName with serial number: $serialNumber"
     
-    do
-    {
-        $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
-        Write-Verbose "[$scriptName] Result: $result"
-        Write-Verbose "[$scriptName] ProcessSerialNumber returned: $result"
-        $serialNumber = $result
-    } until ($result -in $returnValues.values -or $result -eq "EXIT_APPLICATION" -or $result -eq "Back" -or $result -eq "back" -or $result -eq "Main Menu" -or $result -eq "main menu" -or [string]::IsNullOrWhiteSpace($result))
-
     #region Handle navigation responses from GetDeviceByUser
     if ($serialNumber -eq "Back" -or $serialNumber -eq "back")
     {
@@ -1781,16 +2126,231 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
         Write-Verbose "[$scriptName] User selected Main Menu from device selection"
         return "EXIT_APPLICATION"
     }
-    elseif ([string]::IsNullOrWhiteSpace($SerialNumber) -or $null -eq $serialNumber)
+    elseif ([string]::IsNullOrWhiteSpace($SerialNumber) -or $null -eq $serialNumber -or $serialNumber -eq 0 -or $serialNumber -eq "0")
     {
         Write-Verbose "[$scriptName] User requested application exit from device selection."
         return "EXIT_APPLICATION"
     }
     else
     {
-        return $result
+        Write-Verbose "[$scriptName] Continuing script..."
+    }
+    #endregion Handle navigation responses from GetDeviceByUser
+    
+    Write-Host "Found device for user $userName with serial number: $serialNumber"
+    do
+    {
+        $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
+        Write-Verbose "[$scriptName] Result: $result"
+        Write-Verbose "[$scriptName] ProcessSerialNumber returned: $result"
+        if ($null -ne $result)
+        {
+            Write-Verbose "[$scriptName] Result: $result"
+            $serialNumber = $result
+        }
+        else 
+        {
+            Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
+            $result = "EXIT_APPLICATION"
+        }
+    } until ($result -in $returnValues.values -or $result -eq "EXIT_APPLICATION" -or $result -eq "Back" -or $result -eq "back" -or $result -eq "Main Menu" -or $result -eq "main menu" -or [string]::IsNullOrWhiteSpace($result))
+    return $result
+}
+#endregion Check menu
+
+#region show Group Assignments menu
+# Helper scriptblock to avoid duplication between direct and indirect assignment menu items
+$script:ShowGroupAssignmentsAction = {
+    <#
+    This script-scoped variable defines a reusable script block for showing group assignments in the Intune Helpdesk Menu.
+    It is defined at script scope to allow sharing between multiple menu items (e.g., direct and indirect assignment views),
+    avoiding code duplication and ensuring consistent behavior. The script block encapsulates the logic for prompting the user
+    for a group name, resolving the group, and handling navigation commands, and is invoked by different menu actions as needed.
+    #>
+    param(
+        [bool]$IncludeIndirectAssignments,
+        [bool]$exportInstead
+    )
+    
+    $assignmentScope = if ($IncludeIndirectAssignments) { "indirect (All Users/All Devices)" } else { "direct" }
+    $specialGroups = @("*", "?")    
+    $messageText = if ($IncludeIndirectAssignments) { "Enter the name of the group whose indirect (All Users/All Devices) assignments you want to view. Enter any of $specialGroups             for all assignments" } else { "Enter the name of the group whose direct assignments you want to view." }                                                                
+    write-log -logFile $LogFile -Module $scriptName -Message "Prompting user for group name to view $assignmentScope assignments" -LogLevel "Information"                   
+    $groupName = GetUserInput -Message $messageText -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
+    $needsResolution = if ($IncludeIndirectAssignments -and $groupName -in $specialGroups                                                           ) { $false } else { $true }   
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "GroupName: $groupName, IncludeIndirectAssignments: $IncludeIndirectAssignments, AssignmentScope: $assignmentScope, SpecialGroups: $specialGroups, NeedsResolution: $needsResolution"
+    
+    if ($null -eq $groupName)
+    {
+        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
+        write-log -logFile $LogFile -Module $scriptName -Message "User pressed Enter without providing a group name. Returning $($returnValues.BackoutText)." -LogLevel "Information"
+        return $returnValues.backoutText
+    }
+    
+    if ($groupName)
+    {
+        Write-Verbose "[$scriptName] Got group name: $groupName"
+        write-log -logFile $LogFile -Module $scriptName -Message "Got group name: $groupName" -LogLevel "Information"                   
+    }
+    
+    #region Resolve group using unified Resolve-DirectoryObject with entity return
+    if ($needsResolution)
+    {
+        Write-Verbose "[$scriptName] Resolving group: $groupName"   
+        write-log -logFile $LogFile -Module $scriptName -Message "Resolving group: $groupName" -LogLevel "Information"                  
+        $selectedGroup = Resolve-DirectoryObject -EntityName $groupName -AccessToken $accessToken -Settings $settings -ReturnValues $returnValues -EntityType "Group" -ReturnEntity
+        write-log -logFile $LogFile -Module $scriptName -Message "Resolve-DirectoryObject returned: $($selectedGroup | Out-String)" -LogLevel "Verbose"         
+        # Handle navigation commands - check these FIRST before trying to use as group object
+        if ($selectedGroup -eq "EXIT_APPLICATION")
+        {
+            Write-Verbose "[$scriptName] User requested application exit from group resolution"
+            write-log -logFile $LogFile -Module $scriptName -Message "User requested application exit from group resolution" -LogLevel "Information"                        
+            return "EXIT_APPLICATION"
+        }
+        elseif ($selectedGroup -eq "Main Menu")
+        {
+            Write-Verbose "[$scriptName] User selected Main Menu from group resolution"
+            write-log -logFile $LogFile -Module $scriptName -Message "User selected Main Menu from group resolution" -LogLevel "Information"                                    
+            return "Main Menu"
+        }
+        elseif ($selectedGroup -in $returnValues.Values)
+        {
+            Write-Verbose "[$scriptName] Resolve-DirectoryObject returned navigation command: $selectedGroup"
+            write-log -logFile $LogFile -Module $scriptName -Message "Resolve-DirectoryObject returned navigation command: $selectedGroup" -LogLevel "Information"                  
+            return $selectedGroup
+        }
+    
+        # Validate we got a valid group object
+        if ($null -eq $selectedGroup -or -not $selectedGroup.id -or -not $selectedGroup.displayName)
+        {
+            write-log -logFile $LogFile -Module $scriptName -Message "Invalid group object returned from Resolve-DirectoryObject" -LogLevel "Error"                 
+            Write-Host "No group found for the specified group name." -ForegroundColor Red
+            return $returnValues.noGroupFoundMessage
+        }
+        Write-Verbose "[$scriptName] Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))"
+        write-log -logFile $LogFile -Module $scriptName -Message "Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))" -LogLevel "Information"                     
+    }
+    else
+    {
+        Write-Verbose "[$scriptName] Special group selected, skipping resolution: $groupName"                                                               
+        write-log -logFile $LogFile -Module $scriptName -Message "Special group selected, skipping resolution: $groupName" -LogLevel "Information"                                          
+        $selectedGroup = $groupName                         
+    }
+    #endregion Resolve group using unified Resolve-DirectoryObject with entity return
+    
+    # Call ShowGroupAssignments to display the group's assignments
+    Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName) with IncludeIndirect=$IncludeIndirectAssignments"
+    write-log -logFile $LogFile -Module $scriptName -Message "Building splat for ShowGroupAssignments call" -LogLevel "Information"                 
+    $showGroupAssignmentsSplat = @{
+        AccessToken = $accessToken
+        Settings    = $global:settings
+        Group       = $selectedGroup
+    }
+    
+    if ($IncludeIndirectAssignments)
+    {
+        $showGroupAssignmentsSplat['ShowIndirectAssignments'] = $true
+        $showGroupAssignmentsSplat['SpecialGroups'] = $specialGroups   
+        write-log -logFile $LogFile -Module $scriptName -Message "Added ShowIndirectAssignments and SpecialGroups parameters to ShowGroupAssignments splat" -LogLevel "Information"                             
+    }
+    
+    if ($exportInstead)
+    {
+        $showGroupAssignmentsSplat['exportInstead'] = $true
+        write-log -logFile $LogFile -Module $scriptName -Message "Added exportInstead parameter to ShowGroupAssignments splat" -LogLevel "Information"                  
+    }                       
+    if ($settings.HideEmptyMenus)
+    {
+        $showGroupAssignmentsSplat['HideEmptyMenus'] = $true
+        write-log -logFile $LogFile -Module $scriptName -Message "Added HideEmptyMenus parameter to ShowGroupAssignments splat" -LogLevel "Information"                             
+    }               
+    $ShowGroupAssignmentsResponse = ShowGroupAssignments @showGroupAssignmentsSplat
+    write-log -logFile $LogFile -Module $scriptName -Message "ShowGroupAssignments returned: $($ShowGroupAssignmentsResponse | Out-String)" -LogLevel "Verbose"         
+    #region Handle navigation responses from ShowGroupAssignments
+    if ($ShowGroupAssignmentsResponse -eq "Back" -or $ShowGroupAssignmentsResponse -eq "back")
+    {
+        Write-Verbose "[$scriptName] User selected Back from group assignment selection, returning to previous menu"
+        write-log -logFile $LogFile -Module $scriptName -Message "User selected Back from group assignment selection, returning to previous menu" -LogLevel "Information"                   
+        return $returnValues.backoutText
+    }
+    elseif ($ShowGroupAssignmentsResponse -eq "Main Menu" -or $ShowGroupAssignmentsResponse -eq "main menu")
+    {
+        Write-Verbose "[$scriptName] User selected Main Menu from group assignment selection"
+        write-log -logFile $LogFile -Module $scriptName -Message "User selected Main Menu from group assignment selection" -LogLevel "Information"                      
+        return "EXIT_APPLICATION"
+    }
+    elseif ([string]::IsNullOrWhiteSpace($ShowGroupAssignmentsResponse) -or $null -eq $ShowGroupAssignmentsResponse)
+    {
+        Write-Verbose "[$scriptName] User requested application exit from group assignment selection."
+        write-log -logFile $LogFile -Module $scriptName -Message "User requested application exit from group assignment selection" -LogLevel "Information"                  
+        return "EXIT_APPLICATION"
+    }
+    else
+    {
+        Write-Verbose "[$scriptName] Continuing script..."                      
+        write-log -logFile $LogFile -Module $scriptName -Message "Continuing script after group assignment selection" -LogLevel "Information"                               
+        return $ShowGroupAssignmentsResponse
+    }
+    #endregion Handle navigation responses from ShowGroupAssignments
+}
+
+$script:ExportGroupAssignmentsAction = {
+    param(
+        [bool]$RespectOperatingSystem
+    )
+    $resourceScope = if ($RespectOperatingSystem) { "Windows" } else { "Tenant" }
+    Write-Host "Exporting all $resourceScope configurations and their assignments..." -ForegroundColor Cyan
+    Write-Host "This will export all $resourceScope resources with detailed assignment information to a CSV file." -ForegroundColor Gray
+    Write-Host ""
+    $exportParamSplat = @{
+        AccessToken           = $accessToken
+        OutputPath            = $ScriptPath 
+        IncludeBeta           = $true
+        Settings              = $settings 
+        CreateErrorExportFile = $true               
+    }                       
+    if ($RespectOperatingSystem)
+    {
+        $exportParamSplat['RespectOperatingSystem'] = $true
+        write-log -logFile $LogFile -Module $scriptName -Message "Added RespectOperatingSystem parameter to Export-AllConfigurationsAndAssignments splat" -LogLevel "Information"                             
+    }       
+    $exportResult = Export-ConfigurationAssignments @exportParamSplat    
+    write-log -logFile $LogFile -Module $scriptName -Message "Export-ConfigurationAssignments returned: $($exportResult | Out-String)" -LogLevel "Verbose"      
+    if ($exportResult.Success)
+    {
+        write-log -logFile $LogFile -Module $scriptName -Message "Export completed successfully. File: $($exportResult.OutputFile), Resources exported: $($exportResult.ResourceCount)" -LogLevel "Information"     
+        Write-Host ""
+        Write-Host "Export completed successfully!" -ForegroundColor Green
+        Write-Host "File: $($exportResult.OutputFile)" -ForegroundColor Cyan
+        Write-Host "Resources exported: $($exportResult.ResourceCount)" -ForegroundColor Cyan
+    }
+    else
+    {
+        Write-Host ""
+        Write-Host "Export failed: $($exportResult.Message)" -ForegroundColor Red
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Export failed: $($exportResult.Message)" -LogLevel "Error"
     }
 }
+
+$getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "View direct group assignments" -Action {
+    & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $false -exportInstead $false                       
+}
+$getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "View indirect group assignments (All Users/All Devices)" -Action {
+    & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $true -exportInstead $false
+}
+$getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Export direct group assignments" -Action {
+    & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $false -exportInstead $true                            
+}
+$getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Export indirect group assignments (All Users/All Devices)" -Action {
+    & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $true -exportInstead $true                 
+}
+$getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Export all Windows configurations and their assignments" -Action {
+    & $script:ExportGroupAssignmentsAction -RespectOperatingSystem $true
+}
+$getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Export all tenant configurations and their assignments" -Action {
+    & $script:ExportGroupAssignmentsAction -RespectOperatingSystem $false
+}
+#endregion Show Group Assignments menu
 
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
     $username = GetUserInput -Message "Enter the username (Email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
@@ -1800,118 +2360,51 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.backoutText)."
         return $returnValues.backoutText # Return to the previous menu
     }
-    else # Continue only if a username was entered
+    
+    #region Resolve user with matching support
+    $userName = Resolve-DirectoryObject -EntityName $userName -AccessToken $accessToken -Settings $settings -ReturnValues $returnValues -EntityType "User"
+    
+    # Check if user resolution returned a navigation command
+    if ($userName -in $returnValues.Values -or $userName -in @("Main Menu", "EXIT_APPLICATION"))
     {
-        #region Check if the user exists first.
-        $userInfo = GetEntraUser -userName $userName -AccessToken $accessToken -findSimilar
-        Write-Verbose "[$scriptName] Substring search: $($userInfo)"
-        Write-Verbose "[$scriptName] User info returned: $($userInfo[0].value.count) users."
-        Write-Verbose "[$scriptName] User info: $($userInfo | ConvertTo-Json -Depth $maxJSONDepth)"
-        if ($null -ne $userInfo -and $userInfo[1] -eq $false)
+        Write-Verbose "[$scriptName] User resolution returned navigation command: $userName"
+        return $userName
+    }
+    #endregion Resolve user with matching support
+    
+    # Perform comprehensive readiness checks
+    Write-Verbose "[$scriptName] Starting comprehensive user readiness checks for: $userName"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Starting comprehensive user readiness checks for: $userName" -LogLevel Information
+    $readinessResult = Test-UserReadiness -UserName $userName -AccessToken $accessToken -GroupsToInclude $groupsToInclude -GroupsToExclude $groupsToExclude -Settings $settings
+    # Display the readiness report
+    Show-UserReadinessReport -ReadinessResult $readinessResult
+    # Proceed to device check if user is ready
+    if ($readinessResult.IsReady)
+    {
+        Write-Host "Enter the device's serial number." -ForegroundColor Cyan
+        Write-Host "This would be the device you plan to give to the user." -ForegroundColor Cyan
+        $serialNumber = GetUserInput -Message "Enter the serial number of the device." -Prompt 'Please enter the serial number' -InputType 'serialNumber' -settings $settings
+        # Check if user entered 'back'
+        if ($null -eq $serialNumber)
         {
-            Write-Host "Found user: $($userInfo[0].value.displayName) ($($userInfo[0].value.userPrincipalName))"
-            $userName = $userInfo[0].value.userPrincipalName
-            Write-Verbose "[$scriptName] User name set to: $userName"
+            Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.backoutText)."
+            return $returnValues.backoutText # Return to the previous menu
         }
-        elseif ($null -ne $userInfo -and $userInfo[1] -eq $true)
+        else # Process only if a serial number was entered
         {
-            Write-Host "Could not find an exact match for user $($userName)."
-            if ($userInfo[0].value.count -eq 1)
+            $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -CheckUserReadiness
+            # Check if ProcessSerialNumber returned an exit signal
+            if ($null -eq $result)
             {
-                Write-Host "Found a user with a similar name."
-            }
-            else
-            {
-                Write-Host "Found $($userInfo[0].value.count) users with similar names:"
-            }
-            if ($($userInfo[0].value.count) -gt [int]$settings.maxUserMatchDisplay)
-            {
-                Write-Host "Displaying the first $($settings.maxUserMatchDisplay) matches:"
-            }
-            elseif ($($userInfo[0].value.count) -eq 1)
-            {
-                Write-Host "Is this the correct user?"
-            }
-            else
-            {
-                Write-Host "Displaying all $($userInfo[0].value.count) matches:"
-            }
-            $possibleUserName = DisplayUserList -UserList $userInfo[0].value -maxDisplay $settings.maxUserMatchDisplay
-            Write-Verbose "[$scriptName] User name selected: $possibleUserName"
-            # Handle navigation options returned from DisplayUserList
-            if ($possibleUserName -in $returnValues.Values)
-            {
-                Write-Verbose "[$scriptName] DisplayUserList returned a message: $possibleUserName"
-                return $possibleUserName
-            }
-            elseif ($possibleUserName -eq "Back" -or $possibleUserName -eq "back")
-            {
-                Write-Verbose "[$scriptName] User selected 'Back'. Returning $($returnValues.backoutText)."
-                return $returnValues.backoutText
-            }
-            elseif ($possibleUserName -eq "Main Menu" -or $possibleUserName -eq "main menu")
-            {
-                Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
-                return "Main Menu"
-            }
-            elseif ($null -eq $possibleUserName -or $possibleUserName -eq 0 -or $possibleUserName -eq "0")
-            {
-                Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
+                Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
                 return "EXIT_APPLICATION"
             }
-            else
-            {
-                Write-Verbose "[$scriptName] User selected: $possibleUserName"
-                $userName = $possibleUserName
-            }
         }
-        elseif ($userInfo -eq $returnValues.noUserFoundInDirectoryMessage)
-        {
-            return $userInfo
-        }
-        else
-        {
-            return $returnValues.noUserFoundInDirectoryMessage
-        }
-        #endregion Check if the user exists first.
-        
-        # Perform comprehensive readiness checks
-        Write-Verbose "[$scriptName] Starting comprehensive user readiness checks for: $userName"
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Starting comprehensive user readiness checks for: $userName" -LogLevel Information
-        
-        $readinessResult = Test-UserReadiness -UserName $userName -AccessToken $accessToken -GroupsToInclude $groupsToInclude -GroupsToExclude $groupsToExclude -Settings $settings
-        
-        # Display the readiness report
-        Show-UserReadinessReport -ReadinessResult $readinessResult
-        
-        # Proceed to device check if user is ready
-        if ($readinessResult.IsReady)
-        {
-            Write-Host "Enter the device's serial number." -ForegroundColor Cyan
-            Write-Host "This would be the device you plan to give to the user." -ForegroundColor Cyan
-            $serialNumber = GetUserInput -Message "Enter the serial number of the device." -Prompt 'Please enter the serial number' -InputType 'serialNumber' -settings $settings
-            # Check if user entered 'back'
-            if ($null -eq $serialNumber)
-            {
-                Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.backoutText)."
-                return $returnValues.backoutText # Return to the previous menu
-            }
-            else # Process only if a serial number was entered
-            {
-                $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -CheckUserReadiness
-                # Check if ProcessSerialNumber returned an exit signal
-                if ($null -eq $result)
-                {
-                    Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
-                    return "EXIT_APPLICATION"
-                }
-            }
-        }
-        else
-        {
-            Write-Verbose "[$scriptName] User $userName is not ready. Readiness check failed with $($readinessResult.IssueCount) issues."
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "User $userName is not ready. Issues: $($readinessResult.IssueCount), Warnings: $($readinessResult.WarningCount)" -LogLevel Warning
-        }
+    }
+    else
+    {
+        Write-Verbose "[$scriptName] User $userName is not ready. Readiness check failed with $($readinessResult.IssueCount) issues."
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "User $userName is not ready. Issues: $($readinessResult.IssueCount), Warnings: $($readinessResult.WarningCount)" -LogLevel Warning
     }
 }
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status" -Submenu $CheckMenu
@@ -1919,18 +2412,8 @@ $mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopil
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
     Write-Host "Checking for script updates..."
-    if ($settings.updateLocalSettings)
-    {
-        Write-Verbose "[$scriptName] Including local settings file ($($settings.domain)) in update check."
-        Write-Log -logFile $logFile -Module "$scriptName" -Message "Including local settings file ($($settings.domain)) in update check." -LogLevel "Information"
-        $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -SupportingFiles @($menuFile, $stringsFile, $settings.domain) 
-    }
-    else
-    {
-        Write-Verbose "[$scriptName] Not including local settings file ($($settings.domain)) in update check."
-        Write-Log -logFile $logFile -Module "$scriptName" -Message "Not including local settings file ($($settings.domain)) in update check." -LogLevel "Information"
-        $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -SupportingFiles @($menuFile, $stringsFile) 
-    }
+    # Intentionally omitting -noConfirmation here to allow user confirmation before updating
+    $updateResult = Get-Updates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -filesToUpdate @($stringsFile, $menuFile)
     Write-Verbose "[$scriptName] Update result: $updateResult"
     switch ($updateResult)
     {
@@ -1964,122 +2447,23 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
         return $returnValues.backoutText
     }
 }
-$mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
-    $groupName = GetUserInput -Message "Enter the name of the group whose assignments you want to view." -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
-    if ($null -eq $groupName)
+$mainMenu = AddMenuItem -menu $mainMenu -name "Shutdown the device" -action {
+    Write-Host 'Shutting down the device...'
+    if (-not (RestartDevice -Question 'Do you want to shut down the device now? (Y/N)' -action 'shutdown' -bootMessage 'Shutting down the device...'))
     {
-        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
+        Write-Verbose "[$scriptName] RestartDevice function failed."
         return $returnValues.backoutText
-    }
-    Write-Verbose "[$scriptName] Got group name: $groupName"
-    
-    #region Check if the group exists
-    $groupInfo = GetEntraGroup -groupName $groupName -AccessToken $accessToken -FindSimilar
-    Write-Verbose "[$scriptName] Group search result: $($groupInfo)"
-    if ($groupInfo.GetType().Name -eq 'String')
-    {
-        # Handle error messages from GetEntraUser
-        Write-Verbose "[$scriptName] Error finding group: $groupInfo"
-        return $groupInfo
-    }
-    $selectedGroup = $null
-    $substringSearch = $groupInfo[1]
-    $searchResults = $groupInfo[0].value
-    if ($null -ne $searchResults.value.displayname -and $substringSearch -eq $false)
-    {
-        # Exact match found
-        Write-Host "Found group: $($searchResults.value[0].displayName) ($($searchResults.value[0].id))"
-        $selectedGroup = $searchResults.value
-        Write-Verbose "[$scriptName] Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))"
-    }
-    elseif ($searchResults.groups.count -ne 0 -and $substringSearch -eq $true)
-    {
-        # Similar matches found
-        Write-Host "Could not find an exact match for group '$groupName'."
-        if ($searchResults.value.count -eq 1)
-        {
-            Write-Host "Found a group with a similar name."
-        }
-        else
-        {
-            Write-Host "Found $($searchResults.value.count) groups with similar names:"
-        }
-        if ($searchResults.value.count -gt [int]$settings.maxUserMatchDisplay)
-        {
-            Write-Host "Displaying the first $($settings.maxUserMatchDisplay) matches:"
-        }
-        elseif ($searchResults.value.count -eq 1)
-        {
-            Write-Host "Is this the correct group?"
-        }
-        else
-        {
-            Write-Host "Displaying all $($searchResults.value.count) matches:"
-        }
-        # Display group selection menu similar to user selection
-        $possibleGroupName = DisplayGroupList -GroupList $searchResults -maxDisplay $settings.maxGroupMatchDisplay
-        # Handle navigation options returned from DisplayGroupList
-        if ($possibleGroupName -in $returnValues.Values)
-        {
-            Write-Verbose "[$scriptName] DisplayGroupList returned a message: $possibleGroupName"
-            return $possibleGroupName
-        }
-        elseif ($possibleGroupName -eq "Back" -or $possibleGroupName -eq "back")
-        {
-            Write-Verbose "[$scriptName] User selected 'Back'. Returning $($returnValues.backoutText)."
-            return $returnValues.backoutText
-        }
-        elseif ($possibleGroupName -eq "Main Menu" -or $possibleGroupName -eq "main menu")
-        {
-            Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
-            return "Main Menu"
-        }
-        elseif ($null -eq $possibleGroupName -or $possibleGroupName -eq 0 -or $possibleGroupName -eq "0")
-        {
-            Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
-            return "EXIT_APPLICATION"
-        }
-        else
-        {
-            Write-Verbose "[$scriptName] User selected: $possibleGroupName"
-            $selectedGroup = $possibleGroupName
-        }
-    }
-    else
-    {
-        return $returnValues.noGroupFoundMessage
-    }
-    #endregion Check if the group exists
-    
-    # Call ShowGroupAssignments to display the group's assignments using the group name for consistency with existing function
-    Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName)"
-    $ShowGroupAssignmentsResponse = ShowGroupAssignments -AccessToken $accessToken -Group $selectedGroup
-    #region Handle navigation responses from GetDeviceByUser
-    if ($ShowGroupAssignmentsResponse -eq "Back" -or $ShowGroupAssignmentsResponse -eq "back")
-    {
-        Write-Verbose "[$scriptName] User selected Back from group assignment selection, returning to previous menu"
-        return $returnValues.backoutText
-    }
-    elseif ($ShowGroupAssignmentsResponse -eq "Main Menu" -or $ShowGroupAssignmentsResponse -eq "main menu")
-    {
-        Write-Verbose "[$scriptName] User selected Main Menu from group assignment selection"
-        return "EXIT_APPLICATION"
-    }
-    elseif ([string]::IsNullOrWhiteSpace($ShowGroupAssignmentsResponse) -or $null -eq $ShowGroupAssignmentsResponse)
-    {
-        Write-Verbose "[$scriptName] User requested application exit from group assignment selection."
-        return "EXIT_APPLICATION"
-    }
-    else
-    {
-        return $result
     }
 }
+$mainMenu = AddMenuItem -menu $mainMenu -name "Group Assignments Menu" -Submenu $getGroupAssignmentsMenu
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
-$mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
-    Show-AboutApplication -accessToken $accessToken -Release $latestRelease -appId $appId -tenantId $tenantId -name $name 
-}
-
+$mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -action {
+    $aboutMenuResult = Show-AboutApplication -accessToken $accessToken -Release $latestRelease -name $name -updateAvailable $updateAvailable
+    if ($aboutMenuResult -in $returnValues.Values)
+    {
+        return $aboutMenuResult
+    }
+}                   
 #region show menus
 # Add the main menu to both history arrays for proper stack synchronization
 try
@@ -2097,9 +2481,14 @@ catch
 }
 
 # Only show menu if not in test mode
-if ($settings.testMode -eq $false)
+if ($testMode)
 {
-    Write-Verbose "Test mode: $($settings.testMode)"
+    Write-Host "Test mode: $($testMode). No menu will be shown." -ForegroundColor Yellow
+    Write-Host "You can run the script in test mode to validate functionality without showing the menu."
+}
+else
+{
+    Write-Verbose "Test mode: $($testMode)"
     if ($null -ne $mainMenu)
     {
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Showing main menu." -LogLevel "Information"
@@ -2109,11 +2498,6 @@ if ($settings.testMode -eq $false)
             Write-Host "`nThank you for using the Intune Helpdesk menu. Goodbye!" -ForegroundColor Green
         }
     }
-}
-else
-{
-    Write-Host "Test mode: $($settings.testMode). No menu will be shown." -ForegroundColor Yellow
-    Write-Host "You can run the script in test mode to validate functionality without showing the menu."
 }
 #endregion show menus
 
@@ -2129,7 +2513,6 @@ if ($filesCleaned.AllRemoved)
 }
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
-
 # Finish logging
 Write-Log -LogFile $LogFile -FinishLogging
 #endregion Cleanup

@@ -1,5 +1,42 @@
 function getGroupMembership()
 {
+    <#
+    .SYNOPSIS
+    Retrieves group membership information for a user.
+
+    .DESCRIPTION
+    This function queries Microsoft Graph to determine which groups from a provided list
+    a user is a member of. It accepts group names or GUIDs as input and can return results
+    as either group names or IDs. The function automatically detects whether input is in
+    GUID or name format and handles the conversion appropriately.
+
+    .PARAMETER accessToken
+    The Microsoft Graph API access token for authentication. This parameter is mandatory.
+
+    .PARAMETER userName
+    The user principal name of the user to check group membership for. This parameter is mandatory.
+
+    .PARAMETER groups
+    An array of group names or GUIDs to check membership against. This parameter is mandatory.
+
+    .PARAMETER returnType
+    Specifies the format of the return value. Valid values: "Names" (default), "Ids".
+
+    .OUTPUTS
+    System.String[] or System.Collections.Hashtable
+    Returns an array of group names/IDs that the user is a member of, or a hashtable
+    containing membership details. Returns $null on error.
+
+    .EXAMPLE
+    $membership = getGroupMembership -accessToken $token -userName "john.doe@contoso.com" -groups @("IT-Admins", "Developers")
+    $membership = getGroupMembership -accessToken $token -userName "jane@contoso.com" -groups $groupGuids -returnType "Ids"
+
+    .NOTES
+    Automatically detects if input groups are GUIDs or names.
+    Converts group names to IDs internally for Graph API queries.
+    Requires appropriate Microsoft Graph permissions to query group membership.
+    Compatible with PowerShell 5.1.
+    #>
     [cmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

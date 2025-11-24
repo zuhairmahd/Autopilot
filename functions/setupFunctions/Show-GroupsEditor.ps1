@@ -174,7 +174,6 @@ function Show-GroupsEditor()
                     }
                     
                     $shouldModify = Show-EditorInteractiveChoice -PromptText "`nDo you want to modify groups to include? (y/n)"
-
                     if ($shouldModify)
                     {
                         $updatedIncludeGroups = Get-GroupArrayInput -CurrentGroups $currentIncludeGroups -GroupType "include" -AccessToken $AccessToken
@@ -221,7 +220,6 @@ function Show-GroupsEditor()
                     }
                     
                     $shouldModify = Show-EditorInteractiveChoice -PromptText "`nDo you want to modify groups to exclude? (y/n)"
-
                     if ($shouldModify)
                     {
                         $updatedExcludeGroups = Get-GroupArrayInput -CurrentGroups $currentExcludeGroups -GroupType "exclude" -AccessToken $AccessToken
@@ -364,8 +362,6 @@ function Show-GroupsEditor()
             }
         }
         
-        # Since settings are now saved immediately after each edit operation,
-        # we no longer need to defer saving until the end
         Write-Log -LogFile $logFile -Module $functionName -Message "Groups editor completed" -LogLevel "Information"
         Write-Verbose "[$functionName] Groups editor completed"
         return $true
@@ -386,7 +382,6 @@ function Get-GroupArrayInput()
     .SYNOPSIS
         Gets array input for group names and IDs with interactive resolution.
         Supports both old string array format and new hashtable format.
-        Uses getEntraGroup for enhanced search capabilities.
     #>
     [CmdletBinding()]
     param(
@@ -420,161 +415,195 @@ function Get-GroupArrayInput()
         }
     }
     
-    Write-Log -LogFile $logFile -Module $functionName -Message "Current groups format: $currentFormat" -LogLevel "Verbose"
+    # Get user decision for replace/add/keep
+    $decision = Get-EditorReplaceOrAddChoice -CurrentArray $CurrentGroups -ItemType 'group'
     
-    # Display current groups in appropriate format
-    if ($CurrentGroups -and $CurrentGroups.Count -gt 0)
+    if ($decision.ShouldProceed)
     {
-        Write-Host "`nCurrent groups:" -ForegroundColor Cyan
-        if ($currentFormat -eq "HashTableArray")
+        # Display operation mode banner
+        if ($decision.ShouldReplaceExisting)
         {
-            foreach ($group in $CurrentGroups)
-            {
-                Write-Host "  - Name: $($group.name)" -ForegroundColor White
-                Write-Host "    ID:   $($group.id)" -ForegroundColor Gray
-            }
+            Write-Host "`n=======================================" -ForegroundColor Yellow
+            Write-Host "  MODE: REPLACE - Old groups will be removed" -ForegroundColor Yellow
+            Write-Host "=======================================" -ForegroundColor Yellow
         }
         else
         {
-            foreach ($group in $CurrentGroups)
+            Write-Host "`n=======================================" -ForegroundColor Green
+            Write-Host "  MODE: ADD - New groups will be added" -ForegroundColor Green
+            Write-Host "=======================================" -ForegroundColor Green
+        }
+    
+        if ($CurrentGroups -and $CurrentGroups.Count -gt 0)
+        {
+            Write-Host "`nCurrent groups:" -ForegroundColor Cyan
+            if ($currentFormat -eq "HashTableArray")
             {
-                Write-Host "  - $group" -ForegroundColor White
+                foreach ($group in $CurrentGroups)
+                {
+                    Write-Host "  - Name: $($group.name)" -ForegroundColor White
+                    Write-Host "    ID:   $($group.id)" -ForegroundColor Gray
+                }
+            }
+            else
+            {
+                foreach ($group in $CurrentGroups)
+                {
+                    Write-Host "  - $group" -ForegroundColor White
+                }
             }
         }
-    }
+        Write-Host ""
+        if ($decision.ShouldReplaceExisting)
+        {
+            Write-Host "[!] REPLACE MODE: Enter new groups (old groups will be removed)" -ForegroundColor Yellow
+        }
+        else
+        {
+            Write-Host "[+] ADD MODE: Enter new groups (old groups will be kept)" -ForegroundColor Green
+        }
+        Write-Host "   • Enter group names one per line" -ForegroundColor Gray
+        Write-Host "   • Group names will be searched and resolved interactively" -ForegroundColor Gray
+        Write-Host "   • Press Enter on empty line to finish" -ForegroundColor Gray
+        Write-Host "   • Leave first line empty to cancel" -ForegroundColor Gray
     
-    # Determine if we should ask about replace vs add
-    $shouldReplaceExisting = $true
-    if ($CurrentGroups -and $CurrentGroups.Count -gt 0)
-    {
-        Write-Host "`nYou have existing groups in this list." -ForegroundColor Yellow
-        Write-Host "Do you want to:" -ForegroundColor White
-        Write-Host "  1. Replace all existing groups with new ones" -ForegroundColor White
-        Write-Host "  2. Add new groups to the existing ones" -ForegroundColor White
-        Write-Host "  3. Keep current groups unchanged" -ForegroundColor White
-        
+        $newGroupsHashTable = @()
+        $firstInput = $true
+    
         do
         {
-            $choice = Read-Host "Enter your choice (1-3)"
-            switch ($choice)
+            if ($firstInput)
             {
-                '1'
+                $groupChoice = Read-Host "Group name"
+                $firstInput = $false
+            
+                # If first input is empty, return current groups
+                if ([string]::IsNullOrWhiteSpace($groupChoice))
                 {
-                    $shouldReplaceExisting = $true
-                    Write-Log -LogFile $logFile -Module $functionName -Message "User chose to replace existing $GroupType groups" -LogLevel "Verbose"
-                    Write-Verbose "[$functionName] User chose to replace existing $GroupType groups"
-                    break
-                }
-                '2'
-                {
-                    $shouldReplaceExisting = $false
-                    Write-Log -LogFile $logFile -Module $functionName -Message "User chose to add to existing $GroupType groups" -LogLevel "Verbose"
-                    Write-Verbose "[$functionName] User chose to add to existing $GroupType groups"
-                    break
-                }
-                '3'
-                {
-                    Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current $GroupType groups unchanged" -LogLevel "Verbose"
-                    Write-Verbose "[$functionName] User chose to keep current $GroupType groups unchanged"
+                    Write-Log -LogFile $logFile -Module $functionName -Message "User cancelled input, keeping current $GroupType groups" -LogLevel "Verbose"
+                    Write-Verbose "[$functionName] User cancelled input, keeping current $GroupType groups"
                     return $CurrentGroups
                 }
-                default
+            
+                # Process the first group name
+                # For replace mode, check against building list; for add mode, check against current + building list
+                $checkList = if ($decision.ShouldReplaceExisting)
                 {
-                    Write-Host "Invalid choice. Please enter 1, 2, or 3." -ForegroundColor Red
-                    continue
+                    $newGroupsHashTable 
+                }
+                else
+                {
+                    $CurrentGroups + $newGroupsHashTable 
+                }
+                $resolvedGroup = Resolve-SingleGroupInteractive -GroupName $groupChoice.Trim() -AccessToken $AccessToken -ExistingItems $checkList
+                if ($resolvedGroup)
+                {
+                    $newGroupsHashTable += $resolvedGroup
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Added first $GroupType group: '$($resolvedGroup.name)'" -LogLevel "Verbose"
+                    Write-Verbose "[$functionName] Added first $GroupType group: '$($resolvedGroup.name)'"
+                }
+                else
+                {
+                    Write-Verbose "[$functionName] First group input was null (likely duplicate), continuing to allow re-entry"
                 }
             }
-            break
+            else
+            {
+                $groupChoice = Read-Host "Group name"
+                if ([string]::IsNullOrWhiteSpace($groupChoice))
+                {
+                    break
+                }
+            
+                # Process each additional group name
+                # For replace mode, check against building list; for add mode, check against current + building list
+                $checkList = if ($decision.ShouldReplaceExisting)
+                {
+                    $newGroupsHashTable 
+                }
+                else
+                {
+                    $CurrentGroups + $newGroupsHashTable 
+                }
+                $resolvedGroup = Resolve-SingleGroupInteractive -GroupName $groupChoice.Trim() -AccessToken $AccessToken -ExistingItems $checkList
+                if ($resolvedGroup)
+                {
+                    $newGroupsHashTable += $resolvedGroup
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Added $GroupType group: '$($resolvedGroup.name)'" -LogLevel "Verbose"
+                    Write-Verbose "[$functionName] Added $GroupType group: '$($resolvedGroup.name)'"
+                }
+                else
+                {
+                    Write-Verbose "[$functionName] Group input was null (likely duplicate), ignoring and continuing"
+                }
+            }
         } while ($true)
-    }
-    
-    Write-Host "`nEnter group names to $GroupType (one per line)." -ForegroundColor Yellow
-    Write-Host "Group names will be searched and resolved interactively." -ForegroundColor Green
-    Write-Host "Press Enter on empty line to finish." -ForegroundColor Gray
-    if (-not $shouldReplaceExisting)
-    {
-        Write-Host "New groups will be added to the existing ones." -ForegroundColor Green
-    }
-    Write-Host "Leave first line empty to cancel." -ForegroundColor Gray
-    
-    $newGroupsHashTable = @()
-    $firstInput = $true
-    
-    do
-    {
-        if ($firstInput)
+        
+        # Show summary of what will be saved
+        Write-Host ""
+        if ($decision.ShouldReplaceExisting)
         {
-            $input = Read-Host "Group name"
-            $firstInput = $false
-            
-            # If first input is empty, return current groups
-            if ([string]::IsNullOrWhiteSpace($input))
-            {
-                Write-Log -LogFile $logFile -Module $functionName -Message "User cancelled input, keeping current $GroupType groups" -LogLevel "Verbose"
-                Write-Verbose "[$functionName] User cancelled input, keeping current $GroupType groups"
-                return $CurrentGroups
-            }
-            
-            # Process the first group name
-            $resolvedGroup = Resolve-SingleGroupInteractive -GroupName $input.Trim() -AccessToken $AccessToken
-            if ($resolvedGroup)
-            {
-                $newGroupsHashTable += $resolvedGroup
-                Write-Log -LogFile $logFile -Module $functionName -Message "Added first $GroupType group: '$($resolvedGroup.name)'" -LogLevel "Verbose"
-                Write-Verbose "[$functionName] Added first $GroupType group: '$($resolvedGroup.name)'"
-            }
+            Write-Host "=======================================" -ForegroundColor Yellow
+            Write-Host "  SUMMARY - REPLACE MODE" -ForegroundColor Yellow
+            Write-Host "=======================================" -ForegroundColor Yellow
+            Write-Host "Old groups ($($CurrentGroups.Count)): REMOVED" -ForegroundColor Red
+            Write-Host "New groups ($($newGroupsHashTable.Count)): WILL BE SAVED" -ForegroundColor Green
         }
         else
         {
-            $input = Read-Host "Group name"
-            if ([string]::IsNullOrWhiteSpace($input))
-            {
-                break
-            }
-            
-            # Process each additional group name
-            $resolvedGroup = Resolve-SingleGroupInteractive -GroupName $input.Trim() -AccessToken $AccessToken
-            if ($resolvedGroup)
-            {
-                $newGroupsHashTable += $resolvedGroup
-                Write-Log -LogFile $logFile -Module $functionName -Message "Added $GroupType group: '$($resolvedGroup.name)'" -LogLevel "Verbose"
-                Write-Verbose "[$functionName] Added $GroupType group: '$($resolvedGroup.name)'"
-            }
+            Write-Host "=======================================" -ForegroundColor Green
+            Write-Host "  SUMMARY - ADD MODE" -ForegroundColor Green
+            Write-Host "=======================================" -ForegroundColor Green
+            Write-Host "Old groups ($($CurrentGroups.Count)): KEPT" -ForegroundColor Green
+            Write-Host "New groups ($($newGroupsHashTable.Count)): ADDED" -ForegroundColor Green
+            Write-Host "Total groups: $($CurrentGroups.Count + $newGroupsHashTable.Count)" -ForegroundColor Cyan
         }
-    } while ($true)
+        Write-Host ""
+        
+        # Determine final result based on user choice and format compatibility
     
-    # Determine final result based on user choice and format compatibility
-    if ($shouldReplaceExisting -or -not $CurrentGroups -or $CurrentGroups.Count -eq 0)
-    {
-        # Replace existing groups
-        $result = $newGroupsHashTable
+        if ($decision.ShouldReplaceExisting -or -not $CurrentGroups -or $CurrentGroups.Count -eq 0)
+        {
+            # Replace existing groups
+            $result = $newGroupsHashTable
+        }
+        else
+        {
+            # Add to existing groups - need to handle format conversion
+            $combinedGroups = @()
+        
+            # Add existing groups in hashtable format
+            if ($currentFormat -eq "HashTableArray")
+            {
+                $combinedGroups += $CurrentGroups
+            }
+            elseif ($currentFormat -eq "StringArray")
+            {
+                # Convert old string format to hashtable format
+                Write-Host "`nConverting existing groups to new format..." -ForegroundColor Yellow
+                foreach ($groupName in $CurrentGroups)
+                {
+                    $combinedGroups += @{
+                        name = $groupName
+                        id   = $null  # Will be resolved when VerifyGroupMembership is called
+                    }
+                }
+            }
+        
+            # Add new groups
+            $combinedGroups += $newGroupsHashTable
+            $result = $combinedGroups
+        }
     }
     else
     {
-        # Add to existing groups - need to handle format conversion
-        $combinedGroups = @()
-        
-        # Add existing groups in hashtable format
-        if ($currentFormat -eq "HashTableArray")
-        {
-            $combinedGroups += $CurrentGroups
-        }
-        elseif ($currentFormat -eq "StringArray")
-        {
-            # Convert old string format to hashtable format
-            Write-Host "`nConverting existing groups to new format..." -ForegroundColor Yellow
-            foreach ($groupName in $CurrentGroups)
-            {
-                $combinedGroups += @{
-                    name = $groupName
-                    id   = $null  # Will be resolved when VerifyGroupMembership is called
-                }
-            }
-        }
-        
-        # Add new groups
-        $combinedGroups += $newGroupsHashTable
-        $result = $combinedGroups
+        # User chose to keep current groups unchanged
+        Write-Host "=======================================" -ForegroundColor Cyan
+        Write-Host "  NO CHANGES - Keeping $($CurrentGroups.Count) existing groups" -ForegroundColor Cyan
+        Write-Host "=======================================" -ForegroundColor Cyan
+        Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current $GroupType groups unchanged" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] User chose to keep current $GroupType groups unchanged"
+        $result = $CurrentGroups
     }
     
     Write-Log -LogFile $logFile -Module $functionName -Message "Returning $GroupType group array with $($result.Count) groups in hashtable format" -LogLevel "Information"
@@ -587,12 +616,18 @@ function Resolve-SingleGroupInteractive()
     <#
     .SYNOPSIS
         Resolves a single group name to group object using interactive search.
-        Uses getEntraGroup function for better search capabilities.
+        Checks for duplicates against existing items.
+    
+    .PARAMETER Silent
+        If specified and a single exact match is found, returns the group without prompting.
+        Interactive prompts still occur for multiple matches or no matches.
     #>
     [CmdletBinding()]
     param(
         [string]$GroupName,
-        [string]$AccessToken
+        [string]$AccessToken,
+        [array]$ExistingItems = @(),
+        [switch]$Silent
     )
     $FunctionName = $MyInvocation.MyCommand.Name    
     Write-Log -LogFile $logFile -Module $FunctionName -Message "Resolving group: '$GroupName'" -LogLevel "Verbose"
@@ -609,63 +644,78 @@ function Resolve-SingleGroupInteractive()
     try
     {
         # First try exact match
-        Write-Host "  Searching for group: '$GroupName'..." -ForegroundColor Cyan
-        $result, $wasSubstringSearch = GetEntraGroup -accessToken $AccessToken -groupName $GroupName
-        
-        if ($result -and $result.value -and $result.value.Count -gt 0)
+        if (-not $Silent)
         {
-            if ($result.value.Count -eq 1)
+            Write-Host "  Searching for group: '$GroupName'..." -ForegroundColor Cyan
+        }
+        else
+        {
+            Write-Verbose "[$FunctionName] Searching for group: '$GroupName' (Silent mode)"
+        }
+        
+        $result = Get-EntraDirectoryObject -EntityType Group -EntityName $groupName -AccessToken $accessToken
+        if ($result -and $result.value -and $result[1] -eq $false -and $result[0].value.count -eq 1)
+        {
+            # Single exact match found
+            $group = $result.value[0]
+            
+            # Check for duplicate
+            if (Test-ItemExists -ItemName $group.displayName -ItemId $group.id -ExistingList $ExistingItems)
             {
-                # Single exact match found
-                $group = $result.value[0]
-                Write-Host "  Found group: '$($group.displayName)' (ID: $($group.id))" -ForegroundColor Green
-                return @{
-                    name = $group.displayName
-                    id   = $group.id
+                if (-not $Silent)
+                {
+                    Write-Host "  WARNING: Group '$($group.displayName)' is already in the list. Please choose a different group." -ForegroundColor Yellow
                 }
+                Write-Log -LogFile $logFile -Module $FunctionName -Message "Duplicate group detected: '$($group.displayName)'" -LogLevel "Warning"
+                return $null
+            }
+            
+            # In Silent mode with exact match, automatically accept without prompting
+            if ($Silent)
+            {
+                Write-Verbose "[$FunctionName] Silent mode: Auto-accepted exact match '$($group.displayName)' (ID: $($group.id))"
+                Write-Log -LogFile $logFile -Module $FunctionName -Message "Silent mode: Auto-accepted exact match '$($group.displayName)' (ID: $($group.id))" -LogLevel "Verbose"
             }
             else
             {
-                # Multiple matches found, let user choose
-                Write-Host "  Multiple groups found matching '$GroupName':" -ForegroundColor Yellow
-                for ($i = 0; $i -lt $result.value.Count; $i++)
-                {
-                    $group = $result.value[$i]
-                    Write-Host "    $($i + 1). $($group.displayName) (ID: $($group.id))" -ForegroundColor White
-                }
-                Write-Host "    0. Skip this group" -ForegroundColor Gray
-                
-                do
-                {
-                    $choice = Read-Host "  Select group (0-$($result.value.Count))"
-                    if ($choice -eq "0")
-                    {
-                        Write-Host "  Skipping group '$GroupName'" -ForegroundColor Yellow
-                        Write-Log -LogFile $logFile -Module $FunctionName -Message "User skipped group: '$GroupName'" -LogLevel "Verbose"
-                        return $null
-                    }
-                    elseif ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $result.value.Count)
-                    {
-                        $selectedGroup = $result.value[[int]$choice - 1]
-                        Write-Host "  Selected: '$($selectedGroup.displayName)'" -ForegroundColor Green
-                        Write-Log -LogFile $logFile -Module $FunctionName -Message "User selected group: '$($selectedGroup.displayName)' (ID: $($selectedGroup.id))" -LogLevel "Verbose"
-                        return @{
-                            name = $selectedGroup.displayName
-                            id   = $selectedGroup.id
-                        }
-                    }
-                    Write-Host "  Invalid choice. Please enter a number between 0 and $($result.value.Count)." -ForegroundColor Red
-                } while ($true)
+                Write-Host "  Found group: '$($group.displayName)' (ID: $($group.id))" -ForegroundColor Green
+            }
+            
+            return @{
+                name = $group.displayName
+                id   = $group.id
             }
         }
         else
         {
             # No exact match, try similarity search
             Write-Host "  No exact match found. Searching for similar groups..." -ForegroundColor Yellow
-            $similarResult, $wasSubstringSearch = GetEntraGroup -accessToken $AccessToken -groupName $GroupName -FindSimilar
+            $similarResult, $wasSubstringSearch = Get-EntraDirectoryObject -EntityType Group -EntityName $groupName -AccessToken $accessToken -findSimilar
             
             if ($similarResult -and $similarResult.value -and $similarResult.value.Count -gt 0)
             {
+                # Auto-select if only one match found
+                if ($similarResult.value.Count -eq 1)
+                {
+                    $group = $similarResult.value[0]
+                    Write-Host "  Found group: '$($group.displayName)' (ID: $($group.id))" -ForegroundColor Green
+                    Write-Log -LogFile $logFile -Module $FunctionName -Message "Auto-selected single fuzzy match: '$($group.displayName)' (ID: $($group.id))" -LogLevel "Verbose"
+                    
+                    # Check for duplicate
+                    if (Test-ItemExists -ItemName $group.displayName -ItemId $group.id -ExistingList $ExistingItems)
+                    {
+                        Write-Host "  WARNING: Group '$($group.displayName)' is already in the list. Please choose a different group." -ForegroundColor Yellow
+                        Write-Log -LogFile $logFile -Module $FunctionName -Message "Duplicate group detected: '$($group.displayName)'" -LogLevel "Warning"
+                        return $null
+                    }
+                    
+                    return @{
+                        name = $group.displayName
+                        id   = $group.id
+                    }
+                }
+                
+                # Multiple matches found, let user choose
                 Write-Host "  Similar groups found:" -ForegroundColor Yellow
                 for ($i = 0; $i -lt $similarResult.value.Count; $i++)
                 {
@@ -691,7 +741,7 @@ function Resolve-SingleGroupInteractive()
                         if (-not [string]::IsNullOrWhiteSpace($newGroupName))
                         {
                             Write-Log -LogFile $logFile -Module $FunctionName -Message "User trying different group name: '$($newGroupName.Trim())'" -LogLevel "Verbose"
-                            return Resolve-SingleGroupInteractive -GroupName $newGroupName.Trim() -AccessToken $AccessToken
+                            return Resolve-SingleGroupInteractive -GroupName $newGroupName.Trim() -AccessToken $AccessToken -ExistingItems $ExistingItems
                         }
                         else
                         {
@@ -704,6 +754,15 @@ function Resolve-SingleGroupInteractive()
                         $selectedGroup = $similarResult.value[[int]$choice - 1]
                         Write-Host "  Selected: '$($selectedGroup.displayName)'" -ForegroundColor Green
                         Write-Log -LogFile $logFile -Module $FunctionName -Message "User selected similar group: '$($selectedGroup.displayName)' (ID: $($selectedGroup.id))" -LogLevel "Verbose"
+                        
+                        # Check for duplicate
+                        if (Test-ItemExists -ItemName $selectedGroup.displayName -ItemId $selectedGroup.id -ExistingList $ExistingItems)
+                        {
+                            Write-Host "  WARNING: Group '$($selectedGroup.displayName)' is already in the list. Please choose a different group." -ForegroundColor Yellow
+                            Write-Log -LogFile $logFile -Module $FunctionName -Message "Duplicate group detected: '$($selectedGroup.displayName)'" -LogLevel "Warning"
+                            return $null
+                        }
+                        
                         return @{
                             name = $selectedGroup.displayName
                             id   = $selectedGroup.id

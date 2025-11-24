@@ -17,12 +17,6 @@ function Get-ConfigurationData()
     A hashtable containing default values to use if the configuration file cannot be loaded
     or contains missing keys.
 
-.PARAMETER ConfigurationType
-    For init.psd1 files, specifies which configuration values to use:
-    - 'dev': Uses devdefault values
-    - 'release': Uses reldefault values  
-    - 'default': Uses default values
-
 .PARAMETER EnableCaching
     Enables timestamp-based caching for improved performance on repeated loads.
 
@@ -33,10 +27,6 @@ function Get-ConfigurationData()
 .EXAMPLE
     $config = Get-ConfigurationData -ConfigurationPath "settings" -DefaultValues @{key='value'}
     # Loads settings.psd1 with fallback to defaults
-
-.EXAMPLE
-    $init = Get-ConfigurationData -ConfigurationPath "init" -ConfigurationType 'release' -DefaultValues @{}
-    # Loads init.psd1 configuration with release defaults
 
 .NOTES
     - PowerShell Data Files only (.psd1) - JSON format no longer supported
@@ -51,7 +41,6 @@ function Get-ConfigurationData()
         [string]$ConfigurationPath,
         [Parameter(Mandatory = $true)]
         [hashtable]$DefaultValues,
-        [string]$ConfigurationType = 'default',
         [switch]$EnableCaching
     )
     
@@ -152,29 +141,33 @@ function Get-ConfigurationData()
             }
         }
         
-        # Initialize caching if enabled
+        # Check unified cache if enabled
         if ($EnableCaching)
         {
             Write-Verbose "[$functionName] Caching enabled"
-            if (-not $script:configurationCache)
-            {
-                $script:configurationCache = @{}
-                $script:configurationTimestamps = @{}
-                Write-Verbose "[$functionName] Initialized configuration cache"
-            }
             
-            # Check cache
-            Write-Verbose "[$functionName] Checking cache for: $psd1Path"
-            $cacheKey = $psd1Path
-            if ($script:configurationCache.ContainsKey($cacheKey))
+            # Build cache key from file path
+            $cacheKey = "config:$psd1Path"
+            
+            # Try to get from unified cache
+            $cachedEntry = Get-CachedData -CacheType 'Configuration' -Key $cacheKey -CacheSettings $global:cacheSettings
+            
+            if ($null -ne $cachedEntry)
             {
+                # Validate cache is still current by checking file timestamp
                 $currentFileTime = (Get-Item $psd1Path).LastWriteTime
-                $cachedFileTime = $script:configurationTimestamps[$cacheKey]
+                $cachedFileTime = $cachedEntry.FileTimestamp
+                
                 Write-Verbose "[$functionName] Current file time: $currentFileTime, Cached file time: $cachedFileTime"
+                
                 if ($cachedFileTime -and $currentFileTime -eq $cachedFileTime)
                 {
                     Write-Verbose "[$functionName] Using cached configuration for: $psd1Path"
-                    return $script:configurationCache[$cacheKey]
+                    return $cachedEntry.ConfigData
+                }
+                else
+                {
+                    Write-Verbose "[$functionName] Configuration file modified, refreshing cache"
                 }
             }
         }
@@ -193,9 +186,24 @@ function Get-ConfigurationData()
         # Cache if enabled
         if ($EnableCaching)
         {
-            $script:configurationCache[$cacheKey] = $mergedConfig
-            $script:configurationTimestamps[$cacheKey] = (Get-Item $psd1Path).LastWriteTime
-            Write-Verbose "[$functionName] Cached configuration for: $psd1Path"
+            $fileTimestamp = (Get-Item $psd1Path).LastWriteTime
+            
+            # Store both the config data and file timestamp for validation
+            $cacheData = @{
+                ConfigData    = $mergedConfig
+                FileTimestamp = $fileTimestamp
+            }
+            
+            $metadata = @{
+                FilePath      = $psd1Path
+                FileTimestamp = $fileTimestamp
+            }
+            
+            $cached = Set-CachedData -CacheType 'Configuration' -Key $cacheKey -Data $cacheData -Metadata $metadata -CacheSettings $global:cacheSettings
+            if ($cached)
+            {
+                Write-Verbose "[$functionName] Cached configuration for: $psd1Path"
+            }
         }
         
         Write-Verbose "[$functionName] Successfully loaded configuration from: $psd1Path"

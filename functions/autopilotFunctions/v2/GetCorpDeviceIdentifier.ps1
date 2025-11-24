@@ -1,5 +1,34 @@
 function GetCorpDeviceIdentifier()
 {
+    <#
+    .SYNOPSIS
+    Retrieves corporate device identifier information from the local system.
+
+    .DESCRIPTION
+    This function queries WMI/CIM to retrieve device identification information including
+    manufacturer, model, and serial number from the local computer. The information is
+    useful for corporate device inventory and Autopilot enrollment scenarios. The function
+    provides detailed logging and error handling.
+
+    .PARAMETER OutputPath
+    Optional path for CSV output (currently not implemented in function body).
+    Default is "$pwd\corp_device_info.csv".
+
+    .OUTPUTS
+    System.Management.Automation.PSCustomObject
+    Returns a PSCustomObject with properties: Manufacturer, Model, SerialNumber.
+    Returns $false if an error occurs during retrieval.
+
+    .EXAMPLE
+    $deviceInfo = GetCorpDeviceIdentifier
+    Write-Host "Device: $($deviceInfo.Manufacturer) $($deviceInfo.Model)"
+
+    .NOTES
+    Queries Win32_ComputerSystem for manufacturer and model.
+    Queries Win32_BIOS for serial number.
+    Displays device information to console.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [string]$OutputPath = "$pwd\corp_device_info.csv"

@@ -1,0 +1,178 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+    branches:
+      - master
+      - dev
+      - lhm
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  test-unit:
+    name: Unit Tests with Coverage
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify PowerShell 7
+        shell: pwsh
+        run: |
+          Write-Host "Using PowerShell version: $($PSVersionTable.PSVersion)"
+          if ($PSVersionTable.PSVersion.Major -lt 7) { 
+            Write-Error "PowerShell 7+ is required."
+            exit 1 
+          }
+
+      - name: Cache Pester module
+        uses: actions/cache@v4
+        with:
+          path: ~\Documents\PowerShell\Modules\Pester
+          key: ${{ runner.os }}-pester-${{ hashFiles('**/Invoke-PesterTests.ps1') }}
+          restore-keys: |
+            ${{ runner.os }}-pester-
+
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name Pester -MinimumVersion 5.0.0 -Scope CurrentUser -Force -SkipPublisherCheck
+
+      - name: Run Unit Tests with Code Coverage
+        shell: pwsh
+        run: |
+          .\Invoke-PesterTests.ps1 -TestType Unit -EnableCodeCoverage -CI -OutputVerbosity Detailed
+
+      - name: Upload unit test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: |
+            TestResults*.xml
+            coverage.xml
+          retention-days: 7
+
+      - name: Publish Unit Test Results
+        uses: EnricoMi/publish-unit-test-result-action/windows@v2
+        if: always()
+        with:
+          files: TestResults*.xml
+          check_name: Unit Test Results
+          comment_mode: off
+
+  test-comprehensive:
+    name: Comprehensive Tests with Coverage
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify PowerShell 7
+        shell: pwsh
+        run: |
+          Write-Host "Using PowerShell version: $($PSVersionTable.PSVersion)"
+          if ($PSVersionTable.PSVersion.Major -lt 7) { 
+            Write-Error "PowerShell 7+ is required."
+            exit 1 
+          }
+
+      - name: Cache Pester module
+        uses: actions/cache@v4
+        with:
+          path: ~\Documents\PowerShell\Modules\Pester
+          key: ${{ runner.os }}-pester-${{ hashFiles('**/Invoke-PesterTests.ps1') }}
+          restore-keys: |
+            ${{ runner.os }}-pester-
+
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name Pester -MinimumVersion 5.0.0 -Scope CurrentUser -Force -SkipPublisherCheck
+
+      - name: Run Comprehensive Tests with Code Coverage
+        shell: pwsh
+        run: |
+          .\Invoke-PesterTests.ps1 -TestType Comprehensive -EnableCodeCoverage -CI -OutputVerbosity Detailed
+
+      - name: Upload unit test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: comprehensive-test-results
+          path: |
+            TestResults*.xml
+            coverage.xml
+          retention-days: 7
+
+      - name: Publish Comprehensive Test Results
+        uses: EnricoMi/publish-unit-test-result-action/windows@v2
+        if: always()
+        with:
+          files: TestResults*.xml
+          check_name: Comprehensive Test Results
+          comment_mode: off
+
+  code-quality:
+    name: Code Quality Checks
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force -SkipPublisherCheck
+
+          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Settings PSGallery -ExcludeRule PSAvoidUsingWriteHost
+
+          if ($results) {
+            $results | Format-Table -AutoSize
+            $errorCount = ($results | Where-Object Severity -eq 'Error').Count
+            $warningCount = ($results | Where-Object Severity -eq 'Warning').Count
+            
+            Write-Host "`nSummary: $errorCount errors, $warningCount warnings" -ForegroundColor $(if ($errorCount -gt 0) { 'Red' } else { 'Yellow' })
+            
+            if ($errorCount -gt 0) {
+              Write-Error "PSScriptAnalyzer found $errorCount error(s). Please fix them before merging."
+              exit 1
+            }
+          } else {
+            Write-Host "No PSScriptAnalyzer issues found!" -ForegroundColor Green
+          }
+
+  summary:
+    name: Test Summary
+    runs-on: windows-latest
+    needs: [test-unit, code-quality, test-comprehensive]
+    if: always()
+    steps:
+      - name: Check test results
+        shell: pwsh
+        run: |
+          $unitResult = '${{ needs.test-unit.result }}'
+          $codeQualityResult = '${{ needs.code-quality.result }}'
+
+          Write-Host "Test Results Summary:" -ForegroundColor Cyan
+          Write-Host "  Unit Tests: $unitResult" -ForegroundColor $(if ($unitResult -eq 'success') { 'Green' } else { 'Red' })
+          Write-Host "  Code Quality: $codeQualityResult" -ForegroundColor $(if ($codeQualityResult -eq 'success') { 'Green' } else { 'Red' })
+
+          if ($unitResult -ne 'success' -or $codeQualityResult -ne 'success') {
+            Write-Error "One or more checks failed. Please review the results above."
+            exit 1
+          }
+          else {
+            Write-Host "`nAll checks passed! ✓" -ForegroundColor Green
+          }
