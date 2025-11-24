@@ -11,7 +11,7 @@ on:
         options:
           - dev
           - production
-          - government
+          - lhm
           - ci_test
       test_suite:
         description: "Tests to run before build"
