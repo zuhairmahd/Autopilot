@@ -1439,8 +1439,6 @@ if ($updateHash)
 if ($CreateZipFileOnly)
 {
     Write-Host "Creating zip file only: $zipFilePath"
-    $zipCreated = New-ZipArchive -inputPath $parentFolder -outputPath $zipFilePath
-    if ($zipCreated)
     {
         Write-Host "Zip file created successfully at $zipFilePath"
         Write-Log -logFile $logFile -Message "Zip file created successfully at $zipFilePath" -module $scriptName
