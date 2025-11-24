@@ -1784,6 +1784,10 @@ else
 
 if (-not $SkipZipArchive)
 {
+    # Ensure any existing zip file is deleted before creating a new one
+    if (Test-Path $zipFilePath) {
+        Remove-Item $zipFilePath -Force
+    }
     Write-Verbose "[$scriptName] Creating zip archive of output folder: $parentFolder"
     $zipCreated = New-ZipArchive -inputPath $parentFolder -outputPath $zipFilePath
     if ($zipCreated)
