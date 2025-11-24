@@ -198,6 +198,14 @@
                     @{
                         id   = '27d943bc-77cc-44eb-9f81-13c76841129b'
                         name = 'ITN-USR-CON-WIN-ENROLLMENT-PROD-ALLMSB'
+                    },
+                    @{
+                        id   = '42f5dcb5-5ba1-4e98-8c9c-1a4c758d2572'
+                        name = 'zscaler_zpa_users'
+                    },
+                    @{
+                        id   = 'b5f9b2da-ab81-4927-beaa-88f64fa86cd5'
+                        name = 'zscaler_zia_users'
                     }
                 )
                 groupTag                                  = 'MSB01'
