@@ -147,22 +147,21 @@
             domain          = 'gao.gov'
             
             domainSettings  = @{
-                privateSession                  = $true
-                groupsToExclude                 = @()
-                maxUserMatchDisplay             = 10
-                appModes                        = @(
-                    'registration'
+                privateSession                            = $true
+                appModes                                  = @(
+                    'registration',
+                    'helpdesk'
                 )
-                autopilotDeviceAllowedVendors   = @(
+                autopilotDeviceAllowedVendors             = @(
                     'Dell'
                 )
-                autopilotProfilesToInclude      = @(
+                autopilotProfilesToInclude                = @(
                     @{
                         id   = '20f6050d-263f-401b-847c-3a399e6aa8ac'
                         name = 'msb'
                     }
                 )
-                userPatternsToExclude           = @(
+                userPatternsToExclude                     = @(
                     '-test',
                     'onmicrosoft.com',
                     '-cma',
@@ -170,22 +169,20 @@
                     '-rsa',
                     '-sup'
                 )
-                assignedUser                    = ''
-                minimumDevicePhysicalMemoryInGB = 16
-                maxGroupMatchDisplay            = 20
-                maxWaitTime                     = 30
-                autoUpdate                      = $true
-                checkStrongMapping              = $true
-                strongMappingOptional           = $false
-                preferredBrowser                = 'Chrome'
-                maxSerialNumberLength           = 11
-                minUsernameLength               = 3
-                version                         = '1.3.0.0'
-                operatingSystem                 = 'Windows'
-                minSerialNumberLength           = 7
-                maxUserNameLength               = 50
-                validateScopes                  = $false
-                groupsToInclude                 = @(
+                minimumDevicePhysicalMemoryInGB           = 16
+                maxWaitTime                               = 30
+                autoUpdate                                = $true
+                checkStrongMapping                        = $true
+                strongMappingOptional                     = $false
+                preferredBrowser                          = 'Chrome'
+                maxSerialNumberLength                     = 11
+                minUsernameLength                         = 3
+                version                                   = '1.3.0.0'
+                operatingSystem                           = 'Windows'
+                minSerialNumberLength                     = 7
+                maxUserNameLength                         = 50
+                validateScopes                            = $false
+                groupsToInclude                           = @(
                     @{
                         id   = 'be87a9ef-3e44-4e6b-8a9e-d1696e2f7db5'
                         name = 'sg_passwrd_hash_stage'
@@ -203,24 +200,26 @@
                         name = 'ITN-USR-CON-WIN-ENROLLMENT-PROD-ALLMSB'
                     }
                 )
-                groupTag                        = 'MSB01'
-                groupPatternsToExclude          = @()
-                repoInfo                        = @{
+                groupTag                                  = 'MSB01'
+                repoInfo                                  = @{
                     repoPath      = 'zuhairmahd'
                     baseURL       = 'https://www.github.com'
                     baseSourceURL = 'https://raw.githubusercontent.com'
                     repoName      = 'Autopilot'
                 }
-                companyName                     = 'Government Accountability Office'
-                release                         = 'lhm'
-                deviceContactThresholdInDays    = 30
-                additionalScopes                = @()
-                maxNumberOfDevicesAllowed       = 20
-                migrateLegacyConfiguration      = $true
-                timeInSeconds                   = 60
-                showLicenseBanner               = $false
-                domain                          = 'gao.gov'
-                deviceNamePrefix                = 'w11-'
+                companyName                               = 'Government Accountability Office'
+                release                                   = 'lhm'
+                deviceContactThresholdInDays              = 30
+                additionalScopes                          = @()
+                maxNumberOfDevicesAllowed                 = 20
+                includeEnrolledDevicesInNextUserReadiness = $false
+                supportEmail                              = 'mahmoudz@gao.gov'
+                maxMenuItemsPerPage                       = 15
+                migrateLegacyConfiguration                = $true
+                timeInSeconds                             = 60
+                showLicenseBanner                         = $false
+                domain                                    = 'gao.gov'
+                deviceNamePrefix                          = 'w11-'
             }
             
             description     = 'Government build for gao.gov with enhanced security and compliance settings'
