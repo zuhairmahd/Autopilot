@@ -1295,7 +1295,7 @@ function Set-ParametersFromTarget()
 Write-Log -logFile $logFile -startLogging
 
 #region Apply script parameters and target settings
-Write-Host "Applying scritt parameters..."
+Write-Host "Applying script parameters..."
 Write-Log -logFile $logFile -Message "Applying script parameters..." -module $scriptName
 # Apply target build scrit configuration
 if ($targetConfig)
