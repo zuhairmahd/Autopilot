@@ -1,5 +1,39 @@
 function Get-CachedTokenObject()
 {
+    <#
+    .SYNOPSIS
+    Retrieves a cached access token object from memory or file cache.
+
+    .DESCRIPTION
+    This function retrieves a cached access token for a specified domain from either memory
+    or file-based cache storage. For memory cache, it initializes the global cache if needed
+    and validates the domain matches. For file cache, it reads and deserializes the JSON token
+    file. The function includes error handling and validation of cache data.
+
+    .PARAMETER cacheType
+    The cache storage type: 'memory' or 'file'.
+
+    .PARAMETER cacheTokenFile
+    The path to the cache token file (required for file-based caching).
+
+    .PARAMETER domain
+    The domain/tenant identifier to match against the cached token.
+
+    .OUTPUTS
+    System.Management.Automation.PSCustomObject
+    Returns the cached token object if found and valid for the domain, otherwise $null.
+
+    .EXAMPLE
+    $token = Get-CachedTokenObject -cacheType 'memory' -domain "contoso.com"
+    $token = Get-CachedTokenObject -cacheType 'file' -cacheTokenFile $cachePath -domain "contoso.com"
+
+    .NOTES
+    Memory cache uses global $MemoryCache hashtable with 'accessToken' key.
+    File cache reads JSON from cacheTokenFile path.
+    Validates domain matches before returning cached token.
+    Returns $null if cache doesn't exist, is empty, or domain doesn't match.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [string]$cacheType,
@@ -62,7 +96,111 @@ function Get-CachedTokenObject()
             {
                 write-log -LogFile $LogFile -Module "$functionName" -Message "Reading token from file cache: $cacheTokenFile"               
                 Write-Verbose "[$functionName] Reading token from file cache: $cacheTokenFile"
-                $tokenObject = Get-Content -Path $cacheTokenFile -Raw -Force | ConvertFrom-Json
+                
+                $tokenContent = Get-Content -Path $cacheTokenFile -Raw -Force
+                
+                # Check if the content is encrypted (base64 encoded)
+                $isEncrypted = $false
+                try
+                {
+                    # Try to parse as JSON first - if it fails, it's likely encrypted
+                    $null = ConvertFrom-Json $tokenContent -ErrorAction Stop
+                    Write-Verbose "[$functionName] Token appears to be unencrypted JSON"
+                }
+                catch
+                {
+                    # Not JSON, likely encrypted
+                    $isEncrypted = $true
+                    Write-Verbose "[$functionName] Token appears to be encrypted"
+                }
+                
+                # If encrypted and we have the user's password, decrypt it
+                if ($isEncrypted -and ($script:UserEncryptionPassword -or $global:UserEncryptionPassword))
+                {
+                    $userPassword = if ($script:UserEncryptionPassword) { $script:UserEncryptionPassword } else { $global:UserEncryptionPassword }
+                    
+                    Write-Verbose "[$functionName] Decrypting token from file cache"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Decrypting token from file cache" -LogLevel "Debug"
+                    
+                    # Create a temporary file for decryption
+                    $tempFile = [System.IO.Path]::GetTempFileName()
+                    try
+                    {
+                        Set-Content -Path $tempFile -Value $tokenContent -Encoding UTF8 -NoNewline
+                        
+                        # Decrypt the token using the user's password (same as config file)
+                        $decryptResult = Invoke-JsonFileEncryption -FilePath $tempFile -Key $userPassword -Decrypt -InMemoryOnly
+                        
+                        if ($decryptResult.Success)
+                        {
+                            Write-Verbose "[$functionName] Token decrypted successfully"
+                            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Token decrypted successfully" -LogLevel "Information"
+                            $tokenContent = $decryptResult.Content
+                        }
+                        else
+                        {
+                            Write-Warning "[$functionName] Failed to decrypt token (wrong password or corrupted file)"
+                            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to decrypt token: $($decryptResult.ErrorMessage)" -LogLevel "Warning"
+                            return $null
+                        }
+                    }
+                    finally
+                    {
+                        # Securely overwrite and clean up temporary file
+                        if (Test-Path $tempFile)
+                        {
+                            try {
+                                $fileInfo = Get-Item $tempFile
+                                $fileSize = $fileInfo.Length
+                                if ($fileSize -gt 0) {
+                                    $randomBytes = New-Object byte[] $fileSize
+                                    [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($randomBytes)
+                                    [System.IO.File]::WriteAllBytes($tempFile, $randomBytes)
+                                }
+                            } catch {
+                                # Ignore errors during overwrite
+                            }
+                            try {
+                                $fileInfo = Get-Item $tempFile
+                                $fileSize = $fileInfo.Length
+                                if ($fileSize -gt 0) {
+                                    $randomBytes = New-Object byte[] $fileSize
+                                    [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($randomBytes)
+                                    [System.IO.File]::WriteAllBytes($tempFile, $randomBytes)
+                                }
+                            } catch {
+                                # Ignore errors during overwrite
+                            }
+                            try
+                            {
+                                # Overwrite the file with random data before deletion to prevent recovery.
+                                $fileInfo = Get-Item $tempFile
+                                if ($fileInfo.Length -gt 0)
+                                {
+                                    $randomBytes = New-Object byte[] $fileInfo.Length
+                                    [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($randomBytes)
+                                    [System.IO.File]::WriteAllBytes($tempFile, $randomBytes)
+                                }
+                                Remove-Item $tempFile -Force -ErrorAction Stop
+                            }
+                            catch
+                            {
+                                Write-Warning "[$functionName] Failed to securely delete temporary file '$($tempFile)'. Attempting regular deletion."
+                                Remove-Item $tempFile -Force -ErrorAction SilentlyContinue | Out-Null
+                            }
+                        }
+                    }
+                }
+                elseif ($isEncrypted -and -not ($script:UserEncryptionPassword -or $global:UserEncryptionPassword))
+                {
+                    Write-Warning "[$functionName] Token is encrypted but no user password is available"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Token is encrypted but no user password is available" -LogLevel "Warning"
+                    return $null
+                }
+                
+                # Parse the token JSON
+                $tokenObject = ConvertFrom-Json $tokenContent
+                
                 if ($tokenObject.domain -eq $domain)
                 {
                     Write-Verbose "[$functionName] Found matching token in file cache for domain: $domain"

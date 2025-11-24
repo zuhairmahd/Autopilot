@@ -1,5 +1,28 @@
 function cleanupTempFiles()
 {
+    <#
+    .SYNOPSIS
+    Cleans up temporary and backup files from the working directory.
+
+    .DESCRIPTION
+    This function identifies and moves temporary files (backups, test files, logs, old executables)
+    from the current directory to the system TEMP folder. It provides detailed logging of the
+    cleanup process and returns statistics about files processed. The function handles errors
+    gracefully and reports on the success of each file operation.
+
+    .OUTPUTS
+    System.Management.Automation.PSCustomObject
+    Returns an object with properties: tempFilesCount, RemovedFilesCount, and AllRemoved (boolean).
+
+    .EXAMPLE
+    $cleanupResult = cleanupTempFiles
+    Write-Host "Cleaned up $($cleanupResult.RemovedFilesCount) files"
+
+    .NOTES
+    Removes files matching patterns: *.backup.*, test*.*.psd1, test-*.*, contoso.com.psd1, *.tmp, *.log, *.old, main.exe.old
+    Files are moved to $env:TEMP rather than deleted for safety.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param()
 

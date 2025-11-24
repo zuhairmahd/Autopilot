@@ -1,5 +1,31 @@
 function PrepareImportDevice()
 {
+    <#
+    .SYNOPSIS
+    Prepares device object for Autopilot import by validating and formatting properties.
+
+    .DESCRIPTION
+    This function validates the device object contains required properties (serialNumber, hardwareHash),
+    formats optional properties (GroupTag, AssignedUser), and creates the properly structured device
+    object for Graph API import. It ensures all data meets Autopilot import requirements.
+
+    .PARAMETER device
+    Device object to prepare containing serialNumber, hardwareHash, and optional GroupTag/AssignedUser.
+    This parameter is mandatory.
+
+    .OUTPUTS
+    System.Management.Automation.PSCustomObject
+    Returns prepared device object with validated and formatted properties, or $null if validation fails.
+
+    .EXAMPLE
+    $preparedDevice = PrepareImportDevice -device $rawDevice
+
+    .NOTES
+    Validates serialNumber and hardwareHash are present.
+    Formats GroupTag and AssignedUser properties.
+    Returns $null if required properties missing.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

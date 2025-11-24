@@ -1,5 +1,52 @@
 function SendDeviceCommand()
 {
+    <#
+    .SYNOPSIS
+    Sends management commands to a managed device via Microsoft Graph.
+
+    .DESCRIPTION
+    This function sends various management commands (clean, wipe, sync, restart) to a managed
+    device through Microsoft Graph API. It supports user confirmation, retry logic, and optional
+    action monitoring. Different commands perform different actions:
+    - clean: Removes user data while preserving provisioning
+    - wipe: Removes all data and settings
+    - sync: Synchronizes device policy
+    - restart: Restarts the device
+
+    .PARAMETER ManagedDeviceId
+    The managed device ID (Intune device ID) of the target device.
+
+    .PARAMETER accessToken
+    The Microsoft Graph API access token for authentication.
+
+    .PARAMETER Command
+    The command to send. Valid values: "clean", "wipe", "sync", "restart". Default is "clean".
+
+    .PARAMETER MaxRetries
+    Maximum number of retry attempts for the command. Default is 20.
+
+    .PARAMETER RetryDelaySeconds
+    Delay in seconds between retry attempts. Default is 15.
+
+    .PARAMETER MonitorAction
+    When specified, monitors the action status after execution.
+
+    .PARAMETER NoConfirmation
+    When specified, skips the user confirmation prompt.
+
+    .OUTPUTS
+    System.String
+    Returns success or failure messages based on the command execution result.
+
+    .EXAMPLE
+    SendDeviceCommand -ManagedDeviceId "abc123" -accessToken $token -Command "sync"
+    SendDeviceCommand -ManagedDeviceId "abc123" -accessToken $token -Command "wipe" -NoConfirmation
+
+    .NOTES
+    Requires appropriate Microsoft Graph permissions for device management actions.
+    Clean and wipe operations are destructive and require careful consideration.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [string]$ManagedDeviceId,

@@ -1,5 +1,66 @@
 function VerifyGroupMembership()
 {
+    <#
+    .SYNOPSIS
+    Verifies a user's membership in inclusion and exclusion groups for assignment filtering.
+
+    .DESCRIPTION
+    This function checks whether a user is a member of specified inclusion groups and not a member
+    of exclusion groups. It supports multiple group input formats (string arrays or hashtable arrays
+    with name/id properties), automatically detects and converts formats, and performs efficient
+    group membership validation. The function is used for determining user eligibility based on
+    group-based assignment filters.
+
+    .PARAMETER accessToken
+    The Microsoft Graph API access token for authentication. This parameter is mandatory.
+
+    .PARAMETER userName
+    The user principal name to check group membership for. This parameter is mandatory.
+
+    .PARAMETER groupsToInclude
+    Groups the user must be a member of. Accepts string array of group names/IDs or hashtable array
+    with 'name' and 'id' properties.
+
+    .PARAMETER groupsToExclude
+    Groups the user must NOT be a member of. Accepts string array of group names/IDs or hashtable array
+    with 'name' and 'id' properties.
+
+    .OUTPUTS
+    System.Management.Automation.PSCustomObject
+    Returns object with properties:
+    - includeGroupsPass: Boolean indicating if user is in all required inclusion groups
+    - excludeGroupsPass: Boolean indicating if user is not in any exclusion groups
+    - overallPass: Boolean indicating if both include and exclude checks pass
+    - includeGroupNames: Array of inclusion group names checked
+    - excludeGroupNames: Array of exclusion group names checked
+    - includeMembership: Array of groups user is actually a member of
+    - excludeMembership: Array of exclusion groups user is a member of (should be empty for pass)
+
+    .EXAMPLE
+    $result = VerifyGroupMembership -accessToken $token -userName "john@contoso.com" -groupsToInclude @("IT-Staff", "Admins")
+    if ($result.overallPass) {
+        Write-Host "User passes group membership requirements"
+    }
+    
+    $result = VerifyGroupMembership -accessToken $token -userName "john@contoso.com" `
+        -groupsToInclude @(@{name="IT-Staff"; id="guid1"}) `
+        -groupsToExclude @("Contractors")
+
+    .NOTES
+    Supports multiple input formats:
+    - String array: @("GroupName1", "GroupName2")
+    - Hashtable array: @(@{name="Group"; id="guid"})
+    - Mixed format detection and automatic conversion
+    
+    Helper functions:
+    - Test-GroupFormat: Detects input format
+    - Convert-GroupsToStandardFormat: Normalizes to standard format
+    
+    Uses GetGroupIdsByNames for name-to-ID resolution.
+    Uses getGroupMembership for actual membership checking.
+    Provides detailed logging of membership verification process.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

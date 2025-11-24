@@ -1,5 +1,33 @@
 function GetBitLockerRecoveryKey()
 {
+    <#
+    .SYNOPSIS
+    Retrieves the BitLocker recovery key for a specific key identifier.
+
+    .DESCRIPTION
+    This function queries Microsoft Graph to retrieve the actual BitLocker recovery key
+    for a given key object. It displays the recovery key along with metadata such as
+    creation date and volume type. The function handles errors gracefully and provides
+    fallback information if the key cannot be retrieved.
+
+    .PARAMETER key
+    The BitLocker key object containing the key ID and metadata.
+
+    .PARAMETER accessToken
+    The Microsoft Graph API access token for authentication.
+
+    .OUTPUTS
+    System.String
+    Returns the BitLocker recovery key as a string, or an empty line if retrieval fails.
+
+    .EXAMPLE
+    $recoveryKey = GetBitLockerRecoveryKey -key $keyObject -accessToken $token
+
+    .NOTES
+    Requires appropriate Microsoft Graph permissions to access BitLocker recovery keys.
+    Volume types: 0=Unknown, 1=OperatingSystem, 2=FixedData, 3=RemovableData.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [parameter(Mandatory = $true)]

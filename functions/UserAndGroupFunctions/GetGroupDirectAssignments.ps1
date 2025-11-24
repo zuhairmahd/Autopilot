@@ -1,5 +1,52 @@
 function GetGroupDirectAssignments()
 {
+    <#
+    .SYNOPSIS
+    Retrieves direct policy and configuration assignments for an Entra ID group.
+
+    .DESCRIPTION
+    This function queries Microsoft Graph to retrieve all direct Intune policy and configuration
+    assignments for a specified group. It can include beta API assignments, show summary information,
+    include indirect assignments through nested groups, and batch process multiple assignment types.
+    The function uses a common assignment result object structure for consistent output.
+
+    .PARAMETER AccessToken
+    The Microsoft Graph API access token for authentication.
+
+    .PARAMETER GroupName
+    The group object (with Id and displayName properties) to retrieve assignments for. This parameter is mandatory.
+
+    .PARAMETER IncludeBeta
+    When specified, includes assignments from Microsoft Graph beta API endpoints.
+
+    .PARAMETER ShowSummary
+    When specified, displays summary information about assignments found.
+
+    .PARAMETER IncludeIndirectAssignments
+    When specified, includes indirect assignments through nested group membership.
+
+    .PARAMETER BatchSize
+    Number of assignment queries to process in parallel batches. Default is 20.
+
+    .PARAMETER Settings
+    Optional hashtable containing additional settings like operatingSystem filter.
+
+    .OUTPUTS
+    System.Collections.Hashtable
+    Returns hashtable with assignment details including policies, configurations, and applications
+    assigned to the group. Uses Initialize-AssignmentResultObject structure.
+
+    .EXAMPLE
+    $assignments = GetGroupDirectAssignments -AccessToken $token -GroupName $group
+    $assignments = GetGroupDirectAssignments -AccessToken $token -GroupName $group -IncludeBeta -ShowSummary
+
+    .NOTES
+    Queries multiple Intune configuration types: device configurations, compliance policies,
+    configuration policies, app protection policies, and more.
+    Supports batching for performance with large numbers of assignments.
+    Requires appropriate Microsoft Graph permissions (DeviceManagementConfiguration.Read.All).
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $false)]

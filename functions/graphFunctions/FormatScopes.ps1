@@ -1,5 +1,35 @@
 function FormatScopes()
 {
+    <#
+    .SYNOPSIS
+    Formats OAuth scopes for Microsoft Graph API authentication.
+
+    .DESCRIPTION
+    This function processes OAuth scope strings for use with Microsoft Graph API. In normal mode,
+    it adds the Graph API URL prefix to scopes and includes default OpenID Connect scopes. In
+    reverse mode, it removes the Graph API prefix from scopes. The function handles space-separated
+    scope strings and validates input.
+
+    .PARAMETER scopes
+    Array of scope strings to format. Can be space-separated or an array.
+
+    .PARAMETER Reverse
+    When specified, removes Graph API prefixes instead of adding them.
+
+    .OUTPUTS
+    System.String[] or System.String
+    Returns formatted scope array or string. Returns empty string if no scopes provided.
+
+    .EXAMPLE
+    $formattedScopes = FormatScopes -scopes "User.Read Device.Read"
+    $cleanScopes = FormatScopes -scopes $graphScopes -Reverse
+
+    .NOTES
+    Default OpenID scopes: offline_access, openid, profile.
+    Normal mode adds "https://graph.microsoft.com/" prefix to non-OpenID scopes.
+    Reverse mode removes the Graph API URL prefix.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [string[]]$scopes,

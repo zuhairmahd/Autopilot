@@ -1,5 +1,35 @@
 function LaunchBrowser()
 {
+    <#
+    .SYNOPSIS
+    Launches a web browser with a specified URL.
+
+    .DESCRIPTION
+    This function opens a web browser (Chrome, Edge, Firefox, or system default) with the
+    specified URL. It supports private/incognito mode based on settings and uses the preferred
+    browser from settings if not explicitly specified. The function handles browser-specific
+    paths and argument formats.
+
+    .PARAMETER url
+    The URL to open in the browser. This parameter is mandatory.
+
+    .PARAMETER browser
+    The browser to use. Valid values: "Chrome", "Edge", "Firefox", "Default".
+    If not specified, uses the preferredBrowser setting or defaults to "Default".
+
+    .OUTPUTS
+    None. Opens the specified browser with the URL.
+
+    .EXAMPLE
+    LaunchBrowser -url "https://login.microsoftonline.com/oauth2/authorize" -browser "Edge"
+    LaunchBrowser -url "https://portal.azure.com"
+
+    .NOTES
+    Reads preferredBrowser and privateSession settings from $settings variable.
+    Uses standard installation paths for browsers.
+    Private session mode supported for Edge, Chrome, and Firefox.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true, Position = 0)]

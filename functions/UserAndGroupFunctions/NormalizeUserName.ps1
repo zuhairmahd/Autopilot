@@ -1,5 +1,37 @@
 function NormalizeUserName()
 {
+    <#
+    .SYNOPSIS
+    Normalizes a user name by ensuring it includes the domain suffix.
+
+    .DESCRIPTION
+    This function takes a user name and ensures it is in the correct format with the domain
+    suffix (e.g., user@domain.com). If the user name is missing the domain suffix, it is
+    automatically appended using the domain from settings. The function trims whitespace
+    and validates the format.
+
+    .PARAMETER UserName
+    The user name to normalize. Can be with or without domain suffix.
+
+    .PARAMETER Settings
+    The settings object containing the domain property. Defaults to script-level $settings.
+
+    .OUTPUTS
+    System.String
+    Returns the normalized user name in the format username@domain.
+
+    .EXAMPLE
+    $normalizedName = NormalizeUserName -UserName "john.doe"
+    # Returns "john.doe@contoso.com" if domain is "contoso.com"
+    
+    $normalizedName = NormalizeUserName -UserName "jane@contoso.com"
+    # Returns "jane@contoso.com" unchanged
+
+    .NOTES
+    Automatically appends domain suffix if missing.
+    Trims leading and trailing whitespace.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [string]$UserName,

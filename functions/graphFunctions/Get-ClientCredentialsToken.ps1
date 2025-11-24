@@ -1,5 +1,58 @@
 function Get-ClientCredentialsToken()
 {
+    <#
+    .SYNOPSIS
+    Acquires Microsoft Graph API access token using client credentials (application) authentication flow.
+
+    .DESCRIPTION
+    This function implements the OAuth 2.0 client credentials grant for non-delegated (application-only)
+    authentication to Microsoft Graph. It supports both client secret and certificate-based authentication,
+    with automatic fallback between methods. The function handles token caching, validation, and renewal
+    to minimize redundant authentication requests.
+
+    .PARAMETER tenantId
+    The Azure AD tenant ID. This parameter is mandatory.
+
+    .PARAMETER clientId
+    The application (client) ID from Azure AD app registration. This parameter is mandatory.
+
+    .PARAMETER clientSecret
+    The client secret from Azure AD app registration. Either clientSecret or certificateThumbprint required.
+
+    .PARAMETER certificateThumbprint
+    The certificate thumbprint for certificate-based authentication. Either clientSecret or certificateThumbprint required.
+
+    .PARAMETER domain
+    The domain name for tenant-specific caching and logging.
+
+    .PARAMETER cacheType
+    The cache storage type: 'file' or 'memory'.
+
+    .PARAMETER cacheTokenFile
+    Path to the cache token file for file-based caching.
+
+    .PARAMETER cacheFolder
+    Path to the cache folder for file-based caching.
+
+    .PARAMETER secureString
+    When specified, returns access token as SecureString instead of plain text.
+
+    .OUTPUTS
+    System.String or System.Security.SecureString
+    Returns the access token (plain text or SecureString based on -secureString switch), or $null on error.
+
+    .EXAMPLE
+    $token = Get-ClientCredentialsToken -tenantId $tid -clientId $cid -clientSecret $secret
+    $token = Get-ClientCredentialsToken -tenantId $tid -clientId $cid -certificateThumbprint $thumb -cacheType 'memory'
+
+    .NOTES
+    Uses client credentials OAuth 2.0 flow for application-only permissions.
+    Supports both client secret and certificate authentication.
+    Implements automatic fallback: tries certificate first if both provided.
+    Caches tokens to avoid redundant authentication.
+    Validates cached tokens before reuse.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

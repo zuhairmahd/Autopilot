@@ -1,5 +1,45 @@
 function Test-CachedTokenValidity()
 {
+    <#
+    .SYNOPSIS
+    Validates a cached access token for expiry and scope coverage.
+
+    .DESCRIPTION
+    This function validates a cached access token by checking its expiry time against a time
+    buffer and optionally validating that it has all requested scopes. It handles different
+    time formats, normalizes scope inputs (string or array), and decodes JWT tokens to extract
+    scope information. The function returns the validated token or $null if invalid.
+
+    .PARAMETER accessTokenObject
+    The cached access token object to validate.
+
+    .PARAMETER timeBuffer
+    The DateTime threshold for token expiry validation (current time + renewal lead time).
+
+    .PARAMETER domain
+    The domain/tenant identifier for logging purposes.
+
+    .PARAMETER cacheType
+    The cache storage type ('file' or 'memory') for logging purposes.
+
+    .PARAMETER requestedScopes
+    Optional array of scopes to validate against the cached token. Can be space-separated string or array.
+
+    .OUTPUTS
+    System.String or $null
+    Returns the access token string if valid, or $null if expired or missing required scopes.
+
+    .EXAMPLE
+    $token = Test-CachedTokenValidity -accessTokenObject $cachedToken -timeBuffer $buffer -domain "contoso.com" -cacheType 'file'
+    $token = Test-CachedTokenValidity -accessTokenObject $cachedToken -timeBuffer $buffer -domain "contoso.com" -cacheType 'file' -requestedScopes @("User.Read", "Device.Read")
+
+    .NOTES
+    Handles both delegated (scp claim) and application (roles claim) authentication.
+    Normalizes space-separated scope strings to arrays automatically.
+    Filters empty scope elements from splitting operations.
+    Returns $null for expired tokens or insufficient scopes.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [object]$accessTokenObject,

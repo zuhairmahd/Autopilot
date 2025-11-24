@@ -1,5 +1,42 @@
 function ProcessAssignmentResult()
 {
+    <#
+    .SYNOPSIS
+    Processes the result of profile assignment check for an imported Autopilot device.
+
+    .DESCRIPTION
+    This function interprets the profile assignment status returned from CheckDeviceAssignment
+    and determines next steps. It handles success (profile assigned), timeout scenarios, and
+    delegation to HandleDeviceEnrollmentState for enrollment-specific processing.
+
+    .PARAMETER assignmentResult
+    Result object from CheckDeviceAssignment containing device assignment status. This parameter is mandatory.
+
+    .PARAMETER serialNumber
+    Device serial number for logging and further lookups. This parameter is mandatory.
+
+    .PARAMETER accessToken
+    Microsoft Graph API access token for additional operations. This parameter is mandatory.
+
+    .PARAMETER returnValues
+    Return values object containing status messages. This parameter is mandatory.
+
+    .PARAMETER domain
+    Optional domain for tenant-specific operations.
+
+    .OUTPUTS
+    System.String
+    Returns status message from returnValues based on assignment result.
+
+    .EXAMPLE
+    $result = ProcessAssignmentResult -assignmentResult $assignment -serialNumber "ABC123" -accessToken $token -returnValues $rv
+
+    .NOTES
+    Handles successful assignment (profile assigned).
+    Handles timeout scenarios (no assignment after retries).
+    Delegates enrollment state handling to HandleDeviceEnrollmentState.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

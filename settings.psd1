@@ -1,37 +1,4 @@
 ﻿@{
-    repoInfo       = @{
-        repoPath      = 'zuhairmahd'
-        baseURL       = 'https://www.github.com'
-        baseSourceURL = 'https://raw.githubusercontent.com'
-        repoName      = 'Autopilot'
-    }
-    globalSettings = @{
-        migrateLegacyConfiguration   = $true
-        operatingSystem              = 'Windows'
-        documentationURL             = 'https://github.com/zuhairmahd/Autopilot/blob/master/readme.md'
-        licenseURL                   = 'https://github.com/zuhairmahd/Autopilot/blob/master/LICENSE'
-        timeInSeconds                = 60
-        maxMenuItemsPerPage          = 15
-        maxUserMatchDisplay          = 10
-        maxWaitTime                  = 30
-        appModes                     = @('full')
-        autoUpdate                   = $true
-        strongMappingOptional        = $true
-        preferredBrowser             = 'Chrome'
-        validateScopes               = $true
-        maxGroupMatchDisplay         = 10
-        useGridForLogDisplay         = $true
-        hideEmptyMenus               = $true
-        privateSession               = $false
-        DisplayManualFilterSelection = $false
-        release                      = 'auto'
-        checkStrongMapping           = $false
-        configFile                   = '.\.secrets\config.json'
-        showLicenseBanner            = $true
-        deviceContactThresholdInDays = 30
-    }
-    description    = 'This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.'
-    version        = '1.3.0.0'
     cacheSettings  = @{
         maxCacheSize             = 1000
         defaultExpirationMinutes = 15
@@ -50,6 +17,40 @@
             }
         }
         enabled                  = $true
+    }
+    globalSettings = @{
+        migrateLegacyConfiguration                = $true
+        operatingSystem                           = 'Windows'
+        documentationURL                          = 'https://github.com/zuhairmahd/Autopilot/blob/master/readme.md'
+        timeInSeconds                             = 60
+        maxMenuItemsPerPage                       = 15
+        maxUserMatchDisplay                       = 10
+        maxWaitTime                               = 30
+        appModes                                  = @('full')
+        autoUpdate                                = $true
+        strongMappingOptional                     = $true
+        preferredBrowser                          = 'Chrome'
+        validateScopes                            = $true
+        licenseURL                                = 'https://github.com/zuhairmahd/Autopilot/blob/master/LICENSE'
+        maxGroupMatchDisplay                      = 10
+        useGridForLogDisplay                      = $true
+        hideEmptyMenus                            = $true
+        privateSession                            = $false
+        DisplayManualFilterSelection              = $false
+        release                                   = 'auto'
+        checkStrongMapping                        = $false
+        includeEnrolledDevicesInNextUserReadiness = $true
+        configFile                                = '.\.secrets\config.json'
+        showLicenseBanner                         = $true
+        deviceContactThresholdInDays              = 30
+    }
+    description    = 'This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.'
+    version        = '1.3.0.0'
+    repoInfo       = @{
+        repoPath      = 'zuhairmahd'
+        baseURL       = 'https://www.github.com'
+        baseSourceURL = 'https://raw.githubusercontent.com'
+        repoName      = 'Autopilot'
     }
     requiredScopes = @(
         @{
@@ -139,11 +140,11 @@
         }
     )
     auth           = @{
-        cacheType           = 'Memory'
-        changePwOnNextStart = $false
         noSaveRefreshToken  = $false
+        cacheType           = 'File'
+        changePwOnNextStart = $false
+        delegated           = $true
         forceNewToken       = $false
-        renewalLeadTime     = 5
         scope               = @(
             'Device.ReadWrite.All',
             'DeviceManagementApps.Read.All',
@@ -156,6 +157,6 @@
         )
         authType            = 'PublicAuthFlow'
         secureString        = $false
-        delegated           = $true
+        renewalLeadTime     = 5
     }
 }

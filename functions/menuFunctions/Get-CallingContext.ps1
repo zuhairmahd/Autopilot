@@ -1,5 +1,39 @@
 function Get-CallingContext()
 {
+    <#
+    .SYNOPSIS
+    Gets the calling context for menu operations with optional navigation path enhancement.
+
+    .DESCRIPTION
+    This function determines the calling context for menu operations by either using a preferred
+    context or analyzing the call stack. It can optionally enhance the context with navigation
+    path information from the global menu history, creating contexts like "Action-ViaCheckMenu"
+    or "Navigation-ViaAutopilotMenu" for more precise menu state tracking.
+
+    .PARAMETER Menu
+    Optional hashtable containing the current menu object for context generation.
+
+    .PARAMETER PreferredContext
+    Optional preferred context string. If provided and valid ('Direct', 'Action', 'Submenu', 'Navigation'),
+    it will be used instead of analyzing the call stack.
+
+    .PARAMETER IncludeNavigationPath
+    When specified, enhances the context with navigation path information from MenuHistory.
+
+    .OUTPUTS
+    System.String
+    Returns a context string, optionally enhanced with navigation path (e.g., "Action-ViaCheckMenu").
+
+    .EXAMPLE
+    $context = Get-CallingContext -Menu $currentMenu
+    $context = Get-CallingContext -PreferredContext 'Action' -IncludeNavigationPath
+
+    .NOTES
+    Valid contexts: Direct, Action, Submenu, Navigation.
+    Navigation path enhancement creates contexts like "baseContext-pathContext".
+    Uses global $MenuHistory for navigation path analysis.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $false)]

@@ -1,5 +1,68 @@
 function GetGraphAccessToken()
 {
+    <#
+    .SYNOPSIS
+    Main entry point for acquiring Microsoft Graph API access tokens with automatic auth flow detection.
+
+    .DESCRIPTION
+    This is the primary token acquisition function that orchestrates the complete authentication process.
+    It automatically determines whether to use delegated (user) or application (client credentials) auth
+    based on parameters, handles configuration file processing, manages encrypted credential storage,
+    implements token caching strategies, and provides flexible renewal options. The function abstracts
+    the complexity of different auth flows into a unified interface.
+
+    .PARAMETER configFile
+    Path to the configuration file containing auth settings. This parameter is mandatory.
+
+    .PARAMETER renewalLeadTime
+    Minutes before expiry to renew token. Default is 5 minutes.
+
+    .PARAMETER SecureString
+    When specified, returns access token as SecureString.
+
+    .PARAMETER NoSaveRefreshToken
+    (Delegated only) Prevents saving refresh token to configuration.
+
+    .PARAMETER delegated
+    When specified, forces delegated (user) authentication flow.
+
+    .PARAMETER Scope
+    (Delegated only) Array of Microsoft Graph permission scopes.
+
+    .PARAMETER AuthType
+    (Delegated only) Authentication type: 'PublicAuthFlow', 'Interactive', or 'Private'. Default is 'Private'.
+
+    .PARAMETER ForceNewToken
+    (Delegated only) Forces new token acquisition bypassing cache.
+
+    .PARAMETER ForceNewRefreshToken
+    (Delegated only) Forces new refresh token acquisition.
+
+    .PARAMETER CacheType
+    Token cache storage type: 'file' or 'memory'. Default is 'Memory'.
+
+    .PARAMETER APIVersion
+    Microsoft Graph API version: 'Beta' (default) or 'v1.0'.
+
+    .OUTPUTS
+    System.String or System.Security.SecureString
+    Returns the access token, or $null on error.
+
+    .EXAMPLE
+    $token = GetGraphAccessToken -configFile "config.json"
+    $token = GetGraphAccessToken -configFile "config.json" -delegated -Scope @("User.Read") -CacheType 'file'
+    $token = GetGraphAccessToken -configFile "config.json" -ForceNewToken -SecureString
+
+    .NOTES
+    Unified entry point for all authentication flows.
+    Auto-detects delegated vs application auth from config and parameters.
+    Processes encrypted configuration files securely.
+    Manages both in-memory and file-based token caching.
+    Handles refresh token extraction from encrypted config.
+    Delegates to Get-DelegatedToken or Get-ClientCredentialsToken based on auth type.
+    Implements comprehensive error handling and logging.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

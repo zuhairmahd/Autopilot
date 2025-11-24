@@ -1,42 +1,38 @@
 function MergeSettings()
-<#
-.SYNOPSIS
+{
+    <#
+    .SYNOPSIS
     Merges two hashtables (local and global settings) into a single flat hashtable with conflict resolution.
 
-.DESCRIPTION
+    .DESCRIPTION
     The MergeSettings function combines local and global settings into a single hashtable, flattening nested structures and resolving conflicts according to the specified strategy. It supports merging nested hashtables and PSCustomObjects. Keys are normalized to their simplest form (last segment after any dot notation). When a conflict occurs (same key exists in both settings), the ConflictResolution parameter determines which value wins - this applies to all data types including arrays, which are replaced rather than merged. The function provides detailed verbose logging for each step, including flattening, normalization, and conflict resolution.
 
-.PARAMETER localSettings
+    .PARAMETER localSettings
     The hashtable containing local (user or environment-specific) settings. These take precedence unless overridden by the ConflictResolution parameter.
 
-.PARAMETER globalSettings
+    .PARAMETER globalSettings
     The hashtable containing global (default or organization-wide) settings. These are merged in after local settings and may override them depending on the ConflictResolution parameter.
 
-.PARAMETER ConflictResolution
+    .PARAMETER ConflictResolution
     Determines which value to use when a key exists in both local and global settings:
     - 'Local': Keep the value from localSettings (default behavior)
     - 'Global': Use the value from globalSettings
     This applies to all data types. When both values are arrays, the winning array completely replaces the other (arrays are not merged).
 
-.OUTPUTS
+    .OUTPUTS
     System.Collections.Hashtable
     Returns a flat hashtable containing the merged settings, with conflicts resolved as specified.
 
-.EXAMPLE
-    # Merge local and global settings, preferring global values on conflict
+    .EXAMPLE
     $merged = MergeSettings -localSettings $local -globalSettings $global -ConflictResolution 'Global'
-
-.EXAMPLE
-    # Merge settings, keeping local values on conflict (default)
     $merged = MergeSettings -localSettings $local -globalSettings $global
 
-.NOTES
-    - Flattens nested hashtables and PSCustomObjects for key normalization
-    - Arrays are replaced (not merged) based on ConflictResolution parameter
-    - Provides verbose logging for troubleshooting and auditing
-    - Compatible with PowerShell 5.1 and later
-#>
-{
+    .NOTES
+    Flattens nested hashtables and PSCustomObjects for key normalization.
+    Arrays are replaced (not merged) based on ConflictResolution parameter.
+    Provides verbose logging for troubleshooting and auditing.
+    Compatible with PowerShell 5.1 and later.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

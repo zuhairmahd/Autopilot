@@ -1,5 +1,37 @@
 function GetDeviceByUser()
 {
+    <#
+    .SYNOPSIS
+    Retrieves device information for a specific user and operating system.
+
+    .DESCRIPTION
+    This function queries Microsoft Graph to find managed devices associated with a user's
+    principal name and operating system. If multiple devices are found, it presents an
+    interactive menu for device selection. The function returns the serial number of the
+    selected device or handles navigation commands appropriately.
+
+    .PARAMETER UserName
+    The user principal name or prefix to search for devices.
+
+    .PARAMETER OperatingSystem
+    The operating system type to filter devices (e.g., "Windows", "iOS", "Android").
+
+    .PARAMETER AccessToken
+    The Microsoft Graph API access token for authentication.
+
+    .OUTPUTS
+    System.String
+    Returns the serial number of the selected device, navigation commands ("Back", "Main Menu"),
+    or predefined return values (noDeviceFound) if no devices are found.
+
+    .EXAMPLE
+    $serialNumber = GetDeviceByUser -UserName "john.doe@contoso.com" -OperatingSystem "Windows" -AccessToken $token
+
+    .NOTES
+    Uses interactive menu system when multiple devices are found.
+    Requires appropriate Microsoft Graph permissions to query managed devices.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [parameter(Mandatory = $true)]

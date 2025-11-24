@@ -1,5 +1,31 @@
 function ExportDeviceStorage()
 {
+    <#
+    .SYNOPSIS
+    Exports device storage information to CSV file.
+
+    .DESCRIPTION
+    This function retrieves storage details for managed devices and exports them to CSV format.
+    Includes disk capacity, free space, and storage health metrics.
+
+    .PARAMETER accessToken
+    Microsoft Graph API access token. This parameter is mandatory.
+
+    .PARAMETER outputPath
+    Directory path for CSV export. This parameter is mandatory.
+
+    .OUTPUTS
+    System.String
+    Returns path to exported storage report file.
+
+    .EXAMPLE
+    ExportDeviceStorage -accessToken $token -outputPath "C:\Reports"
+
+    .NOTES
+    Retrieves hardware storage information via Graph API.
+    Exports disk capacity and availability metrics.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

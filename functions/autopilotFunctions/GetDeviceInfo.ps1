@@ -1,5 +1,46 @@
 function GetDeviceInfo()
 {
+    <#
+    .SYNOPSIS
+    Retrieves local device hardware information for Autopilot enrollment.
+
+    .DESCRIPTION
+    This function collects device information from the local system including serial number,
+    manufacturer, model, and optionally the hardware hash. It uses CIM to query BIOS and
+    system information, and validates the manufacturer against an allowed vendors list from
+    settings. The function supports manufacturer override for testing scenarios.
+
+    .PARAMETER GroupTag
+    Optional group tag to assign to the device for Autopilot profile assignment.
+
+    .PARAMETER AssignedUser
+    Optional user principal name to pre-assign to the device.
+
+    .PARAMETER Name
+    Optional device name (currently not used in implementation).
+
+    .PARAMETER NoHash
+    When specified, skips hardware hash collection. Useful for quick device info retrieval.
+
+    .PARAMETER ManufacturerOverride
+    Optional manufacturer name override for testing vendor filtering without local CIM data.
+
+    .OUTPUTS
+    System.Collections.Hashtable
+    Returns a hashtable with device properties: SerialNumber, Manufacturer, Model, Product,
+    GroupTag, AssignedUser, HardwareHash (if not NoHash), and deviceAllowed (boolean).
+    Returns $null if hardware hash is requested but not found.
+
+    .EXAMPLE
+    $deviceInfo = GetDeviceInfo -GroupTag "IT-Dept" -AssignedUser "john.doe@contoso.com"
+    $quickInfo = GetDeviceInfo -NoHash
+
+    .NOTES
+    Requires administrator privileges to access MDM_DevDetail_Ext01 namespace for hardware hash.
+    Hardware hash is required for Autopilot device registration.
+    Vendor validation uses normalized manufacturer names (removes common suffixes/punctuation).
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param
     (
