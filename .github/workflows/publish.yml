@@ -284,9 +284,10 @@ jobs:
         shell: pwsh
         run: |
           $branchDir = ".\$env:BRANCH_NAME"
-          #copy lastrun to the root folder from the current directory if it exists.
-          if (Test-Path -Path "$branchDir\lastrun.json") { Copy-Item -Path "$branchDir\lastrun.json" -Destination .\lastrun.json -Force }
           .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName $env:TARGET_NAME -Overwrite -CreateZipFileOnly
+          #copy reset.cmd and reset.ps1 from the tools folder to the target folder.
+          if (Test-Path -Path .\tools\reset.cmd) { Copy-Item -Path .\tools\reset.cmd -Destination "$branchDir\reset.cmd" -Force }                   
+          if (Test-Path -Path .\tools\reset.ps1) { Copy-Item -Path .\tools\reset.ps1 -Destination "$branchDir\reset.ps1" -Force }
 
       - name: Commit signed artifacts to repository
         if: env.AZURE_TENANT_ID != '' && env.AZURE_CLIENT_ID != '' && env.AZURE_CLIENT_SECRET != ''
