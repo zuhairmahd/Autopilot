@@ -107,8 +107,8 @@
             description     = 'Development build with test mode enabled and signing disabled'
         }
         
-        # Government build (example for gao.gov)
-        government = @{
+        # LHM build (example for gao.gov)
+        lhm        = @{
             buildParameters = @{
                 OutputPath      = 'lhm'
                 NoVersionUpdate = $false
