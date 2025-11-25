@@ -26,7 +26,7 @@
             # Settings to apply to corporate section
             corporateSettings = @{
                 useCorporateSettings       = $false
-                corporateDomain            = 'arabictutor.com'    
+                corporateDomain            = 'arabictutor.com'
                 corporateSettingsFilePaths = @(
                     "\\test\folder\path",
                     "\\$env:COMPUTERNAME\c$\users\$env:USERNAME\code\autopilot",
