@@ -470,7 +470,7 @@ if ($null -ne $appMetaData.corporateSettings -and $appMetaData.corporateSettings
         Write-Host "Copying corporate settings from $domainFileName to $localDomainFileName" -ForegroundColor Green
         try
         {
-            Copy-Item -Path $domainFileName -Destination "$scriptPath\$domain.psd1" -Force -ErrorAction Stop                
+            Copy-Item -Path $domainFileName -Destination $localDomainFileName -Force -ErrorAction Stop                
             $fileCopied = $true
             Write-Host "Successfully copied corporate settings from $domainFileName to $localDomainFileName" -ForegroundColor Green                             
             break
