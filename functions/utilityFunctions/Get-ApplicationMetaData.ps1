@@ -43,12 +43,51 @@ function Get-ApplicationMetaData()
     param (
         [string]$GlobalSettingsFile = "$pwd\settings.psd1",
         [string]$scriptPath,
-        $scriptName,
+        [string]$scriptName,
         [string]$domain,
         [switch]$Silent
     )
 
     $functionName = $MyInvocation.MyCommand.Name
+    $appMetaData = @{
+        companyName       = $null
+        version           = $null
+        release           = $null
+        domain            = $null
+        corporateSettings = @{
+            useCorporateSettings = $false
+        }
+        result            = $false
+    }
+    
+    if ($GlobalSettingsFile)
+    {
+        Write-Verbose "[$functionName] Loading global settings from: $GlobalSettingsFile"
+        Write-Log -logFile $logFile -module $functionName -Message "Loading global settings from: $GlobalSettingsFile"
+        try
+        {
+            $globalSettings = Import-PowerShellDataFile -Path $GlobalSettingsFile -ErrorAction SilentlyContinue
+            if ($null -ne $globalSettings.corporateSettings.corporateDomain -and $globalSettings.corporateSettings.useCorporateSettings)
+            {
+                $domain = $globalSettings.corporateSettings.corporateDomain
+                Write-Verbose "[$functionName] Corporate settings enabled. Using corporate domain: $domain"                 
+                write-log -logFile $logFile -module $functionName -Message "Corporate settings enabled. Using corporate domain: $domain"                                            
+            }
+            Write-Verbose "[$functionName] Successfully loaded global settings."
+            Write-Log -logFile $logFile -module $functionName -Message "Successfully loaded global settings."
+        }
+        catch
+        {
+            Write-Verbose "[$functionName] Error reading global settings file: $GlobalSettingsFile"
+            Write-Log -logFile $logFile -module $functionName -Message "Error reading global settings file: $GlobalSettingsFile" -logLevel 'Error'
+        }
+    }
+    else
+    {
+        Write-Verbose "[$functionName] No global settings file specified."
+        Write-Log -logFile $logFile -module $functionName -Message "No global settings file specified."
+    }
+    
     if (-not $domain)
     {
         Write-Verbose "[$functionName] No domain specified. Attempting to infer from context."
@@ -126,27 +165,6 @@ function Get-ApplicationMetaData()
         Write-Verbose "[$functionName] A domain settings file for domain '$domain' could not be determined."
         Write-Log -logFile $logFile -module $functionName -Message "A domain settings file for domain '$domain' could not be determined."
     }
-    if ($GlobalSettingsFile)
-    {
-        Write-Verbose "[$functionName] Loading global settings from: $GlobalSettingsFile"
-        Write-Log -logFile $logFile -module $functionName -Message "Loading global settings from: $GlobalSettingsFile"
-        try
-        {
-            $globalSettings = Import-PowerShellDataFile -Path $GlobalSettingsFile -ErrorAction SilentlyContinue
-            Write-Verbose "[$functionName] Successfully loaded global settings."
-            Write-Log -logFile $logFile -module $functionName -Message "Successfully loaded global settings."
-        }
-        catch
-        {
-            Write-Verbose "[$functionName] Error reading global settings file: $GlobalSettingsFile"
-            Write-Log -logFile $logFile -module $functionName -Message "Error reading global settings file: $GlobalSettingsFile" -logLevel 'Error'
-        }
-    }
-    else
-    {
-        Write-Verbose "[$functionName] No global settings file specified."
-        Write-Log -logFile $logFile -module $functionName -Message "No global settings file specified."
-    }
     
     #Get the version.  Check if the script name exists
     if ($scriptName -and $scriptName.endswith('.ps1'))
@@ -199,17 +217,26 @@ function Get-ApplicationMetaData()
     {
         Write-Verbose "[$functionName] No settings files could be loaded. Cannot retrieve application metadata."
         Write-Log -logFile $logFile -module $functionName -Message "No settings files could be loaded. Cannot retrieve application metadata." -logLevel "Error"
-        return $null
+        return $appMetaData
     }
     
     $appMetaData = @{
-        companyName = if ($domainSettings.companyName)
+        result            = $true
+        corporateSettings = if ($null -ne $globalSettings.corporateSettings -and $globalSettings.corporateSettings.useCorporateSettings     )
+        {
+            $globalSettings.corporateSettings
+        }
+        else
+        {
+            @{}
+        }                       
+        companyName       = if ($domainSettings.companyName)
         {
             $domainSettings.companyName  
         }
-        elseif ($globalSettings.companyName)
+        elseif ($globalSettings.globalSettings.companyName)
         {
-            $globalSettings.companyName 
+            $globalSettings.globalSettings.companyName 
         }
         elseif ($fileVersionInfo.companyName)
         {
@@ -219,7 +246,7 @@ function Get-ApplicationMetaData()
         {
             'Zuhair Mahmoud'
         }
-        version     = if ($fileVersionInfo.version)
+        version           = if ($fileVersionInfo.version)
         {
             [version]$fileVersionInfo.version
         }
@@ -235,19 +262,19 @@ function Get-ApplicationMetaData()
         {
             [version]"1.0.0.0"
         }
-        release     = if ($domainSettings.release)
+        release           = if ($domainSettings.release)
         {
             $domainSettings.release 
         }
-        elseif ($globalSettings.release)
+        elseif ($globalSettings.globalSettings.release)
         {
-            $globalSettings.release 
+            $globalSettings.globalSettings.release 
         }
         else
         {
             $null 
         }
-        domain      = if ($domainSettings.domain)
+        domain            = if ($domainSettings.domain)
         {
             $domainSettings.domain 
         }
