@@ -162,7 +162,7 @@ function Get-ApplicationDefaults()
         #corporate settings defaults
         corporateSettings = [ordered]@{
             useCorporateSettings       = $false
-            corporateDomain            = ''    
+            corporateDomain            = ''
             corporateSettingsFilePaths = @()
         }
 
