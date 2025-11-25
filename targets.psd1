@@ -1,7 +1,6 @@
 @{
     description = 'Build targets configuration for CreateRelease.ps1 - defines different build configurations with parameters and settings'
     version     = '1.0.0'
-    
     # Build targets - each target defines build parameters and settings to apply
     targets     = @{
         # Development build target
@@ -29,7 +28,7 @@
                 corporateDomain            = 'arabictutor.com'
                 corporateSettingsFilePaths = @(
                     "\\test\folder\path",
-                    "\\$env:COMPUTERNAME\c$\users\$env:USERNAME\code\autopilot",
+                    "\\localhost\c$\users\username\code\autopilot",
                     "\\test\sysvol\Autopilot"
                 )
             }
@@ -41,7 +40,6 @@
                 delegated           = $true
                 forceNewToken       = $false
             }
-
             
             # Domain to use for domain-specific settings (optional)
             domain            = 'arabictutor.com'
