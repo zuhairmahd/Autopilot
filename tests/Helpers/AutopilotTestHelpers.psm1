@@ -222,6 +222,11 @@ function ConvertTo-Psd1String
         {
             $result += "$indent$quotedKey = '$value'`n"
         }
+        elseif ($value -is [bool])
+        {
+            $boolValue = if ($value) { '$true' } else { '$false' }
+            $result += "$indent$quotedKey = $boolValue`n"
+        }
         elseif ($value -is [array])
         {
             $result += "$indent$quotedKey = @("

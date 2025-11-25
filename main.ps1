@@ -438,6 +438,82 @@ else
     write-log -logFile $logFile -module $scriptName -message "Initializing application metadata"
     $appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile -scriptName $scriptName -scriptPath $ScriptPath
 }
+if ($null -ne $appMetaData.corporateSettings -and $appMetaData.corporateSettings.useCorporateSettings -and $null -ne $appMetaData.corporateSettings.corporateSettingsFilePaths -and $appMetaData.corporateSettings.corporateSettingsFilePaths.count -gt 0)
+{
+    $fileCopied = $false
+    $domain = if ($appMetaData.corporateSettings.corporateDomain)
+    {
+        $appMetaData.corporateSettings.corporateDomain
+    }
+    else
+    {
+        $appMetaData.domain
+    }
+    if ([string]::IsNullOrWhiteSpace($domain))
+    {
+        Write-Host "Error: Corporate domain is not specified. Skipping corporate settings file operations." -ForegroundColor Red
+        write-log -logFile $logFile -module $scriptName -Message "Corporate domain is not specified. Skipping corporate settings file operations." -LogLevel "Error"
+        return
+    }
+    $localDomainFileName = Join-Path -Path $scriptPath -ChildPath "$domain.psd1"
+    Write-Verbose "[$scriptName] Checking $($appMetaData.corporateSettings.corporateSettingsFilePaths) paths for corporate settings for domain: $domain"
+    write-log -logFile $logFile -module $scriptName -Message "Checking $($appMetaData.corporateSettings.corporateSettingsFilePaths) paths for corporate settings for domain: $domain"
+    Write-Host "Looking for corporate settings for domain: $domain" -ForegroundColor Green
+    for ($i = 0; $i -lt $appMetaData.corporateSettings.corporateSettingsFilePaths.count; $i++)
+    {
+        $path = $appMetaData.corporateSettings.corporateSettingsFilePaths[$i]
+        $domainFileName = Join-Path -Path $path -ChildPath "$domain.psd1"
+        Write-Verbose "[$scriptName] Checking path: $path for corporate settings file."
+        write-log -logFile $logFile -module $scriptName -Message "Checking path: $path for corporate settings file."
+        if (-not (Test-Path $domainFileName -ErrorAction SilentlyContinue))
+        {
+            Write-Verbose "[$scriptName] Path does not exist: $path"
+            write-log -logFile $logFile -module $scriptName -Message "Path does not exist: $path"                
+            continue
+        }
+        Write-Verbose "[$scriptName] Found corporate settings file: $domainFileName"
+        write-log -logFile $logFile -module $scriptName -Message "Found corporate settings file: $domainFileName"
+        Write-Host "Copying corporate settings from $domainFileName to $localDomainFileName" -ForegroundColor Green
+        try
+        {
+            Copy-Item -Path $domainFileName -Destination $localDomainFileName -Force -ErrorAction Stop                
+            $fileCopied = $true
+            Write-Host "Successfully copied corporate settings from $domainFileName to $localDomainFileName" -ForegroundColor Green                             
+            break
+        }
+        catch
+        {
+            Write-Error "[$scriptName] Error copying corporate settings file: $_"
+            write-log -logFile $logFile -module $scriptName -Message "Error copying corporate settings file: $_" -LogLevel "Error"
+            if ($i -lt ($appMetaData.corporateSettings.corporateSettingsFilePaths.count - 1))
+            {
+                Write-Host "Trying next path if available..." -ForegroundColor Yellow
+                write-log -logFile $logFile -module $scriptName -Message "Trying next path if available..."         
+            }
+            else
+            {
+                Write-Host "No more paths to try." -ForegroundColor Yellow
+                write-log -logFile $logFile -module $scriptName -Message "No more paths to try."    
+            }
+        }
+    }
+    if ($fileCopied)
+    {
+        Write-Host "Corporate settings file copied successfully." -ForegroundColor Green
+        Write-Verbose "[$scriptName] Corporate settings file copied successfully."
+        write-log -logFile $logFile -module $scriptName -Message "Corporate settings file copied successfully."                                        
+    }
+    else
+    {
+        Write-Host "No files were copied from all specified paths." -ForegroundColor Red
+        write-log -logFile $logFile -module $scriptName -Message "Failed to copy corporate settings file from all specified paths." -LogLevel "Error"                                        
+    }                   
+}
+else 
+{
+    Write-Verbose "[$scriptName] Corporate settings not enabled or no paths specified."             
+    write-log -logFile $logFile -module $scriptName -Message "Corporate settings not enabled or no paths specified."                                        
+}
 $version = if ($null -ne $appMetaData.version)
 {
     $appMetaData.version
@@ -756,11 +832,10 @@ $localSettings = $configResult.LocalSettings
 $requiredScopes = $configResult.RequiredScopes
 $repoInfo = $configResult.RepoInfo
 $global:cacheSettings = $configResult.CacheSettings            
-        
 # Merge global and local settings into a single settings object
 Write-Verbose "[$scriptName] Merging global and local settings"
 $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
-
+# Make sure we are using the correct domain in settings
 if ($settings.domain -ne $domain)
 {
     Write-Verbose "[$scriptName] Updating settings domain from $($settings.domain) to $domain"
