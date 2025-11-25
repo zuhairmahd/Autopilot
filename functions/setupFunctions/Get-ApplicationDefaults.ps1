@@ -44,7 +44,7 @@ function Get-ApplicationDefaults()
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [ValidateSet('Settings', 'Auth', 'Global', 'Domain', 'Menus', 'Strings', 'requiredScopes', 'cacheSettings', 'repoInfo', 'Overwrite', 'All')]
+        [ValidateSet('Settings', 'Auth', 'Global', 'corporateSettings', 'Domain', 'Menus', 'Strings', 'requiredScopes', 'cacheSettings', 'repoInfo', 'Overwrite', 'All')]
         [string]$DefaultType,
         [string]$DomainName,
         [string]$Version
@@ -79,7 +79,7 @@ function Get-ApplicationDefaults()
     $defaults = [ordered]@{
         
         # Authentication defaults - single source of truth
-        Auth           = [ordered]@{
+        Auth              = [ordered]@{
             changePwOnNextStart = $false
             authType            = "PublicAuthFlow"
             noSaveRefreshToken  = $false
@@ -101,7 +101,7 @@ function Get-ApplicationDefaults()
         }
         
         # Global settings defaults - single source of truth
-        Global         = [ordered]@{
+        Global            = [ordered]@{
             configFile                                = ".\.secrets\config.json"
             maxWaitTime                               = 30
             showLicenseBanner                         = $true
@@ -131,7 +131,7 @@ function Get-ApplicationDefaults()
         }
 
         #cache settings defaults - single source of truth   
-        cacheSettings  = [ordered]@{
+        cacheSettings     = [ordered]@{
             enabled                  = $true
             defaultExpirationMinutes = 15
             maxCacheSize             = 1000
@@ -152,15 +152,22 @@ function Get-ApplicationDefaults()
         }
 
         # Repository information defaults - single source of truth  
-        repoInfo       = [ordered]@{
+        repoInfo          = [ordered]@{
             repoName      = 'Autopilot'
             baseSourceURL = 'https://raw.githubusercontent.com'
             baseURL       = 'https://www.github.com'
             repoPath      = 'zuhairmahd'
         }
-    
+
+        #corporate settings defaults
+        corporateSettings = [ordered]@{
+            useCorporateSettings       = $false
+            corporateDomain            = ''
+            corporateSettingsFilePaths = @()
+        }
+
         # Domain template defaults - single source of truth for domain structure
-        Domain         = [ordered]@{
+        Domain            = [ordered]@{
             groupsToInclude                           = @()
             knownProblemGraphEndpoints                = @()
             groupsToExclude                           = @()
@@ -241,7 +248,7 @@ function Get-ApplicationDefaults()
         }
         
         # Required scopes for Microsoft Graph API
-        RequiredScopes = @(
+        RequiredScopes    = @(
             @{
                 Scope     = "User.Read.All"
                 Reason    = "Required to read user profiles, group memberships, and registered devices."
@@ -348,7 +355,7 @@ function Get-ApplicationDefaults()
         )
         
         # Strings defaults - UI text and localization
-        Strings        = [ordered]@{
+        Strings           = [ordered]@{
             Description   = "This is the strings file for the Intune Helpdesk script. It contains all the user-facing strings used in the script."
             deviceActions = @{
                 none             = "No action"
@@ -405,7 +412,7 @@ function Get-ApplicationDefaults()
         }
         
         # Menu defaults - complete menu structure 
-        Menus          = [ordered]@{
+        Menus             = [ordered]@{
             version                   = '1.3.0.0'
             name                      = 'menu.psd1'
             description               = 'This file contains the definitions for the menus used in the application.'
@@ -1613,13 +1620,14 @@ function Get-ApplicationDefaults()
     
     # Complete settings structure combining all components
     $defaults.Settings = [ordered]@{
-        description    = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
-        version        = $Version
-        auth           = $defaults.Auth
-        cacheSettings  = $defaults.cacheSettings
-        repoInfo       = $defaults.repoInfo 
-        requiredScopes = $defaults.RequiredScopes
-        globalSettings = $defaults.Global
+        description       = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
+        version           = $Version
+        auth              = $defaults.Auth
+        cacheSettings     = $defaults.cacheSettings
+        repoInfo          = $defaults.repoInfo 
+        requiredScopes    = $defaults.RequiredScopes
+        corporateSettings = $defaults.corporateSettings 
+        globalSettings    = $defaults.Global
     }
     
     # Overwrite configurations - centralized force-overwrite settings
@@ -1676,6 +1684,13 @@ function Get-ApplicationDefaults()
             $script:defaultsCache[$cacheKey] = $result
             return $result
         }                                   
+        'corporateSettings'
+        {
+            Write-Verbose "[$functionName] Returning corporate settings defaults"
+            $result = $defaults.corporateSettings
+            $script:defaultsCache[$cacheKey] = $result
+            return $result
+        }                                               
         'Domain'
         {
             Write-Verbose "[$functionName] Returning domain template defaults for: $DomainName"
@@ -1810,3 +1825,17 @@ function Get-RepoInfoDefaults()
     
     return Get-ApplicationDefaults -DefaultType "repoInfo"
 }                                   
+function Get-CorporateSettingsDefaults()
+{
+    <#
+    .SYNOPSIS
+        Returns the default corporate settings structure.
+    
+    .DESCRIPTION
+        Wrapper function that calls Get-ApplicationDefaults for corporate settings.
+    #>
+    [CmdletBinding()]
+    param()
+    
+    return Get-ApplicationDefaults -DefaultType "corporateSettings"
+}                                                                                           

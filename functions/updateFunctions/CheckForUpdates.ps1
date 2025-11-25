@@ -110,6 +110,7 @@ function CheckForUpdates()
         $returnObject.localVersion = $localVersion
         $returnObject.ReleaseDate = [datetime]::Parse($remoteVersionResponse.date).ToLocalTime()
         $returnObject.hash = $remoteVersionResponse.hash
+        $returnObject.success = ($null -ne $returnObject.remoteVersion -and $null -ne $returnObject.localVersion -and $null -ne $returnObject.ReleaseDate -and $null -ne $returnObject.hash)
         if ($returnObject.remoteVersion -gt $returnObject.localVersion)
         {
             Write-Verbose "[$functionName] Update available. Remote version: $($remoteVersionResponse.version), Local version: $($localVersion)"

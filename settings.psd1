@@ -1,5 +1,7 @@
 ﻿@{
-    cacheSettings  = @{
+    description       = 'This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.'
+    version           = '1.3.0.0'
+    cacheSettings     = @{
         maxCacheSize             = 1000
         defaultExpirationMinutes = 15
         cacheTypes               = @{
@@ -18,7 +20,7 @@
         }
         enabled                  = $true
     }
-    globalSettings = @{
+    globalSettings    = @{
         migrateLegacyConfiguration                = $true
         operatingSystem                           = 'Windows'
         documentationURL                          = 'https://github.com/zuhairmahd/Autopilot/blob/master/readme.md'
@@ -44,15 +46,18 @@
         showLicenseBanner                         = $true
         deviceContactThresholdInDays              = 30
     }
-    description    = 'This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.'
-    version        = '1.3.0.0'
-    repoInfo       = @{
+    repoInfo          = @{
         repoPath      = 'zuhairmahd'
         baseURL       = 'https://www.github.com'
         baseSourceURL = 'https://raw.githubusercontent.com'
         repoName      = 'Autopilot'
     }
-    requiredScopes = @(
+    corporateSettings = @{
+        useCorporateSettings       = $false
+        corporateDomain            = ''
+        corporateSettingsFilePaths = @()
+    }
+    requiredScopes    = @(
         @{
             Scope     = 'User.Read.All'
             Endpoints = @(
@@ -139,7 +144,7 @@
             Reason    = 'Required to create, update, and delete Intune device management scripts.'
         }
     )
-    auth           = @{
+    auth              = @{
         noSaveRefreshToken  = $false
         cacheType           = 'File'
         changePwOnNextStart = $false

@@ -1,13 +1,12 @@
 @{
     description = 'Build targets configuration for CreateRelease.ps1 - defines different build configurations with parameters and settings'
     version     = '1.0.0'
-    
     # Build targets - each target defines build parameters and settings to apply
     targets     = @{
         # Development build target
         dev        = @{
             # Build parameters that are passed to CreateRelease.ps1
-            buildParameters = @{
+            buildParameters   = @{
                 inputFile       = 'main.ps1'
                 OutputPath      = 'dev'
                 NoVersionUpdate = $false
@@ -17,14 +16,25 @@
             }
             
             # Settings to apply to global settings.psd1
-            globalSettings  = @{
+            globalSettings    = @{
                 autoUpdate        = $false
                 showLicenseBanner = $false
                 validateScopes    = $false
             }
             
+            # Settings to apply to corporate section
+            corporateSettings = @{
+                useCorporateSettings       = $false
+                corporateDomain            = 'arabictutor.com'
+                corporateSettingsFilePaths = @(
+                    "\\test\folder\path",
+                    "\\localhost\c$\users\username\code\autopilot",
+                    "\\test\sysvol\Autopilot"
+                )
+            }
+
             # Settings to apply to auth section
-            authSettings    = @{
+            authSettings      = @{
                 changePwOnNextStart = $false
                 cacheType           = 'File'
                 delegated           = $true
@@ -32,10 +42,10 @@
             }
             
             # Domain to use for domain-specific settings (optional)
-            domain          = 'arabictutor.com'
+            domain            = 'arabictutor.com'
             
             # Settings to apply to domain configuration (when domain is specified)
-            domainSettings  = @{
+            domainSettings    = @{
                 privateSession                  = $false
                 groupsToExclude                 = @(
                     @{
@@ -105,7 +115,7 @@
                 deviceNamePrefix                = 'vmware'
             }
             
-            description     = 'Development build with test mode enabled and signing disabled'
+            description       = 'Development build with test mode enabled and signing disabled'
         }
         
         # LHM build (example for gao.gov)
