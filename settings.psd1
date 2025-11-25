@@ -54,7 +54,7 @@
     }
     corporateSettings = @{
         useCorporateSettings       = $false
-        corporateDomain            = ''    
+        corporateDomain            = ''
         corporateSettingsFilePaths = @()
     }
     requiredScopes    = @(
