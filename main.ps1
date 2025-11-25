@@ -438,7 +438,7 @@ else
     write-log -logFile $logFile -module $scriptName -message "Initializing application metadata"
     $appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile -scriptName $scriptName -scriptPath $ScriptPath
 }
-if ($null -ne $appMetaData.corporateSettings -and $appMetaData.corporateSettings.useCorporateSettings -and $appMetaData.corporateSettings.corporateSettingsFilePaths.count -gt 0)
+if ($null -ne $appMetaData.corporateSettings -and $appMetaData.corporateSettings.useCorporateSettings -and $null -ne $appMetaData.corporateSettings.corporateSettingsFilePaths -and $appMetaData.corporateSettings.corporateSettingsFilePaths.count -gt 0)
 {
     $fileCopied = $false
     $domain = if ($appMetaData.corporateSettings.corporateDomain)
