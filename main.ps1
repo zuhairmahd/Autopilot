@@ -448,17 +448,23 @@ if ($null -ne $appMetaData.corporateSettings -and $appMetaData.corporateSettings
     else
     {
         $appMetaData.domain
-    }                           
-    $localDomainFileName = Join-Path -Path $scriptPath -ChildPath "$domain.psd1"        
+    }
+    if ([string]::IsNullOrWhiteSpace($domain))
+    {
+        Write-Host "Error: Corporate domain is not specified. Skipping corporate settings file operations." -ForegroundColor Red
+        write-log -logFile $logFile -module $scriptName -Message "Corporate domain is not specified. Skipping corporate settings file operations." -LogLevel "Error"
+        return
+    }
+    $localDomainFileName = Join-Path -Path $scriptPath -ChildPath "$domain.psd1"
     Write-Verbose "[$scriptName] Checking $($appMetaData.corporateSettings.corporateSettingsFilePaths) paths for corporate settings for domain: $domain"
-    write-log -logFile $logFile -module $scriptName -Message "Checking $($appMetaData.corporateSettings.corporateSettingsFilePaths) paths for corporate settings for domain: $domain"                  
+    write-log -logFile $logFile -module $scriptName -Message "Checking $($appMetaData.corporateSettings.corporateSettingsFilePaths) paths for corporate settings for domain: $domain"
     Write-Host "Looking for corporate settings for domain: $domain" -ForegroundColor Green
     for ($i = 0; $i -lt $appMetaData.corporateSettings.corporateSettingsFilePaths.count; $i++)
     {
         $path = $appMetaData.corporateSettings.corporateSettingsFilePaths[$i]
         $domainFileName = Join-Path -Path $path -ChildPath "$domain.psd1"
         Write-Verbose "[$scriptName] Checking path: $path for corporate settings file."
-        write-log -logFile $logFile -module $scriptName -Message "Checking path: $path for corporate settings file."                
+        write-log -logFile $logFile -module $scriptName -Message "Checking path: $path for corporate settings file."
         if (-not (Test-Path $domainFileName -ErrorAction SilentlyContinue))
         {
             Write-Verbose "[$scriptName] Path does not exist: $path"

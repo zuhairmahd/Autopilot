@@ -1141,43 +1141,32 @@ function Update-TargetSettings()
             }
         }
         
-        #Apply corporate settings if specified
-        if ($TargetConfig.corporateSettings -and $TargetConfig.corporateSettings.Count -gt 0)
+        #Apply specified settings from target config
+        $sections = @{
+            corporateSettings = 'corporate setting'
+            cacheSettings     = 'cache setting'
+            repoInfo          = 'repo info setting'
+        }
+
+        foreach ($entry in $sections.GetEnumerator())
         {
-            Write-Verbose "[$functionName] Applying $($TargetConfig.corporateSettings.Count) corporate settings"
-            Write-Log -LogFile $logFile -Message "Applying $($TargetConfig.corporateSettings.Count) corporate settings" -Module $functionName -LogLevel "Verbose"
-            
-            foreach ($key in $TargetConfig.corporateSettings.Keys)
+            $sectionName = $entry.Name
+            $singularName = $entry.Value
+            $targetSection = $TargetConfig.$sectionName
+
+            if ($targetSection -and $targetSection.Count -gt 0)
             {
-                $currentSettings.corporateSettings[$key] = $TargetConfig.corporateSettings[$key]
-                Write-Verbose "[$functionName] Applied corporate setting: $key = $($TargetConfig.corporateSettings[$key])"
-            }
-        }                                           
+                $pluralName = if ($sectionName -eq 'repoInfo') { 'repo info settings' } else { $sectionName -replace 'Settings', ' settings' }
+                Write-Verbose "[$functionName] Applying $($targetSection.Count) $pluralName"
+                Write-Log -LogFile $logFile -Message "Applying $($targetSection.Count) $pluralName" -Module $functionName -LogLevel "Verbose"
         
-        #Apply cacheSettings if specified
-        if ($TargetConfig.cacheSettings -and $TargetConfig.cacheSettings.Count -gt 0)
-        {
-            Write-Verbose "[$functionName] Applying $($TargetConfig.cacheSettings.Count) cache settings"
-            Write-Log -LogFile $logFile -Message "Applying $($TargetConfig.cacheSettings.Count) cache settings" -Module $functionName -LogLevel "Verbose"
-            
-            foreach ($key in $TargetConfig.cacheSettings.Keys)
-            {
-                $currentSettings.cacheSettings[$key] = $TargetConfig.cacheSettings[$key]
-                Write-Verbose "[$functionName] Applied cache setting: $key = $($TargetConfig.cacheSettings[$key])"
+                foreach ($key in $targetSection.Keys)
+                {
+                    $currentSettings.$sectionName[$key] = $targetSection[$key]
+                    Write-Verbose "[$functionName] Applied $($singularName): $key = $($targetSection[$key])"
+                }
             }
-        }                                                       
-        
-        # Apply repoInfo if specified
-        if ($TargetConfig.repoInfo -and $TargetConfig.repoInfo.Count -gt 0)
-        {
-            Write-Verbose "[$functionName] Applying $($TargetConfig.repoInfo.Count) repo info settings"
-            Write-Log -LogFile $logFile -Message "Applying $($TargetConfig.repoInfo.Count) repo info settings" -Module $functionName -LogLevel "Verbose"
-            foreach ($key in $TargetConfig.repoInfo.Keys)
-            {
-                $currentSettings.repoInfo[$key] = $TargetConfig.repoInfo[$key]
-                Write-Verbose "[$functionName] Applied repo info setting: $key = $($TargetConfig.repoInfo[$key])"
-            }
-        }                                                                                             
+        }   
         
         # Save updated main settings file
         Write-Verbose "[$functionName] Saving updated settings file"
