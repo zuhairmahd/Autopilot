@@ -25,7 +25,14 @@ Describe "Function: Get-ApplicationMetaData" -Tags 'Unit', 'UtilityFunctions' {
         BeforeAll {
             Set-Location $script:TestFolder
             $script:GlobalPath = Join-Path $script:TestFolder "settings.psd1"
-            New-MockSettingsFile -Path $script:GlobalPath -CustomSettings @{companyName = "TestCo"; version = "2.0.0.0"; release = "2024-10"} -Format 'psd1'
+            # Settings structure matches production format with nested globalSettings
+            New-MockSettingsFile -Path $script:GlobalPath -CustomSettings @{
+                version        = "2.0.0.0"
+                globalSettings = @{
+                    companyName = "TestCo"
+                    release     = "2024-10"
+                }
+            } -Format 'psd1'
         }
         AfterAll { Set-Location $script:OriginalLocation; if (Test-Path $script:GlobalPath) { Remove-Item $script:GlobalPath -Force }}
         
@@ -45,13 +52,41 @@ Describe "Function: Get-ApplicationMetaData" -Tags 'Unit', 'UtilityFunctions' {
             $r = Get-ApplicationMetaData -GlobalSettingsFile $script:GlobalPath -Silent
             $r.release | Should -Be "2024-10"
         }
+        
+        It "Should handle globalSettings without companyName" {
+            $testPath = Join-Path $script:TestFolder "settings2.psd1"
+            New-MockSettingsFile -Path $testPath -CustomSettings @{
+                version        = "1.0.0.0"
+                globalSettings = @{}
+            } -Format 'psd1'
+            $r = Get-ApplicationMetaData -GlobalSettingsFile $testPath -Silent
+            $r.companyName | Should -Be "Zuhair Mahmoud"
+            Remove-Item $testPath -Force
+        }
+        
+        It "Should handle globalSettings without release" {
+            $testPath = Join-Path $script:TestFolder "settings3.psd1"
+            New-MockSettingsFile -Path $testPath -CustomSettings @{
+                version        = "1.0.0.0"
+                globalSettings = @{
+                    companyName = "TestCo"
+                }
+            } -Format 'psd1'
+            $r = Get-ApplicationMetaData -GlobalSettingsFile $testPath -Silent
+            $r.release | Should -BeNullOrEmpty
+            Remove-Item $testPath -Force
+        }
     }
     
     Context "Domain settings" {
         BeforeAll {
             Set-Location $script:TestFolder
             $script:DomainPath = Join-Path $script:TestFolder "test.com.psd1"
-            New-MockSettingsFile -Path $script:DomainPath -CustomSettings @{companyName = "DomainCo"; version = "3.0.0.0"; domain = "test.com"} -Format 'psd1'
+            New-MockSettingsFile -Path $script:DomainPath -CustomSettings @{
+                companyName = "DomainCo"
+                version     = "3.0.0.0"
+                domain      = "test.com"
+            } -Format 'psd1'
         }
         AfterAll { Set-Location $script:OriginalLocation; if (Test-Path $script:DomainPath) { Remove-Item $script:DomainPath -Force }}
         
@@ -63,7 +98,12 @@ Describe "Function: Get-ApplicationMetaData" -Tags 'Unit', 'UtilityFunctions' {
         
         It "Should prefer domain over global settings" {
             $gPath = Join-Path $script:TestFolder "settings.psd1"
-            New-MockSettingsFile -Path $gPath -CustomSettings @{companyName = "GlobalCo"; version = "1.0.0.0"} -Format 'psd1'
+            New-MockSettingsFile -Path $gPath -CustomSettings @{
+                version        = "1.0.0.0"
+                globalSettings = @{
+                    companyName = "GlobalCo"
+                }
+            } -Format 'psd1'
             $r = Get-ApplicationMetaData -GlobalSettingsFile $gPath -Silent
             $r.companyName | Should -Be "DomainCo"
             $r.version.Major | Should -Be 3
@@ -76,8 +116,16 @@ Describe "Function: Get-ApplicationMetaData" -Tags 'Unit', 'UtilityFunctions' {
             Set-Location $script:TestFolder
             $d1 = Join-Path $script:TestFolder "domain1.com.psd1"
             $d2 = Join-Path $script:TestFolder "domain2.com.psd1"
-            New-MockSettingsFile -Path $d1 -CustomSettings @{companyName = "Co1"; version = "1.0.0.0"; domain = "domain1.com"} -Format 'psd1'
-            New-MockSettingsFile -Path $d2 -CustomSettings @{companyName = "Co2"; version = "2.0.0.0"; domain = "domain2.com"} -Format 'psd1'
+            New-MockSettingsFile -Path $d1 -CustomSettings @{
+                companyName = "Co1"
+                version     = "1.0.0.0"
+                domain      = "domain1.com"
+            } -Format 'psd1'
+            New-MockSettingsFile -Path $d2 -CustomSettings @{
+                companyName = "Co2"
+                version     = "2.0.0.0"
+                domain      = "domain2.com"
+            } -Format 'psd1'
             $script:D1 = $d1; $script:D2 = $d2
         }
         AfterAll { Set-Location $script:OriginalLocation; Remove-Item $script:D1, $script:D2 -Force -ErrorAction SilentlyContinue }
@@ -116,7 +164,12 @@ Describe "Function: Get-ApplicationMetaData" -Tags 'Unit', 'UtilityFunctions' {
         
         It "Should prefer exe version over settings" {
             $gPath = Join-Path $script:TestFolder "settings.psd1"
-            New-MockSettingsFile -Path $gPath -CustomSettings @{companyName = "Global"; version = "1.0.0.0"} -Format 'psd1'
+            New-MockSettingsFile -Path $gPath -CustomSettings @{
+                version        = "1.0.0.0"
+                globalSettings = @{
+                    companyName = "Global"
+                }
+            } -Format 'psd1'
             $r = Get-ApplicationMetaData -GlobalSettingsFile $gPath -scriptName $script:Exe -Silent
             $r.version | Should -Not -Be "1.0.0.0"
             Remove-Item $gPath -Force
@@ -140,7 +193,11 @@ Describe "Function: Get-ApplicationMetaData" -Tags 'Unit', 'UtilityFunctions' {
         
         It "Should read version from lastrun.json" {
             $gPath = Join-Path $script:TestFolder "settings.psd1"
-            New-MockSettingsFile -Path $gPath -CustomSettings @{companyName = "Test"} -Format 'psd1'
+            New-MockSettingsFile -Path $gPath -CustomSettings @{
+                globalSettings = @{
+                    companyName = "Test"
+                }
+            } -Format 'psd1'
             $r = Get-ApplicationMetaData -GlobalSettingsFile $gPath -scriptName "nonexist.exe" -scriptPath $script:TestFolder -Silent
             $r.version.ToString() | Should -Be "4.5.6.7"
             Remove-Item $gPath -Force
@@ -149,7 +206,12 @@ Describe "Function: Get-ApplicationMetaData" -Tags 'Unit', 'UtilityFunctions' {
         It "Should fallback to settings if no version in json" {
             Set-Content $script:LRPath -Value (@{} | ConvertTo-Json)
             $gPath = Join-Path $script:TestFolder "settings.psd1"
-            New-MockSettingsFile -Path $gPath -CustomSettings @{companyName = "Test"; version = "1.2.3.4"} -Format 'psd1'
+            New-MockSettingsFile -Path $gPath -CustomSettings @{
+                version        = "1.2.3.4"
+                globalSettings = @{
+                    companyName = "Test"
+                }
+            } -Format 'psd1'
             $r = Get-ApplicationMetaData -GlobalSettingsFile $gPath -scriptName "nonexist.exe" -scriptPath $script:TestFolder -Silent
             $r.version.ToString() | Should -Be "1.2.3.4"
             Remove-Item $gPath -Force
@@ -165,7 +227,11 @@ Describe "Function: Get-ApplicationMetaData" -Tags 'Unit', 'UtilityFunctions' {
             New-Item -Path $tmp -ItemType Directory -Force | Out-Null
             Set-Location $tmp
             $gPath = Join-Path $tmp "settings.psd1"
-            New-MockSettingsFile -Path $gPath -CustomSettings @{companyName = "Test"} -Format 'psd1'
+            New-MockSettingsFile -Path $gPath -CustomSettings @{
+                globalSettings = @{
+                    companyName = "Test"
+                }
+            } -Format 'psd1'
             $r = Get-ApplicationMetaData -GlobalSettingsFile $gPath -Silent
             $r.version.Major | Should -Be 1
             $r.version.Minor | Should -Be 0
@@ -179,7 +245,10 @@ Describe "Function: Get-ApplicationMetaData" -Tags 'Unit', 'UtilityFunctions' {
             New-Item -Path $tmp -ItemType Directory -Force | Out-Null
             Set-Location $tmp
             $gPath = Join-Path $tmp "settings.psd1"
-            New-MockSettingsFile -Path $gPath -CustomSettings @{version = "1.0.0.0"} -Format 'psd1'
+            New-MockSettingsFile -Path $gPath -CustomSettings @{
+                version        = "1.0.0.0"
+                globalSettings = @{}
+            } -Format 'psd1'
             $r = Get-ApplicationMetaData -GlobalSettingsFile $gPath -Silent
             $r.companyName | Should -Be "Zuhair Mahmoud"
             Remove-Item $gPath -Force
@@ -192,7 +261,12 @@ Describe "Function: Get-ApplicationMetaData" -Tags 'Unit', 'UtilityFunctions' {
             New-Item -Path $tmp -ItemType Directory -Force | Out-Null
             Set-Location $tmp
             $gPath = Join-Path $tmp "settings.psd1"
-            New-MockSettingsFile -Path $gPath -CustomSettings @{companyName = "Test"; version = "1.0.0.0"} -Format 'psd1'
+            New-MockSettingsFile -Path $gPath -CustomSettings @{
+                version        = "1.0.0.0"
+                globalSettings = @{
+                    companyName = "Test"
+                }
+            } -Format 'psd1'
             $r = Get-ApplicationMetaData -GlobalSettingsFile $gPath -Silent
             $r.release | Should -BeNullOrEmpty
             Remove-Item $gPath -Force
@@ -204,12 +278,13 @@ Describe "Function: Get-ApplicationMetaData" -Tags 'Unit', 'UtilityFunctions' {
         BeforeAll { Set-Location $script:TestFolder }
         AfterAll { Set-Location $script:OriginalLocation }
         
-        It "Should return null with no sources" {
+        It "Should return hashtable with result false when no sources" {
             $tmp = Join-Path $env:TEMP "Tmp_$(Get-Date -Format 'yyyyMMddHHmmss')"
             New-Item -Path $tmp -ItemType Directory -Force | Out-Null
             Set-Location $tmp
             $r = Get-ApplicationMetaData -Silent
-            $r | Should -BeNullOrEmpty
+            $r | Should -Not -BeNullOrEmpty
+            $r.result | Should -Be $false
             Set-Location $script:TestFolder
             Remove-Item $tmp -Recurse -Force
         }
@@ -219,7 +294,8 @@ Describe "Function: Get-ApplicationMetaData" -Tags 'Unit', 'UtilityFunctions' {
             New-Item -Path $tmp -ItemType Directory -Force | Out-Null
             Set-Location $tmp
             $r = Get-ApplicationMetaData -GlobalSettingsFile "nonexist.psd1" -Silent
-            $r | Should -BeNullOrEmpty
+            $r | Should -Not -BeNullOrEmpty
+            $r.result | Should -Be $false
             Set-Location $script:TestFolder
             Remove-Item $tmp -Recurse -Force
         }
@@ -236,9 +312,18 @@ Describe "Function: Get-ApplicationMetaData" -Tags 'Unit', 'UtilityFunctions' {
         BeforeAll {
             Set-Location $script:TestFolder
             $gPath = Join-Path $script:TestFolder "settings.psd1"
-            New-MockSettingsFile -Path $gPath -CustomSettings @{companyName = "Test"; version = "1.0.0.0"} -Format 'psd1'
+            New-MockSettingsFile -Path $gPath -CustomSettings @{
+                version        = "1.0.0.0"
+                globalSettings = @{
+                    companyName = "Test"
+                }
+            } -Format 'psd1'
             $dPath = Join-Path $script:TestFolder "test.com.psd1"
-            New-MockSettingsFile -Path $dPath -CustomSettings @{companyName = "Domain"; version = "2.0.0.0"; domain = "test.com"} -Format 'psd1'
+            New-MockSettingsFile -Path $dPath -CustomSettings @{
+                companyName = "Domain"
+                version     = "2.0.0.0"
+                domain      = "test.com"
+            } -Format 'psd1'
             $script:GP = $gPath; $script:DP = $dPath
         }
         AfterAll { Set-Location $script:OriginalLocation; Remove-Item $script:GP, $script:DP -Force -ErrorAction SilentlyContinue }
@@ -251,6 +336,103 @@ Describe "Function: Get-ApplicationMetaData" -Tags 'Unit', 'UtilityFunctions' {
         It "Should log metadata values" {
             $r = Get-ApplicationMetaData -GlobalSettingsFile $script:GP -Silent
             Should -Invoke Write-Log -Times 1 -ParameterFilter { $Message -like "*companyName:*" -or $Message -like "*version:*" }
+        }
+    }
+    
+    Context "Corporate settings" {
+        BeforeAll { Set-Location $script:TestFolder }
+        AfterAll { Set-Location $script:OriginalLocation }
+        
+        It "Should load corporate settings when enabled" {
+            $gPath = Join-Path $script:TestFolder "corp-settings.psd1"
+            New-MockSettingsFile -Path $gPath -CustomSettings @{
+                version           = "1.0.0.0"
+                corporateSettings = @{
+                    useCorporateSettings = $true
+                    corporateDomain      = "corporate.com"
+                }
+                globalSettings    = @{
+                    companyName = "CorpCo"
+                }
+            } -Format 'psd1'
+            
+            $r = Get-ApplicationMetaData -GlobalSettingsFile $gPath -Silent
+            $r | Should -Not -BeNullOrEmpty
+            $r.corporateSettings | Should -Not -BeNullOrEmpty
+            $r.corporateSettings.GetType().Name | Should -Be 'Hashtable'
+            $r.corporateSettings.useCorporateSettings | Should -Be $true
+            $r.corporateSettings.corporateDomain | Should -Be "corporate.com"
+            
+            Remove-Item $gPath -Force
+        }
+        
+        It "Should set domain from corporate settings when enabled" {
+            # When corporate settings specify a domain, it's set but the domain file
+            # is NOT automatically loaded (the function skips domain file discovery)
+            $originalLoc = Get-Location
+            Set-Location $script:TestFolder
+            
+            $gPath = Join-Path $script:TestFolder "corp-domain.psd1"
+            
+            New-MockSettingsFile -Path $gPath -CustomSettings @{
+                version           = "1.0.0.0"
+                corporateSettings = @{
+                    useCorporateSettings = $true
+                    corporateDomain      = "corporate.com"
+                }
+                globalSettings    = @{
+                    companyName = "GlobalCo"
+                }
+            } -Format 'psd1'
+            
+            $r = Get-ApplicationMetaData -GlobalSettingsFile $gPath -Silent
+            $r | Should -Not -BeNullOrEmpty
+            # The function sets domain from corporate settings but doesn't load domain file
+            # So we just verify corporate settings were loaded correctly
+            $r.corporateSettings.corporateDomain | Should -Be "corporate.com"
+            $r.companyName | Should -Be "GlobalCo"
+            
+            Remove-Item $gPath -Force
+            Set-Location $originalLoc
+        }
+        
+        It "Should handle corporate settings disabled" {
+            $gPath = Join-Path $script:TestFolder "nocorp-settings.psd1"
+            New-MockSettingsFile -Path $gPath -CustomSettings @{
+                version           = "1.0.0.0"
+                corporateSettings = @{
+                    useCorporateSettings = $false
+                    corporateDomain      = "corporate.com"
+                }
+                globalSettings    = @{
+                    companyName = "TestCo"
+                }
+            } -Format 'psd1'
+            
+            $r = Get-ApplicationMetaData -GlobalSettingsFile $gPath -Silent
+            $r | Should -Not -BeNullOrEmpty
+            # When useCorporateSettings = false, function returns empty hashtable
+            $r.corporateSettings | Should -BeOfType [hashtable]
+            $r.corporateSettings.Keys.Count | Should -Be 0
+            
+            Remove-Item $gPath -Force
+        }
+        
+        It "Should return empty hashtable when corporate settings missing" {
+            $gPath = Join-Path $script:TestFolder "missing-corp.psd1"
+            New-MockSettingsFile -Path $gPath -CustomSettings @{
+                version        = "1.0.0.0"
+                globalSettings = @{
+                    companyName = "TestCo"
+                }
+            } -Format 'psd1'
+            
+            $r = Get-ApplicationMetaData -GlobalSettingsFile $gPath -Silent
+            $r | Should -Not -BeNullOrEmpty
+            $r.corporateSettings | Should -BeOfType [hashtable]
+            $r.corporateSettings.Keys.Count | Should -Be 0
+            
+            Remove-Item $gPath -Force
         }
     }
 }

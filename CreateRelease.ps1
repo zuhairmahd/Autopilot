@@ -1141,6 +1141,33 @@ function Update-TargetSettings()
             }
         }
         
+        #Apply specified settings from target config
+        $sections = @{
+            corporateSettings = 'corporate setting'
+            cacheSettings     = 'cache setting'
+            repoInfo          = 'repo info setting'
+        }
+
+        foreach ($entry in $sections.GetEnumerator())
+        {
+            $sectionName = $entry.Name
+            $singularName = $entry.Value
+            $targetSection = $TargetConfig.$sectionName
+
+            if ($targetSection -and $targetSection.Count -gt 0)
+            {
+                $pluralName = if ($sectionName -eq 'repoInfo') { 'repo info settings' } else { $sectionName -replace 'Settings', ' settings' }
+                Write-Verbose "[$functionName] Applying $($targetSection.Count) $pluralName"
+                Write-Log -LogFile $logFile -Message "Applying $($targetSection.Count) $pluralName" -Module $functionName -LogLevel "Verbose"
+        
+                foreach ($key in $targetSection.Keys)
+                {
+                    $currentSettings.$sectionName[$key] = $targetSection[$key]
+                    Write-Verbose "[$functionName] Applied $($singularName): $key = $($targetSection[$key])"
+                }
+            }
+        }   
+        
         # Save updated main settings file
         Write-Verbose "[$functionName] Saving updated settings file"
         $currentSettings | Export-PowerShellDataFile -Path $SettingsFilePath -Validate -Force
