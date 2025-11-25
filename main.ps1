@@ -829,7 +829,7 @@ $global:cacheSettings = $configResult.CacheSettings
 # Merge global and local settings into a single settings object
 Write-Verbose "[$scriptName] Merging global and local settings"
 $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
-#Make sure we are using the correct domain in settings
+# Make sure we are using the correct domain in settings
 if ($settings.domain -ne $domain)
 {
     Write-Verbose "[$scriptName] Updating settings domain from $($settings.domain) to $domain"
