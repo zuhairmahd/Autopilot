@@ -1167,7 +1167,7 @@ function Update-TargetSettings()
             }
         }                                                       
         
-        #Apply repoInfo if specified
+        # Apply repoInfo if specified
         if ($TargetConfig.repoInfo -and $TargetConfig.repoInfo.Count -gt 0)
         {
             Write-Verbose "[$functionName] Applying $($TargetConfig.repoInfo.Count) repo info settings"
