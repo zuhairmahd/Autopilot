@@ -222,7 +222,7 @@ function Get-ApplicationMetaData()
     
     $appMetaData = @{
         result            = $true
-        corporateSettings = if ($null -ne $globalSettings.corporateSettings -and $globalSettings.corporateSettings.useCorporateSettings     )
+        corporateSettings = if ($null -ne $globalSettings.corporateSettings -and $globalSettings.corporateSettings.useCorporateSettings)
         {
             $globalSettings.corporateSettings
         }
