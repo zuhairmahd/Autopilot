@@ -145,8 +145,8 @@ domains = @{
 | Document | Description |
 |----------|-------------|
 | [SETTINGS.md](docs/SETTINGS.md) | Complete settings reference |
-| [DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) | Architecture and contributor guide |
-| [TECHNICAL_DOCUMENTATION.md](docs/TECHNICAL_DOCUMENTATION.md) | Detailed technical reference |
+| [DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) | Architecture, testing, and coding standards |
+| [TECHNICAL_DOCUMENTATION.md](docs/TECHNICAL_DOCUMENTATION.md) | API and function reference |
 
 ### Microsoft Resources
 
