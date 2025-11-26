@@ -125,12 +125,12 @@ function GetManagedDeviceRelevantProperties()
         }
     }
 
-    if ($OrphanDevice -eq $false -and $CorrectRam -and -not $HasUser)
+    if ($orphanDevice -eq $false -and $CorrectRam -and -not $HasUser)
     {
         $readyForNextUser = $true
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device is ready for the next user" -LogLevel "Information"
     }
-    elseif ($OrphanDevice -eq $false -and $CorrectRam -and $HasUser -and -not $ValidUser)
+    elseif ($orphanDevice -eq $false -and $CorrectRam -and $HasUser -and -not $ValidUser)
     {
         # Device has an invalid user (SPN or deleted user) - not ready
         $readyForNextUser = $false
