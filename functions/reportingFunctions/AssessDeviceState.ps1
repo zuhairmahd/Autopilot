@@ -279,7 +279,7 @@ function AssessDeviceState()
                             Write-Host "      " -NoNewline
                             Write-Host "Please check the device's network connectivity and ensure it can reach Intune." -ForegroundColor Cyan
                             $allIssues += $issue
-                            $actionsPriority[$deviceActions.connectToNetwork] = 2  # High priority - fix connectivity
+                            $actionsPriority[$deviceActions.connectToNetwork] = 2  # Priority 2 - fix connectivity
                         }
                     }
                     elseif (-not $settings.includeEnrolledDevicesInNextUserReadiness -and $enrollmentState.Managed)
