@@ -106,6 +106,45 @@ Settings merge in this order (highest priority first):
 
 The `MergeSettings` function handles this merging.
 
+### Device Readiness Architecture
+
+The application includes comprehensive device readiness assessment functionality:
+
+#### Key Components
+
+| Function | Purpose |
+|----------|---------|
+| `AssessDeviceState` | Main assessment orchestrator with multiple assessment types |
+| `GetManagedDeviceRelevantProperties` | Extract device properties and check user association |
+| `GetAutopilotDeviceRelevantProperties` | Validate Autopilot profile assignment |
+| `GetLastDeviceContactDate` | Check device connectivity threshold |
+| `getDevicePendingActions` | Detect incomplete device actions |
+
+#### Readiness Checks
+
+The system performs multi-stage validation:
+
+1. **Autopilot Registration**: Confirms device is in Autopilot
+2. **Enrollment State**: Validates enrollment status (notContacted/enrolled)
+3. **Profile Assignment**: Checks correct Autopilot profile
+4. **Hardware Validation**: Verifies RAM meets requirements
+5. **User Association**: Determines if device has user and if it's the intended user
+6. **Pending Actions**: Detects incomplete operations (wipe, reset, sync)
+7. **Network Connectivity**: Ensures device recently contacted Intune
+
+#### Special Cases
+
+- **Same-User Devices**: Devices already registered to intended user are identified
+- **Unmanaged Devices**: Properly handled without managed device checks
+- **Orphan Detection**: Identifies devices with mismatched Autopilot/Intune records
+- **Invalid Users**: Detects service principal or deleted user associations
+
+#### Settings
+
+- `includeEnrolledDevicesInNextUserReadiness`: Include enrolled devices in readiness checks
+- `MinimumDevicePhysicalMemoryInGB`: RAM requirement (default: 16GB)
+- `deviceContactThresholdInDays`: Days before device considered stale (default: 30)
+
 ## Menu System
 
 ### Architecture

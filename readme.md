@@ -56,8 +56,8 @@ cd autopilot
 
 | Option | Description |
 |--------|-------------|
-| **Give a device to a user** | Assign devices with automatic readiness validation |
-| **Check device status** | Lookup by serial number or user, check readiness state |
+| **Give a device to a user** | Assign devices with comprehensive readiness checks (pending actions, enrollment state, user association) |
+| **Check device status** | Lookup by serial number or user, assess readiness with detailed reporting |
 | **Autopilot menu** | Import devices, manage profiles, get device hash |
 | **Change application settings** | Configure global, domain, and authentication settings |
 | **Check for script updates** | Download latest features and security updates |
@@ -85,6 +85,19 @@ The tool supports role-based access through app modes:
 | **registration** | Device Specialists | Device enrollment |
 | **advancedRegistration** | Senior Device Specialists | Extended registration features |
 | **custom** | Special Deployments | User-defined access |
+
+### Device Readiness Checks
+
+The tool performs comprehensive device readiness assessments:
+
+- **Enrollment State**: Verifies device is properly enrolled or ready for enrollment
+- **Pending Actions**: Checks for incomplete device actions (wipe, reset, sync)
+- **User Association**: Detects if device is already registered to intended user
+- **Hardware Requirements**: Validates RAM and other specifications
+- **Profile Assignment**: Confirms correct Autopilot profile assignment
+- **Network Connectivity**: Ensures recent contact with Intune
+
+Devices marked as "ready" have passed all checks and can be assigned to the next user. Devices already registered to the intended user with compliant state are identified and handled appropriately.
 
 ## Key Settings
 
