@@ -90,7 +90,7 @@ Describe "Function: AssessDeviceState" -Tags 'Unit', 'reportingFunctions' {
             WipeOrClean      = 'Wipe or clean the device'
             turnOnDevice     = 'Turn on the device and allow pending actions to complete'
             none             = 'No action'
-            connectToNetwork = 'Connect to network'   
+            connectToNetwork = 'Connect the device to a network'
         }
         
         # Mock returnValues for new string
