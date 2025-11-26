@@ -73,15 +73,6 @@ Located in `settings.psd1` under `globalSettings`:
 | `checkStrongMapping` | Boolean | `$false` | Validate certificate strong mapping |
 | `strongMappingOptional` | Boolean | `$true` | Allow operations without strong mapping |
 
-### Device Settings
-
-| Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| `deviceContactThresholdInDays` | Integer | `30` | Days before device considered stale |
-| `includeEnrolledDevicesInNextUserReadiness` | Boolean | `$true` | Include enrolled devices in readiness check |
-| `checkStrongMapping` | Boolean | `$false` | Validate certificate strong mapping |
-| `strongMappingOptional` | Boolean | `$true` | Allow operations without strong mapping |
-
 ### Validation Settings
 
 | Setting | Type | Default | Description |
