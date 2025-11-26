@@ -115,7 +115,7 @@ function AssessDeviceState()
                 Write-Verbose "[$functionName] isNotContactedReady: $isNotContactedReady"
                 Write-Verbose "[$functionName] isEnrolledReady: $isEnrolledReady"
                 Write-Verbose "[$functionName] isPendingActions: $isPendingActions"
-                write-log -logFile $LogFile -Module "$functionName" -Message "Device readiness for next user - isEnrolledReady: $isEnrolledReady, isNotContactedReady: $isNotContactedReady, isPendingActions: $isPendingActions" -LogLevel "Information"
+                Write-Log -logFile $LogFile -Module "$functionName" -Message "Device readiness for next user - isEnrolledReady: $isEnrolledReady, isNotContactedReady: $isNotContactedReady, isPendingActions: $isPendingActions" -LogLevel "Information"
                 
                 # Device is only ready if it passes readiness checks AND has no pending actions
                 if (($isEnrolledReady -or $isNotContactedReady) -and -not $isPendingActions)
@@ -279,7 +279,7 @@ function AssessDeviceState()
                             Write-Host "      " -NoNewline
                             Write-Host "Please check the device's network connectivity and ensure it can reach Intune." -ForegroundColor Cyan
                             $allIssues += $issue
-                            $actionsPriority[$deviceActions.connectToNetwork] = 2  # High priority - fix connectivity
+                            $actionsPriority[$deviceActions.connectToNetwork] = 2  # Priority 2 - fix connectivity
                         }
                     }
                     elseif (-not $settings.includeEnrolledDevicesInNextUserReadiness -and $enrollmentState.Managed)
@@ -335,6 +335,10 @@ function AssessDeviceState()
                         $deviceActions.connectToNetwork
                         {
                             Write-Host "  Connect the device to the network and allow it to sync with Intune." -ForegroundColor Cyan
+                        }
+                        $deviceActions.none
+                        {
+                            Write-Host "  No specific guidance available for this device state." -ForegroundColor DarkGray
                         }
                     }
                     Write-Host "===================================`n" -ForegroundColor Cyan
