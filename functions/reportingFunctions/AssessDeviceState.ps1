@@ -336,6 +336,10 @@ function AssessDeviceState()
                         {
                             Write-Host "  Connect the device to the network and allow it to sync with Intune." -ForegroundColor Cyan
                         }
+                        $deviceActions.none
+                        {
+                            Write-Host "  No specific guidance available for this device state." -ForegroundColor DarkGray
+                        }
                     }
                     Write-Host "===================================`n" -ForegroundColor Cyan
                 }
