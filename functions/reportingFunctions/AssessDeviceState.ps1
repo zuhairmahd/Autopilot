@@ -115,7 +115,7 @@ function AssessDeviceState()
                 Write-Verbose "[$functionName] isNotContactedReady: $isNotContactedReady"
                 Write-Verbose "[$functionName] isEnrolledReady: $isEnrolledReady"
                 Write-Verbose "[$functionName] isPendingActions: $isPendingActions"
-                write-log -logFile $LogFile -Module "$functionName" -Message "Device readiness for next user - isEnrolledReady: $isEnrolledReady, isNotContactedReady: $isNotContactedReady, isPendingActions: $isPendingActions" -LogLevel "Information"
+                Write-Log -logFile $LogFile -Module "$functionName" -Message "Device readiness for next user - isEnrolledReady: $isEnrolledReady, isNotContactedReady: $isNotContactedReady, isPendingActions: $isPendingActions" -LogLevel "Information"
                 
                 # Device is only ready if it passes readiness checks AND has no pending actions
                 if (($isEnrolledReady -or $isNotContactedReady) -and -not $isPendingActions)
