@@ -50,7 +50,8 @@ function ProcessSerialNumber()
     param (
         [parameter(Mandatory = $true)]
         [string]$SerialNumber,
-        $AccessToken,
+        [string]$AccessToken,
+        [string]$username,
         $Settings = $settings,
         [switch]$CheckUserReadiness
     )
@@ -79,7 +80,7 @@ function ProcessSerialNumber()
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device imported: $($enrollmentState.Imported)" -LogLevel "Information"
         if ($CheckUserReadiness)
         {
-            return GetNextUserReadinessReport -enrollmentState $enrollmentState
+            return GetNextUserReadinessReport -enrollmentState $enrollmentState -username $username
         }
         
         if ($enrollmentState.inAutopilot)

@@ -28,7 +28,8 @@ function GetManagedDeviceRelevantProperties()
     param(
         [Parameter(Mandatory = $true)]
         $enrollmentState,
-        $settings = $settings
+        $settings = $settings,
+        [string]$username
     )
     $functionName = $MyInvocation.MyCommand.Name
     $managedDeviceProperties = [ordered] @{}
@@ -77,6 +78,15 @@ function GetManagedDeviceRelevantProperties()
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "User id: $($enrollmentState.managedDevice.device.userId)" -LogLevel "Information"
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "User principal name: $($enrollmentState.managedDevice.users.userPrincipalName)" -LogLevel "Information"
                 $hasUser = $true
+                
+                # Check if device is registered to the same user we're checking for
+                $registeredToSameUser = $false
+                if (-not [string]::IsNullOrWhiteSpace($username) -and $enrollmentState.managedDevice.users.userPrincipalName)
+                {
+                    $registeredToSameUser = $enrollmentState.managedDevice.users.userPrincipalName -eq $username
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device registered to same user ($username): $registeredToSameUser" -LogLevel "Information"
+                }
+                
                 if ($enrollmentState.managedDevice.users.azureUser)
                 {
                     $validUser = $true
@@ -115,10 +125,16 @@ function GetManagedDeviceRelevantProperties()
         }
     }
 
-    if ($OrphanDevice -eq $false -and $CorrectRam -and -not ($HasUser -and $ValidUser))
+    if ($OrphanDevice -eq $false -and $CorrectRam -and -not $HasUser)
     {
         $readyForNextUser = $true
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device is ready for the next user" -LogLevel "Information"
+    }
+    elseif ($OrphanDevice -eq $false -and $CorrectRam -and $HasUser -and -not $ValidUser)
+    {
+        # Device has an invalid user (SPN or deleted user) - not ready
+        $readyForNextUser = $false
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device has invalid user association, not ready for next user" -LogLevel "Information"
     }
     else
     {
@@ -131,6 +147,7 @@ function GetManagedDeviceRelevantProperties()
     $managedDeviceProperties.Add('ValidUser', $validUser)
     $managedDeviceProperties.Add('LastLogonDate', $lastLogonDate)
     $managedDeviceProperties.Add('ReadyForNextUser', $readyForNextUser)
+    $managedDeviceProperties.Add('RegisteredToSameUser', $registeredToSameUser)
     return $managedDeviceProperties
 }
 

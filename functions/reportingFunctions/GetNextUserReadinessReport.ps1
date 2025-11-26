@@ -29,7 +29,8 @@ function GetNextUserReadinessReport()
     param(
         [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
-        $enrollmentState
+        $enrollmentState,
+        [string]$username
     )
 
     $functionName = $MyInvocation.MyCommand.Name
@@ -91,7 +92,7 @@ function GetNextUserReadinessReport()
     # Call AssessDeviceState with error handling
     try
     {
-        $DeviceAssessmentState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness'
+        $DeviceAssessmentState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness' -username $username
         if (-not $DeviceAssessmentState)
         {
             throw "AssessDeviceState returned null or empty result"

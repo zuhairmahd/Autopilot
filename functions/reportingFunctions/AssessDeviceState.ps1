@@ -34,7 +34,8 @@ function AssessDeviceState()
         $settings = $settings,
         [Parameter(Mandatory = $true)]
         [ValidateSet('PropperEnrollmentVerification', 'NextUserReadiness', 'TroubleShooting')]
-        [string]$AssessmentType
+        [string]$AssessmentType,
+        [string]$username
     )
     $functionName = $MyInvocation.MyCommand.Name
     #region Write verbose log of received parameters.
@@ -72,7 +73,7 @@ function AssessDeviceState()
                 if ($enrollmentState.autopilot.device.enrollmentState -ne 'notContacted')
                 {   
                     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting managed device properties." -LogLevel "Information"
-                    $managedDeviceReadiness = GetManagedDeviceRelevantProperties -enrollmentState $enrollmentState -settings $settings
+                    $managedDeviceReadiness = GetManagedDeviceRelevantProperties -enrollmentState $enrollmentState -settings $settings -username $username
                     $deviceLastContactDate = GetLastDeviceContactDate -accessToken $accessToken -enrollmentState $enrollmentState
                     if ($deviceLastContactDate.withinThreshold)
                     {
@@ -108,22 +109,41 @@ function AssessDeviceState()
                 $null -ne $deviceLastContactDate -and
                 $deviceLastContactDate.withinThreshold
 
+                # Check for same-user device: registered to the intended user, no enrollment events, and compliant
+                $isSameUserDevice = $null -ne $managedDeviceReadiness -and
+                $managedDeviceReadiness.RegisteredToSameUser -eq $true -and
+                $enrollmentState.autopilot.device.enrollmentState -eq 'enrolled' -and
+                $enrollmentState.managedDevice.device.complianceState -eq 'compliant' -and
+                $autopilotReadiness.AutopilotAssignmentGood
+
                 # Check for pending actions using getDevicePendingActions
                 $pendingActionsResult = getDevicePendingActions -enrollmentState $enrollmentState
                 $isPendingActions = $pendingActionsResult.IsPendingAction
 
                 Write-Verbose "[$functionName] isNotContactedReady: $isNotContactedReady"
                 Write-Verbose "[$functionName] isEnrolledReady: $isEnrolledReady"
+                Write-Verbose "[$functionName] isSameUserDevice: $isSameUserDevice"
                 Write-Verbose "[$functionName] isPendingActions: $isPendingActions"
-                write-log -logFile $LogFile -Module "$functionName" -Message "Device readiness for next user - isEnrolledReady: $isEnrolledReady, isNotContactedReady: $isNotContactedReady, isPendingActions: $isPendingActions" -LogLevel "Information"
+                write-log -logFile $LogFile -Module "$functionName" -Message "Device readiness for next user - isEnrolledReady: $isEnrolledReady, isNotContactedReady: $isNotContactedReady, isSameUserDevice: $isSameUserDevice, isPendingActions: $isPendingActions" -LogLevel "Information"
                 
                 # Device is only ready if it passes readiness checks AND has no pending actions
-                if (($isEnrolledReady -or $isNotContactedReady) -and -not $isPendingActions)
+                # OR if it's registered to the same user with no enrollment issues
+                if ((($isEnrolledReady -or $isNotContactedReady) -and -not $isPendingActions) -or ($isSameUserDevice -and -not $isPendingActions))
                 {
                     Write-Host "`n=== Device Readiness Assessment ===" -ForegroundColor Cyan
                     Write-Host "Status: " -NoNewline
                     Write-Host "READY" -ForegroundColor Green
-                    Write-Host "The device is ready for the next user." -ForegroundColor Green
+                    
+                    if ($isSameUserDevice)
+                    {
+                        Write-Host "The device is already registered to this user and is compliant." -ForegroundColor Green
+                        Write-Host "The user needs to log into the device." -ForegroundColor Cyan
+                        Write-Host "If the device is to be assigned to another user, it should be wiped or cleaned." -ForegroundColor Yellow
+                    }
+                    else
+                    {
+                        Write-Host "The device is ready for the next user." -ForegroundColor Green
+                    }
                     Write-Host $memoryMessage
                     Write-Host "===================================`n" -ForegroundColor Cyan
                     $readinessState = $deviceStates.ready 
