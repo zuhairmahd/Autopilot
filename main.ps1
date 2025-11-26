@@ -2467,7 +2467,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         }
         else # Process only if a serial number was entered
         {
-            $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -CheckUserReadiness
+            $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -CheckUserReadiness -username $username
             # Check if ProcessSerialNumber returned an exit signal
             if ($null -eq $result)
             {
