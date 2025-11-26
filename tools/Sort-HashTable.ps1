@@ -57,7 +57,7 @@ foreach ($key in $sortedStrings.Keys)
 {
     $value = $sortedStrings[$key]
     $content += "    $key"
-    $content += " " * (14 - $key.Length)  # Align the = sign
+    $content += " " * ([Math]::Max(0, 14 - $key.Length))  # Align the = sign
     
     if ($value -is [System.Collections.IDictionary])
     {
