@@ -344,8 +344,7 @@ Describe "Feature X" -Tags 'Unit' {
 ### Test Documentation
 
 - [tests/AGENTS.md](../tests/AGENTS.md) - AI-optimized test guide
-- [TEST_TEMPLATE_GUIDELINES.md](TEST_TEMPLATE_GUIDELINES.md) - Test patterns
-- [PESTER_MIGRATION_README.md](PESTER_MIGRATION_README.md) - Migration status
+- [PESTER_MIGRATION_README.md](archive/PESTER_MIGRATION_README.md) - Migration status
 
 ## Coding Standards
 

@@ -333,4 +333,4 @@ repoInfo = @{
 
 ---
 
-*For additional information, see [TECHNICAL_DOCUMENTATION.md](TECHNICAL_DOCUMENTATION.md) or return to the [main README](../readme.md).*
+*For additional information, see [TECHNICAL_DOCUMENTATION.md](./TECHNICAL_DOCUMENTATION.md) or return to the [main README](../readme.md).*

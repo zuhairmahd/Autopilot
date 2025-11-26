@@ -33,7 +33,6 @@ Located in `tests/` and `archive/`:
 | Document | Description |
 |----------|-------------|
 | [../tests/AGENTS.md](../tests/AGENTS.md) | AI-optimized testing guide |
-| [TEST_TEMPLATE_GUIDELINES.md](archive/TEST_TEMPLATE_GUIDELINES.md) | Test patterns and guidelines |
 | [PESTER_MIGRATION_README.md](archive/PESTER_MIGRATION_README.md) | Pester migration status |
 
 ## Archived Documentation
