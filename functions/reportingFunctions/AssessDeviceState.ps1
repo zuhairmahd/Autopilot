@@ -108,9 +108,14 @@ function AssessDeviceState()
                 $null -ne $deviceLastContactDate -and
                 $deviceLastContactDate.withinThreshold
 
-                # Check for pending actions using getDevicePendingActions
-                $pendingActionsResult = getDevicePendingActions -enrollmentState $enrollmentState
-                $isPendingActions = $pendingActionsResult.IsPendingAction
+                # Check for pending actions using getDevicePendingActions - only for managed devices
+                $pendingActionsResult = $null
+                $isPendingActions = $false
+                if ($enrollmentState.managed -and $enrollmentState.managedDevice)
+                {
+                    $pendingActionsResult = getDevicePendingActions -enrollmentState $enrollmentState
+                    $isPendingActions = $pendingActionsResult.IsPendingAction
+                }
 
                 Write-Verbose "[$functionName] isNotContactedReady: $isNotContactedReady"
                 Write-Verbose "[$functionName] isEnrolledReady: $isEnrolledReady"
