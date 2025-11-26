@@ -62,7 +62,7 @@ function GetNextUserReadinessReport()
         }
         else
         { 
-            "Unknown Device" 
+            "Device name not available" 
         }
         
         $serialNumber = if ($enrollmentState.autopilot -and $enrollmentState.autopilot.device.serialNumber)
@@ -91,7 +91,7 @@ function GetNextUserReadinessReport()
     # Call AssessDeviceState with error handling
     try
     {
-        $global:DeviceAssessmentState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness'
+        $DeviceAssessmentState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness'
         if (-not $DeviceAssessmentState)
         {
             throw "AssessDeviceState returned null or empty result"
