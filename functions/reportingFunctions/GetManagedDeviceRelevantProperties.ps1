@@ -39,6 +39,13 @@ function GetManagedDeviceRelevantProperties()
     )
     $functionName = $MyInvocation.MyCommand.Name
     $managedDeviceProperties = [ordered] @{}
+    $orphanDevice = $true
+    $correctRam = $false
+    $hasUser = $false
+    $validUser = $false
+    $lastLogonDate = $null
+    $readyForNextUser = $false
+    $registeredToSameUser = $false
     if ($null -eq $settings.MinimumDevicePhysicalMemoryInGB -or $settings.MinimumDevicePhysicalMemoryInGB -eq 0)
     {
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "No minimum device physical memory specified in settings." -LogLevel "Information"
