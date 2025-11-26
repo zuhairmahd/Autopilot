@@ -12,12 +12,19 @@ function GetNextUserReadinessReport()
     .PARAMETER enrollmentState
     Enrollment state object with device information. This parameter is mandatory.
 
+    .PARAMETER username
+    Optional username for context in the assessment.
+
     .OUTPUTS
     System.Management.Automation.PSCustomObject
     Returns readiness report with assessment, issues, recommendations, and device details.
 
     .EXAMPLE
     $report = GetNextUserReadinessReport -enrollmentState $state
+    Generates a readiness report for the provided enrollment state.
+    .EXAMPLE
+    $report = GetNextUserReadinessReport -enrollmentState $state -username "jdoe"
+    Generates a readiness report for the provided enrollment state with user context.
 
     .NOTES
     Delegates to AssessDeviceState for comprehensive evaluation.
@@ -29,7 +36,8 @@ function GetNextUserReadinessReport()
     param(
         [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
-        $enrollmentState
+        $enrollmentState,
+        [string]$username
     )
 
     $functionName = $MyInvocation.MyCommand.Name
@@ -91,7 +99,7 @@ function GetNextUserReadinessReport()
     # Call AssessDeviceState with error handling
     try
     {
-        $DeviceAssessmentState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness'
+        $DeviceAssessmentState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness' -username $username
         if (-not $DeviceAssessmentState)
         {
             throw "AssessDeviceState returned null or empty result"
