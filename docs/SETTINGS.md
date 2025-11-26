@@ -28,7 +28,7 @@ Settings in `settings.psd1` use PowerShell Data File format for native integrati
 | File | Purpose | Location |
 |------|---------|----------|
 | `settings.psd1` | Main application settings | Root directory |
-| `config.psd1` | Encrypted authentication credentials | `.secrets/` |
+| `config.json` | Encrypted authentication credentials | `.secrets/` |
 | `strings.psd1` | UI text and messages | Root directory |
 | `menu.psd1` | Menu structure definitions | Root directory |
 
