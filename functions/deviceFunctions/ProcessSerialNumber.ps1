@@ -22,6 +22,9 @@ function ProcessSerialNumber()
     .PARAMETER CheckUserReadiness
     When specified, performs user readiness assessment instead of standard device lookup.
 
+    .PARAMETER username
+    Optional username for context in the assessment.
+
     .OUTPUTS
     System.Object
     Returns device information and assessment results. When CheckUserReadiness is specified,
@@ -31,6 +34,10 @@ function ProcessSerialNumber()
     .EXAMPLE
     ProcessSerialNumber -SerialNumber "ABC123456" -AccessToken $token
     ProcessSerialNumber -SerialNumber "ABC123456" -AccessToken $token -CheckUserReadiness
+
+    .EXAMPLE
+    $result = ProcessSerialNumber -SerialNumber "ABC123456" -AccessToken $token -Settings $customSettings -username "jdoe"
+    if ($result) { Write-Host "Device processed successfully." } else { Write-Host "Device processing failed." }
 
     .NOTES
     Validates and trims serial number input.

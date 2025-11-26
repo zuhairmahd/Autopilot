@@ -9,12 +9,18 @@ function GetManagedDeviceRelevantProperties()
     device name, OS, compliance state, management state, last sync time, and user information.
     Returns standardized property set for consistent reporting.
 
-    .PARAMETER managedDevice
+    .PARAMETER enrollmentState
     Managed device object from Graph API. This parameter is mandatory.
 
+    .PARAMETER settings
+    Configuration settings object containing reporting parameters.
+
+    .PARAMETER username
+    Optional username to check device association against.
+    
     .OUTPUTS
     System.Management.Automation.PSCustomObject
-    Returns object with relevant device properties formatted for reporting.
+    Returns object with relevant device properties formatted for reporting. 
 
     .EXAMPLE
     $properties = GetManagedDeviceRelevantProperties -managedDevice $device
