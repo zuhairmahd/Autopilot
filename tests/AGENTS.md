@@ -1097,15 +1097,13 @@ Move-Item "TestScripts\test-get-user-strong-mapping.ps1" "TestScripts\archived\"
 - Start with Template.Tests.ps1
 - Use existing tests as examples
 - Follow the patterns in this guide
-- Check TEST_TEMPLATE_GUIDELINES.md for detailed explanations
-- Review PESTER_MIGRATION_LESSONS_LEARNED.md for common issues
+- See [docs/DEVELOPER_GUIDE.md](../docs/DEVELOPER_GUIDE.md) for testing standards
 
 **For help:**
-- See `docs/TEST_TEMPLATE_GUIDELINES.md` - Comprehensive guide
-- See `docs/PESTER_MIGRATION_LESSONS_LEARNED.md` - Common issues and solutions
-- See `docs/PESTER_MIGRATION_PROGRESS_UPDATED.md` - Current status
+- See `docs/DEVELOPER_GUIDE.md` - Testing section
+- See `docs/archive/PESTER_MIGRATION_LESSONS_LEARNED.md` - Common issues and solutions
 - See existing tests in `tests/Unit/` for working examples
 
 ---
 
-**Current Status:** 155 tests migrated, 100% passing, PS 5.1 compatible ✅
+**Current Status:** 155+ tests migrated, 100% passing, PS 5.1 compatible

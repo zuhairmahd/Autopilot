@@ -611,16 +611,43 @@ GetNextUserReadinessReport -enrollmentState <Object>
 
 **AssessDeviceState**
 ```powershell
-AssessDeviceState -enrollmentState <Object> -AssessmentType <String> [-settings <Object>]
+AssessDeviceState -enrollmentState <Object> -AssessmentType <String> [-settings <Object>] [-username <String>]
 ```
 - Core device assessment engine supporting multiple assessment types
-- **Enhanced Logic**: Collects all issues simultaneously instead of overwriting previous findings
+- **Recent Enhancements**:
+  - **Pending Actions Detection**: Checks for incomplete device operations before marking ready
+  - **Same-User Detection**: Identifies devices already registered to intended user
+  - **Enhanced Managed Device Handling**: Only checks pending actions for managed devices
+  - **Improved Readiness Logic**: Comprehensive validation including enrollment state and pending actions
 - **Assessment Types**:
-  - `NextUserReadiness`: Comprehensive readiness validation
+  - `NextUserReadiness`: Comprehensive readiness validation with pending actions check
   - `PropperEnrollmentVerification`: Enrollment status verification
   - `TroubleShooting`: Device troubleshooting assistance
-- **Issue Collection**: Uses priority-based action determination for comprehensive reporting
-- Returns structured assessment object with all findings
+- **New Parameters**:
+  - `username`: Optional parameter to check device association against intended user
+- **Enhanced Readiness Criteria**:
+  - Device passes all standard checks (enrollment, profile, RAM, network)
+  - No pending actions (wipe, reset, sync)
+  - Either ready for new user OR already registered to same user with compliant state
+- Returns structured assessment object with detailed readiness information
+
+**GetManagedDeviceRelevantProperties**
+```powershell
+GetManagedDeviceRelevantProperties -enrollmentState <Object> [-settings <Object>] [-username <String>]
+```
+- Extracts relevant properties from managed device object
+- **Recent Enhancements**:
+  - **Variable Initialization**: Proper initialization of all readiness check variables
+  - **Same-User Detection**: New `RegisteredToSameUser` property indicates device is already registered to intended user
+  - **Enhanced User Validation**: Improved logic for detecting invalid user associations (SPNs, deleted users)
+- **Return Properties**:
+  - `OrphanDevice`: Whether device has mismatched Autopilot/Intune records
+  - `CorrectRam`: Device meets memory requirements
+  - `HasUser`: Device has user association
+  - `ValidUser`: User association is valid (not SPN or deleted)
+  - `LastLogonDate`: Last user logon timestamp
+  - `ReadyForNextUser`: Overall readiness boolean
+  - `RegisteredToSameUser`: New - indicates device is registered to intended user
 
 #### GraphAPIFunctions.ps1
 
