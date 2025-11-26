@@ -1,12 +1,12 @@
 [CmdletBinding()]
 param(
-    $inputFile,
+    $InputFile,
     $OutputFile
 )
 #region Sort and backup strings.psd1
 # Load the strings file
 
-$stringsFilePath = if ($inputFile) { $inputFile } else { Join-Path -Path (Split-Path -Parent $MyInvocation.MyCommand.Path) -ChildPath "strings.psd1" }          
+$stringsFilePath = if ($InputFile) { $InputFile } else { Join-Path -Path (Split-Path -Parent $MyInvocation.MyCommand.Path) -ChildPath "strings.psd1" }          
 
 # Read the original file to preserve the order of top-level keys
 $fileContent = Get-Content -Path $stringsFilePath -Raw
