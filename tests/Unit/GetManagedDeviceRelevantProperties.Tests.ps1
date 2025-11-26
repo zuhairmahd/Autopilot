@@ -55,15 +55,15 @@ Describe "GetManagedDeviceRelevantProperties Function" -Tags 'Unit', 'DeviceMana
         
         It "Should mark device as ready when RAM is sufficient and no user assigned" {
             $enrollmentState = @{
-                managed = $true
+                managed       = $true
                 managedDevice = @{
                     device = @{
-                        id = "device-123"
+                        id     = "device-123"
                         userId = $null
                     }
                     memory = 16
                 }
-                autopilot = @{
+                autopilot     = @{
                     device = @{
                         managedDeviceId = "device-123"
                     }
@@ -80,15 +80,15 @@ Describe "GetManagedDeviceRelevantProperties Function" -Tags 'Unit', 'DeviceMana
         
         It "Should mark device as not ready when RAM is insufficient" {
             $enrollmentState = @{
-                managed = $true
+                managed       = $true
                 managedDevice = @{
                     device = @{
-                        id = "device-123"
+                        id     = "device-123"
                         userId = $null
                     }
                     memory = 8
                 }
-                autopilot = @{
+                autopilot     = @{
                     device = @{
                         managedDeviceId = "device-123"
                     }
@@ -106,24 +106,24 @@ Describe "GetManagedDeviceRelevantProperties Function" -Tags 'Unit', 'DeviceMana
         
         It "Should detect device has a user when userId is present" {
             $enrollmentState = @{
-                managed = $true
+                managed       = $true
                 managedDevice = @{
                     device = @{
-                        id = "device-123"
+                        id     = "device-123"
                         userId = "user-456"
                     }
                     memory = 16
-                    users = @{
-                        userDisplayName = "John Doe"
+                    users  = @{
+                        userDisplayName   = "John Doe"
                         userPrincipalName = "john.doe@contoso.com"
-                        azureUser = $true
-                        user = @{
+                        azureUser         = $true
+                        user              = @{
                             givenName = "John"
                         }
                         lastLogOnDateTime = $null
                     }
                 }
-                autopilot = @{
+                autopilot     = @{
                     device = @{
                         managedDeviceId = "device-123"
                     }
@@ -139,24 +139,24 @@ Describe "GetManagedDeviceRelevantProperties Function" -Tags 'Unit', 'DeviceMana
         
         It "Should detect same-user device when username matches" {
             $enrollmentState = @{
-                managed = $true
+                managed       = $true
                 managedDevice = @{
                     device = @{
-                        id = "device-123"
+                        id     = "device-123"
                         userId = "user-456"
                     }
                     memory = 16
-                    users = @{
-                        userDisplayName = "John Doe"
+                    users  = @{
+                        userDisplayName   = "John Doe"
                         userPrincipalName = "john.doe@contoso.com"
-                        azureUser = $true
-                        user = @{
+                        azureUser         = $true
+                        user              = @{
                             givenName = "John"
                         }
                         lastLogOnDateTime = $null
                     }
                 }
-                autopilot = @{
+                autopilot     = @{
                     device = @{
                         managedDeviceId = "device-123"
                     }
@@ -172,24 +172,24 @@ Describe "GetManagedDeviceRelevantProperties Function" -Tags 'Unit', 'DeviceMana
         
         It "Should not detect same-user when username does not match" {
             $enrollmentState = @{
-                managed = $true
+                managed       = $true
                 managedDevice = @{
                     device = @{
-                        id = "device-123"
+                        id     = "device-123"
                         userId = "user-456"
                     }
                     memory = 16
-                    users = @{
-                        userDisplayName = "John Doe"
+                    users  = @{
+                        userDisplayName   = "John Doe"
                         userPrincipalName = "john.doe@contoso.com"
-                        azureUser = $true
-                        user = @{
+                        azureUser         = $true
+                        user              = @{
                             givenName = "John"
                         }
                         lastLogOnDateTime = $null
                     }
                 }
-                autopilot = @{
+                autopilot     = @{
                     device = @{
                         managedDeviceId = "device-123"
                     }
@@ -205,24 +205,24 @@ Describe "GetManagedDeviceRelevantProperties Function" -Tags 'Unit', 'DeviceMana
         
         It "Should handle missing username parameter gracefully" {
             $enrollmentState = @{
-                managed = $true
+                managed       = $true
                 managedDevice = @{
                     device = @{
-                        id = "device-123"
+                        id     = "device-123"
                         userId = "user-456"
                     }
                     memory = 16
-                    users = @{
-                        userDisplayName = "John Doe"
+                    users  = @{
+                        userDisplayName   = "John Doe"
                         userPrincipalName = "john.doe@contoso.com"
-                        azureUser = $true
-                        user = @{
+                        azureUser         = $true
+                        user              = @{
                             givenName = "John"
                         }
                         lastLogOnDateTime = $null
                     }
                 }
-                autopilot = @{
+                autopilot     = @{
                     device = @{
                         managedDeviceId = "device-123"
                     }
@@ -236,23 +236,23 @@ Describe "GetManagedDeviceRelevantProperties Function" -Tags 'Unit', 'DeviceMana
         
         It "Should detect invalid user when azureUser is false" {
             $enrollmentState = @{
-                managed = $true
+                managed       = $true
                 managedDevice = @{
                     device = @{
-                        id = "device-123"
+                        id     = "device-123"
                         userId = "user-456"
                     }
                     memory = 16
-                    users = @{
-                        userDisplayName = "Unknown User"
+                    users  = @{
+                        userDisplayName   = "Unknown User"
                         userPrincipalName = "unknown@contoso.com"
-                        azureUser = $false
-                        user = @{
+                        azureUser         = $false
+                        user              = @{
                             givenName = "Unknown"
                         }
                     }
                 }
-                autopilot = @{
+                autopilot     = @{
                     device = @{
                         managedDeviceId = "device-123"
                     }
@@ -271,15 +271,15 @@ Describe "GetManagedDeviceRelevantProperties Function" -Tags 'Unit', 'DeviceMana
         
         It "Should detect orphan device when IDs do not match" {
             $enrollmentState = @{
-                managed = $true
+                managed       = $true
                 managedDevice = @{
                     device = @{
-                        id = "device-123"
+                        id     = "device-123"
                         userId = $null
                     }
                     memory = 16
                 }
-                autopilot = @{
+                autopilot     = @{
                     device = @{
                         managedDeviceId = "device-456"
                     }
@@ -294,15 +294,15 @@ Describe "GetManagedDeviceRelevantProperties Function" -Tags 'Unit', 'DeviceMana
         
         It "Should not detect orphan when IDs match" {
             $enrollmentState = @{
-                managed = $true
+                managed       = $true
                 managedDevice = @{
                     device = @{
-                        id = "device-123"
+                        id     = "device-123"
                         userId = $null
                     }
                     memory = 16
                 }
-                autopilot = @{
+                autopilot     = @{
                     device = @{
                         managedDeviceId = "device-123"
                     }
@@ -315,19 +315,111 @@ Describe "GetManagedDeviceRelevantProperties Function" -Tags 'Unit', 'DeviceMana
         }
     }
     
+    Context "Non-managed device handling" {
+        
+        It "Should handle non-managed device with default values" {
+            $enrollmentState = @{
+                managed       = $false
+                managedDevice = $null
+                autopilot     = @{
+                    device = @{
+                        managedDeviceId = "device-123"
+                    }
+                }
+            }
+            
+            $result = GetManagedDeviceRelevantProperties -enrollmentState $enrollmentState -settings $script:testSettings
+            
+            # Verify all default values are set correctly
+            $result.OrphanDevice | Should -Be $true
+            $result.CorrectRam | Should -Be $false
+            $result.HasUser | Should -Be $false
+            $result.ValidUser | Should -Be $false
+            $result.LastLogonDate | Should -BeNullOrEmpty
+            $result.ReadyForNextUser | Should -Be $false
+            $result.RegisteredToSameUser | Should -Be $false
+        }
+        
+        It "Should handle non-managed device without errors" {
+            $enrollmentState = @{
+                managed = $false
+            }
+            
+            { GetManagedDeviceRelevantProperties -enrollmentState $enrollmentState -settings $script:testSettings } | Should -Not -Throw
+        }
+        
+        It "Should return all required properties for non-managed device" {
+            $enrollmentState = @{
+                managed       = $false
+                managedDevice = $null
+            }
+            
+            $result = GetManagedDeviceRelevantProperties -enrollmentState $enrollmentState -settings $script:testSettings
+            
+            # Verify structure is complete
+            $result.Keys | Should -Contain 'OrphanDevice'
+            $result.Keys | Should -Contain 'CorrectRam'
+            $result.Keys | Should -Contain 'HasUser'
+            $result.Keys | Should -Contain 'ValidUser'
+            $result.Keys | Should -Contain 'LastLogonDate'
+            $result.Keys | Should -Contain 'ReadyForNextUser'
+            $result.Keys | Should -Contain 'RegisteredToSameUser'
+        }
+        
+        It "Should handle non-managed device with username parameter" {
+            $enrollmentState = @{
+                managed       = $false
+                managedDevice = $null
+            }
+            
+            $result = GetManagedDeviceRelevantProperties -enrollmentState $enrollmentState -settings $script:testSettings -username "john.doe@contoso.com"
+            
+            # Username should not affect non-managed device behavior
+            $result.RegisteredToSameUser | Should -Be $false
+            $result.HasUser | Should -Be $false
+        }
+        
+        It "Should not be ready for next user when device is not managed" {
+            $enrollmentState = @{
+                managed = $false
+            }
+            
+            $result = GetManagedDeviceRelevantProperties -enrollmentState $enrollmentState -settings $script:testSettings
+            
+            # Non-managed devices should never be ready for next user
+            $result.ReadyForNextUser | Should -Be $false
+        }
+        
+        It "Should ensure all boolean variables are defined for non-managed device" {
+            $enrollmentState = @{
+                managed = $false
+            }
+            
+            $result = GetManagedDeviceRelevantProperties -enrollmentState $enrollmentState -settings $script:testSettings
+            
+            # Verify no null boolean values (all should be true or false)
+            $result.OrphanDevice | Should -BeOfType [bool]
+            $result.CorrectRam | Should -BeOfType [bool]
+            $result.HasUser | Should -BeOfType [bool]
+            $result.ValidUser | Should -BeOfType [bool]
+            $result.ReadyForNextUser | Should -BeOfType [bool]
+            $result.RegisteredToSameUser | Should -BeOfType [bool]
+        }
+    }
+    
     Context "Return value structure" {
         
         It "Should return all required properties" {
             $enrollmentState = @{
-                managed = $true
+                managed       = $true
                 managedDevice = @{
                     device = @{
-                        id = "device-123"
+                        id     = "device-123"
                         userId = $null
                     }
                     memory = 16
                 }
-                autopilot = @{
+                autopilot     = @{
                     device = @{
                         managedDeviceId = "device-123"
                     }
