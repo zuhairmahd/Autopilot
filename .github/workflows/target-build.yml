@@ -176,6 +176,14 @@ jobs:
           name: ${{ steps.target_info.outputs.artifact_name }}
           path: ${{ steps.target_info.outputs.output_path }}
 
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-${{ github.event.inputs.target }}
+          path: logs/CreateRelease.log
+          retention-days: 14
+
   sign:
     name: Code Signing (${{ github.event.inputs.target }})
     runs-on: windows-latest

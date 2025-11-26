@@ -30,12 +30,21 @@ Describe "Function: AssessDeviceState" -Tags 'Unit', 'reportingFunctions' {
         . "$script:RepoRoot/functions/reportingFunctions/GetAutopilotDeviceRelevantProperties.ps1"
         . "$script:RepoRoot/functions/reportingFunctions/GetManagedDeviceRelevantProperties.ps1"
         . "$script:RepoRoot/functions/reportingFunctions/GetLastDeviceContactDate.ps1"
+        . "$script:RepoRoot/functions/reportingFunctions/getDevicePendingActions.ps1"
         . "$script:RepoRoot/functions/utilityFunctions/FormatDateWithTimeZone.ps1"
         . "$script:RepoRoot/functions/utilityFunctions/GetTimeZoneAbbreviation.ps1"
         . "$script:RepoRoot/functions/utilityFunctions/Write-Log.ps1"
         
         # Mock Write-Log
         Mock Write-Log {}
+        
+        # Mock getDevicePendingActions globally
+        Mock getDevicePendingActions {
+            return @{
+                IsPendingAction = $false
+                PendingActions  = $null
+            }
+        }
         
         # Mock GetAutopilotDeviceRelevantProperties globally (will be overridden in tests)
         Mock GetAutopilotDeviceRelevantProperties {
@@ -79,8 +88,14 @@ Describe "Function: AssessDeviceState" -Tags 'Unit', 'reportingFunctions' {
             contactAdmin     = 'Contact an Intune administrator'
             contactHelpdesk  = 'Contact the helpdesk'
             WipeOrClean      = 'Wipe or clean the device'
+            turnOnDevice     = 'Turn on the device and allow pending actions to complete'
             none             = 'No action'
-            connectToNetwork = 'Connect to network'   
+            connectToNetwork = 'Connect the device to a network'
+        }
+        
+        # Mock returnValues for new string
+        $script:returnValues = @{
+            devicePendingActionsMessage = 'The device has pending actions that must complete before it is ready for the next user.'
         }
         
         # Mock settings
@@ -390,7 +405,7 @@ Describe "Function: AssessDeviceState" -Tags 'Unit', 'reportingFunctions' {
             
             # Assert
             $result.AllIssues | Should -Match 'The device has not contacted Intune in \d+ days\.'
-            # This should be the highest priority action
+            # This should be a high priority action
         }
         
         It "Should not check contact date for notContacted devices" {
@@ -412,6 +427,147 @@ Describe "Function: AssessDeviceState" -Tags 'Unit', 'reportingFunctions' {
             # Assert
             # Should be ready because notContacted with good autopilot assignment
             $result.IsReady | Should -Be $true
+        }
+    }
+    
+    Context "When device has pending actions" {
+        BeforeEach {
+            $script:enrollmentState = @{
+                inAutopilot   = $true
+                managed       = $true
+                autopilot     = @{
+                    device = @{
+                        enrollmentState = 'enrolled'
+                        id              = 'autopilot-device-id-123'
+                    }
+                }
+                managedDevice = @{
+                    device = @{
+                        id              = 'managed-device-id-123'
+                        managementState = 'managed'
+                    }
+                }
+            }
+        }
+        
+        It "Should return not ready when device has pending actions even if otherwise ready" {
+            # Arrange - device would normally be ready but has pending actions
+            Mock getDevicePendingActions {
+                return @{
+                    IsPendingAction = $true
+                    PendingActions  = @{
+                        ActionName   = 'wipe'
+                        ActionStatus = 'pending'
+                    }
+                }
+            }
+            
+            # Act
+            $result = AssessDeviceState -enrollmentState $script:enrollmentState -settings $script:settings -AssessmentType 'NextUserReadiness'
+            
+            # Assert
+            $result.ReadinessState | Should -Be $script:deviceStates.notReady
+            $result.IsReady | Should -Be $false
+            $result.AllIssues | Should -Contain $script:returnValues.devicePendingActionsMessage
+            $result.Action | Should -Be $script:deviceActions.turnOnDevice
+        }
+        
+        It "Should display all pending actions when multiple exist" {
+            # Arrange
+            Mock getDevicePendingActions {
+                return @{
+                    IsPendingAction = $true
+                    PendingActions  = @(
+                        @{
+                            ActionName   = 'wipe'
+                            ActionStatus = 'pending'
+                        },
+                        @{
+                            ActionName   = 'retire'
+                            ActionStatus = 'pending'
+                        }
+                    )
+                }
+            }
+            
+            # Act
+            $result = AssessDeviceState -enrollmentState $script:enrollmentState -settings $script:settings -AssessmentType 'NextUserReadiness'
+            
+            # Assert
+            $result.IsReady | Should -Be $false
+            $result.AllIssues | Should -Contain $script:returnValues.devicePendingActionsMessage
+            $result.Action | Should -Be $script:deviceActions.turnOnDevice
+        }
+        
+        It "Should prioritize turnOnDevice action when pending actions exist" {
+            # Arrange - pending actions plus other issues
+            Mock getDevicePendingActions {
+                return @{
+                    IsPendingAction = $true
+                    PendingActions  = @{
+                        ActionName   = 'sync'
+                        ActionStatus = 'pending'
+                    }
+                }
+            }
+            
+            Mock GetAutopilotDeviceRelevantProperties {
+                return @{
+                    CorrectProfile          = $false
+                    ProfileAssigned         = $true
+                    RemediationStateGood    = $true
+                    EnrollmentStateGood     = $true
+                    AutopilotAssignmentGood = $false
+                }
+            }
+            
+            # Act
+            $result = AssessDeviceState -enrollmentState $script:enrollmentState -settings $script:settings -AssessmentType 'NextUserReadiness'
+            
+            # Assert - turnOnDevice should be primary action (priority 1)
+            $result.Action | Should -Be $script:deviceActions.turnOnDevice
+            $result.AllActions | Should -Contain $script:deviceActions.turnOnDevice
+            $result.AllActions | Should -Contain $script:deviceActions.contactAdmin
+        }
+        
+        It "Should not mark device ready when pending actions exist even for notContacted devices" {
+            # Arrange - notContacted state but with pending actions
+            $script:enrollmentState.autopilot.device.enrollmentState = 'notContacted'
+            
+            Mock getDevicePendingActions {
+                return @{
+                    IsPendingAction = $true
+                    PendingActions  = @{
+                        ActionName   = 'wipe'
+                        ActionStatus = 'pending'
+                    }
+                }
+            }
+            
+            # Act
+            $result = AssessDeviceState -enrollmentState $script:enrollmentState -settings $script:settings -AssessmentType 'NextUserReadiness'
+            
+            # Assert
+            $result.IsReady | Should -Be $false
+            $result.ReadinessState | Should -Be $script:deviceStates.notReady
+        }
+        
+        It "Should mark device ready when no pending actions and all checks pass" {
+            # Arrange - explicitly no pending actions
+            Mock getDevicePendingActions {
+                return @{
+                    IsPendingAction = $false
+                    PendingActions  = $null
+                }
+            }
+            
+            # Act
+            $result = AssessDeviceState -enrollmentState $script:enrollmentState -settings $script:settings -AssessmentType 'NextUserReadiness'
+            
+            # Assert
+            $result.IsReady | Should -Be $true
+            $result.ReadinessState | Should -Be $script:deviceStates.ready
+            $result.Action | Should -Be $script:deviceActions.none
         }
     }
     
