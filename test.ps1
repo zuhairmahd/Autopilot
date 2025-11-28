@@ -1,180 +1,3 @@
-<#
-.SYNOPSIS
-    Main entry point for the Intune Helpdesk Menu application.
-
-.DESCRIPTION
-    This PowerShell script initializes configuration, authentication, and menu structures for managing Windows Autopilot devices and related Intune operations.
-    It supports exporting device lists, managing Autopilot profiles, updating application settings, and handling authentication with Microsoft Graph API.
-    The script loads supporting functions from the 'functions' folder and provides a menu-driven interface for helpdesk and administrative tasks.
-
-.PARAMETER configFile
-    Path to the configuration file containing authentication details. Default: "$pwd\.secrets\config.json"
-
-.PARAMETER InitFile
-    Path to the initialization file containing application settings. Default: "$pwd\settings.psd1"
-
-.PARAMETER stringsFile
-    Path to the strings file containing localized text. Default: "$pwd\strings.psd1"
-
-.PARAMETER menuFile
-    Path to the menu configuration file. Default: "$pwd\menu.psd1"
-
-.PARAMETER maxWaitTime
-    Maximum wait time in seconds for API operations.
-
-.PARAMETER timeInSeconds
-    Time limit in seconds for specific operations.
-
-.PARAMETER GroupTag
-    Autopilot group tag to assign to devices during import operations.
-
-.PARAMETER showLicenseBanner
-    Display the license banner on application startup.
-
-.PARAMETER showAuth
-    Display authentication configuration details during startup.
-
-.PARAMETER showVersion
-    Display the application version information and exit.
-
-.PARAMETER showSettings
-    Display all application settings during startup.
-
-.PARAMETER OverwriteLogs
-    Overwrite existing log files instead of appending to them.
-
-.PARAMETER SecureString
-    Use secure string encryption for sensitive data.
-
-.PARAMETER ResetAuth
-    Reset authentication credentials and launch the authentication wizard.
-
-.PARAMETER ForceNewToken
-    Force retrieval of a new access token, ignoring cached tokens.
-
-.PARAMETER delegated
-    Use delegated authentication flow (requires user interaction).
-
-.PARAMETER ForceNewRefreshToken
-    Force retrieval of a new refresh token (delegated auth only).
-
-.PARAMETER NoSaveRefreshToken
-    Do not save refresh tokens to disk (delegated auth only).
-
-.PARAMETER Scope
-    Microsoft Graph API scopes to request (delegated auth only).
-
-.PARAMETER AuthType
-    Authentication type for delegated flow. Valid values: 'PublicAuthFlow', 'Interactive', 'Private'
-
-.PARAMETER CacheType
-    Token cache storage type. Valid values: 'file', 'memory'
-
-.PARAMETER Repo
-    Repository source for updates. Valid values: 'github', 'gitlab'
-
-.PARAMETER Release
-    Specific release version to use for updates.
-
-.PARAMETER appMode
-    Application mode determining available features. Valid values: 'full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom'
-
-.PARAMETER LogFilePath
-    Path to the log file. Default: "$pwd\Logs\Autopilot.log"
-
-.PARAMETER LogLevel
-    Logging level for the application. Valid values: 'Error', 'Warning', 'Information', 'Verbose', 'Debug'
-
-.PARAMETER testMode
-    Enable test mode to skip interactive prompts and menu display. Used primarily for automated testing.
-
-.PARAMETER testModeMetadata
-    Test mode: Enable metadata initialization phase (default: true). Only effective with -testMode.
-
-.PARAMETER testModeCleanup
-    Test mode: Enable temporary file cleanup phase (default: true). Only effective with -testMode.
-
-.PARAMETER testModeMigration
-    Test mode: Enable settings migration check phase (default: true). Only effective with -testMode.
-
-.PARAMETER testModeConfig
-    Test mode: Enable configuration loading phase (default: true). Only effective with -testMode.
-
-.PARAMETER testModeAuth
-    Test mode: Enable authentication phase (default: false). Only effective with -testMode.
-
-.PARAMETER testModeLegacyMigration
-    Test mode: Enable legacy migration phase (default: false). Only effective with -testMode.
-
-.PARAMETER testModeExitAfter
-    Test mode: Exit after initialization phases complete (default: true). Only effective with -testMode.
-
-.PARAMETER TestPassword
-    Test password for encryption operations during test mode. Only works with -testMode.
-
-.EXAMPLE
-    .\main.ps1
-    Run the application with default settings and display the main menu.
-
-.EXAMPLE
-    .\main.ps1 -showVersion
-    Display version information and exit without launching the menu.
-
-.EXAMPLE
-    .\main.ps1 -appMode helpDesk -LogLevel Verbose
-    Launch the application in help desk mode with verbose logging.
-
-.EXAMPLE
-    .\main.ps1 -delegated -AuthType Interactive -Scope "DeviceManagementManagedDevices.ReadWrite.All"
-    Use delegated authentication with interactive login and specific Graph API scopes.
-
-.EXAMPLE
-    .\main.ps1 -ResetAuth
-    Reset authentication credentials and launch the first-run wizard.
-
-.EXAMPLE
-    .\main.ps1 -GroupTag "IT-Devices" -OverwriteLogs -LogLevel Debug
-    Run with a specific group tag for Autopilot imports, overwrite existing logs, and enable debug logging.
-
-.EXAMPLE
-    .\main.ps1 -configFile "C:\Config\custom-config.json" -InitFile "C:\Config\custom-settings.psd1"
-    Use custom configuration and settings files instead of defaults.
-
-.EXAMPLE
-    .\main.ps1 -ForceNewToken -CacheType memory
-    Force a new access token and store it in memory only (not on disk).
-
-.EXAMPLE
-    .\main.ps1 -testMode -testModeMetadata -testModeExitAfter
-    Run in test mode, only testing metadata initialization phase then exit.
-
-.LINK
-    Project Repository: https://github.com/zuhairmahd/autopilot
-
-.NOTES
-    Author: Zuhair Mahmoud
-    Copyright: (c) 2024 Zuhair Mahmoud
-    License: MIT License
-    
-    Project URL: https://github.com/zuhairmahd/autopilot
-    
-    Prerequisites:
-    - PowerShell 5.1 or later
-    - Microsoft Graph PowerShell modules
-    - Appropriate permissions in Microsoft Intune/Entra ID
-    
-    First Run:
-    If no configuration file exists, the script will launch a first-run wizard to set up authentication and basic settings.
-    
-    Authentication:
-    The script supports both application (client credentials) and delegated (user interactive) authentication flows.
-    Configuration is stored securely with encryption.
-    
-    Logging:
-    All operations are logged to the specified log file. Use -LogLevel to control verbosity.
-    Use -OverwriteLogs to start with a fresh log file on each run.
-#>
-
 [CmdletBinding()]
 param(
     [string]$configFile = "$pwd\.secrets\config.json",
@@ -438,6 +261,82 @@ else
     write-log -logFile $logFile -module $scriptName -message "Initializing application metadata"
     $appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile -scriptName $scriptName -scriptPath $ScriptPath
 }
+if ($null -ne $appMetaData.corporateSettings -and $appMetaData.corporateSettings.useCorporateSettings -and $null -ne $appMetaData.corporateSettings.corporateSettingsFilePaths -and $appMetaData.corporateSettings.corporateSettingsFilePaths.count -gt 0)
+{
+    $fileCopied = $false
+    $domain = if ($appMetaData.corporateSettings.corporateDomain)
+    {
+        $appMetaData.corporateSettings.corporateDomain
+    }
+    else
+    {
+        $appMetaData.domain
+    }
+    if ([string]::IsNullOrWhiteSpace($domain))
+    {
+        Write-Host "Error: Corporate domain is not specified. Skipping corporate settings file operations." -ForegroundColor Red
+        write-log -logFile $logFile -module $scriptName -Message "Corporate domain is not specified. Skipping corporate settings file operations." -LogLevel "Error"
+        return
+    }
+    $localDomainFileName = Join-Path -Path $scriptPath -ChildPath "$domain.psd1"
+    Write-Verbose "[$scriptName] Checking $($appMetaData.corporateSettings.corporateSettingsFilePaths) paths for corporate settings for domain: $domain"
+    write-log -logFile $logFile -module $scriptName -Message "Checking $($appMetaData.corporateSettings.corporateSettingsFilePaths) paths for corporate settings for domain: $domain"
+    Write-Host "Looking for corporate settings for domain: $domain" -ForegroundColor Green
+    for ($i = 0; $i -lt $appMetaData.corporateSettings.corporateSettingsFilePaths.count; $i++)
+    {
+        $path = $appMetaData.corporateSettings.corporateSettingsFilePaths[$i]
+        $domainFileName = Join-Path -Path $path -ChildPath "$domain.psd1"
+        Write-Verbose "[$scriptName] Checking path: $path for corporate settings file."
+        write-log -logFile $logFile -module $scriptName -Message "Checking path: $path for corporate settings file."
+        if (-not (Test-Path $domainFileName -ErrorAction SilentlyContinue))
+        {
+            Write-Verbose "[$scriptName] Path does not exist: $path"
+            write-log -logFile $logFile -module $scriptName -Message "Path does not exist: $path"                
+            continue
+        }
+        Write-Verbose "[$scriptName] Found corporate settings file: $domainFileName"
+        write-log -logFile $logFile -module $scriptName -Message "Found corporate settings file: $domainFileName"
+        Write-Host "Copying corporate settings from $domainFileName to $localDomainFileName" -ForegroundColor Green
+        try
+        {
+            Copy-Item -Path $domainFileName -Destination $localDomainFileName -Force -ErrorAction Stop                
+            $fileCopied = $true
+            Write-Host "Successfully copied corporate settings from $domainFileName to $localDomainFileName" -ForegroundColor Green                             
+            break
+        }
+        catch
+        {
+            Write-Error "[$scriptName] Error copying corporate settings file: $_"
+            write-log -logFile $logFile -module $scriptName -Message "Error copying corporate settings file: $_" -LogLevel "Error"
+            if ($i -lt ($appMetaData.corporateSettings.corporateSettingsFilePaths.count - 1))
+            {
+                Write-Host "Trying next path if available..." -ForegroundColor Yellow
+                write-log -logFile $logFile -module $scriptName -Message "Trying next path if available..."         
+            }
+            else
+            {
+                Write-Host "No more paths to try." -ForegroundColor Yellow
+                write-log -logFile $logFile -module $scriptName -Message "No more paths to try."    
+            }
+        }
+    }
+    if ($fileCopied)
+    {
+        Write-Host "Corporate settings file copied successfully." -ForegroundColor Green
+        Write-Verbose "[$scriptName] Corporate settings file copied successfully."
+        write-log -logFile $logFile -module $scriptName -Message "Corporate settings file copied successfully."                                        
+    }
+    else
+    {
+        Write-Host "No files were copied from all specified paths." -ForegroundColor Red
+        write-log -logFile $logFile -module $scriptName -Message "Failed to copy corporate settings file from all specified paths." -LogLevel "Error"                                        
+    }                   
+}
+else 
+{
+    Write-Verbose "[$scriptName] Corporate settings not enabled or no paths specified."             
+    write-log -logFile $logFile -module $scriptName -Message "Corporate settings not enabled or no paths specified."                                        
+}
 $version = if ($null -ne $appMetaData.version)
 {
     $appMetaData.version
@@ -462,7 +361,6 @@ if ($testMode -and -not $script:testModeOptions.cleanup)
 {
     Write-Verbose "[$scriptName] Test mode: Skipping temporary file cleanup (testModeOptions.cleanup = false)"
     write-log -logFile $logFile -module $scriptName -message "Test mode: Skipping temporary file cleanup"
-    
     # Create minimal cleanup result
     $filesCleaned = @{
         AllRemoved        = $true
@@ -637,7 +535,7 @@ else
         Write-Host "Starting first run wizard to set up your configuration..." -ForegroundColor Green
         
         # Launch the first run wizard (pass Silent switch if testMode is active)
-        $wizardResult = Start-FirstRunWizard -ConfigFile $configFile -SettingsFile $InitFile -StringsFile $stringsFile -Silent:$testMode
+        $wizardResult = Start-FirstRunWizard -ConfigFile $configFile -SettingsFile $InitFile -StringsFile "$PWD\strings.psd1" -Silent:$testMode
     }
     if ($wizardResult)
     {
@@ -757,11 +655,10 @@ $localSettings = $configResult.LocalSettings
 $requiredScopes = $configResult.RequiredScopes
 $repoInfo = $configResult.RepoInfo
 $global:cacheSettings = $configResult.CacheSettings            
-        
 # Merge global and local settings into a single settings object
 Write-Verbose "[$scriptName] Merging global and local settings"
 $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
-
+# Make sure we are using the correct domain in settings
 if ($settings.domain -ne $domain)
 {
     Write-Verbose "[$scriptName] Updating settings domain from $($settings.domain) to $domain"
@@ -909,7 +806,9 @@ else
 }
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/lastrun.json"
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
-$updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL -localVersion $version
+$updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL -executableFileName "$scriptPath\$scriptName" 
+Write-Verbose "[$scriptName] Update available: $($updateAvailable.updateAvailable), Remote version: $($updateAvailable.version | Out-String)"
+write-log -logFile $LogFile -Module $scriptName -Message "Update available: $($updateAvailable.updateAvailable), Remote version: $($updateAvailable.version | Out-String)" -LogLevel "Information"
 $groupsToInclude = $settings.groupsToInclude
 Write-Verbose "[$scriptName] Groups to include: $($groupsToInclude | Out-String)"
 $groupsToExclude = $settings.groupsToExclude
@@ -986,8 +885,14 @@ $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $sc
 # }
 #endregion Define variables
 
-
-
+$inputFile = Join-Path -Path $scriptPath -ChildPath "users.txt"            
+if (-not (Test-Path -Path $inputFile))
+{
+    Write-Error "Input file 'users.txt' not found at path: $inputFile. Please ensure the file exists before running this script."
+    exit 1
+}
+$users = Get-Content -Path $inputFile | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }                               
+$global:devices = Get-RegisteredDevicesByUser -accessToken $accessToken -usersList $users
 
 exit 0
 
