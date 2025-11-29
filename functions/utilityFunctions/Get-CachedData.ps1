@@ -99,7 +99,9 @@ function Get-CachedData()
     }
     
     Write-Verbose "[$functionName] Cache hit for key: $Key in type: $CacheType"
-    return $cacheEntry.Data
+    # Use Write-Output with -NoEnumerate to preserve empty arrays
+    # This prevents PowerShell from unrolling empty arrays to null
+    return Write-Output -NoEnumerate $cacheEntry.Data
 }
 
 function Set-CachedData()

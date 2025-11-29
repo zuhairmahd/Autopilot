@@ -658,6 +658,18 @@
                     'admin',
                     'advanced'
                 )
+            },
+            @{
+                description           = 'Generate a list of devices assigned to a user or a group of users'
+                name                  = 'Assigned devices by user'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin',
+                    'advanced',
+                    'registration',
+                    'advancedRegistration'
+                )                           
             }
         )
         includeInDisplayModes = @(

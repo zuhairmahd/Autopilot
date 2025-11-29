@@ -2,23 +2,28 @@ function Get-RegisteredDevicesByUser()
 {
     <#
     .SYNOPSIS
-    Retrieves registered devices for specified users with optional filtering.
+    Retrieves registered devices for specified users with optional filtering and caching.
 
     .DESCRIPTION
     Queries Microsoft Graph API to get registered devices for a list of users.
     Supports filtering by operating system and device name pattern.
+    
+    Uses the unified cache management system to cache device results per user,
+    significantly improving performance for repeated queries. Cache keys include
+    the operating system filter and device name prefix to ensure correct results.
+    
+    When caching is enabled, the function:
+    - Checks cache first for each user before making API calls
+    - Returns cached results immediately if all users are cached
+    - Only queries the API for users not found in cache
+    - Caches results after successful API queries
+    - Handles mixed cache hits/misses efficiently
 
     .PARAMETER usersList
     Array of user principal names or user IDs to query.
 
     .PARAMETER accessToken
     Microsoft Graph API access token for authentication.
-
-    .PARAMETER operatingSystem
-    Operating system filter (e.g., 'Windows', 'iOS', 'Android'). Default is 'Windows'.
-
-    .PARAMETER deviceNameFilter
-    Device name pattern to filter results (e.g., 'w11-' to match devices starting with 'w11-').
 
     .OUTPUTS
     Array of custom objects containing user and device information.
@@ -28,6 +33,8 @@ function Get-RegisteredDevicesByUser()
 
     .NOTES
     Compatible with PowerShell 5.1.
+    Uses DirectoryObjects cache type with automatic expiration.
+    Cache behavior controlled by global $cacheSettings configuration.
     #>
     [CmdletBinding()]
     param
@@ -41,8 +48,10 @@ function Get-RegisteredDevicesByUser()
     # Private helper function to process and filter devices
     function ConvertTo-FilteredDeviceObject()
     {
+        [CmdletBinding()]
         param(
             [Parameter(Mandatory = $true)]
+            [AllowEmptyCollection()]
             [object[]]$Devices,
             [Parameter(Mandatory = $true)]
             [string]$UserName,
@@ -52,14 +61,18 @@ function Get-RegisteredDevicesByUser()
 
         $filteredResults = @()
         
+        # Handle null or empty device array
+        if ($null -eq $Devices -or $Devices.Count -eq 0)
+        {
+            return $filteredResults
+        }
+        
         foreach ($device in $Devices)
         {
             # Skip if device is null or empty
-            if ($null -eq $device -or $device -is [int]) { continue }
-            
+            if ($null -eq $device -or $device.IsManaged -eq $false -or $device -is [int]) { continue }
             # Apply client-side filtering (since registeredDevices endpoint doesn't support $filter)
             $includeDevice = $true
-            
             # Filter by operating system if specified
             if (-not [string]::IsNullOrEmpty($OperatingSystemFilter))
             {
@@ -81,6 +94,10 @@ function Get-RegisteredDevicesByUser()
             # Only add device if it passes all filters
             if ($includeDevice)
             {
+                # Format dates using FormatDateWithTimeZone for consistent display
+                $formattedRegistrationDate = if ($device.registrationDateTime) { FormatDateWithTimeZone -DateTime $device.registrationDateTime } else { "N/A" }
+                $formattedLastSignIn = if ($device.approximateLastSignInDateTime) { FormatDateWithTimeZone -DateTime $device.approximateLastSignInDateTime } else { "N/A" }
+                
                 $filteredResults += [PSCustomObject]@{
                     UserName                      = $UserName
                     DeviceId                      = $device.id
@@ -90,44 +107,69 @@ function Get-RegisteredDevicesByUser()
                     OperatingSystem               = $device.operatingSystem
                     OperatingSystemVersion        = $device.operatingSystemVersion
                     AccountEnabled                = $device.accountEnabled
-                    ApproximateLastSignInDateTime = $device.approximateLastSignInDateTime
+                    ApproximateLastSignInDateTime = $formattedLastSignIn
                     DeviceTrustType               = $device.trustType
                     IsCompliant                   = $device.isCompliant
                     IsManaged                     = $device.isManaged
                     DeviceOwnership               = $device.deviceOwnership
                     EnrollmentType                = $device.enrollmentType
-                    RegistrationDateTime          = $device.registrationDateTime
+                    RegistrationDateTime          = $formattedRegistrationDate
                 }
             }
         }
-        
         return $filteredResults
     }
 
     $functionName = $MyInvocation.MyCommand.Name
-    $operatingSystem = $settings.operatingSystem
-    $deviceNameFilter = $settings.deviceNamePrefix
+    $operatingSystem = $global:settings.operatingSystem
+    $deviceNameFilter = $global:settings.deviceNamePrefix
     Write-Verbose "[$functionName] Starting device query for $($usersList.Count) user(s)"
     Write-Log -LogFile $logFile -Module $functionName -Message "Starting device query for $($usersList.Count) user(s)" -LogLevel "Information"
 
-    # Build resource paths for batch processing
+    # Build resource paths for batch processing, checking cache first
     $resourcePaths = @()
+    $cachedResults = @()
+    $usersToQuery = @()
+    
     foreach ($user in $usersList)
     {
         $userTrimmed = $user.Trim()
         if (-not [string]::IsNullOrEmpty($userTrimmed))
         {
-            $resourcePaths += "users/$userTrimmed/registeredDevices"
-            Write-Verbose "[$functionName] Added resource path for user: $userTrimmed"
+            # Create cache key for this user's registered devices
+            $cacheKey = "registeredDevices:${userTrimmed}:OS=${operatingSystem}:Prefix=${deviceNameFilter}"
+            
+            # Check unified cache
+            $cachedDevices = Get-CachedData -CacheType 'DirectoryObjects' -Key $cacheKey -CacheSettings $global:cacheSettings
+            
+            # Check if we have cached data (including empty arrays)
+            if ($null -ne $cachedDevices)
+            {
+                Write-Verbose "[$functionName] Cache hit for user: $userTrimmed ($($cachedDevices.Count) devices)"
+                Write-Log -LogFile $logFile -Module $functionName -Message "Using cached devices for user: $userTrimmed" -LogLevel "Debug"
+                if ($cachedDevices) { $cachedResults += $cachedDevices }
+            }
+            else
+            {
+                # Cache miss - add to query list
+                Write-Verbose "[$functionName] Cache miss for user: $userTrimmed - will query API"
+                $resourcePaths += "users/$userTrimmed/registeredDevices"
+                $usersToQuery += $userTrimmed
+                Write-Verbose "[$functionName] Added resource path for user: $userTrimmed"
+            }
         }
     }
 
+    # If all users were cached, return cached results immediately
     if ($resourcePaths.Count -eq 0)
     {
-        Write-Warning "[$functionName] No valid users provided"
-        Write-Log -LogFile $logFile -Module $functionName -Message "No valid users provided" -LogLevel "Warning"
-        return @()
+        Write-Verbose "[$functionName] All users found in cache ($($cachedResults.Count) devices)"
+        Write-Log -LogFile $logFile -Module $functionName -Message "All users found in cache, returning $($cachedResults.Count) cached devices" -LogLevel "Information"
+        return $cachedResults
     }
+    
+    Write-Verbose "[$functionName] Cache hits: $($cachedResults.Count) devices, API queries needed: $($resourcePaths.Count) user(s)"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Cache hits: $($cachedResults.Count) devices, querying API for $($resourcePaths.Count) remaining user(s)" -LogLevel "Information"
 
     # Note: The /registeredDevices endpoint does NOT support OData $filter queries
     # We must retrieve all devices and filter client-side
@@ -143,11 +185,22 @@ function Get-RegisteredDevicesByUser()
     {
         Write-Warning "[$functionName] No response received from Graph API"
         Write-Log -LogFile $logFile -Module $functionName -Message "No response received from Graph API" -LogLevel "Warning"
+        # Return cached results if any, otherwise empty array
+        if ($cachedResults.Count -gt 0)
+        {
+            Write-Verbose "[$functionName] API call failed, returning $($cachedResults.Count) cached devices"
+            return $cachedResults
+        }
         return @()
     }
 
-    # Process the response
+    # Process the response - start with cached results
     $results = @()
+    if ($cachedResults.Count -gt 0)
+    {
+        $results += $cachedResults
+        Write-Verbose "[$functionName] Starting with $($cachedResults.Count) cached device(s)"
+    }
     
     # Handle batch response
     if ($response.batchProcessed -eq $true)
@@ -176,9 +229,46 @@ function Get-RegisteredDevicesByUser()
                 # Extract devices from the batch response body
                 $devices = if ($batchItem.body.value) { $batchItem.body.value } else { @() }
                 
+                # Handle empty device array
+                if ($null -eq $devices -or $devices.Count -eq 0)
+                {
+                    Write-Verbose "[$functionName] No devices found for user: $userName"
+                    # Cache empty result to avoid repeated queries
+                    $cacheKey = "registeredDevices:${userName}:OS=${operatingSystem}:Prefix=${deviceNameFilter}"
+                    $metadata = @{
+                        UserName     = $userName
+                        OS           = $operatingSystem
+                        DevicePrefix = $deviceNameFilter
+                        DeviceCount  = 0
+                    }
+                    Set-CachedData -CacheType 'DirectoryObjects' -Key $cacheKey -Data @() -Metadata $metadata -CacheSettings $global:cacheSettings | Out-Null
+                    continue
+                }
+                
                 # Process devices using helper function
-                $filteredDevices = ConvertTo-FilteredDeviceObject -Devices $devices -UserName $userName -OperatingSystemFilter $operatingSystem -DeviceNameFilter $deviceNameFilter
+                $filteredDevices = ConvertTo-FilteredDeviceObject `
+                    -Devices $devices `
+                    -UserName $userName `
+                    -OperatingSystemFilter $operatingSystem `
+                    -DeviceNameFilter $deviceNameFilter
+                if ($null -eq $filteredDevices) { $filteredDevices = @() }
                 $results += $filteredDevices
+                
+                # Cache the filtered results for this user
+                $cacheKey = "registeredDevices:${userName}:OS=${operatingSystem}:Prefix=${deviceNameFilter}"
+                $metadata = @{
+                    UserName     = $userName
+                    OS           = $operatingSystem
+                    DevicePrefix = $deviceNameFilter
+                    DeviceCount  = $filteredDevices.Count
+                    TotalDevices = $devices.Count
+                }
+                $cached = Set-CachedData -CacheType 'DirectoryObjects' -Key $cacheKey -Data $filteredDevices -Metadata $metadata -CacheSettings $global:cacheSettings
+                if ($cached)
+                {
+                    Write-Verbose "[$functionName] Cached $($filteredDevices.Count) device(s) for user: $userName"
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Cached devices for user: $userName" -LogLevel "Debug"
+                }
                 
                 Write-Verbose "[$functionName] Processed $($devices.Count) device(s) for user: $userName (after filtering: $($filteredDevices.Count) matching)"
             }
@@ -193,15 +283,30 @@ function Get-RegisteredDevicesByUser()
     else
     {
         Write-Verbose "[$functionName] Processing single response"
-        
         # Extract user from the original request (single user scenario)
-        $userName = if ($usersList.Count -eq 1) { $usersList[0] } else { "Unknown" }
-        
+        $userName = if ($usersToQuery.Count -eq 1) { $usersToQuery[0] } else { "Unknown" }
         $devices = if ($response.value) { $response.value } else { @($response) }
         
         # Process devices using helper function
         $filteredDevices = ConvertTo-FilteredDeviceObject -Devices $devices -UserName $userName -OperatingSystemFilter $operatingSystem -DeviceNameFilter $deviceNameFilter
+        if ($null -eq $filteredDevices) { $filteredDevices = @() }
         $results += $filteredDevices
+        
+        # Cache the filtered results for this user
+        $cacheKey = "registeredDevices:${userName}:OS=${operatingSystem}:Prefix=${deviceNameFilter}"
+        $metadata = @{
+            UserName     = $userName
+            OS           = $operatingSystem
+            DevicePrefix = $deviceNameFilter
+            DeviceCount  = $filteredDevices.Count
+            TotalDevices = $devices.Count
+        }
+        $cached = Set-CachedData -CacheType 'DirectoryObjects' -Key $cacheKey -Data $filteredDevices -Metadata $metadata -CacheSettings $global:cacheSettings
+        if ($cached)
+        {
+            Write-Verbose "[$functionName] Cached $($filteredDevices.Count) device(s) for single user query"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Cached devices for user: $userName" -LogLevel "Debug"
+        }
         
         Write-Verbose "[$functionName] Processed $($devices.Count) device(s) for single user query (after filtering: $($filteredDevices.Count) matching)"
     }
