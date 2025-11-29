@@ -227,9 +227,10 @@ function Get-AssignedDevicesByUserReport()
                 $outputFileName = "AssignedDevicesByUserReport-$dateTime.csv"
                 write-log -logFile $logFile -Module $functionName -Message "Exporting report to CSV file: $outputFileName" -LogLevel "Information"                              
                 Write-Verbose "[$functionName] Exporting report to CSV file: $outputFileName"           
-                $deviceList | Export-Csv -Path $outputFileName -NoTypeInformation -UseCulture -Force
+                $deviceList | Export-Csv -Path $outputFileName -NoTypeInformation -Force 
                 Write-Host "Report exported successfully to $outputFileName" -ForegroundColor Green
-                $deviceList | Export-Csv -Path $outputFileName -NoTypeInformation -Encoding UTF8
+                write-log -logFile $logFile -Module $functionName -Message "Report exported successfully to $outputFileName" -LogLevel "Information"
+                return New-ReportResult -Success $true -Action 'Exported' -DeviceCount $deviceList.count -UserCount $userList.count -ExportPath $outputFileName -Message "Successfully exported $($deviceList.count) devices to $outputFileName"
             }
             'Q'
             {
