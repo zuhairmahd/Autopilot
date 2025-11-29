@@ -79,7 +79,6 @@ function Show-PagedContent()
             param($item)
             Write-Host "Name: $($item.Name), Value: $($item.Value)"
         } -PageSize 1                                                           
-         
 
     .NOTES
         - Maintains PowerShell 5.1 compatibility (no null-coalescing, ordered hashtables created via [ordered])
