@@ -72,6 +72,15 @@ function Show-PagedContent()
         # Display without paging
         Show-PagedContent -Content $smallArray -NoPaging -DisplayScriptBlock { param($item) Write-Host $item }
     
+        .EXAMPLE
+        #PSCustomObject input with custom display
+        $objList = @([PSCustomObject]@{ Name="Item1"; Value=10 }, [PSCustomObject]@{ Name="Item2"; Value=20 })                                          
+        Show-PagedContent -Content $objList -DisplayScriptBlock {
+            param($item)
+            Write-Host "Name: $($item.Name), Value: $($item.Value)"
+        } -PageSize 1                                                           
+         
+
     .NOTES
         - Maintains PowerShell 5.1 compatibility (no null-coalescing, ordered hashtables created via [ordered])
         - Follows repository coding standards (4-space indentation, Write-Verbose, Write-Log)
@@ -268,6 +277,7 @@ function Show-PagedContent()
     }
     
     # Paging loop
+    $firstPage = $true
     do
     {
         # Calculate page boundaries
@@ -280,6 +290,13 @@ function Show-PagedContent()
         
         if (-not $Silent)
         {
+            # Clear screen before showing new page (except first page)
+            if (-not $firstPage)
+            {
+                Clear-Host
+            }
+            $firstPage = $false
+            
             # Display title and page info
             if (-not [string]::IsNullOrWhiteSpace($Title))
             {
@@ -391,9 +408,6 @@ function Show-PagedContent()
             {
                 break
             }
-            
-            # Clear screen for next page (optional - can be disabled if needed)
-            Clear-Host
         }
         else
         {
