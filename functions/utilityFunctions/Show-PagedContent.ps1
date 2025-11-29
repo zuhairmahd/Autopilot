@@ -72,7 +72,7 @@ function Show-PagedContent()
         # Display without paging
         Show-PagedContent -Content $smallArray -NoPaging -DisplayScriptBlock { param($item) Write-Host $item }
     
-        .EXAMPLE
+    .EXAMPLE
         # PSCustomObject input with custom display
         $objList = @([PSCustomObject]@{ Name="Item1"; Value=10 }, [PSCustomObject]@{ Name="Item2"; Value=20 })                                          
         Show-PagedContent -Content $objList -DisplayScriptBlock {
