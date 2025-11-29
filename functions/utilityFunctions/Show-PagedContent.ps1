@@ -291,11 +291,10 @@ function Show-PagedContent()
         if (-not $Silent)
         {
             # Clear screen before showing new page (except first page)
-            if (-not $firstPage)
+            if ($currentPage -ne 1)
             {
                 Clear-Host
             }
-            $firstPage = $false
             
             # Display title and page info
             if (-not [string]::IsNullOrWhiteSpace($Title))
