@@ -1,51 +1,46 @@
 # Documentation Index
 
-This directory contains comprehensive technical documentation for the Windows Autopilot Management Tool.
+This directory contains technical documentation for the Windows Autopilot Management Tool.
 
-## Core Documentation
+## Primary Documentation
 
-### [TECHNICAL_DOCUMENTATION.md](TECHNICAL_DOCUMENTATION.md)
-**Primary technical reference** - Complete architecture overview, configuration system, API integration, testing framework, and development guidelines. **Start here for technical implementation details.**
+### For Users
+- **[Main README](../readme.md)** - Quick start, menu overview, troubleshooting
 
-### [CONTRIBUTOR_GUIDE.md](CONTRIBUTOR_GUIDE.md)
-**Developer onboarding guide** - Step-by-step guide for contributors including development environment setup, coding standards, testing procedures, and common development scenarios.
+### For Developers
+| Document | Description |
+|----------|-------------|
+| **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** | Architecture, menu system, caching, testing, coding standards |
+| **[SETTINGS.md](SETTINGS.md)** | Complete settings and configuration reference |
+| **[TECHNICAL_DOCUMENTATION.md](TECHNICAL_DOCUMENTATION.md)** | Detailed API and function reference |
+| **[CONTRIBUTOR_GUIDE.md](CONTRIBUTOR_GUIDE.md)** | Additional contributor information |
 
-## Specialized Documentation
+## Feature Documentation
 
-### [MENU_SYSTEM_DOCUMENTATION.md](MENU_SYSTEM_DOCUMENTATION.md)
-**Menu system reference** - Detailed documentation of the hierarchical menu system, navigation patterns, and menu configuration.
+Located in `features/`:
 
-### [APP_MODE_CONFIGURATION.md](APP_MODE_CONFIGURATION.md)
-**Application modes guide** - Role-based interface configurations, app mode definitions, and user permission management.
+| Document | Description |
+|----------|-------------|
+| [MENU_SYSTEM_DOCUMENTATION.md](features/MENU_SYSTEM_DOCUMENTATION.md) | Detailed menu system reference |
+| [APP_MODE_CONFIGURATION.md](features/APP_MODE_CONFIGURATION.md) | App mode configuration guide |
+| [SCOPE_VALIDATION.md](features/SCOPE_VALIDATION.md) | Microsoft Graph permissions |
+| [unified-cache-implementation.md](features/unified-cache-implementation.md) | Cache system implementation |
 
-### [APPMODE_FUNCTIONS_TESTING.md](APPMODE_FUNCTIONS_TESTING.md)
-**App mode testing documentation** - Comprehensive test suite for app mode functions, including 70+ test cases covering hierarchy resolution, conflict detection, and settings persistence. See also [APPMODE_FUNCTIONS_TESTING_SUMMARY.md](APPMODE_FUNCTIONS_TESTING_SUMMARY.md) for quick reference.
+## Testing Documentation
 
-### [GITHUB_ACTIONS_INTEGRATION.md](GITHUB_ACTIONS_INTEGRATION.md)
-**CI/CD documentation** - GitHub Actions workflows, build automation, and deployment procedures.
+Located in `tests/` and `archive/`:
 
-### [SCOPE_VALIDATION.md](SCOPE_VALIDATION.md)
-**Microsoft Graph permissions** - Required API scopes, permission validation, and Graph API integration details.
-
-## Issue-Specific Documentation
-
-### [SINGLE_GROUP_FIX.md](SINGLE_GROUP_FIX.md)
-**Single group saving fix** - Technical details of the array handling fix for single group configurations.
-
-### [issue-61-fix-summary.md](issue-61-fix-summary.md)
-**Authentication setting fix** - Summary of delegated authentication configuration improvements.
-
-## Documentation Organization
-
-- **For End Users**: See the main [README.md](../readme.md) in the repository root
-- **For Developers**: Start with [TECHNICAL_DOCUMENTATION.md](TECHNICAL_DOCUMENTATION.md)
-- **For Contributors**: Follow [CONTRIBUTOR_GUIDE.md](CONTRIBUTOR_GUIDE.md)
-- **For Specific Features**: Refer to specialized documentation above
+| Document | Description |
+|----------|-------------|
+| [../tests/AGENTS.md](../tests/AGENTS.md) | AI-optimized testing guide |
+| [PESTER_MIGRATION_README.md](archive/PESTER_MIGRATION_README.md) | Pester migration status |
 
 ## Archived Documentation
 
-Implementation-specific documentation from the development process has been moved to `archive-implementation/` to maintain focus on current, actionable documentation while preserving historical context.
+Implementation-specific and historical documentation has been moved to `archive/` to maintain focus on current documentation while preserving context.
+
+See [archive/README.md](archive/README.md) for a list of archived documents.
 
 ---
 
-*For the most current information, always refer to the main [README.md](../readme.md) and [GitHub Copilot Agent Instructions](../.github/agent.md).*
+*For the most current information, start with the [Developer Guide](DEVELOPER_GUIDE.md) or the main [README](../readme.md).*

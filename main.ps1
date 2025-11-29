@@ -1556,6 +1556,31 @@ $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "All Windows Dev
         Write-Host $exportedDeviceAssignment.message -ForegroundColor Red
     }                           
 }
+$deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Assigned devices by user" -Action {
+    $result = Get-AssignedDevicesByUserReport -accessToken $accessToken 
+    Write-Verbose "[$scriptName] Device user assignment report result: $($result | ConvertTo-Json -Depth 3)"
+    write-log -logFile $logFile -module $scriptName -message "Device user assignment report result: Action=$($result.Action), Success=$($result.Success), DeviceCount=$($result.DeviceCount), UserCount=$($result.UserCount)" -LogLevel "Information"
+    if ($result.Success)
+    {
+        switch ($result.Action)
+        {
+            'Displayed' { Write-Verbose "[$scriptName] $($result.Message)" }
+            'Exported' { Write-Host "$($result.Message)" -ForegroundColor Green }
+            'NoDevices' { Write-Verbose "[$scriptName] $($result.Message)" }
+            'UserCancelled' { Write-Verbose "[$scriptName] $($result.Message)" }
+            default { Write-Verbose "[$scriptName] Report completed: $($result.Message)" }
+        }
+    }
+    else
+    {
+        Write-Host "Error generating report: $($result.Message)" -ForegroundColor Red
+        if ($result.ErrorDetails)
+        {
+            Write-Verbose "[$scriptName] Error details: $($result.ErrorDetails)"
+            write-log -logFile $logFile -module $scriptName -message "Error details: $($result.ErrorDetails)" -LogLevel "Error"
+        }
+    }
+}
 #endregion device reports menu
 
 #region serial number menu
