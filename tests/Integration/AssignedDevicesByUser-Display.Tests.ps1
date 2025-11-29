@@ -449,6 +449,7 @@ Describe "Assigned Devices by User - Display Integration" -Tags 'Integration', '
             for ($i = 1; $i -le 50; $i++)
             {
                 # Generate valid day (1-28) with leading zero
+                # Use modulo 28 to ensure the day is always valid for February (max 28 days), and thus for any month with more days.
                 $day = ($i % 28) + 1
                 $dayString = "{0:D2}" -f $day
                 $largeDeviceArray += @{

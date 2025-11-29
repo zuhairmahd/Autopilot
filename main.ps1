@@ -1563,8 +1563,7 @@ $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Assigned device
     {
         Write-Host "Invalid choice. Please enter E, F, or Q."
         [console]::beep()
-        $choice = Read-Host -Prompt "E to enter a list of users, F to read from file, Q to quit"                                            
-        
+        $choice = Read-Host -Prompt "E to enter a list of users, F to read from file, Q to quit"
     }
     [array]$userList = @()
     switch ($choice)
@@ -1678,7 +1677,7 @@ $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Assigned device
                         Write-Host $device.ApproximateLastSignInDateTime -ForegroundColor White
                         Write-Host ""
                     }
-                    # Use smaller page size (3) because each device displays ~16 lines of output
+                    # Use smaller page size (1) because each device displays ~16 lines of output
                     $pageChoice = Show-PagedContent -Content $deviceList -PageSize 1 -DisplayScriptBlock $deviceDisplayScript -Title "Device list by user"
                     if ($pageChoice -notin @('completed', 'quit') )
                     {

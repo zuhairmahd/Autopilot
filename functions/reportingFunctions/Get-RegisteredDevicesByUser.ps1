@@ -48,7 +48,7 @@ function Get-RegisteredDevicesByUser()
     # Private helper function to process and filter devices
     function ConvertTo-FilteredDeviceObject()
     {
-        [CmdletBinding()                                    ]
+        [CmdletBinding()]
         param(
             [Parameter(Mandatory = $true)]
             [AllowEmptyCollection()]
@@ -246,7 +246,11 @@ function Get-RegisteredDevicesByUser()
                 }
                 
                 # Process devices using helper function
-                $filteredDevices = ConvertTo-FilteredDeviceObject -Devices $devices -UserName $userName -OperatingSystemFilter $operatingSystem -DeviceNameFilter $deviceNameFilter
+                $filteredDevices = ConvertTo-FilteredDeviceObject `
+                    -Devices $devices `
+                    -UserName $userName `
+                    -OperatingSystemFilter $operatingSystem `
+                    -DeviceNameFilter $deviceNameFilter
                 if ($null -eq $filteredDevices) { $filteredDevices = @() }
                 $results += $filteredDevices
                 

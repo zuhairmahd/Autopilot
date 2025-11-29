@@ -185,7 +185,8 @@ Describe "Show-PagedContent with Device Objects" -Tags 'Unit', 'Show-PagedConten
         BeforeAll {
             # Create multiple devices for paging tests
             $script:deviceList = @()
-            for ($i = 1; $i -le 25; $i++) {
+            for ($i = 1; $i -le 25; $i++)
+            {
                 $script:deviceList += [PSCustomObject]@{
                     UserName                      = "user$i@domain.com"
                     DeviceId                      = "device-id-$i"
@@ -195,13 +196,13 @@ Describe "Show-PagedContent with Device Objects" -Tags 'Unit', 'Show-PagedConten
                     OperatingSystem               = "Windows"
                     OperatingSystemVersion        = "10.0.$i"
                     AccountEnabled                = ($i % 2 -eq 0)
-                    ApproximateLastSignInDateTime = "2025-11-$i`T10:00:00Z"
+                    ApproximateLastSignInDateTime = "2025-11-{0:D2}T10:00:00Z" -f $i
                     DeviceTrustType               = "AzureAd"
                     IsCompliant                   = ($i % 3 -eq 0)
                     IsManaged                     = $true
                     DeviceOwnership               = "Company"
                     EnrollmentType                = "AzureADJoined"
-                    RegistrationDateTime          = "2025-01-$i`T09:00:00Z"
+                    RegistrationDateTime          = "2025-01-{0:D2}T09:00:00Z" -f $i
                 }
             }
         }
