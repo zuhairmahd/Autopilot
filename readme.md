@@ -121,7 +121,7 @@ Generate comprehensive reports of devices assigned to specific users with detail
    - **F** - Import from file (one user per line)
    - **Q** - Quit
 3. Select output option:
-   - **V** - View on screen with paging (3 devices per page, ~48 lines)
+   - **V** - View on screen with paging (1 device per page, ~48 lines)
    - **E** - Export to CSV file
    - **Q** - Cancel
 

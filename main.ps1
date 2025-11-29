@@ -1677,7 +1677,7 @@ $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Assigned device
                         Write-Host $device.ApproximateLastSignInDateTime -ForegroundColor White
                         Write-Host ""
                     }
-                    # Use smaller page size (1) because each device displays ~16 lines of output
+                    # Display 1 device per page since devices take up 16 lines per device
                     $pageChoice = Show-PagedContent -Content $deviceList -PageSize 1 -DisplayScriptBlock $deviceDisplayScript -Title "Device list by user"
                     if ($pageChoice -notin @('completed', 'quit') )
                     {
