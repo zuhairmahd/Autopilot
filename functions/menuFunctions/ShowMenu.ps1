@@ -207,11 +207,11 @@ function ShowMenu()
     
     #region Display choices and add navigation options
     $choices = @()
-    $descriptions = @()
     $menuItems = @()
-    Write-Verbose "[$functionName] Initializing choices, descriptions and menu items."
+    Write-Verbose "[$functionName] Initializing choices and menu items."
     
     # Loop through menu items and add to choices (excluding items in exclusion list)
+    # Build hashtables with name and description for the new DisplayNumericMenu format
     foreach ($item in $Menu.Items)
     {
         # If this menu was prefiltered at build time, skip additional include checks
@@ -221,9 +221,12 @@ function ShowMenu()
         if ($includeItem)
         {
             Write-Verbose "[$functionName] Adding item: $($item.Name)"
-            $choices += $item.Name
-            # Add description if available, otherwise add empty string
-            $descriptions += if ($item.description) { $item.description } else { "" }
+            # Build a hashtable with name and description for DisplayNumericMenu
+            $choiceItem = @{
+                name        = $item.Name
+                description = if ($item.description) { $item.description } else { "" }
+            }
+            $choices += $choiceItem
             $menuItems += $item
         }
         else
@@ -241,14 +244,12 @@ function ShowMenu()
     if ($Global:MenuHistory.Count -gt 1)
     {
         Write-Verbose "[$functionName] Adding 'Back' option since depth is $($Global:MenuHistory.Count)"
-        $choices += "Back"
-        $descriptions += ""  # No description for navigation options
+        $choices += @{ name = "Back"; description = "" }
     }
     if ($Global:MenuHistory.Count -gt 2)
     {
         Write-Verbose "[$functionName] Adding 'Main Menu' option since depth is $($Global:MenuHistory.Count)"
-        $choices += "Main Menu"
-        $descriptions += ""  # No description for navigation options
+        $choices += @{ name = "Main Menu"; description = "" }
     }
     #endregion
 
@@ -263,7 +264,7 @@ function ShowMenu()
     #endregion
 
     # Display menu and get selection
-    $selectedOption = DisplayNumericMenu -choices $choices -descriptions $descriptions -banner $banner -Prompt "Please select an option" -RequireEnter
+    $selectedOption = DisplayNumericMenu -choices $choices -banner $banner -Prompt "Please select an option" -RequireEnter
     Write-Verbose "[$functionName] Selected option: $selectedOption"
     
     # Check if the selected option is a return value from global return values

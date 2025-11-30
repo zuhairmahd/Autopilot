@@ -9,13 +9,17 @@ function DisplayNumericMenu()
     It handles user input validation, navigation commands (Back, Main Menu, Exit), and provides
     flexible configuration for prompts and behavior. The function supports both immediate selection
     and Enter-required modes.
+    
+    The choices parameter accepts two formats:
+    - String array (legacy format): @("Option 1", "Option 2", "Option 3")
+    - Hashtable array (new format): @(@{name="Option 1"; description="Description 1"}, @{name="Option 2"; description="Description 2"})
+    
+    When hashtables are provided, descriptions are displayed after the name in Gray color.
 
     .PARAMETER choices
-    Array of menu choice strings to display. This parameter is mandatory.
-
-    .PARAMETER descriptions
-    Optional array of description strings corresponding to each choice. When provided, descriptions
-    are displayed on the same line after the choice name in a different color (Gray).
+    Array of menu choices to display. This parameter is mandatory.
+    Accepts either an array of strings (legacy format) or an array of hashtables with 'name' 
+    and optional 'description' keys (new format). The function auto-detects the format.
 
     .PARAMETER banner
     Banner message displayed above the menu. Default is "Please press the number of your choice and press enter."
@@ -34,28 +38,27 @@ function DisplayNumericMenu()
 
     .OUTPUTS
     System.String or System.Int32
-    Returns selected choice string, navigation command ("Back", "Main Menu"), exit code (0), or
+    Returns selected choice string (the name), navigation command ("Back", "Main Menu"), exit code (0), or
     NoMenusConfigured value if no choices provided.
 
     .EXAMPLE
     $choice = DisplayNumericMenu -choices @("Option 1", "Option 2", "Option 3")
     $choice = DisplayNumericMenu -choices $items -banner "Select action:" -MaxItemsPerPage 10
-    $choice = DisplayNumericMenu -choices @("Save", "Load") -descriptions @("Save current file", "Load existing file")
+    $choice = DisplayNumericMenu -choices @(@{name="Save"; description="Save current file"}, @{name="Load"; description="Load existing file"})
 
     .NOTES
     Supports automatic paging when choice count exceeds MaxItemsPerPage.
     Navigation options: "B" or "b" for Back, "M" or "m" for Main Menu, "0" for Exit.
     Page navigation: "N" for next page, "P" for previous page.
     Returns NoMenusConfigured value from $returnValues if choices array is empty.
-    When descriptions are provided, they are displayed in Gray color after the choice name,
-    separated by " - " to distinguish them from the menu item name.
+    When hashtables with descriptions are provided, they are displayed in Gray color after the 
+    choice name, separated by " - " to distinguish them from the menu item name.
     Compatible with PowerShell 5.1.
     #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true)]
-        [string[]]$choices,
-        [string[]]$descriptions = @(),
+        $choices,
         [string]$banner = "Please press the number of your choice and press enter.",
         [string]$Prompt = "Please select an option",
         $errorMessage = "Invalid selection. Please try again.",
@@ -76,6 +79,47 @@ function DisplayNumericMenu()
         Write-Verbose "[$functionName] No choices provided, returning no menus configured message."
         Write-Log -LogFile $LogFile -Module $functionName -Message "No menu items available to display." -LogLevel "Warning"
         return $returnValues.NoMenusConfigured
+    }
+    
+    # Detect if choices are hashtables (new format) or strings (legacy format)
+    $isHashtableFormat = $false
+    if ($choices[0] -is [hashtable])
+    {
+        $isHashtableFormat = $true
+        Write-Verbose "[$functionName] Detected hashtable format for choices (new format with descriptions)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Using hashtable format for menu choices" -LogLevel "Debug"
+    }
+    else
+    {
+        Write-Verbose "[$functionName] Detected string format for choices (legacy format)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Using string format for menu choices" -LogLevel "Debug"
+    }
+    
+    # Helper function to get the name from a choice (handles both formats)
+    $getChoiceName = {
+        param($choice)
+        if ($choice -is [hashtable])
+        {
+            return $choice.name
+        }
+        return $choice
+    }
+    
+    # Helper function to get the description from a choice (returns empty for strings)
+    $getChoiceDescription = {
+        param($choice)
+        if ($choice -is [hashtable] -and $choice.description)
+        {
+            return $choice.description
+        }
+        return ""
+    }
+    
+    # Build a normalized list of choice names for validation and return
+    $choiceNames = @()
+    foreach ($choice in $choices)
+    {
+        $choiceNames += & $getChoiceName $choice
     }
     
     # Get max items per page from settings if not explicitly provided
@@ -124,13 +168,15 @@ function DisplayNumericMenu()
         for ($i = 0; $i -lt $pageChoices.Count; $i++)
         {
             $globalIndex = $startIndex + $i + 1
-            $actualIndex = $startIndex + $i
-            Write-Host "$globalIndex. $($pageChoices[$i])" -NoNewline -ForegroundColor White
+            $choiceName = & $getChoiceName $pageChoices[$i]
+            $choiceDesc = & $getChoiceDescription $pageChoices[$i]
             
-            # Display description if available for this choice
-            if ($descriptions.Count -gt $actualIndex -and -not [string]::IsNullOrWhiteSpace($descriptions[$actualIndex]))
+            Write-Host "$globalIndex. $choiceName" -NoNewline -ForegroundColor White
+            
+            # Display description if available
+            if (-not [string]::IsNullOrWhiteSpace($choiceDesc))
             {
-                Write-Host " - $($descriptions[$actualIndex])" -ForegroundColor Gray
+                Write-Host " - $choiceDesc" -ForegroundColor Gray
             }
             else
             {
@@ -186,12 +232,12 @@ function DisplayNumericMenu()
     
         # Add mnemonic keys based on available choices (easter egg functionality)
         $mnemonicKeys = @()
-        if ($choices -contains "Back")
+        if ($choiceNames -contains "Back")
         {
             $mnemonicKeys += "b"
             Write-Verbose "[$functionName] Added mnemonic key 'b' for Back navigation"
         }
-        if ($choices -contains "Main Menu")
+        if ($choiceNames -contains "Main Menu")
         {
             $mnemonicKeys += "m"
             Write-Verbose "[$functionName] Added mnemonic key 'm' for Main Menu navigation"
@@ -302,7 +348,7 @@ function DisplayNumericMenu()
         while ($selection -notin $allValidKeys)
         {
             # Check if it's a valid numeric selection
-            if ($selection -match '^\d+$' -and [int]$selection -ge 0 -and [int]$selection -le $choices.Count)
+            if ($selection -match '^\d+$' -and [int]$selection -ge 0 -and [int]$selection -le $choiceNames.Count)
             {
                 break
             }
@@ -333,13 +379,13 @@ function DisplayNumericMenu()
     } while ($needsPaging)  # End of paging loop
     
     # Handle mnemonic keys first
-    if ($selection -eq "b" -and $choices -contains "Back")
+    if ($selection -eq "b" -and $choiceNames -contains "Back")
     {
         Write-Verbose "[$functionName] Mnemonic key 'b' pressed, returning 'Back'"
         Write-Log -LogFile $LogFile -Module $functionName -Message "User pressed mnemonic key 'b' for Back navigation" -LogLevel "Information"
         return "Back"
     }
-    elseif ($selection -eq "m" -and $choices -contains "Main Menu")
+    elseif ($selection -eq "m" -and $choiceNames -contains "Main Menu")
     {
         Write-Verbose "[$functionName] Mnemonic key 'm' pressed, returning 'Main Menu'"
         Write-Log -LogFile $LogFile -Module $functionName -Message "User pressed mnemonic key 'm' for Main Menu navigation" -LogLevel "Information"
@@ -358,14 +404,14 @@ function DisplayNumericMenu()
         # Return integer 0 for exit option to ensure proper type matching
         return [int]$selection
     }
-    elseif ($selection -match '^\d+$' -and [int]$selection -ge 1 -and [int]$selection -le $choices.Count)
+    elseif ($selection -match '^\d+$' -and [int]$selection -ge 1 -and [int]$selection -le $choiceNames.Count)
     {
         # Convert to integer explicitly to avoid any type conversion issues
         $index = [int]$selection - 1
-        Write-Verbose "[$functionName] Returning choice at index $($index): '$($choices[$index])'"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "User selected option $($index + 1): '$($choices[$index])'" -LogLevel "Debug"
-        # Return the selected choice
-        return $choices[$index]
+        Write-Verbose "[$functionName] Returning choice at index $($index): '$($choiceNames[$index])'"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "User selected option $($index + 1): '$($choiceNames[$index])'" -LogLevel "Debug"
+        # Return the selected choice name
+        return $choiceNames[$index]
     }
     else
     {
