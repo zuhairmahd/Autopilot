@@ -81,11 +81,16 @@ function DisplayNumericMenu()
         return $returnValues.NoMenusConfigured
     }
     
-    # Detect if choices are hashtables (new format) or strings (legacy format)
-    $isHashtableFormat = $false
-    if ($choices[0] -is [hashtable])
+    # Ensure choices is an array (handle single item case)
+    if ($choices -isnot [array])
     {
-        $isHashtableFormat = $true
+        $choices = @($choices)
+    }
+    
+    # Detect if choices are hashtables (new format) or strings (legacy format)
+    $isHashtableFormat = $choices[0] -is [hashtable]
+    if ($isHashtableFormat)
+    {
         Write-Verbose "[$functionName] Detected hashtable format for choices (new format with descriptions)"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Using hashtable format for menu choices" -LogLevel "Debug"
     }
@@ -100,7 +105,13 @@ function DisplayNumericMenu()
         param($choice)
         if ($choice -is [hashtable])
         {
-            return $choice.name
+            # Validate that hashtable has 'name' key
+            if ($choice.ContainsKey('name'))
+            {
+                return $choice.name
+            }
+            Write-Warning "[$functionName] Hashtable choice missing required 'name' key"
+            return "[Unknown]"
         }
         return $choice
     }
@@ -108,7 +119,7 @@ function DisplayNumericMenu()
     # Helper function to get the description from a choice (returns empty for strings)
     $getChoiceDescription = {
         param($choice)
-        if ($choice -is [hashtable] -and $choice.description)
+        if ($choice -is [hashtable] -and $choice.ContainsKey('description') -and $choice.description)
         {
             return $choice.description
         }
