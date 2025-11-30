@@ -63,6 +63,7 @@ cd autopilot
 | **Check for script updates** | Download latest features and security updates |
 | **Restart the device** | Remote device restart (requires permissions) |
 | **Export Menu** | Export device lists, app assignments, group assignments |
+| **Device Reports Menu** | View and export device reports including assigned devices by user |
 | **About** | Version information and license details |
 
 ### Navigation
@@ -98,6 +99,64 @@ The tool performs comprehensive device readiness assessments:
 - **Network Connectivity**: Ensures recent contact with Intune
 
 Devices marked as "ready" have passed all checks and can be assigned to the next user. Devices already registered to the intended user with compliant state are identified and handled appropriately.
+
+## Device Reports
+
+The **Device Reports Menu** provides detailed insights into your device inventory with interactive viewing and export capabilities.
+
+### Assigned Devices by User Report
+
+Generate comprehensive reports of devices assigned to specific users with detailed device information:
+
+**Features:**
+- Query multiple users simultaneously (manual entry or file import)
+- View devices with full details including compliance status, enrollment type, and ownership
+- Interactive paged display with navigation controls
+- Export to CSV for further analysis
+
+**How to Use:**
+1. Navigate to **Device Reports Menu** > **Assigned devices by user**
+2. Choose input method:
+   - **E** - Enter user names/emails manually (one per prompt)
+   - **F** - Import from file (one user per line)
+   - **Q** - Quit
+3. Select output option:
+   - **V** - View on screen with paging (1 device per page, ~48 lines)
+   - **E** - Export to CSV file
+   - **Q** - Cancel
+
+**Report Information Displayed:**
+- User association
+- Device name and ID
+- Manufacturer and model
+- Operating system and version
+- Account status (Enabled/Disabled)
+- Compliance state (Compliant/Non-Compliant)
+- Management status
+- Trust type and ownership
+- Enrollment type
+- Registration and last sign-in dates (formatted with timezone)
+
+**Filtering:**
+The report automatically applies configured filters:
+- Operating system filter (from `settings.operatingSystem`)
+- Device name prefix filter (from `settings.deviceNamePrefix`)
+
+**Navigation Controls** (when viewing on screen):
+- `n` - Next page
+- `p` - Previous page
+- `1-N` - Jump to specific page number
+- `q` - Quit paging and return to menu
+
+**Export Files:**
+CSV files are saved with timestamp: `AssignedDevicesByUserReport-YYYYMMDD_HHMM.csv`
+
+### Other Available Reports
+
+- **Assigned Windows Devices** - All devices with user assignments
+- **Unassigned Windows Devices** - Devices without user assignments
+- **Pre-provisioned Windows Devices** - Devices staged for Autopilot
+- **All Windows Devices** - Complete device inventory
 
 ## Key Settings
 

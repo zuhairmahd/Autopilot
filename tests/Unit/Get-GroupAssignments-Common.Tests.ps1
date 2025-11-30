@@ -191,14 +191,53 @@ Describe "Function: Get-IntuneResourceLists" -Tags 'Unit', 'GroupAssignments', '
     
     Context "Caching Behavior" {
         BeforeEach {
+            # Clear cache and ensure caching infrastructure is initialized
             Clear-UnifiedCache -CacheType 'Configuration' -ErrorAction SilentlyContinue
+            
+            # Initialize $global:cacheSettings if not already set (required for caching to work)
+            if (-not $global:cacheSettings)
+            {
+                $global:cacheSettings = @{
+                    enabled    = $true
+                    cacheTypes = @{
+                        Configuration    = @{ enabled = $true; expirationMinutes = 60 }
+                        DirectoryObjects = @{ enabled = $true; expirationMinutes = 30 }
+                        Devices          = @{ enabled = $true; expirationMinutes = 15 }
+                    }
+                }
+            }
         }
         
         It "Should cache resource lists after successful fetch" {
+            $script:CallCount = 0
+            $script:GetCacheDataCallCount = 0
+            
+            # Prepare test data that will be "cached"
+            $testCachedData = @{
+                mobileApps             = @(@{ id = "app-1"; displayName = "Cached App"; '@odata.type' = '#microsoft.graph.win32LobApp' })
+                deviceConfigs          = @()
+                compliancePolicies     = @()
+                autopilotProfiles      = @()
+                deviceScripts          = @()
+                healthScripts          = @()
+                appProtectionPolicies  = @()
+                intents                = @()
+                resourceAccessProfiles = @()
+                configurationPolicies  = @()
+                groupPolicyConfigs     = @()
+                policySets             = @()
+                wipPolicies            = @()
+                mdmWipPolicies         = @()
+                windowsFeatureUpdates  = @()
+                windowsQualityUpdates  = @()
+                windowsDriverUpdates   = @()
+            }
+            
             Mock CallGraphAPI {
+                $script:CallCount++
                 return @{
                     responses = @(
-                        @{ id = "mobileApps"; status = 200; body = @{ value = @(@{ id = "app-1"; displayName = "Cached App" }) } }
+                        @{ id = "mobileApps"; status = 200; body = @{ value = $testCachedData.mobileApps } }
                         @{ id = "deviceConfigs"; status = 200; body = @{ value = @() } }
                         @{ id = "compliancePolicies"; status = 200; body = @{ value = @() } }
                         @{ id = "deviceScripts"; status = 200; body = @{ value = @() } }
@@ -210,10 +249,30 @@ Describe "Function: Get-IntuneResourceLists" -Tags 'Unit', 'GroupAssignments', '
                 }
             }
             
-            # First call - should hit API
+            # Mock Get-CachedData to return null on first call, cached data on second call
+            Mock Get-CachedData {
+                $script:GetCacheDataCallCount++
+                if ($script:GetCacheDataCallCount -eq 1)
+                {
+                    # First call - no cache
+                    return $null
+                }
+                else
+                {
+                    # Subsequent calls - return cached data
+                    return $testCachedData
+                }
+            }
+            
+            # Mock Set-CachedData to just return true
+            Mock Set-CachedData {
+                return $true
+            }
+            
+            # First call - should hit API (cache returns null)
             $result1 = Get-IntuneResourceLists -AccessToken $script:TestAccessToken
             
-            # Second call - should use cache
+            # Second call - should use cache (cache returns data)
             $result2 = Get-IntuneResourceLists -AccessToken $script:TestAccessToken
             
             # Verify API was only called once (cache hit on second call)
