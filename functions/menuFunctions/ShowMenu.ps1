@@ -223,14 +223,7 @@ function ShowMenu()
             Write-Verbose "[$functionName] Adding item: $($item.Name)"
             $choices += $item.Name
             # Add description if available, otherwise add empty string
-            if ($item.description)
-            {
-                $descriptions += $item.description
-            }
-            else
-            {
-                $descriptions += ""
-            }
+            $descriptions += if ($item.description) { $item.description } else { "" }
             $menuItems += $item
         }
         else

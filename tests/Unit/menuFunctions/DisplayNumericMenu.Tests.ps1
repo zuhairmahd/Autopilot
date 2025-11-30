@@ -31,8 +31,9 @@ Describe "Function: DisplayNumericMenu" -Tags 'Unit', 'menuFunctions' {
     }
     
     BeforeEach {
-        # Initialize mock global variables with explicit LogFile to avoid $env:TEMP issues on Linux
-        $Global:LogFile = "/tmp/autopilot-test.log"
+        # Initialize mock global variables with cross-platform temp path
+        $tempPath = if ($env:TEMP) { $env:TEMP } else { [System.IO.Path]::GetTempPath() }
+        $Global:LogFile = Join-Path $tempPath "autopilot-test.log"
         Initialize-MockGlobalVariables -Settings @{ maxMenuItemsPerPage = 15 } -LogFile $Global:LogFile
         
         # Initialize returnValues for edge cases
