@@ -44,7 +44,7 @@ function Get-ApplicationDefaults()
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [ValidateSet('Settings', 'Auth', 'Global', 'Domain', 'Menus', 'Strings', 'requiredScopes', 'cacheSettings', 'repoInfo', 'Overwrite', 'All')]
+        [ValidateSet('Settings', 'Auth', 'Global', 'corporateSettings', 'Domain', 'Menus', 'Strings', 'requiredScopes', 'cacheSettings', 'repoInfo', 'Overwrite', 'All')]
         [string]$DefaultType,
         [string]$DomainName,
         [string]$Version
@@ -79,7 +79,7 @@ function Get-ApplicationDefaults()
     $defaults = [ordered]@{
         
         # Authentication defaults - single source of truth
-        Auth           = [ordered]@{
+        Auth              = [ordered]@{
             changePwOnNextStart = $false
             authType            = "PublicAuthFlow"
             noSaveRefreshToken  = $false
@@ -89,6 +89,7 @@ function Get-ApplicationDefaults()
                 "Device.ReadWrite.All",
                 "DeviceManagementApps.Read.All",
                 "DeviceManagementConfiguration.ReadWrite.All",
+                "Mail.Send",
                 "DeviceManagementScripts.Read.All",
                 "DeviceManagementManagedDevices.PrivilegedOperations.All",
                 "DeviceManagementManagedDevices.ReadWrite.All",
@@ -100,36 +101,37 @@ function Get-ApplicationDefaults()
         }
         
         # Global settings defaults - single source of truth
-        Global         = [ordered]@{
-            configFile                   = ".\.secrets\config.json"
-            maxWaitTime                  = 30
-            showLicenseBanner            = $true
-            validateScopes               = $true
-            deviceContactThresholdInDays = 30
-            appModes                     = @(
+        Global            = [ordered]@{
+            configFile                                = ".\.secrets\config.json"
+            maxWaitTime                               = 30
+            showLicenseBanner                         = $true
+            validateScopes                            = $true
+            deviceContactThresholdInDays              = 30
+            includeEnrolledDevicesInNextUserReadiness = $true
+            useGridForLogDisplay                      = $true     
+            DisplayManualFilterSelection              = $false
+            appModes                                  = @(
                 "full"
             )
-            timeInSeconds                = 60
-            maxUserMatchDisplay          = 10
-            checkStrongMapping           = $false
-            strongMappingOptional        = $true
-            maxGroupMatchDisplay         = 10
-            maxMenuItemsPerPage          = 15
-            release                      = "auto"
-            repoInfo                     = [ordered]@{
-                repoName      = "Autopilot"
-                baseSourceURL = "https://raw.githubusercontent.com"
-                baseURL       = "https://www.github.com"
-                repoPath      = "zuhairmahd"
-            }
-            operatingSystem              = "Windows"
-            migrateLegacyConfiguration   = $true
-            hideEmptyMenus               = $true
-            autoUpdate                   = $true
+            timeInSeconds                             = 60
+            maxUserMatchDisplay                       = 10
+            checkStrongMapping                        = $false
+            strongMappingOptional                     = $true
+            maxGroupMatchDisplay                      = 10
+            maxMenuItemsPerPage                       = 15
+            release                                   = "auto"
+            operatingSystem                           = "Windows"
+            preferredBrowser                          = 'Chrome'
+            documentationURL                          = "https://github.com/zuhairmahd/Autopilot/blob/master/readme.md"
+            licenseURL                                = "https://github.com/zuhairmahd/Autopilot/blob/master/LICENSE"
+            privateSession                            = $false           
+            migrateLegacyConfiguration                = $true
+            hideEmptyMenus                            = $true
+            autoUpdate                                = $true
         }
 
         #cache settings defaults - single source of truth   
-        cacheSettings  = [ordered]@{
+        cacheSettings     = [ordered]@{
             enabled                  = $true
             defaultExpirationMinutes = 15
             maxCacheSize             = 1000
@@ -150,43 +152,56 @@ function Get-ApplicationDefaults()
         }
 
         # Repository information defaults - single source of truth  
-        repoInfo       = [ordered]@{
+        repoInfo          = [ordered]@{
             repoName      = 'Autopilot'
             baseSourceURL = 'https://raw.githubusercontent.com'
             baseURL       = 'https://www.github.com'
             repoPath      = 'zuhairmahd'
         }
-    
+
+        #corporate settings defaults
+        corporateSettings = [ordered]@{
+            useCorporateSettings       = $false
+            corporateDomain            = ''
+            corporateSettingsFilePaths = @()
+        }
+
         # Domain template defaults - single source of truth for domain structure
-        Domain         = [ordered]@{
-            groupsToInclude                 = @()
-            knownProblemGraphEndpoints      = @()
-            groupsToExclude                 = @()
-            autopilotProfilesToInclude      = @()
-            autopilotDeviceAllowedVendors   = @(
+        Domain            = [ordered]@{
+            groupsToInclude                           = @()
+            knownProblemGraphEndpoints                = @()
+            groupsToExclude                           = @()
+            autopilotProfilesToInclude                = @()
+            autopilotDeviceAllowedVendors             = @(
                 "Dell",
                 "VMWare"
             )
-            domain                          = $DomainName
-            companyName                     = ""
-            version                         = $Version
-            validateScopes                  = $false
-            hideEmptyMenus                  = $true
-            maxWaitTime                     = 30
-            showLicenseBanner               = $true
-            deviceContactThresholdInDays    = 30
-            checkStrongMapping              = $false
-            strongMappingOptional           = $true
-            migrateLegacyConfiguration      = $true
-            appModes                        = @(
+            domain                                    = $DomainName
+            companyName                               = ""
+            supportEmail                              = ""
+            documentationURL                          = "https://github.com/zuhairmahd/Autopilot/blob/master/readme.md"
+            licenseURL                                = "https://github.com/zuhairmahd/Autopilot/blob/master/LICENSE"
+            version                                   = $Version
+            validateScopes                            = $false
+            useGridForLogDisplay                      = $true
+            DisplayManualFilterSelection              = $false
+            hideEmptyMenus                            = $true
+            includeEnrolledDevicesInNextUserReadiness = $true
+            maxWaitTime                               = 30
+            showLicenseBanner                         = $true
+            deviceContactThresholdInDays              = 30
+            checkStrongMapping                        = $false
+            strongMappingOptional                     = $true
+            migrateLegacyConfiguration                = $true
+            appModes                                  = @(
                 "full"
             )
-            timeInSeconds                   = 60
-            maxUserMatchDisplay             = 20
-            maxGroupMatchDisplay            = 20
-            maxMenuItemsPerPage             = 20
-            release                         = "master"
-            cacheSettings                   = [ordered]@{
+            timeInSeconds                             = 60
+            maxUserMatchDisplay                       = 20
+            maxGroupMatchDisplay                      = 20
+            maxMenuItemsPerPage                       = 20
+            release                                   = "master"
+            cacheSettings                             = [ordered]@{
                 enabled                  = $true
                 defaultExpirationMinutes = 15
                 maxCacheSize             = 1000
@@ -205,35 +220,35 @@ function Get-ApplicationDefaults()
                     }
                 }
             }
-            repoInfo                        = [ordered]@{
+            repoInfo                                  = [ordered]@{
                 repoName      = "Autopilot"
                 baseSourceURL = "https://raw.githubusercontent.com"
                 baseURL       = "https://www.github.com"
                 repoPath      = "zuhairmahd"
             }
-            autoUpdate                      = $true
-            deviceNamePrefix                = ""
-            operatingSystem                 = "Windows"
-            minUsernameLength               = 3
-            maxUserNameLength               = 50
-            maxSerialNumberLength           = 50
-            minSerialNumberLength           = 7
-            minimumDevicePhysicalMemoryInGB = 8
-            maxNumberOfDevicesAllowed       = 15
-            preferredBrowser                = "Chrome"
-            privateSession                  = $false
-            userPatternsToExclude           = @( 
+            autoUpdate                                = $true
+            deviceNamePrefix                          = ""
+            operatingSystem                           = "Windows"
+            minUsernameLength                         = 3
+            maxUserNameLength                         = 50
+            maxSerialNumberLength                     = 50
+            minSerialNumberLength                     = 7
+            minimumDevicePhysicalMemoryInGB           = 8
+            maxNumberOfDevicesAllowed                 = 15
+            preferredBrowser                          = "Chrome"
+            privateSession                            = $false
+            userPatternsToExclude                     = @( 
                 "-test",
                 "onmicrosoft.com"
             )
-            groupPatternsToExclude          = @()  
-            groupTag                        = ''
-            assignedUser                    = ''
-            additionalScopes                = @()
+            groupPatternsToExclude                    = @()  
+            groupTag                                  = ''
+            assignedUser                              = ''
+            additionalScopes                          = @()
         }
         
         # Required scopes for Microsoft Graph API
-        RequiredScopes = @(
+        RequiredScopes    = @(
             @{
                 Scope     = "User.Read.All"
                 Reason    = "Required to read user profiles, group memberships, and registered devices."
@@ -258,6 +273,11 @@ function Get-ApplicationDefaults()
                     "deviceAppManagement/mobileApps",
                     "deviceAppManagement/mobileApps/id/assignments"
                 )
+            },
+            @{
+                scope     = 'Mail.Send'
+                endpoints = @('me/sendMail')                                    
+                reason    = 'Required to send emails on behalf of the signed-in user.'              
             },
             @{
                 Scope     = "DeviceManagementConfiguration.Read.All"
@@ -335,64 +355,66 @@ function Get-ApplicationDefaults()
         )
         
         # Strings defaults - UI text and localization
-        Strings        = [ordered]@{
+        Strings           = [ordered]@{
             Description   = "This is the strings file for the Intune Helpdesk script. It contains all the user-facing strings used in the script."
             deviceActions = @{
-                none             = "No action"
+                connectToNetwork = "Connect the device to a network"
                 contactAdmin     = "Contact an Intune administrator"
                 contactHelpdesk  = "Contact the helpdesk"
-                connectToNetwork = "Connect the device to a network"
+                none             = "No action"
+                turnOnDevice     = "Turn on the device and allow pending actions to complete"
                 WipeOrClean      = "Wipe or clean the device"
             }
             deviceStates  = @{
-                Ready    = "The device is ready for the next user"
                 NotReady = "The device is not ready for the next user"
+                Ready    = "The device is ready for the next user"
             }
             returnValues  = @{
+                "1000"                         = "All updates were installed"
                 "1001"                         = "Some updates were installed"
-                deviceRestartSuccessMessage    = "The device was restarted successfully."
-                deviceNotAssignedMessage       = "The device is not assigned to a deployment profile."
-                manufacturerNotAllowed         = 'You are not allowed to import this device using this script.  Please contact your system administrator.'
-                exitString                     = "EXIT_APPLICATION"
-                deviceIsInIntuneMessage        = 'The device is in Intune. Delete the device and try again.'
-                userCanceledMessage            = "Operation canceled by user"
-                noUserDeviceFoundMessage       = "No user or device found."
-                EnrollmentFailedMessage        = "The device enrollment failed."
-                noUserFoundInDirectoryMessage  = "This user does not exist"
-                testUpdateMessage              = "Only Update tests. No update applied"
-                deviceSyncFailedMessage        = "The device sync failed."
                 "1003"                         = "Updates failed to install"
-                noRestartMessage               = "Device not restarted."
+                "999"                          = "No updates were found"
+                backoutText                    = "Returning to previous menu"
+                deviceAssignedMessage          = "The device is assigned to a deployment profile."
+                deviceAssignmentPendingMessage = "The device is pending assignment to a deployment profile."
+                deviceCleanSuccessMessage      = "The device was cleaned successfully."
+                deviceDeleteSuccessMessage     = "The device was deleted successfully."
+                deviceIsInIntuneMessage        = "The device is in Intune. Delete the device and try again."
+                deviceNotAssignedMessage       = "The device is not assigned to a deployment profile."
+                devicePendingActionsMessage    = "The device has pending actions that must complete before it is ready for the next user."
                 deviceRestartFailedMessage     = "The device restart failed."
-                serialNumberNotFoundMessage    = "The serial number was not found."
-                InvalidSignatureMessage        = "The signature is invalid. The update will be aborted."
+                deviceRestartSuccessMessage    = "The device was restarted successfully."
+                deviceSyncFailedMessage        = "The device sync failed."
                 deviceUnknownActionMessage     = "The action may still be in progress. You can check the device status in the Intune portal."
                 deviceWipeFailedMessage        = "The device wipe failed."
-                "999"                          = "No updates were found"
-                deviceCleanSuccessMessage      = "The device was cleaned successfully."
-                "1000"                         = "All updates were installed"
+                EnrollmentFailedMessage        = "The device enrollment failed."
+                exitString                     = "EXIT_APPLICATION"
                 InvalidFileHash                = "The file hash is invalid. The update will be aborted."
+                invalidFileType                = "Invalid file type."
+                InvalidSignatureMessage        = "The signature is invalid. The update will be aborted."
+                manufacturerNotAllowed         = "You are not allowed to import this device using this script.  Please contact your system administrator."
+                noBitLockerKeysFoundMessage    = "No BitLocker keys found for this device."
+                noDeviceFound                  = "No device found"
+                noGroupAssignmentsFoundMessage = "No assignments found for the specified group."
+                noGroupFoundInDirectoryMessage = "This group does not exist"
+                noLAPSFoundMessage             = "No LAPS password found for this device."
+                noRestartMessage               = "Device not restarted."
+                notContactedMessage            = "The device has not contacted the enrollment service."
+                noUserDeviceFoundMessage       = "No user or device found."
+                noUserFoundInDirectoryMessage  = "This user does not exist"
+                PendingResetMessage            = "The device is pending a reset."
+                serialNumberNotFoundMessage    = "The serial number was not found."
+                testUpdateMessage              = "Only Update tests. No update applied"
+                unknownErrorMessage            = "An unknown error occurred."
                 UpdateCancelledMessage         = "The update was cancelled."
                 UpdateNotNeededMessage         = "The script is already up to date."
-                noBitLockerKeysFoundMessage    = "No BitLocker keys found for this device."
-                deviceDeleteSuccessMessage     = "The device was deleted successfully."
                 UpdateSuccessMessage           = "The script was updated successfully."
-                deviceAssignmentPendingMessage = "The device is pending assignment to a deployment profile."
-                noGroupFoundInDirectoryMessage = "This group does not exist"
-                deviceAssignedMessage          = "The device is assigned to a deployment profile."
-                noGroupAssignmentsFoundMessage = "No assignments found for the specified group."
-                noDeviceFound                  = "No device found"
-                notContactedMessage            = "The device has not contacted the enrollment service."
-                invalidFileType                = "Invalid file type."
-                PendingResetMessage            = "The device is pending a reset."
-                backoutText                    = "Returning to previous menu"
-                noLAPSFoundMessage             = "No LAPS password found for this device."
-                unknownErrorMessage            = "An unknown error occurred."
+                userCanceledMessage            = "Operation canceled by user"
             }
         }
         
         # Menu defaults - complete menu structure 
-        Menus          = [ordered]@{
+        Menus             = [ordered]@{
             version                   = '1.3.0.0'
             name                      = 'menu.psd1'
             description               = 'This file contains the definitions for the menus used in the application.'
@@ -604,8 +626,10 @@ function Get-ApplicationDefaults()
                         )
                     },
                     @{
-                        description           = 'Learn more about this application'
+                        # menuName              = 'aboutMenu'
+                        description           = 'Application information and support'
                         name                  = 'About'
+                        # blockType             = 'menu'
                         blockType             = 'action'
                         includeInDisplayModes = @(
                             'full',
@@ -940,6 +964,80 @@ function Get-ApplicationDefaults()
                     'registration'
                 )
             }
+            aboutMenu                 = @{
+                Title                 = 'About'
+                Description           = 'Application information and support'
+                items                 = @(
+                    @{
+                        description           = 'View the Azure application information and scopes'
+                        name                  = 'View Azure App Registration and Scopes'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced',
+                            'helpdesk',
+                            'registration'
+                        )
+                    },
+                    @{
+                        description           = 'View the script logs'
+                        name                  = 'View logs'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced',
+                            'helpdesk',
+                            'registration'
+                        )
+                    },
+                    @{
+                        description           = 'View the application documentation'
+                        name                  = 'View Documentation'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced',
+                            'helpdesk',
+                            'registration'
+                        )                                   
+                    },
+                    @{
+                        description           = 'View the application License Terms'
+                        name                  = 'View License'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced',
+                            'helpdesk',
+                            'registration'
+                        )                                   
+                    },
+                    @{
+                        description           = 'Send a message to support including logs'
+                        name                  = 'Request support'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced',
+                            'helpdesk',
+                            'registration'
+                        )
+                    }
+                )
+                type                  = 'static'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin',
+                    'advanced',
+                    'helpdesk',
+                    'registration'
+                )
+            }
             deviceReportsMenu         = @{
                 Title                 = 'Device Reports Menu'
                 Description           = 'Select the type of device report you would like to export'
@@ -983,6 +1081,18 @@ function Get-ApplicationDefaults()
                             'admin',
                             'advanced'
                         )
+                    },
+                    @{
+                        description           = 'Generate a list of devices assigned to a user or a group of users'
+                        name                  = 'Assigned devices by user'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced',
+                            'registration',
+                            'advancedRegistration'
+                        )                           
                     }
                 )
                 type                  = 'static'
@@ -1290,16 +1400,6 @@ function Get-ApplicationDefaults()
                         )
                     },
                     @{
-                        description           = 'View all unassigned configuration profiles '
-                        name                  = 'View all unassigned configurations'        
-                        blockType             = 'action'
-                        includeInDisplayModes = @(
-                            'full',
-                            'admin',
-                            'advanced'
-                        )                   
-                    },
-                    @{
                         description           = 'Export direct group assignments to a CSV file'
                         name                  = 'Export direct group assignments'        
                         blockType             = 'action'
@@ -1318,16 +1418,6 @@ function Get-ApplicationDefaults()
                             'admin',
                             'advanced'
                         )                                           
-                    },
-                    @{
-                        description           = 'Export all unassigned configuration profiles to a CSV file'
-                        name                  = 'Export all unassigned configuration profiles'        
-                        blockType             = 'action'
-                        includeInDisplayModes = @(
-                            'full',
-                            'admin',
-                            'advanced'
-                        )                       
                     },
                     @{
                         description           = 'Export all Windows configurations and their assignments to a CSV file'
@@ -1544,13 +1634,14 @@ function Get-ApplicationDefaults()
     
     # Complete settings structure combining all components
     $defaults.Settings = [ordered]@{
-        description    = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
-        version        = $Version
-        auth           = $defaults.Auth
-        cacheSettings  = $defaults.cacheSettings
-        repoInfo       = $defaults.repoInfo 
-        requiredScopes = $defaults.RequiredScopes
-        globalSettings = $defaults.Global
+        description       = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
+        version           = $Version
+        auth              = $defaults.Auth
+        cacheSettings     = $defaults.cacheSettings
+        repoInfo          = $defaults.repoInfo 
+        requiredScopes    = $defaults.RequiredScopes
+        corporateSettings = $defaults.corporateSettings 
+        globalSettings    = $defaults.Global
     }
     
     # Overwrite configurations - centralized force-overwrite settings
@@ -1607,6 +1698,13 @@ function Get-ApplicationDefaults()
             $script:defaultsCache[$cacheKey] = $result
             return $result
         }                                   
+        'corporateSettings'
+        {
+            Write-Verbose "[$functionName] Returning corporate settings defaults"
+            $result = $defaults.corporateSettings
+            $script:defaultsCache[$cacheKey] = $result
+            return $result
+        }                                               
         'Domain'
         {
             Write-Verbose "[$functionName] Returning domain template defaults for: $DomainName"
@@ -1741,3 +1839,17 @@ function Get-RepoInfoDefaults()
     
     return Get-ApplicationDefaults -DefaultType "repoInfo"
 }                                   
+function Get-CorporateSettingsDefaults()
+{
+    <#
+    .SYNOPSIS
+        Returns the default corporate settings structure.
+    
+    .DESCRIPTION
+        Wrapper function that calls Get-ApplicationDefaults for corporate settings.
+    #>
+    [CmdletBinding()]
+    param()
+    
+    return Get-ApplicationDefaults -DefaultType "corporateSettings"
+}                                                                                           

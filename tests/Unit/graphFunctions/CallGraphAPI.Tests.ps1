@@ -373,7 +373,20 @@ Describe "Function: CallGraphAPI" -Tags 'Unit', 'GraphFunctions' {
             
             Should -Invoke Invoke-RestMethod -Times 1
         }
-        
+    
+        It "Should merge custom headers while preserving Authorization" {
+            Mock Invoke-RestMethod {
+                param($Headers)
+                $Headers.Authorization | Should -Be "Bearer $script:testAccessToken"
+                $Headers.'Custom-Header' | Should -Be "CustomValue"
+                $Headers.'Content-Type' | Should -Be "application/json"
+                return @{ value = @() }
+            }
+    
+            $customHeaders = @{ 'Custom-Header' = 'CustomValue' }
+            CallGraphAPI -accessToken $script:testAccessToken -ResourcePath "users" -headers $customHeaders
+        }
+
         It "Should combine extra parameters with filter" {
             Mock ProcessFilterCondition { param($condition) return $condition }
             Mock Invoke-RestMethod {
@@ -388,6 +401,7 @@ Describe "Function: CallGraphAPI" -Tags 'Unit', 'GraphFunctions' {
             Should -Invoke Invoke-RestMethod -Times 1
         }
     }
+
     
     Context "When using consistency level" {
         It "Should add ConsistencyLevel header when switch is present" {

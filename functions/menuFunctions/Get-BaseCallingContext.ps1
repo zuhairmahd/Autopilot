@@ -1,5 +1,37 @@
 function Get-BaseCallingContext()
 {
+    <#
+    .SYNOPSIS
+    Determines the base calling context for menu operations.
+
+    .DESCRIPTION
+    This function analyzes the PowerShell call stack to determine how a menu function was invoked.
+    It identifies whether the call originated from navigation (ShowMenu, back/main navigation),
+    action execution (Handle-ActionExecution), submenu navigation, or generates a unique context
+    based on caller properties. This context information is used for menu state management and
+    navigation tracking.
+
+    .PARAMETER CallStack
+    The PowerShell call stack array to analyze. This parameter is mandatory.
+
+    .PARAMETER Menu
+    Optional hashtable containing the current menu object for context generation.
+
+    .OUTPUTS
+    System.String
+    Returns a context string: 'Navigation', 'Action', 'Submenu', unique caller context, or 'Direct'.
+
+    .EXAMPLE
+    $context = Get-BaseCallingContext -CallStack (Get-PSCallStack) -Menu $currentMenu
+
+    .NOTES
+    Known navigation functions: Handle-BackNavigation, Handle-MainMenuNavigation, GoBack, GoToMainMenu.
+    Known action functions: Handle-ActionExecution, Handle-MenuItemSelection.
+    Known submenu functions: Handle-SubmenuNavigation.
+    Skips Get-CallingContext and Get-BaseCallingContext when analyzing stack.
+    Falls back to 'Direct' if context cannot be determined.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

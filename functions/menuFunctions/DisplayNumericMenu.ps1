@@ -1,5 +1,49 @@
 function DisplayNumericMenu()
 {
+    <#
+    .SYNOPSIS
+    Displays a numbered menu with user input validation and optional paging support.
+
+    .DESCRIPTION
+    This function presents a numbered menu to the user with automatic paging for large choice lists.
+    It handles user input validation, navigation commands (Back, Main Menu, Exit), and provides
+    flexible configuration for prompts and behavior. The function supports both immediate selection
+    and Enter-required modes.
+
+    .PARAMETER choices
+    Array of menu choice strings to display. This parameter is mandatory.
+
+    .PARAMETER banner
+    Banner message displayed above the menu. Default is "Please press the number of your choice and press enter."
+
+    .PARAMETER Prompt
+    Prompt text for user input. Default is "Please select an option".
+
+    .PARAMETER errorMessage
+    Error message displayed for invalid selections. Default is "Invalid selection. Please try again."
+
+    .PARAMETER RequireEnter
+    When specified, requires user to press Enter after selection instead of immediate processing.
+
+    .PARAMETER MaxItemsPerPage
+    Maximum items to display per page. If 0, uses setting from $settings.maxMenuItemsPerPage or defaults to 15.
+
+    .OUTPUTS
+    System.String or System.Int32
+    Returns selected choice string, navigation command ("Back", "Main Menu"), exit code (0), or
+    NoMenusConfigured value if no choices provided.
+
+    .EXAMPLE
+    $choice = DisplayNumericMenu -choices @("Option 1", "Option 2", "Option 3")
+    $choice = DisplayNumericMenu -choices $items -banner "Select action:" -MaxItemsPerPage 10
+
+    .NOTES
+    Supports automatic paging when choice count exceeds MaxItemsPerPage.
+    Navigation options: "B" or "b" for Back, "M" or "m" for Main Menu, "0" for Exit.
+    Page navigation: "N" for next page, "P" for previous page.
+    Returns NoMenusConfigured value from $returnValues if choices array is empty.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true)]

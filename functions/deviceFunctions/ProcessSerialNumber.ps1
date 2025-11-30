@@ -1,10 +1,64 @@
 function ProcessSerialNumber()
 {
+    <#
+    .SYNOPSIS
+    Processes and displays comprehensive device information for a given serial number.
+
+    .DESCRIPTION
+    This function orchestrates device lookup by serial number, retrieves enrollment status,
+    and presents formatted device information including Autopilot status, deployment profile
+    assignment, management state, and user readiness assessment. It supports both standard
+    device lookup and user readiness checking modes.
+
+    .PARAMETER SerialNumber
+    The device serial number to process. This parameter is mandatory.
+
+    .PARAMETER AccessToken
+    The Microsoft Graph API access token for authentication.
+
+    .PARAMETER Settings
+    Optional settings object containing configuration values. Defaults to script-level $settings.
+
+    .PARAMETER CheckUserReadiness
+    When specified, performs user readiness assessment instead of standard device lookup.
+
+    .PARAMETER username
+    Optional username for context in the assessment.
+
+    .OUTPUTS
+    System.Object
+    Returns device information and assessment results. When CheckUserReadiness is specified,
+    returns user readiness report. Otherwise displays formatted device information to console
+    and returns enrollment state object.
+
+    .EXAMPLE
+    ProcessSerialNumber -SerialNumber "ABC123456" -AccessToken $token
+    ProcessSerialNumber -SerialNumber "ABC123456" -AccessToken $token -CheckUserReadiness
+
+    .EXAMPLE
+    $result = ProcessSerialNumber -SerialNumber "ABC123456" -AccessToken $token -Settings $customSettings -username "jdoe"
+    if ($result) { Write-Host "Device processed successfully." } else { Write-Host "Device processing failed." }
+
+    .NOTES
+    Validates and trims serial number input.
+    Uses Get-CachedDeviceEnrollmentStatus for efficient lookups with caching.
+    Displays formatted device information including:
+    - Autopilot enrollment status
+    - Deployment profile assignment
+    - Management state
+    - Device hardware details
+    - Import history
+    
+    When CheckUserReadiness is specified, delegates to GetNextUserReadinessReport.
+    Provides detailed logging throughout the lookup process.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [parameter(Mandatory = $true)]
         [string]$SerialNumber,
-        $AccessToken,
+        [string]$AccessToken,
+        [string]$username,
         $Settings = $settings,
         [switch]$CheckUserReadiness
     )
@@ -33,7 +87,7 @@ function ProcessSerialNumber()
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device imported: $($enrollmentState.Imported)" -LogLevel "Information"
         if ($CheckUserReadiness)
         {
-            return GetNextUserReadinessReport -enrollmentState $enrollmentState
+            return GetNextUserReadinessReport -enrollmentState $enrollmentState -username $username
         }
         
         if ($enrollmentState.inAutopilot)

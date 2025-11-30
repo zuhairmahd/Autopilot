@@ -1,5 +1,49 @@
-function DecodeJwtToken
+function DecodeJwtToken()
 {
+    <#
+    .SYNOPSIS
+    Decodes and parses a JWT (JSON Web Token) into its component parts.
+
+    .DESCRIPTION
+    This function decodes a Base64-encoded JWT token and extracts its payload claims.
+    It handles Base64 padding, provides human-readable claim names for common JWT properties,
+    and supports both raw object output and formatted JSON output. The function validates
+    token format and handles decoding errors gracefully.
+
+    .PARAMETER Token
+    The JWT token string to decode. This parameter is mandatory.
+
+    .PARAMETER raw
+    When specified, returns the raw decoded object without human-readable claim name mapping.
+
+    .PARAMETER RawJSON
+    When specified, returns the decoded payload as raw JSON string instead of PSObject.
+
+    .OUTPUTS
+    System.Management.Automation.PSCustomObject or System.String
+    Returns decoded token claims as PSObject (default), raw object (if -raw), or JSON string (if -RawJSON).
+    Returns error message from $returnValues if token is invalid.
+
+    .EXAMPLE
+    $claims = DecodeJwtToken -Token $accessToken
+    Write-Host "User: $($claims.UserPrincipalName)"
+    Write-Host "Expires: $($claims.ExpirationTime)"
+    
+    $rawClaims = DecodeJwtToken -Token $accessToken -raw
+
+    .NOTES
+    Maps common JWT claims to human-readable names:
+    - aud → Audience
+    - iss → Issuer
+    - roles → Roles
+    - exp → ExpirationTime
+    - preferred_username → UserPrincipalName
+    And many more...
+    
+    Handles Base64 padding automatically for URL-safe Base64 encoding.
+    Validates token has at least 2 parts (header.payload).
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -9,25 +53,30 @@ function DecodeJwtToken
     )
     $functionName = $MyInvocation.MyCommand.Name
     $HRIdentifyers = @{
-        aud      = 'Audience'
-        iss      = 'Issuer'
-        wids     = 'WindowsIdentifiers'
-        roles    = 'Roles'
-        sub      = 'Subject'
-        oid      = 'Object Identifier'
-        iat      = 'IssuedAt'
-        nbf      = 'NotBefore'
-        exp      = 'ExpirationTime'
-        idp      = 'IdentityProvider'
-        appidacr = 'AuthenticationMechanism'
-        idtyp    = 'IdentityType'
-        tid      = 'TenantID'
-        uti      = 'UniqueTokenIdentifier'
-        ver      = 'Version'
+        aud                = 'Audience'
+        iss                = 'Issuer'
+        wids               = 'WindowsIdentifiers'
+        roles              = 'Roles'
+        sub                = 'Subject'
+        oid                = 'Object Identifier'
+        iat                = 'IssuedAt'
+        nbf                = 'NotBefore'
+        exp                = 'ExpirationTime'
+        idp                = 'IdentityProvider'
+        appidacr           = 'AuthenticationMechanism'
+        idtyp              = 'IdentityType'
+        tid                = 'TenantID'
+        uti                = 'UniqueTokenIdentifier'
+        ver                = 'Version'
+        preferred_username = 'UserPrincipalName'
+        email              = 'Email'
+        upn                = 'UserPrincipalName'
+        unique_name        = 'UniqueName'
+        mail               = 'Email'
     }
     $parts = $Token -split '\.'
     Write-Verbose "[$functionName] Token parts: $($parts.Length)"
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing JWT token with $($parts.Length) parts" -LogLevel "Verbose"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing JWT token with $($parts.Length) parts" -LogLevel "Verbose"
     if ($parts.Length -lt 2)
     {
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Invalid JWT token format. Expected at least 2 parts." -LogLevel "Error"
@@ -148,15 +197,20 @@ Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing JWT tok
             return $humanClaims
         }
     }
-    if ($RawJSON)
-    {
-        Write-Verbose "[$functionName] Returning raw decoded JWT payload as raw JSON."
-        return $json 
-    }
     else
     {
-        Write-Verbose "[$functionName] Returning raw decoded JWT payload."
-        return $json | ConvertFrom-Json
+        # Raw mode: Return unfiltered JWT claims
+        Write-Verbose "[$functionName] Raw mode: Returning unfiltered JWT claims"
+        if ($RawJSON)
+        {
+            Write-Verbose "[$functionName] Returning raw decoded JWT payload as raw JSON."
+            return $json 
+        }
+        else
+        {
+            Write-Verbose "[$functionName] Returning raw decoded JWT payload as object."
+            return $claims
+        }
     }
 }
 

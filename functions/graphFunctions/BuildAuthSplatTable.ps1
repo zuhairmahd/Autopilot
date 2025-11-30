@@ -1,5 +1,31 @@
 function BuildAuthSplatTable()
 {
+    <#
+    .SYNOPSIS
+    Builds a parameter splatting hashtable for Graph API authentication from an auth configuration object.
+
+    .DESCRIPTION
+    This function constructs a properly formatted parameter hashtable for the GetGraphAccessToken
+    function from an auth configuration object. It validates parameters, handles case-insensitive
+    matching, filters out null/empty values, and respects parameter set constraints (e.g., delegated-only
+    parameters). The function supports both hashtable and PSObject input types.
+
+    .PARAMETER auth
+    The authentication configuration object containing authentication parameters and settings.
+    Can be a hashtable or PSCustomObject.
+
+    .OUTPUTS
+    System.Collections.Hashtable
+    Returns a hashtable suitable for splatting to GetGraphAccessToken function.
+
+    .EXAMPLE
+    $authParams = BuildAuthSplatTable -auth $authConfig
+
+    .NOTES
+    Filters parameters based on validity and value presence.
+    Handles delegated-only parameters (NoSaveRefreshToken, delegated, Scope, AuthType, ForceNewRefreshToken).
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

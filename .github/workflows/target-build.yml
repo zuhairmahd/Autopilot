@@ -11,7 +11,7 @@ on:
         options:
           - dev
           - production
-          - government
+          - lhm
           - ci_test
       test_suite:
         description: "Tests to run before build"
@@ -175,6 +175,14 @@ jobs:
         with:
           name: ${{ steps.target_info.outputs.artifact_name }}
           path: ${{ steps.target_info.outputs.output_path }}
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-${{ github.event.inputs.target }}
+          path: logs/CreateRelease.log
+          retention-days: 14
 
   sign:
     name: Code Signing (${{ github.event.inputs.target }})

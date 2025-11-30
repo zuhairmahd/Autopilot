@@ -1,5 +1,35 @@
 function Export-DeviceList()
 {
+    <#
+    .SYNOPSIS
+    Exports list of managed devices to CSV file.
+
+    .DESCRIPTION
+    This function retrieves managed devices from Microsoft Graph and exports them to CSV format.
+    Supports filtering and custom property selection for tailored device list exports.
+
+    .PARAMETER accessToken
+    Microsoft Graph API access token. This parameter is mandatory.
+
+    .PARAMETER outputPath
+    Directory path for CSV export. This parameter is mandatory.
+
+    .PARAMETER filter
+    Optional OData filter for device selection.
+
+    .OUTPUTS
+    System.String
+    Returns path to exported CSV file.
+
+    .EXAMPLE
+    Export-DeviceList -accessToken $token -outputPath "C:\Reports"
+    Export-DeviceList -accessToken $token -outputPath "C:\Reports" -filter "operatingSystem eq 'Windows'"
+
+    .NOTES
+    Exports device list with standard properties.
+    Creates timestamped CSV file.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

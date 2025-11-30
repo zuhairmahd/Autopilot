@@ -439,6 +439,82 @@ else
     write-log -logFile $logFile -module $scriptName -message "Initializing application metadata"
     $appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile -scriptName $scriptName -scriptPath $ScriptPath
 }
+if ($null -ne $appMetaData.corporateSettings -and $appMetaData.corporateSettings.useCorporateSettings -and $null -ne $appMetaData.corporateSettings.corporateSettingsFilePaths -and $appMetaData.corporateSettings.corporateSettingsFilePaths.count -gt 0)
+{
+    $fileCopied = $false
+    $domain = if ($appMetaData.corporateSettings.corporateDomain)
+    {
+        $appMetaData.corporateSettings.corporateDomain
+    }
+    else
+    {
+        $appMetaData.domain
+    }
+    if ([string]::IsNullOrWhiteSpace($domain))
+    {
+        Write-Host "Error: Corporate domain is not specified. Skipping corporate settings file operations." -ForegroundColor Red
+        write-log -logFile $logFile -module $scriptName -Message "Corporate domain is not specified. Skipping corporate settings file operations." -LogLevel "Error"
+        return
+    }
+    $localDomainFileName = Join-Path -Path $scriptPath -ChildPath "$domain.psd1"
+    Write-Verbose "[$scriptName] Checking $($appMetaData.corporateSettings.corporateSettingsFilePaths) paths for corporate settings for domain: $domain"
+    write-log -logFile $logFile -module $scriptName -Message "Checking $($appMetaData.corporateSettings.corporateSettingsFilePaths) paths for corporate settings for domain: $domain"
+    Write-Host "Looking for corporate settings for domain: $domain" -ForegroundColor Green
+    for ($i = 0; $i -lt $appMetaData.corporateSettings.corporateSettingsFilePaths.count; $i++)
+    {
+        $path = $appMetaData.corporateSettings.corporateSettingsFilePaths[$i]
+        $domainFileName = Join-Path -Path $path -ChildPath "$domain.psd1"
+        Write-Verbose "[$scriptName] Checking path: $path for corporate settings file."
+        write-log -logFile $logFile -module $scriptName -Message "Checking path: $path for corporate settings file."
+        if (-not (Test-Path $domainFileName -ErrorAction SilentlyContinue))
+        {
+            Write-Verbose "[$scriptName] Path does not exist: $path"
+            write-log -logFile $logFile -module $scriptName -Message "Path does not exist: $path"                
+            continue
+        }
+        Write-Verbose "[$scriptName] Found corporate settings file: $domainFileName"
+        write-log -logFile $logFile -module $scriptName -Message "Found corporate settings file: $domainFileName"
+        Write-Host "Copying corporate settings from $domainFileName to $localDomainFileName" -ForegroundColor Green
+        try
+        {
+            Copy-Item -Path $domainFileName -Destination $localDomainFileName -Force -ErrorAction Stop                
+            $fileCopied = $true
+            Write-Host "Successfully copied corporate settings from $domainFileName to $localDomainFileName" -ForegroundColor Green                             
+            break
+        }
+        catch
+        {
+            Write-Error "[$scriptName] Error copying corporate settings file: $_"
+            write-log -logFile $logFile -module $scriptName -Message "Error copying corporate settings file: $_" -LogLevel "Error"
+            if ($i -lt ($appMetaData.corporateSettings.corporateSettingsFilePaths.count - 1))
+            {
+                Write-Host "Trying next path if available..." -ForegroundColor Yellow
+                write-log -logFile $logFile -module $scriptName -Message "Trying next path if available..."         
+            }
+            else
+            {
+                Write-Host "No more paths to try." -ForegroundColor Yellow
+                write-log -logFile $logFile -module $scriptName -Message "No more paths to try."    
+            }
+        }
+    }
+    if ($fileCopied)
+    {
+        Write-Host "Corporate settings file copied successfully." -ForegroundColor Green
+        Write-Verbose "[$scriptName] Corporate settings file copied successfully."
+        write-log -logFile $logFile -module $scriptName -Message "Corporate settings file copied successfully."                                        
+    }
+    else
+    {
+        Write-Host "No files were copied from all specified paths." -ForegroundColor Red
+        write-log -logFile $logFile -module $scriptName -Message "Failed to copy corporate settings file from all specified paths." -LogLevel "Error"                                        
+    }                   
+}
+else 
+{
+    Write-Verbose "[$scriptName] Corporate settings not enabled or no paths specified."             
+    write-log -logFile $logFile -module $scriptName -Message "Corporate settings not enabled or no paths specified."                                        
+}
 $version = if ($null -ne $appMetaData.version)
 {
     $appMetaData.version
@@ -463,7 +539,6 @@ if ($testMode -and -not $script:testModeOptions.cleanup)
 {
     Write-Verbose "[$scriptName] Test mode: Skipping temporary file cleanup (testModeOptions.cleanup = false)"
     write-log -logFile $logFile -module $scriptName -message "Test mode: Skipping temporary file cleanup"
-    
     # Create minimal cleanup result
     $filesCleaned = @{
         AllRemoved        = $true
@@ -763,6 +838,10 @@ $global:cacheSettings = $configResult.CacheSettings
 Write-Verbose "[$scriptName] Merging global and local settings"
 $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
 
+# Merge global and local settings into a single settings object
+Write-Verbose "[$scriptName] Merging global and local settings"
+$global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+# Make sure we are using the correct domain in settings
 if ($settings.domain -ne $domain)
 {
     Write-Verbose "[$scriptName] Updating settings domain from $($settings.domain) to $domain"
@@ -910,7 +989,9 @@ else
 }
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/lastrun.json"
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
-# $updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL -localVersion $version
+$updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL -executableFileName "$scriptPath\$scriptName" 
+Write-Verbose "[$scriptName] Update available: $($updateAvailable.updateAvailable), Remote version: $($updateAvailable.version | Out-String)"
+write-log -logFile $LogFile -Module $scriptName -Message "Update available: $($updateAvailable.updateAvailable), Remote version: $($updateAvailable.version | Out-String)" -LogLevel "Information"
 $groupsToInclude = $settings.groupsToInclude
 Write-Verbose "[$scriptName] Groups to include: $($groupsToInclude | Out-String)"
 $groupsToExclude = $settings.groupsToExclude
@@ -987,131 +1068,18 @@ $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $sc
 # }
 #endregion Define variables
 
-#region test code
-# Define resource endpoints
-$resourceEndpoints = @(
-    @{ id = "mobileApps"; url = "deviceAppManagement/mobileApps" }
-    @{ id = "deviceConfigs"; url = "deviceManagement/deviceConfigurations" }
-    @{ id = "compliancePolicies"; url = "deviceManagement/deviceCompliancePolicies" }
-    @{ id = "deviceScripts"; url = "deviceManagement/deviceManagementScripts" }
-    @{ id = "appProtectionPolicies"; url = "deviceAppManagement/managedAppPolicies" }
-    @{ id = "intents"; url = "deviceManagement/intents" }
-    @{ id = "policySets"; url = "deviceAppManagement/policySets" }
-    @{ id = "autopilotProfiles"; url = "deviceManagement/windowsAutopilotDeploymentProfiles" }
-    @{ id = "healthScripts"; url = "deviceManagement/deviceHealthScripts" }
-    @{ id = "configurationPolicies"; url = "deviceManagement/configurationPolicies" }
-    @{ id = "groupPolicyConfigs"; url = "deviceManagement/groupPolicyConfigurations" }
-    @{ id = "wipPolicies"; url = "deviceAppManagement/windowsInformationProtectionPolicies" }
-    @{ id = "mdmWipPolicies"; url = "deviceAppManagement/mdmWindowsInformationProtectionPolicies" }
-    @{ id = "windowsFeatureUpdates"; url = "deviceManagement/windowsFeatureUpdateProfiles" }
-    @{ id = "windowsQualityUpdates"; url = "deviceManagement/windowsQualityUpdateProfiles"  }
-    @{ id = "windowsDriverUpdates"; url = "deviceManagement/windowsDriverUpdateProfiles" }
-)
-
-if ($useBatch)
+$inputFile = Join-Path -Path $scriptPath -ChildPath "users.txt"            
+if (-not (Test-Path -Path $inputFile))
 {
-    Write-Host "Using batch mode to fetch $($resourceEndpoints.Count) resources..." -ForegroundColor Cyan
-    
-    # Call batch endpoint with hashtable array (improved implementation)
-    $batchResult = CallGraphAPI -accessToken $accessToken -ResourcePath $resourceEndpoints
-    
-    # Initialize configs hashtable
-    $global:configs = @{}
-    
-    # Display batch processing summary
-    Write-Host ""
-    Write-Host "Batch Processing Summary:" -ForegroundColor Yellow
-    Write-Host "  Total Requests: $($batchResult.totalCount)" -ForegroundColor White
-    Write-Host "  Successful: $($batchResult.successCount)" -ForegroundColor Green
-    Write-Host "  Failed: $($batchResult.failureCount)" -ForegroundColor Red
-    Write-Host ""
-    
-    # Process successful results by mapping to resource IDs
-    foreach ($result in $batchResult.value)
-    {
-        # Extract resource metadata added by batch processor
-        if ($result.__batchMetadata)
-        {
-            $resourceId = $result.__batchMetadata.resourceId
-            $resourceUrl = $result.__batchMetadata.resourceUrl
-            $status = $result.__batchMetadata.status
-            
-            Write-Verbose "[$scriptName] Mapping batch result to resource: $resourceId (status: $status)"
-            
-            # Store the result under the resource ID
-            $global:configs[$resourceId] = $result
-            
-            if ($result.value -and $result.value.Count -ge 0)
-            {
-                Write-Host "  $resourceId : $($result.value.Count) items" -ForegroundColor Green
-            }
-            else
-            {
-                Write-Host "  $resourceId : No items" -ForegroundColor Gray
-            }
-        }
-    }
-    
-    # Display detailed error information if any failures occurred
-    if ($batchResult.failureCount -gt 0 -and $batchResult.errorDetails)
-    {
-        Write-Host ""
-        Write-Host "Failed Requests Details:" -ForegroundColor Red
-        foreach ($error in $batchResult.errorDetails)
-        {
-            Write-Host "  Resource: $($error.resourceId)" -ForegroundColor Yellow
-            Write-Host "    URL: $($error.resourceUrl)" -ForegroundColor Gray
-            Write-Host "    Status: $($error.statusCode)" -ForegroundColor Red
-            Write-Host "    Error: [$($error.errorCode)] $($error.errorMessage)" -ForegroundColor Red
-            if ($error.requestId -ne "N/A")
-            {
-                Write-Host "    Request-Id: $($error.requestId)" -ForegroundColor Gray
-            }
-            Write-Host ""
-        }
-    }
-    
-    Write-Host "Batch processing complete. Results stored in `$global:configs" -ForegroundColor Cyan
+    Write-Error "Input file 'users.txt' not found at path: $inputFile. Please ensure the file exists before running this script."
+    exit 1
 }
-else
-{
-    Write-Host "Using sequential mode to fetch $($resourceEndpoints.Count) resources..." -ForegroundColor Cyan
-    
-    # Initialize configs hashtable
-    $global:configs = @{}
-    $successCount = 0
-    $failureCount = 0
-    
-    foreach ($resource in $resourceEndpoints)
-    {
-        Write-Verbose "[$scriptName] Fetching data for resource: $($resource.id) from endpoint: $($resource.url)"
-        $response = CallGraphAPI -accessToken $accessToken -ResourcePath $resource.url -Verbose 
-        
-        if ($response)
-        {
-            $itemCount = if ($response.value) { $response.value.Count } else { 0 }
-            Write-Verbose "[$scriptName] Successfully fetched data for resource: $($resource.id). Items count: $itemCount"
-            Write-Host "  $($resource.id) : $itemCount items" -ForegroundColor Green
-            $global:configs[$resource.id] = $response
-            $successCount++
-        }
-        else
-        {
-            Write-Error "[$scriptName] Failed to fetch data for resource: $($resource.id) from endpoint: $($resource.url)"
-            Write-Host "  $($resource.id) : FAILED" -ForegroundColor Red
-            $failureCount++
-        }
-    }
-    
-    Write-Host ""
-    Write-Host "Sequential Processing Summary:" -ForegroundColor Yellow
-    Write-Host "  Successful: $successCount" -ForegroundColor Green
-    Write-Host "  Failed: $failureCount" -ForegroundColor Red
-    Write-Host "Sequential processing complete. Results stored in `$global:configs" -ForegroundColor Cyan
-}
-#endregion       test code  
+$users = Get-Content -Path $inputFile | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }                               
+$global:devices = Get-RegisteredDevicesByUser -accessToken $accessToken -usersList $users
 
 exit 0
+
+Send-EmailWithAttachments -accessToken $accessToken -to 'zuhair@accesstojobs.com' -Subject 'test' -body 'this is a test' -AttachmentPaths $logfile
 #region Usage examples for GetGraphObjectMetadata
 # Example 1: Get metadata for users collection
 $usersResponse = CallGraphAPI -accessToken $accessToken -ResourcePath "users"

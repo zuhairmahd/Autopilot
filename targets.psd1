@@ -1,39 +1,51 @@
 @{
     description = 'Build targets configuration for CreateRelease.ps1 - defines different build configurations with parameters and settings'
     version     = '1.0.0'
-    
     # Build targets - each target defines build parameters and settings to apply
     targets     = @{
         # Development build target
         dev        = @{
             # Build parameters that are passed to CreateRelease.ps1
-            buildParameters = @{
+            buildParameters   = @{
                 inputFile       = 'main.ps1'
                 OutputPath      = 'dev'
                 NoVersionUpdate = $false
                 Overwrite       = $true
                 noCleanup       = $false
+                skipModuleCheck = $true
             }
             
             # Settings to apply to global settings.psd1
-            globalSettings  = @{
+            globalSettings    = @{
                 autoUpdate        = $false
                 showLicenseBanner = $false
                 validateScopes    = $false
             }
             
+            # Settings to apply to corporate section
+            corporateSettings = @{
+                useCorporateSettings       = $false
+                corporateDomain            = 'arabictutor.com'
+                corporateSettingsFilePaths = @(
+                    "\\test\folder\path",
+                    "\\localhost\c$\users\username\code\autopilot",
+                    "\\test\sysvol\Autopilot"
+                )
+            }
+
             # Settings to apply to auth section
-            authSettings    = @{
+            authSettings      = @{
                 changePwOnNextStart = $false
-                delegated           = $false
+                cacheType           = 'File'
+                delegated           = $true
                 forceNewToken       = $false
             }
             
             # Domain to use for domain-specific settings (optional)
-            domain          = 'arabictutor.com'
+            domain            = 'arabictutor.com'
             
             # Settings to apply to domain configuration (when domain is specified)
-            domainSettings  = @{
+            domainSettings    = @{
                 privateSession                  = $false
                 groupsToExclude                 = @(
                     @{
@@ -42,14 +54,14 @@
                     }
                 )
                 companyName                     = 'ZM Consulting'
-                maxUserMatchDisplay             = 10
+                useGridForLogDisplay            = $true
+                maxMenuItemsPerPage             = 15
                 appModes                        = @(
                     'full'
                 )
                 assignedUser                    = ''
                 minimumDevicePhysicalMemoryInGB = 8
                 maxNumberOfDevicesAllowed       = 15
-                maxGroupMatchDisplay            = 20
                 autopilotDeviceAllowedVendors   = @(
                     'vmware'
                 ) 
@@ -103,15 +115,16 @@
                 deviceNamePrefix                = 'vmware'
             }
             
-            description     = 'Development build with test mode enabled and signing disabled'
+            description       = 'Development build with test mode enabled and signing disabled'
         }
         
-        # Government build (example for gao.gov)
-        government = @{
+        # LHM build (example for gao.gov)
+        lhm        = @{
             buildParameters = @{
                 OutputPath      = 'lhm'
                 NoVersionUpdate = $false
                 Overwrite       = $true
+                skipModuleCheck = $true
             }
             
             globalSettings  = @{
@@ -123,6 +136,7 @@
             authSettings    = @{
                 changePwOnNextStart = $true
                 validateScopes      = $false
+                cacheType           = 'File'
                 authType            = 'PublicAuthFlow'
                 noSaveRefreshToken  = $false
                 forceNewToken       = $false
@@ -134,10 +148,10 @@
                     'DeviceManagementConfiguration.ReadWrite.All',
                     'DeviceManagementManagedDevices.PrivilegedOperations.All',
                     'DeviceManagementManagedDevices.ReadWrite.All',
+                    'Mail.Send',
                     'DeviceManagementServiceConfig.ReadWrite.All'
                 )
                 delegated           = $false
-                cacheType           = 'Memory'
                 secureString        = $false
                 renewalLeadTime     = 5
             }
@@ -145,22 +159,21 @@
             domain          = 'gao.gov'
             
             domainSettings  = @{
-                privateSession                  = $true
-                groupsToExclude                 = @()
-                maxUserMatchDisplay             = 10
-                appModes                        = @(
-                    'registration'
+                privateSession                            = $true
+                appModes                                  = @(
+                    'registration',
+                    'helpdesk'
                 )
-                autopilotDeviceAllowedVendors   = @(
+                autopilotDeviceAllowedVendors             = @(
                     'Dell'
                 )
-                autopilotProfilesToInclude      = @(
+                autopilotProfilesToInclude                = @(
                     @{
                         id   = '20f6050d-263f-401b-847c-3a399e6aa8ac'
                         name = 'msb'
                     }
                 )
-                userPatternsToExclude           = @(
+                userPatternsToExclude                     = @(
                     '-test',
                     'onmicrosoft.com',
                     '-cma',
@@ -168,22 +181,20 @@
                     '-rsa',
                     '-sup'
                 )
-                assignedUser                    = ''
-                minimumDevicePhysicalMemoryInGB = 16
-                maxGroupMatchDisplay            = 20
-                maxWaitTime                     = 30
-                autoUpdate                      = $true
-                checkStrongMapping              = $true
-                strongMappingOptional           = $false
-                preferredBrowser                = 'Chrome'
-                maxSerialNumberLength           = 11
-                minUsernameLength               = 3
-                version                         = '1.3.0.0'
-                operatingSystem                 = 'Windows'
-                minSerialNumberLength           = 7
-                maxUserNameLength               = 50
-                validateScopes                  = $false
-                groupsToInclude                 = @(
+                minimumDevicePhysicalMemoryInGB           = 16
+                maxWaitTime                               = 30
+                autoUpdate                                = $true
+                checkStrongMapping                        = $true
+                strongMappingOptional                     = $false
+                preferredBrowser                          = 'Chrome'
+                maxSerialNumberLength                     = 11
+                minUsernameLength                         = 3
+                version                                   = '1.3.0.0'
+                operatingSystem                           = 'Windows'
+                minSerialNumberLength                     = 7
+                maxUserNameLength                         = 50
+                validateScopes                            = $false
+                groupsToInclude                           = @(
                     @{
                         id   = 'be87a9ef-3e44-4e6b-8a9e-d1696e2f7db5'
                         name = 'sg_passwrd_hash_stage'
@@ -199,29 +210,39 @@
                     @{
                         id   = '27d943bc-77cc-44eb-9f81-13c76841129b'
                         name = 'ITN-USR-CON-WIN-ENROLLMENT-PROD-ALLMSB'
+                    },
+                    @{
+                        id   = '42f5dcb5-5ba1-4e98-8c9c-1a4c758d2572'
+                        name = 'zscaler_zpa_users'
+                    },
+                    @{
+                        id   = 'b5f9b2da-ab81-4927-beaa-88f64fa86cd5'
+                        name = 'zscaler_zia_users'
                     }
                 )
-                groupTag                        = 'MSB01'
-                groupPatternsToExclude          = @()
-                repoInfo                        = @{
+                groupTag                                  = 'MSB01'
+                repoInfo                                  = @{
                     repoPath      = 'zuhairmahd'
                     baseURL       = 'https://www.github.com'
                     baseSourceURL = 'https://raw.githubusercontent.com'
                     repoName      = 'Autopilot'
                 }
-                companyName                     = 'Government Accountability Office'
-                release                         = 'lhm'
-                deviceContactThresholdInDays    = 30
-                additionalScopes                = @()
-                maxNumberOfDevicesAllowed       = 20
-                migrateLegacyConfiguration      = $true
-                timeInSeconds                   = 60
-                showLicenseBanner               = $false
-                domain                          = 'gao.gov'
-                deviceNamePrefix                = 'w11-'
+                companyName                               = 'Government Accountability Office'
+                release                                   = 'lhm'
+                deviceContactThresholdInDays              = 30
+                additionalScopes                          = @()
+                maxNumberOfDevicesAllowed                 = 20
+                includeEnrolledDevicesInNextUserReadiness = $false
+                supportEmail                              = 'mahmoudz@gao.gov'
+                maxMenuItemsPerPage                       = 15
+                migrateLegacyConfiguration                = $true
+                timeInSeconds                             = 60
+                showLicenseBanner                         = $false
+                domain                                    = 'gao.gov'
+                deviceNamePrefix                          = 'w11-'
             }
             
-            description     = 'Government build for gao.gov with enhanced security and compliance settings'
+            description     = 'LHM build for gao.gov'
         }
         
         # Production build target

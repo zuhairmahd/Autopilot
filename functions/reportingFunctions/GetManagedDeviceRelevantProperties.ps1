@@ -1,13 +1,51 @@
 function GetManagedDeviceRelevantProperties()
 {
+    <#
+    .SYNOPSIS
+    Extracts relevant properties from managed device object for reporting.
+
+    .DESCRIPTION
+    This function selects and formats key properties from an Intune managed device object including
+    device name, OS, compliance state, management state, last sync time, and user information.
+    Returns standardized property set for consistent reporting.
+
+    .PARAMETER enrollmentState
+    Managed device object from Graph API. This parameter is mandatory.
+
+    .PARAMETER settings
+    Configuration settings object containing reporting parameters.
+
+    .PARAMETER username
+    Optional username to check device association against.
+    
+    .OUTPUTS
+    System.Management.Automation.PSCustomObject
+    Returns object with relevant device properties formatted for reporting. 
+
+    .EXAMPLE
+    $properties = GetManagedDeviceRelevantProperties -managedDevice $device
+
+    .NOTES
+    Standardizes property names and formats.
+    Includes compliance, management, and user details.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
         $enrollmentState,
-        $settings = $settings
+        $settings = $settings,
+        [string]$username
     )
     $functionName = $MyInvocation.MyCommand.Name
     $managedDeviceProperties = [ordered] @{}
+    $orphanDevice = $true
+    $correctRam = $false
+    $hasUser = $false
+    $validUser = $false
+    $lastLogonDate = $null
+    $readyForNextUser = $false
+    $registeredToSameUser = $false
     if ($null -eq $settings.MinimumDevicePhysicalMemoryInGB -or $settings.MinimumDevicePhysicalMemoryInGB -eq 0)
     {
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "No minimum device physical memory specified in settings." -LogLevel "Information"
@@ -53,6 +91,15 @@ function GetManagedDeviceRelevantProperties()
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "User id: $($enrollmentState.managedDevice.device.userId)" -LogLevel "Information"
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "User principal name: $($enrollmentState.managedDevice.users.userPrincipalName)" -LogLevel "Information"
                 $hasUser = $true
+                
+                # Check if device is registered to the same user we're checking for
+                $registeredToSameUser = $false
+                if (-not [string]::IsNullOrWhiteSpace($username) -and $enrollmentState.managedDevice.users.userPrincipalName)
+                {
+                    $registeredToSameUser = $enrollmentState.managedDevice.users.userPrincipalName -eq $username
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device registered to same user ($username): $registeredToSameUser" -LogLevel "Information"
+                }
+                
                 if ($enrollmentState.managedDevice.users.azureUser)
                 {
                     $validUser = $true
@@ -91,10 +138,16 @@ function GetManagedDeviceRelevantProperties()
         }
     }
 
-    if ($OrphanDevice -eq $false -and $CorrectRam -and -not ($HasUser -and $ValidUser))
+    if ($orphanDevice -eq $false -and $CorrectRam -and -not $HasUser)
     {
         $readyForNextUser = $true
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device is ready for the next user" -LogLevel "Information"
+    }
+    elseif ($orphanDevice -eq $false -and $CorrectRam -and $HasUser -and -not $ValidUser)
+    {
+        # Device has an invalid user (SPN or deleted user) - not ready
+        $readyForNextUser = $false
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device has invalid user association, not ready for next user" -LogLevel "Information"
     }
     else
     {
@@ -107,6 +160,7 @@ function GetManagedDeviceRelevantProperties()
     $managedDeviceProperties.Add('ValidUser', $validUser)
     $managedDeviceProperties.Add('LastLogonDate', $lastLogonDate)
     $managedDeviceProperties.Add('ReadyForNextUser', $readyForNextUser)
+    $managedDeviceProperties.Add('RegisteredToSameUser', $registeredToSameUser)
     return $managedDeviceProperties
 }
 

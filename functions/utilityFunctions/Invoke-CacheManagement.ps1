@@ -204,13 +204,8 @@ function Invoke-CacheManagement()
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to cache data for $CacheType`: $Key (caching may be disabled)" -LogLevel "Debug"
             }
             
-            return @{
-                Action    = 'Set'
-                CacheType = $CacheType
-                Key       = $Key
-                Success   = $success
-                Timestamp = Get-Date
-            }
+            # Return boolean for success/failure (API contract for tests)
+            return $success
         }
         'Clear'
         {
@@ -271,7 +266,7 @@ function Invoke-CacheManagement()
             Write-Host "Cleared $clearedCaches cache(s)" -ForegroundColor Green
             Write-Log -LogFile $LogFile -Module $functionName -Message "Cache clearing completed - Cleared: $clearedCaches caches [$($cacheDetails -join ', ')]" -LogLevel "Information"
             
-            return @{ Action = 'Clear'; CachesCleared = $clearedCaches; Details = $cacheDetails; Timestamp = Get-Date }
+            return @{ Action = 'Clear'; Status = 'Success'; CachesCleared = $clearedCaches; Details = $cacheDetails; Timestamp = Get-Date }
         }
         'ClearSpecific'
         {
@@ -334,12 +329,12 @@ function Invoke-CacheManagement()
             
             if ($cleared)
             {
-                return @{ Action = 'ClearSpecific'; CacheType = $CacheType; Cleared = $true; Timestamp = Get-Date }
+                return @{ Action = 'ClearSpecific'; Status = 'Success'; CacheType = $CacheType; Cleared = $true; Timestamp = Get-Date }
             }
             else
             {
                 Write-Host "$CacheType cache not found or already empty" -ForegroundColor Yellow
-                return @{ Action = 'ClearSpecific'; CacheType = $CacheType; Cleared = $false; Timestamp = Get-Date }
+                return @{ Action = 'ClearSpecific'; Status = 'NotFound'; CacheType = $CacheType; Cleared = $false; Timestamp = Get-Date }
             }
         }
         'GetStatistics'
@@ -352,6 +347,7 @@ function Invoke-CacheManagement()
                 Initialized     = $global:CacheStats.Initialized
                 TotalOperations = $global:CacheStats.Operations
                 Caches          = @{}
+                UnifiedCache    = @{}
             }
             
             # Get current cache sizes
@@ -372,7 +368,7 @@ function Invoke-CacheManagement()
                 Size    = if ($script:defaultsCache) { $script:defaultsCache.Count } else { 0 }
             }
             
-            # Add unified cache statistics
+            # Add unified cache statistics with EntryCount properties (API contract for tests)
             if ($global:UnifiedCache)
             {
                 $stats.Caches.UnifiedConfiguration = @{
@@ -387,6 +383,24 @@ function Invoke-CacheManagement()
                     Enabled = $true
                     Size    = if ($global:UnifiedCache.Devices) { $global:UnifiedCache.Devices.Count } else { 0 }
                 }
+                
+                # Add UnifiedCache object with EntryCount for test API contract
+                $stats.UnifiedCache.Configuration = @{
+                    EntryCount = if ($global:UnifiedCache.Configuration) { $global:UnifiedCache.Configuration.Count } else { 0 }
+                }
+                $stats.UnifiedCache.DirectoryObjects = @{
+                    EntryCount = if ($global:UnifiedCache.DirectoryObjects) { $global:UnifiedCache.DirectoryObjects.Count } else { 0 }
+                }
+                $stats.UnifiedCache.Devices = @{
+                    EntryCount = if ($global:UnifiedCache.Devices) { $global:UnifiedCache.Devices.Count } else { 0 }
+                }
+            }
+            else
+            {
+                # Initialize empty UnifiedCache stats if cache doesn't exist yet
+                $stats.UnifiedCache.Configuration = @{ EntryCount = 0 }
+                $stats.UnifiedCache.DirectoryObjects = @{ EntryCount = 0 }
+                $stats.UnifiedCache.Devices = @{ EntryCount = 0 }
             }
             
             if ($ShowDetails)
@@ -428,7 +442,13 @@ function Invoke-CacheManagement()
                 Write-Host "  Enabled: $enabled, Size: $size" -ForegroundColor $(if ($enabled) { "Green" } else { "Yellow" })
             }
             
-            return @{ Action = 'ListCaches'; Caches = $cacheList; Timestamp = Get-Date }
+            # Return UnifiedCaches array for API contract
+            return @{ 
+                Action        = 'ListCaches'
+                Caches        = $cacheList
+                UnifiedCaches = @('Configuration', 'DirectoryObjects', 'Devices')
+                Timestamp     = Get-Date 
+            }
         }
         'Monitor'
         {
@@ -499,6 +519,8 @@ function Invoke-CacheManagement()
                 }
             }
             
+            # Add Status='Success' for API contract
+            $stats.Status = 'Success'
             return $stats
         }
         'GetMenuConfiguration'

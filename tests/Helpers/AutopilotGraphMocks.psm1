@@ -349,20 +349,27 @@ function Invoke-MockGraphAPI
     
     # Handle array input for batch processing
     # When called with an array, simulate what CallGraphAPI's batch processing would return
-    # CallGraphAPI returns: @{ value = [array of response bodies] }
+    # CallGraphAPI batch responses have structure: { value = [array of { id, status, body }] }
+    # where body contains the actual API response
     if ($ResourcePath -is [array] -and $ResourcePath.Count -gt 1)
     {
         Write-Verbose "[MockGraphAPI] Processing array request with $($ResourcePath.Count) paths (simulating CallGraphAPI batch result format)"
         $allResults = @()
         for ($i = 0; $i -lt $ResourcePath.Count; $i++)
         {
-            # Recursively call for each path and collect the result
-            $result = Invoke-MockGraphAPI -accessToken $accessToken -ResourcePath $ResourcePath[$i] `
+            # Recursively call for each path and get the actual response
+            $actualResponse = Invoke-MockGraphAPI -accessToken $accessToken -ResourcePath $ResourcePath[$i] `
                 -Filter $Filter -ExtraParameters $ExtraParameters -consistencyLevel:$consistencyLevel `
                 -Method $Method -Body $Body -apiVersion $apiVersion
             
-            # Add result to collection (even if it's 404 or other error)
-            $allResults += $result
+            # Wrap in batch response format with id, status, and body
+            $batchResponseItem = @{
+                id     = "$($i + 1)"
+                status = if ($actualResponse -eq 404) { 404 } else { 200 }
+                body   = $actualResponse
+            }
+            
+            $allResults += $batchResponseItem
         }
         # Return in the format that CallGraphAPI would return after processing a batch
         return @{
@@ -551,6 +558,7 @@ function Invoke-MockGraphAPI
         {
             $assignments += $script:MockProfileAssignments[$profileId]
         }
+        Write-Verbose "[MockGraphAPI] Returning $($assignments.Count) assignment(s) for profile $profileId"
         return @{ value = $assignments }
     }
     

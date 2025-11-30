@@ -1,5 +1,3 @@
-. "$PSScriptRoot/Get-GroupAssignments-Common.ps1"
-
 function Export-ConfigurationAssignments()
 {
     <#

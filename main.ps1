@@ -438,6 +438,82 @@ else
     write-log -logFile $logFile -module $scriptName -message "Initializing application metadata"
     $appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile -scriptName $scriptName -scriptPath $ScriptPath
 }
+if ($null -ne $appMetaData.corporateSettings -and $appMetaData.corporateSettings.useCorporateSettings -and $null -ne $appMetaData.corporateSettings.corporateSettingsFilePaths -and $appMetaData.corporateSettings.corporateSettingsFilePaths.count -gt 0)
+{
+    $fileCopied = $false
+    $domain = if ($appMetaData.corporateSettings.corporateDomain)
+    {
+        $appMetaData.corporateSettings.corporateDomain
+    }
+    else
+    {
+        $appMetaData.domain
+    }
+    if ([string]::IsNullOrWhiteSpace($domain))
+    {
+        Write-Host "Error: Corporate domain is not specified. Skipping corporate settings file operations." -ForegroundColor Red
+        write-log -logFile $logFile -module $scriptName -Message "Corporate domain is not specified. Skipping corporate settings file operations." -LogLevel "Error"
+        return
+    }
+    $localDomainFileName = Join-Path -Path $scriptPath -ChildPath "$domain.psd1"
+    Write-Verbose "[$scriptName] Checking $($appMetaData.corporateSettings.corporateSettingsFilePaths) paths for corporate settings for domain: $domain"
+    write-log -logFile $logFile -module $scriptName -Message "Checking $($appMetaData.corporateSettings.corporateSettingsFilePaths) paths for corporate settings for domain: $domain"
+    Write-Host "Looking for corporate settings for domain: $domain" -ForegroundColor Green
+    for ($i = 0; $i -lt $appMetaData.corporateSettings.corporateSettingsFilePaths.count; $i++)
+    {
+        $path = $appMetaData.corporateSettings.corporateSettingsFilePaths[$i]
+        $domainFileName = Join-Path -Path $path -ChildPath "$domain.psd1"
+        Write-Verbose "[$scriptName] Checking path: $path for corporate settings file."
+        write-log -logFile $logFile -module $scriptName -Message "Checking path: $path for corporate settings file."
+        if (-not (Test-Path $domainFileName -ErrorAction SilentlyContinue))
+        {
+            Write-Verbose "[$scriptName] Path does not exist: $path"
+            write-log -logFile $logFile -module $scriptName -Message "Path does not exist: $path"                
+            continue
+        }
+        Write-Verbose "[$scriptName] Found corporate settings file: $domainFileName"
+        write-log -logFile $logFile -module $scriptName -Message "Found corporate settings file: $domainFileName"
+        Write-Host "Copying corporate settings from $domainFileName to $localDomainFileName" -ForegroundColor Green
+        try
+        {
+            Copy-Item -Path $domainFileName -Destination $localDomainFileName -Force -ErrorAction Stop                
+            $fileCopied = $true
+            Write-Host "Successfully copied corporate settings from $domainFileName to $localDomainFileName" -ForegroundColor Green                             
+            break
+        }
+        catch
+        {
+            Write-Error "[$scriptName] Error copying corporate settings file: $_"
+            write-log -logFile $logFile -module $scriptName -Message "Error copying corporate settings file: $_" -LogLevel "Error"
+            if ($i -lt ($appMetaData.corporateSettings.corporateSettingsFilePaths.count - 1))
+            {
+                Write-Host "Trying next path if available..." -ForegroundColor Yellow
+                write-log -logFile $logFile -module $scriptName -Message "Trying next path if available..."         
+            }
+            else
+            {
+                Write-Host "No more paths to try." -ForegroundColor Yellow
+                write-log -logFile $logFile -module $scriptName -Message "No more paths to try."    
+            }
+        }
+    }
+    if ($fileCopied)
+    {
+        Write-Host "Corporate settings file copied successfully." -ForegroundColor Green
+        Write-Verbose "[$scriptName] Corporate settings file copied successfully."
+        write-log -logFile $logFile -module $scriptName -Message "Corporate settings file copied successfully."                                        
+    }
+    else
+    {
+        Write-Host "No files were copied from all specified paths." -ForegroundColor Red
+        write-log -logFile $logFile -module $scriptName -Message "Failed to copy corporate settings file from all specified paths." -LogLevel "Error"                                        
+    }                   
+}
+else 
+{
+    Write-Verbose "[$scriptName] Corporate settings not enabled or no paths specified."             
+    write-log -logFile $logFile -module $scriptName -Message "Corporate settings not enabled or no paths specified."                                        
+}
 $version = if ($null -ne $appMetaData.version)
 {
     $appMetaData.version
@@ -756,11 +832,10 @@ $localSettings = $configResult.LocalSettings
 $requiredScopes = $configResult.RequiredScopes
 $repoInfo = $configResult.RepoInfo
 $global:cacheSettings = $configResult.CacheSettings            
-        
 # Merge global and local settings into a single settings object
 Write-Verbose "[$scriptName] Merging global and local settings"
 $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
-
+# Make sure we are using the correct domain in settings
 if ($settings.domain -ne $domain)
 {
     Write-Verbose "[$scriptName] Updating settings domain from $($settings.domain) to $domain"
@@ -908,7 +983,9 @@ else
 }
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/lastrun.json"
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
-$updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL -localVersion $version
+$updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL -executableFileName "$scriptPath\$scriptName" 
+Write-Verbose "[$scriptName] Update available: $($updateAvailable.updateAvailable), Remote version: $($updateAvailable.version | Out-String)"
+write-log -logFile $LogFile -Module $scriptName -Message "Update available: $($updateAvailable.updateAvailable), Remote version: $($updateAvailable.version | Out-String)" -LogLevel "Information"
 $groupsToInclude = $settings.groupsToInclude
 Write-Verbose "[$scriptName] Groups to include: $($groupsToInclude | Out-String)"
 $groupsToExclude = $settings.groupsToExclude
@@ -1056,6 +1133,7 @@ else
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Force new refresh token: $($auth.ForceNewRefreshToken )" -LogLevel "Information"
     Write-Log -LogFile $LogFile -Module $scriptName -Message "No save refresh token: $($auth.NoSaveRefreshToken )" -LogLevel "Information"
     Write-Log -logFile $LogFile -Module $scriptName -Message "Getting access token..." -LogLevel "Information"
+
     $accessToken = GetGraphAccessToken @getTokenParams
 }
 # Clear the cached user password now that authentication is complete
@@ -1477,6 +1555,31 @@ $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "All Windows Dev
     {
         Write-Host $exportedDeviceAssignment.message -ForegroundColor Red
     }                           
+}
+$deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Assigned devices by user" -Action {
+    $result = Get-AssignedDevicesByUserReport -accessToken $accessToken 
+    Write-Verbose "[$scriptName] Device user assignment report result: $($result | ConvertTo-Json -Depth 3)"
+    write-log -logFile $logFile -module $scriptName -message "Device user assignment report result: Action=$($result.Action), Success=$($result.Success), DeviceCount=$($result.DeviceCount), UserCount=$($result.UserCount)" -LogLevel "Information"
+    if ($result.Success)
+    {
+        switch ($result.Action)
+        {
+            'Displayed' { Write-Verbose "[$scriptName] $($result.Message)" }
+            'Exported' { Write-Host "$($result.Message)" -ForegroundColor Green }
+            'NoDevices' { Write-Verbose "[$scriptName] $($result.Message)" }
+            'UserCancelled' { Write-Verbose "[$scriptName] $($result.Message)" }
+            default { Write-Verbose "[$scriptName] Report completed: $($result.Message)" }
+        }
+    }
+    else
+    {
+        Write-Host "Error generating report: $($result.Message)" -ForegroundColor Red
+        if ($result.ErrorDetails)
+        {
+            Write-Verbose "[$scriptName] Error details: $($result.ErrorDetails)"
+            write-log -logFile $logFile -module $scriptName -message "Error details: $($result.ErrorDetails)" -LogLevel "Error"
+        }
+    }
 }
 #endregion device reports menu
 
@@ -2166,23 +2269,18 @@ $script:ShowGroupAssignmentsAction = {
     #>
     param(
         [bool]$IncludeIndirectAssignments,
-        [bool]$ShowOnlyUnassigned,
         [bool]$exportInstead
     )
     
     $assignmentScope = if ($IncludeIndirectAssignments) { "indirect (All Users/All Devices)" } else { "direct" }
     $specialGroups = @("*", "?")    
     $messageText = if ($IncludeIndirectAssignments) { "Enter the name of the group whose indirect (All Users/All Devices) assignments you want to view. Enter any of $specialGroups             for all assignments" } else { "Enter the name of the group whose direct assignments you want to view." }                                                                
-    if ($ShowOnlyUnassigned -eq $false)
-    {
-        write-log -logFile $LogFile -Module $scriptName -Message "Prompting user for group name to view $assignmentScope assignments" -LogLevel "Information"                   
-        $groupName = GetUserInput -Message $messageText -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
-    }
-    $needsResolution = if ($ShowOnlyUnassigned -or ($IncludeIndirectAssignments -and $groupName -in $specialGroups                                                           )) { $false } else { $true }                                     
+    write-log -logFile $LogFile -Module $scriptName -Message "Prompting user for group name to view $assignmentScope assignments" -LogLevel "Information"                   
+    $groupName = GetUserInput -Message $messageText -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
+    $needsResolution = if ($IncludeIndirectAssignments -and $groupName -in $specialGroups                                                           ) { $false } else { $true }   
     Write-Log -LogFile $LogFile -Module $scriptName -Message "GroupName: $groupName, IncludeIndirectAssignments: $IncludeIndirectAssignments, AssignmentScope: $assignmentScope, SpecialGroups: $specialGroups, NeedsResolution: $needsResolution"
     
-    # Only check for null groupName if we actually needed to prompt for it (not in ShowOnlyUnassigned mode)
-    if (-not $ShowOnlyUnassigned -and $null -eq $groupName)
+    if ($null -eq $groupName)
     {
         Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
         write-log -logFile $LogFile -Module $scriptName -Message "User pressed Enter without providing a group name. Returning $($returnValues.BackoutText)." -LogLevel "Information"
@@ -2246,13 +2344,7 @@ $script:ShowGroupAssignmentsAction = {
     $showGroupAssignmentsSplat = @{
         AccessToken = $accessToken
         Settings    = $global:settings
-    }
-    
-    # Add Group parameter for all cases except ShowOnlyUnassigned
-    if (-not $ShowOnlyUnassigned)
-    {
-        $showGroupAssignmentsSplat['Group'] = $selectedGroup
-        write-log -logFile $LogFile -Module $scriptName -Message "Added Group parameter to ShowGroupAssignments splat: $($selectedGroup.displayName) (ID: $($selectedGroup.id))" -LogLevel "Information"                                        
+        Group       = $selectedGroup
     }
     
     if ($IncludeIndirectAssignments)
@@ -2261,11 +2353,7 @@ $script:ShowGroupAssignmentsAction = {
         $showGroupAssignmentsSplat['SpecialGroups'] = $specialGroups   
         write-log -logFile $LogFile -Module $scriptName -Message "Added ShowIndirectAssignments and SpecialGroups parameters to ShowGroupAssignments splat" -LogLevel "Information"                             
     }
-    if ($ShowOnlyUnassigned)
-    {
-        $showGroupAssignmentsSplat['ShowOnlyUnassigned'] = $true
-        write-log -logFile $LogFile -Module $scriptName -Message "Added ShowOnlyUnassigned parameter to ShowGroupAssignments splat" -LogLevel "Information"             
-    }                               
+    
     if ($exportInstead)
     {
         $showGroupAssignmentsSplat['exportInstead'] = $true
@@ -2314,7 +2402,7 @@ $script:ExportGroupAssignmentsAction = {
     Write-Host "Exporting all $resourceScope configurations and their assignments..." -ForegroundColor Cyan
     Write-Host "This will export all $resourceScope resources with detailed assignment information to a CSV file." -ForegroundColor Gray
     Write-Host ""
-    $exportParamSlat = @{
+    $exportParamSplat = @{
         AccessToken           = $accessToken
         OutputPath            = $ScriptPath 
         IncludeBeta           = $true
@@ -2323,10 +2411,10 @@ $script:ExportGroupAssignmentsAction = {
     }                       
     if ($RespectOperatingSystem)
     {
-        $exportParamSlat['RespectOperatingSystem'] = $true
+        $exportParamSplat['RespectOperatingSystem'] = $true
         write-log -logFile $LogFile -Module $scriptName -Message "Added RespectOperatingSystem parameter to Export-AllConfigurationsAndAssignments splat" -LogLevel "Information"                             
     }       
-    $exportResult = Export-ConfigurationAssignments @exportParamSlat    
+    $exportResult = Export-ConfigurationAssignments @exportParamSplat    
     write-log -logFile $LogFile -Module $scriptName -Message "Export-ConfigurationAssignments returned: $($exportResult | Out-String)" -LogLevel "Verbose"      
     if ($exportResult.Success)
     {
@@ -2350,17 +2438,11 @@ $getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Vie
 $getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "View indirect group assignments (All Users/All Devices)" -Action {
     & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $true -exportInstead $false
 }
-$getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "View all unassigned configurations" -Action {
-    & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $false -exportInstead $false -ShowOnlyUnassigned $true
-}
 $getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Export direct group assignments" -Action {
     & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $false -exportInstead $true                            
 }
 $getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Export indirect group assignments (All Users/All Devices)" -Action {
     & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $true -exportInstead $true                 
-}
-$getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Export all unassigned configurations" -Action {
-    & $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $false -exportInstead $true -ShowOnlyUnassigned $true
 }
 $getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Export all Windows configurations and their assignments" -Action {
     & $script:ExportGroupAssignmentsAction -RespectOperatingSystem $true
@@ -2410,7 +2492,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         }
         else # Process only if a serial number was entered
         {
-            $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -CheckUserReadiness
+            $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -CheckUserReadiness -username $username
             # Check if ProcessSerialNumber returned an exit signal
             if ($null -eq $result)
             {
@@ -2475,10 +2557,13 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Shutdown the device" -action {
 }
 $mainMenu = AddMenuItem -menu $mainMenu -name "Group Assignments Menu" -Submenu $getGroupAssignmentsMenu
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
-$mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
-    $null = Show-AboutApplication -accessToken $accessToken -Release $latestRelease -appId $appId -tenantId $tenantId -name $name -updateAvailable $updateAvailable
-}
-
+$mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -action {
+    $aboutMenuResult = Show-AboutApplication -accessToken $accessToken -Release $latestRelease -name $name -updateAvailable $updateAvailable
+    if ($aboutMenuResult -in $returnValues.Values)
+    {
+        return $aboutMenuResult
+    }
+}                   
 #region show menus
 # Add the main menu to both history arrays for proper stack synchronization
 try

@@ -1,10 +1,43 @@
 function GetNextUserReadinessReport()
 {
+    <#
+    .SYNOPSIS
+    Generates readiness report for device assignment to next user.
+
+    .DESCRIPTION
+    This function assesses whether a device is ready for next user assignment by evaluating
+    enrollment state, management status, profile assignment, contact dates, and pending actions.
+    Provides detailed readiness assessment with actionable recommendations.
+
+    .PARAMETER enrollmentState
+    Enrollment state object with device information. This parameter is mandatory.
+
+    .PARAMETER username
+    Optional username for context in the assessment.
+
+    .OUTPUTS
+    System.Management.Automation.PSCustomObject
+    Returns readiness report with assessment, issues, recommendations, and device details.
+
+    .EXAMPLE
+    $report = GetNextUserReadinessReport -enrollmentState $state
+    Generates a readiness report for the provided enrollment state.
+    .EXAMPLE
+    $report = GetNextUserReadinessReport -enrollmentState $state -username "jdoe"
+    Generates a readiness report for the provided enrollment state with user context.
+
+    .NOTES
+    Delegates to AssessDeviceState for comprehensive evaluation.
+    Provides user-friendly readiness determination.
+    Includes specific recommendations for remediation.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
-        $enrollmentState
+        $enrollmentState,
+        [string]$username
     )
 
     $functionName = $MyInvocation.MyCommand.Name
@@ -37,7 +70,7 @@ function GetNextUserReadinessReport()
         }
         else
         { 
-            "Unknown Device" 
+            "Device name not available" 
         }
         
         $serialNumber = if ($enrollmentState.autopilot -and $enrollmentState.autopilot.device.serialNumber)
@@ -66,7 +99,7 @@ function GetNextUserReadinessReport()
     # Call AssessDeviceState with error handling
     try
     {
-        $global:DeviceAssessmentState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness'
+        $DeviceAssessmentState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness' -username $username
         if (-not $DeviceAssessmentState)
         {
             throw "AssessDeviceState returned null or empty result"

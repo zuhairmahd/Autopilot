@@ -1,5 +1,28 @@
 function getDevicePendingActions()
 {
+    <#
+    .SYNOPSIS
+    Retrieves pending device actions from enrollment state.
+
+    .DESCRIPTION
+    This function checks for pending device actions such as wipe, retire, or other remote actions
+    from the device's enrollment state. Returns collection of pending actions with status information.
+
+    .PARAMETER enrollmentState
+    Enrollment state object containing device management state and action results. This parameter is mandatory.
+
+    .OUTPUTS
+    System.Collections.Hashtable
+    Returns hashtable with isPendingAction boolean and pendingActions collection.
+
+    .EXAMPLE
+    $pending = getDevicePendingActions -enrollmentState $state
+
+    .NOTES
+    Checks managementState for pending actions (wipePending, etc).
+    Includes deviceActionResults for completed/in-progress actions.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

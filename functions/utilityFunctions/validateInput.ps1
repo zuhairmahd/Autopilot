@@ -1,5 +1,48 @@
 function validateInput()
 {
+    <#
+    .SYNOPSIS
+    Validates user input according to specified type and settings constraints.
+
+    .DESCRIPTION
+    This function validates user input for different types (serialNumber, userName, groupName)
+    against configured constraints such as length limits, character patterns, and domain
+    requirements. It returns a hashtable with validation status and the processed value.
+    The function trims input and provides detailed validation feedback.
+
+    .PARAMETER UserInput
+    The user input string to validate. This parameter is mandatory.
+
+    .PARAMETER type
+    The type of input to validate. Valid values: 'serialNumber', 'userName', 'groupName'.
+    This parameter is mandatory.
+
+    .PARAMETER settings
+    The settings object containing validation parameters (domain, length limits, etc.).
+    Defaults to script-level $settings.
+
+    .OUTPUTS
+    System.Collections.Hashtable
+    Returns a hashtable with two properties:
+    - valid: Boolean indicating if validation passed
+    - value: The validated/processed input value (or $null if invalid)
+
+    .EXAMPLE
+    $result = validateInput -UserInput "ABC123456" -type "serialNumber"
+    if ($result.valid) { Write-Host "Valid serial: $($result.value)" }
+    
+    $result = validateInput -UserInput "john.doe" -type "userName" -settings $customSettings
+
+    .NOTES
+    Validation rules:
+    - serialNumber: Length constraints, alphanumeric with dashes/spaces
+    - userName: Length constraints, optional domain suffix, valid characters
+    - groupName: Similar to userName validation
+    
+    Automatically trims leading/trailing whitespace.
+    Displays colored error messages for validation failures.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [parameter(Mandatory = $true)]
@@ -81,7 +124,7 @@ function validateInput()
             $normalizedUserInput = NormalizeUserName -UserName $UserInput -Settings $settings
             write-log -logFile $logFile -module $functionName -Message "Normalized username: '$normalizedUserInput'"                                                                        
             # Basic email format check
-            if ($normalizedUserInput -match '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2, }$')
+            if ($normalizedUserInput -match '^[a-zA-Z0-9][a-zA-Z0-9._%+-]*@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$')
             {
                 Write-Verbose "[$functionName] Username validation passed"
                 write-log -logFile $logFile -module $functionName -Message "Username validation passed"                                                                     

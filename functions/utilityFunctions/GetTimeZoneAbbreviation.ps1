@@ -1,5 +1,39 @@
 function GetTimeZoneAbbreviation()
 {
+    <#
+    .SYNOPSIS
+    Gets the timezone abbreviation for a given DateTime.
+
+    .DESCRIPTION
+    This function returns the timezone abbreviation (e.g., EST, PDT, UTC+5) for a specified
+    DateTime value. It considers daylight saving time status and supports common US time zones
+    (Eastern, Central, Mountain, Pacific, Alaska, Hawaii). For unrecognized time zones, it
+    returns a UTC offset format (e.g., UTC+5, UTC-8).
+
+    .PARAMETER DateTime
+    The DateTime value for which to determine the timezone abbreviation. This parameter is mandatory.
+
+    .OUTPUTS
+    System.String
+    Returns the timezone abbreviation string (e.g., "EST", "PDT", "UTC+5").
+
+    .EXAMPLE
+    $tzAbbr = GetTimeZoneAbbreviation -DateTime (Get-Date)
+    $tzAbbr = GetTimeZoneAbbreviation -DateTime [DateTime]::Parse("2024-07-15")
+
+    .NOTES
+    Supported US time zones with DST awareness:
+    - Eastern (EST/EDT)
+    - Central (CST/CDT)
+    - Mountain (MST/MDT)
+    - Pacific (PST/PDT)
+    - Alaska (AST/ADT)
+    - Hawaii (HST - no DST)
+    
+    Fallback to UTC offset format for unrecognized time zones.
+    No [CmdletBinding()] attribute as this is a simple helper function.
+    Compatible with PowerShell 5.1.
+    #>
     param (
         [Parameter(Mandatory = $true)]
         [DateTime]$DateTime

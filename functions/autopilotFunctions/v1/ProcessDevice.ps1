@@ -1,5 +1,41 @@
 function ProcessDevice()
 {
+    <#
+    .SYNOPSIS
+    Processes a single device for Autopilot import including all workflow steps.
+
+    .DESCRIPTION
+    This function orchestrates the complete device processing workflow including preparation,
+    import execution, result validation, and status reporting. It serves as the main entry
+    point for processing individual devices through the Autopilot import pipeline.
+
+    .PARAMETER device
+    Device object containing hardware hash and metadata. This parameter is mandatory.
+
+    .PARAMETER accessToken
+    Microsoft Graph API access token. This parameter is mandatory.
+
+    .PARAMETER settings
+    Settings object with configuration values.
+
+    .PARAMETER returnValues
+    Return values object for status messages.
+
+    .PARAMETER domain
+    Optional domain for operations.
+
+    .OUTPUTS
+    System.String
+    Returns workflow status message indicating import outcome.
+
+    .EXAMPLE
+    $result = ProcessDevice -device $deviceObj -accessToken $token -settings $config -returnValues $rv
+
+    .NOTES
+    Coordinates preparation, import, and result processing.
+    Comprehensive error handling throughout workflow.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

@@ -1,6 +1,60 @@
 function Test-RefreshTokenValidity()
 {
-    [CmdletBinding()]   
+    <#
+    .SYNOPSIS
+    Tests if a refresh token is valid by attempting to use it to acquire a new access token.
+
+    .DESCRIPTION
+    This function validates an OAuth refresh token by making a token refresh request to Azure AD.
+    It formats scopes appropriately, constructs the token refresh request body, attempts token
+    acquisition, and returns validation status with detailed error information. The function
+    determines if a refresh token can still be used or if re-authentication is required.
+
+    .PARAMETER refreshToken
+    The OAuth refresh token to validate.
+
+    .PARAMETER clientId
+    The application (client) ID.
+
+    .PARAMETER clientSecret
+    Optional client secret for confidential client applications.
+
+    .PARAMETER tenantId
+    The Azure AD tenant ID.
+
+    .PARAMETER scopes
+    Space-separated string of Microsoft Graph permission scopes.
+
+    .PARAMETER domain
+    The domain name for logging context.
+
+    .PARAMETER AuthType
+    Authentication type for logging context.
+
+    .OUTPUTS
+    System.Collections.Hashtable
+    Returns hashtable with properties:
+    - IsValid: Boolean indicating if refresh token is valid
+    - AccessToken: New access token if validation successful
+    - RefreshToken: New refresh token if provided in response
+    - ExpiresIn: Token expiration time in seconds
+    - Error: Error message if validation failed
+
+    .EXAMPLE
+    $result = Test-RefreshTokenValidity -refreshToken $rt -clientId $cid -tenantId $tid -scopes $scopeString
+    if ($result.IsValid) {
+        $newToken = $result.AccessToken
+    }
+
+    .NOTES
+    Formats scopes with https://graph.microsoft.com/ prefix if needed.
+    Handles offline_access scope specially (no prefix).
+    Makes actual token refresh request to validate.
+    Returns detailed error information for troubleshooting.
+    Does not save the new refresh token - caller must handle.
+    Compatible with PowerShell 5.1.
+    #>
+    [CmdletBinding()]
     param(
         $refreshToken,
         $clientId,

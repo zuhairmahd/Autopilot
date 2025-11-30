@@ -71,7 +71,10 @@ param(
     [switch]$noCleanup,
     [switch]$SkipSigning,
     [switch]$skipModuleCheck,
+    [switch]$SkipZipArchive,
     [switch]$updateHash,
+    [switch]$CreateZipFileOnly,
+    [switch]$SkipExecutable,
     [switch]$Overwrite,
     [switch]$NoVersionUpdate,
     [switch]$AddDebug,
@@ -89,54 +92,71 @@ $logFile = $Log
 if (-not $skipModuleCheck)
 {
     $requiredModules = @(
-        @{ Name = 'ps2exe'; MinimumVersion = '1.0.0' },
-        @{ Name = 'TrustedSigning'; MinimumVersion = '0.0.1' }
+        @{ 
+            Name           = 'ps2exe'
+            MinimumVersion = '1.0.0'
+            install        = if ($SkipExecutable) { $false } else { $true }                
+        },
+        @{ 
+            Name           = 'TrustedSigning'
+            MinimumVersion = '0.0.1'
+            install        = if ($SkipSigning) { $false } else { $true }
+            
+        }
     )
-    Write-Host "Checking required modules..." -ForegroundColor Cyan
-    foreach ($module in $requiredModules)
+    Write-Verbose "[$scriptName] $($requiredModules.count) Required modules."
+    $modulesToCheck = $requiredModules | Where-Object { $_.install -eq $true }      
+    Write-Verbose "[$scriptName] $($modulesToCheck.count) Modules    to check."
+
+    if ($modulesToCheck.Count -gt 0)
     {
-        $installed = Get-Module -ListAvailable -Name $module.Name | Where-Object {
-            $_.Version -ge [Version]$module.MinimumVersion
-        }
-    
-        if (-not $installed)
+        Write-Host "Checking required modules..." -ForegroundColor Cyan
+        foreach ($module in $modulesToCheck)
         {
-            Write-Host "Module '$($module.Name)' (version $($module.MinimumVersion) or higher) is not installed." -ForegroundColor Yellow
-            Write-Host "Attempting to install $($module.Name)..." -ForegroundColor Cyan
-        
-            try
-            {
-                # Try installing from PSGallery first
-                Install-Module -Name $module.Name -MinimumVersion $module.MinimumVersion -Scope CurrentUser -Force -AllowClobber -SkipPublisherCheck -ErrorAction Stop
-                Write-Host "Successfully installed $($module.Name)" -ForegroundColor Green
+            Write-Verbose "[$scriptName] Checking module: $($module.Name) >= $($module.MinimumVersion)"
+            $installed = Get-Module -ListAvailable -Name $module.Name | Where-Object {
+                $_.Version -ge [Version]$module.MinimumVersion
             }
-            catch
+            if (-not $installed)
             {
-                Write-Host "Failed to install $($module.Name): $($_.Exception.Message)" -ForegroundColor Red
-            
-                # Special handling for modules that might not be in PSGallery
-                if ($module.Name -eq 'TrustedSigning')
+                Write-Host "Module '$($module.Name)' (version $($module.MinimumVersion) or higher) is not installed." -ForegroundColor Yellow
+                Write-Host "Attempting to install $($module.Name)..." -ForegroundColor Cyan
+                try
                 {
-                    Write-Host "Note: TrustedSigning may require Azure Trusted Signing setup." -ForegroundColor Yellow
-                    Write-Host "For testing/development, you can use -SkipSigning parameter to bypass code signing." -ForegroundColor Yellow
+                    # Try installing from PSGallery first
+                    Install-Module -Name $module.Name -MinimumVersion $module.MinimumVersion -Scope CurrentUser -Force -AllowClobber -SkipPublisherCheck -Verbose -ErrorAction Stop
+                    Write-Host "Successfully installed $($module.Name)" -ForegroundColor Green
                 }
-            
-                Write-Host "Please install manually: Install-Module -Name $($module.Name) -MinimumVersion $($module.MinimumVersion) -Scope CurrentUser" -ForegroundColor Yellow
-                Write-Host "Or use -SkipSigning if you don't need code signing functionality." -ForegroundColor Yellow
-                exit 1
+                catch
+                {
+                    Write-Host "Failed to install $($module.Name): $($_.Exception.Message)" -ForegroundColor Red
+                    # Special handling for modules that might not be in PSGallery
+                    if ($module.Name -eq 'TrustedSigning')
+                    {
+                        Write-Host "Note: TrustedSigning may require Azure Trusted Signing setup." -ForegroundColor Yellow
+                        Write-Host "For testing/development, you can use -SkipSigning parameter to bypass code signing." -ForegroundColor Yellow
+                    }
+                    Write-Host "Please install manually: Install-Module -Name $($module.Name) -MinimumVersion $($module.MinimumVersion) -Scope CurrentUser" -ForegroundColor Yellow
+                    Write-Host "Or use -SkipSigning if you don't need code signing functionality." -ForegroundColor Yellow
+                    exit 1
+                }
             }
-        }
-        else
-        {
-            Write-Verbose "[$scriptName] Module '$($module.Name)' is already installed (version $($installed[0].Version))"
+            else
+            {
+                Write-Verbose "[$scriptName] Module '$($module.Name)' is already installed (version $($installed[0].Version))"
+            }
         }
     }
-    Write-Host "All required modules are available." -ForegroundColor Green
-    Write-Host ""
+    else
+    {
+        Write-Host "All required modules are available." -ForegroundColor Green
+        Write-Host ""
+    }
 }
 else
 {
     Write-Verbose "[$scriptName] Module check is skipped as per user request."
+    Write-Host "Module check is skipped as per user request." -ForegroundColor Yellow
 }       
 #endregion Module Dependencies
 
@@ -266,9 +286,58 @@ else
 }
 #endregion import functions.
 
-Write-Log -logFile $logFile -startLogging
-
 #region helper functions
+function New-ZipArchive()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$inputPath,
+        [Parameter(Mandatory = $true)]
+        [string]$outputPath,
+        [switch]$Overwrite
+    )
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "Creating zip archive from $inputPath to $outputPath"
+    $tempZipFilePath = Join-Path -Path $env:TEMP -ChildPath "script_$(New-Guid).zip"
+    try
+    {
+        Write-Host "Creating temporary zip archive at: $tempZipFilePath"
+        if ($Overwrite)
+        {
+            Write-Verbose "[$functionName] Overwrite is enabled. Existing zip file at $outputPath will be overwritten."
+            if (Test-Path -Path $outputPath)
+            {
+                Remove-Item -Path $outputPath -Force
+            }                                   
+        }
+        if (Test-Path -Path $inputPath -PathType Container  )
+        {
+            Compress-Archive -Path "$inputPath\*" -DestinationPath $tempZipFilePath -Force
+            Write-Verbose "[$functionName] Compressed folder $inputPath into $tempZipFilePath"  
+        }
+        elseif (Test-Path -Path $inputPath -PathType Leaf)      
+        {
+            Compress-Archive -Path $inputPath -DestinationPath $tempZipFilePath -Force
+            Write-Verbose "[$functionName] Compressed file $inputPath into $tempZipFilePath"                
+        }                   
+        else
+        {
+            throw "Input path '$inputPath' does not exist."
+        }       
+        Write-Host "Zip archive created successfully: $tempZipFilePath"
+        Move-Item -Path $tempZipFilePath -Destination $outputPath -Force       
+        Write-Host "Moved zip archive to final destination: $outputPath"    
+        return $true        
+    }
+    catch
+    {   
+        Write-Host "Failed to create zip archive: $tempZipFilePath"
+        Write-Error $_
+        return $false
+    }
+}
+
 function Get-LastRunObject()
 {
     [CmdletBinding()]
@@ -617,55 +686,6 @@ function SignScripts()
         Write-Host "No files to sign."
         $success = $true
     }
-    return $success
-}
-
-function CopyFiles()
-{
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [string[]]$Source,
-        [Parameter(Mandatory = $true)]
-        [string]$Destination
-    )
-
-    $functionName = $MyInvocation.MyCommand.Name
-    $success = $false
-    Write-Host "Copying $($source.count) files to $Destination"
-    foreach ($file in $Source)
-    {
-        #Check if any of the source file is in a subfolder, if so, append the subfolder to the destination and create it if needed.
-        $subfolder = Split-Path -Parent $file
-        if ($subfolder -ne $file)
-        {
-            $subfolder = Split-Path -Parent $file
-            $destinationFolder = Join-Path -Path $Destination -ChildPath $subfolder
-            if (-not (Test-Path -Path $destinationFolder))
-            {
-                Write-Host "Creating folder: $destinationFolder"
-                New-Item -ItemType Directory -Path $destinationFolder -Force | Out-Null
-            }
-            $currentDestination = Join-Path -Path $Destination -ChildPath $subfolder
-        }
-        else
-        {
-            Write-Host "No subfolder found for file: $file"
-            $currentDestination = $Destination
-        }
-        Write-Verbose "[$functionName] Processing file: $file"
-        try
-        {
-            Copy-Item -Path $file -Destination $currentDestination -Force
-            Write-Host "Copied $file to $currentDestination"
-        }
-        catch
-        {
-            Write-Host "Failed to copy $file to $currentDestination"
-            Write-Error $_
-        }
-    }
-    $success = $true
     return $success
 }
 
@@ -1121,6 +1141,33 @@ function Update-TargetSettings()
             }
         }
         
+        #Apply specified settings from target config
+        $sections = @{
+            corporateSettings = 'corporate setting'
+            cacheSettings     = 'cache setting'
+            repoInfo          = 'repo info setting'
+        }
+
+        foreach ($entry in $sections.GetEnumerator())
+        {
+            $sectionName = $entry.Name
+            $singularName = $entry.Value
+            $targetSection = $TargetConfig.$sectionName
+
+            if ($targetSection -and $targetSection.Count -gt 0)
+            {
+                $pluralName = if ($sectionName -eq 'repoInfo') { 'repo info settings' } else { $sectionName -replace 'Settings', ' settings' }
+                Write-Verbose "[$functionName] Applying $($targetSection.Count) $pluralName"
+                Write-Log -LogFile $logFile -Message "Applying $($targetSection.Count) $pluralName" -Module $functionName -LogLevel "Verbose"
+        
+                foreach ($key in $targetSection.Keys)
+                {
+                    $currentSettings.$sectionName[$key] = $targetSection[$key]
+                    Write-Verbose "[$functionName] Applied $($singularName): $key = $($targetSection[$key])"
+                }
+            }
+        }   
+        
         # Save updated main settings file
         Write-Verbose "[$functionName] Saving updated settings file"
         $currentSettings | Export-PowerShellDataFile -Path $SettingsFilePath -Validate -Force
@@ -1250,8 +1297,10 @@ function Set-ParametersFromTarget()
 }
 #endregion helper functions
 
+Write-Log -logFile $logFile -startLogging
+
 #region Apply script parameters and target settings
-Write-Host "Applying scritt parameters..."
+Write-Host "Applying script parameters..."
 Write-Log -logFile $logFile -Message "Applying script parameters..." -module $scriptName
 # Apply target build scrit configuration
 if ($targetConfig)
@@ -1354,6 +1403,11 @@ Write-Host "Output file resolved to: $OutputFile"
 $successMessage = "$OutputFile written"
 $parentFolder = Split-Path -Parent $OutputFile
 $SettingsFile = "$parentFolder\settings.psd1"
+$zipFilePath = Join-Path $parentFolder "script.zip"
+$toolsFolder = Join-Path -Path $PWD -ChildPath "tools"
+$toolsToCopy = @(Get-ChildItem -Path "$toolsFolder\reset.*" | ForEach-Object { $_.FullName })             
+$PSDFilesToCopy = @(Get-ChildItem -Path $PWD -Filter "*.psd1" | ForEach-Object { $_.FullName } ) | Where-Object { $_ -notlike "*targets*" }
+$filesToCopy = $PSDFilesToCopy + $toolsToCopy
 #endregion
 
 #region initial checks
@@ -1390,6 +1444,34 @@ if ($updateHash)
         exit 1
     }
 }
+
+if ($CreateZipFileOnly)
+{
+    Write-Host "Cleaning backup and temporary files..."
+    $cleanupResult = cleanupTempFiles -Path $parentFolder
+    if ($cleanupResult.AllRemoved)
+    {
+        Write-Host "Cleanup completed successfully."
+    }
+    Write-Host "Removed $($cleanupResult.RemovedFilesCount) files, of which $($cleanupResult.tempFilesCount) file were temp files."
+    Write-Host "Creating zip file only: $zipFilePath"
+    $zipCreated = New-ZipArchive -inputPath $parentFolder -outputPath $zipFilePath -Overwrite
+    if ($zipCreated)
+    {
+        Write-Host "Zip file created successfully at $zipFilePath"
+        Write-Log -logFile $logFile -Message "Zip file created successfully at $zipFilePath" -module $scriptName
+        Write-Log -logFile $logFile -finishLogging
+        exit 0
+    }
+    else
+    {
+        Write-Host "Failed to create zip file at $zipFilePath"
+        Write-Log -logFile $logFile -Message "Failed to create zip file at $zipFilePath" -module $scriptName -LogLevel 'Error'
+        Write-Log -logFile $logFile -finishLogging
+        exit 1
+    }
+}
+
 Write-Verbose "[$scriptName] Updating last run version..."
 $updatedVersion = Update-LastRunVersion -version $version -PartToIncrement 'Revision' -LastRun $LastRun
 Write-Verbose "[$scriptName] Last run version after update: $($updatedVersion.version)"
@@ -1618,102 +1700,156 @@ if (Test-Path $OutputFile)
     Remove-Item -Path $OutputFile -Force
 }
 
-$params = @{
-    inputFile   = $newscriptFile
-    outputFile  = $OutputFile
-    x64         = $true
-    version     = $Version
-    title       = "Intune Registration"
-    description = "Register devices in Intune and perform other Autopilot device functions"
-    STA         = $true
-    company     = $CompanyName
-    product     = "Intune Autopilot Registration"
-    copyright   = '2025'
-}
-if ($AddDebug)
+if ($SkipExecutable)
 {
-    Write-Host "Adding debug information to parameters"
-    $params.Debug = $true
-}
-
-Write-Host "Building executable from $newscriptFile to $OutputFile"
-Write-Host "parameters used:"
-$params | Format-List | Out-Host
-$result = Invoke-ps2exe @params -ErrorAction Stop
-Write-Host "ps2exe result: $result"
-# Use a regex-escaped pattern to avoid invalid escape sequences (e.g., \\m) in Windows paths
-if ($result -match [regex]::Escape($successMessage))
-{
-    Write-Host "Executable created successfully: $OutputFile"
+    Write-Host "Skipping executable creation as per -SkipExecutable flag."
+    $OutputFile = $newscriptFile
+    Write-Host "Output file set to script file: $OutputFile"
+    Write-Log -logFile $logFile -Message "Skipping executable creation. Output file set to script file: $OutputFile" -module $scriptName
 }
 else
 {
-    Write-Host "Failed to create executable: $OutputFile"
-    exit 1
-}
-
-if (-not $SkipSigning)
-{
-    Write-Host "Signing executable at $OutputFile"
-    if (SignScripts -path $outputFile)
+    Write-Host "Creating executable from script file: $newscriptFile"
+    Write-Log -logFile $logFile -Message "Creating executable from script file: $newscriptFile" -module $scriptName
+    $params = @{
+        inputFile   = $newscriptFile
+        outputFile  = $OutputFile
+        x64         = $true
+        version     = $Version
+        title       = "Intune Registration"
+        description = "Register devices in Intune and perform other Autopilot device functions"
+        STA         = $true
+        company     = $CompanyName
+        product     = "Intune Autopilot Registration"
+        copyright   = '2025'
+    }
+    if ($AddDebug)
     {
-        Write-Host "Executable signed successfully: $OutputFile"
+        Write-Host "Adding debug information to parameters"
+        $params.Debug = $true
+    }
+    Write-Host "Building executable from $newscriptFile to $OutputFile"
+    Write-Host "parameters used:"
+    $params | Format-List | Out-Host
+    $result = Invoke-ps2exe @params -ErrorAction Stop
+    Write-Host "ps2exe result: $result"
+    # Use a regex-escaped pattern to avoid invalid escape sequences (e.g., \\m) in Windows paths
+    if ($result -match [regex]::Escape($successMessage))
+    {
+        Write-Host "Executable created successfully: $OutputFile"
     }
     else
     {
-        Write-Host "Failed to sign executable: $OutputFile"
+        Write-Host "Failed to create executable: $OutputFile"
         exit 1
     }
-}
-else 
-{
-    Write-Host "Skipping signing of executable as per -SkipSigning flag."
+    if (-not $SkipSigning)
+    {
+        Write-Host "Signing executable at $OutputFile"
+        if (SignScripts -path $outputFile)
+        {
+            Write-Host "Executable signed successfully: $OutputFile"
+        }
+        else
+        {
+            Write-Host "Failed to sign executable: $OutputFile"
+            exit 1
+        }
+    }
+    else 
+    {
+        Write-Host "Skipping signing of executable as per -SkipSigning flag."
+    }
+    #get the hash for the executable
+    $Hash = UpdateHash -executableFilePath $OutputFile -lastRunContent $lastRun
+    if ($Hash.hashUpdated)
+    {
+        Write-Host "Got the hash for $($OutputFile): $($Hash.hash)"
+        Write-Log -logFile $logFile -Message "Got the hash for $($OutputFile): $($Hash.hash)" -module $scriptName
+        $lastrun = $Hash
+    }
+    else
+    {
+        Write-Host "Failed to update hash in $lastRunFile"
+        exit 1
+    }
+    #save the lastrun file
+    if (Update-LastRunObject -LastRunFile $lastRunFile -LastRun $lastRun)
+    {
+        Write-Host "lastrun file saved successfully."
+        Write-Log -logFile $logFile -Message "lastrun file saved successfully." -module $scriptName
+    }
+    else
+    {
+        Write-Host "Failed to save lastrun file: $lastRunFile"
+        Write-Log -logFile $logFile -Message "Failed to save lastrun file: $lastRunFile" -module $scriptName -LogLevel 'Error'
+        Write-Log -logFile $logFile -finishLogging
+        exit 1
+    }
+
+    if ($Overwrite)
+    {
+        $secretsCopied = CopySecrets -SourceFolder $PSScriptRoot -DestinationFolder $parentFolder -Overwrite
+    }
+    else
+    {
+        $secretsCopied = CopySecrets -SourceFolder $PSScriptRoot -DestinationFolder $parentFolder
+    }
+    if ($secretsCopied)
+    {
+        Write-Host "Secrets copied successfully to $parentFolder\.secrets"
+    }
+    else
+    {
+        Write-Host "No secrets were copied."
+    }
 }
 
-#get the hash for the executable
-$Hash = UpdateHash -executableFilePath $OutputFile -lastRunContent $lastRun
-if ($Hash.hashUpdated)
+if ($filesToCopy.Count -gt 0)
 {
-    Write-Host "Got the hash for $($OutputFile): $($Hash.hash)"
-    Write-Log -logFile $logFile -Message "Got the hash for $($OutputFile): $($Hash.hash)" -module $scriptName
-    $lastrun = $Hash
+    Write-Host "Copying $($filesToCopy.Count) files to $parentFolder"
+    foreach ($file in $filesToCopy)
+    {
+        Write-Verbose "[$scriptName] Copying tool file: $file to $parentFolder"
+        try
+        {
+            Copy-Item -Path $file -Destination $parentFolder -Force
+            Write-Host "Copied file: $file"                    
+        }
+        catch
+        {
+            Write-Host "Failed to copy file: $file to $parentFolder"
+            Write-Error $_
+        }                       
+    }
 }
 else
 {
-    Write-Host "Failed to update hash in $lastRunFile"
-    exit 1
-}
+    Write-Host "No files to copy."
+}                                       
 
-#save the lastrun file
-if (Update-LastRunObject -LastRunFile $lastRunFile -LastRun $lastRun)
+if (-not $SkipZipArchive)
 {
-    Write-Host "lastrun file saved successfully."
-    Write-Log -logFile $logFile -Message "lastrun file saved successfully." -module $scriptName
-}
-else
-{
-    Write-Host "Failed to save lastrun file: $lastRunFile"
-    Write-Log -logFile $logFile -Message "Failed to save lastrun file: $lastRunFile" -module $scriptName -LogLevel 'Error'
-    Write-Log -logFile $logFile -finishLogging
-    exit 1
-}
-
-if ($Overwrite)
-{
-    $secretsCopied = CopySecrets -SourceFolder $PSScriptRoot -DestinationFolder $parentFolder -Overwrite
-}
-else
-{
-    $secretsCopied = CopySecrets -SourceFolder $PSScriptRoot -DestinationFolder $parentFolder
-}
-
-if ($secretsCopied)
-{
-    Write-Host "Secrets copied successfully to $parentFolder\.secrets"
-}
-else
-{
-    Write-Host "No secrets were copied."
+    Write-Host "Cleaning backup and temporary files..."
+    $cleanupResult = cleanupTempFiles -Path $parentFolder
+    if ($cleanupResult.AllRemoved)
+    {
+        Write-Host "Cleanup completed successfully."
+    }
+    Write-Host "Removed $($cleanupResult.RemovedFilesCount) files, of which $($cleanupResult.tempFilesCount) file were temp files."
+    Write-Host "Creating zip file only: $zipFilePath"
+    Write-Verbose "[$scriptName] Creating zip archive of output folder: $parentFolder"
+    $zipCreated = New-ZipArchive -inputPath $parentFolder -outputPath $zipFilePath -Overwrite
+    if ($zipCreated)
+    {
+        Write-Host "Zip archive created successfully at $zipFilePath"
+        Write-Log -logFile $logFile -Message "Zip archive created successfully at $zipFilePath" -module $scriptName
+    }
+    else
+    {
+        Write-Host "Failed to create zip archive at $zipFilePath"
+        Write-Log -logFile $logFile -Message "Failed to create zip archive at $zipFilePath" -module $scriptName -LogLevel 'Error'
+    }
 }
 
 if (-not $noCleanup)
@@ -1766,50 +1902,54 @@ else
 {
     Write-Host "Skipping cleanup as per -noCleanup flag."
 }
+
 Write-Host "Build process completed successfully."
-Write-Host "Executable and files are located in $parentFolder"
+Write-Host "Files are located in $parentFolder"
 
-$response = $null
-if (-not $Overwrite)
+if (-not $SkipExecutable)
 {
-    Write-Host "Would you like to copy the executable into the current directory? (Y/N)"
-    $response = Read-Host "Enter 'y' to copy, 'n' to skip"
-    Write-Verbose "[$scriptName] User response: $response"
-    while ($response -ne 'Y' -and $response -ne 'y' -and $response -ne 'N' -and $response -ne 'n')
+    $response = $null
+    if (-not $Overwrite)
     {
-        Write-Host "Invalid response. Please enter Y or N."
-        [console]::beep(1000, 500)
+        Write-Host "Would you like to copy the executable into the current directory? (Y/N)"
         $response = Read-Host "Enter 'y' to copy, 'n' to skip"
-    }   
-}
+        Write-Verbose "[$scriptName] User response: $response"
+        while ($response -ne 'Y' -and $response -ne 'y' -and $response -ne 'N' -and $response -ne 'n')
+        {
+            Write-Host "Invalid response. Please enter Y or N."
+            [console]::beep(1000, 500)
+            $response = Read-Host "Enter 'y' to copy, 'n' to skip"
+        }   
+    }
 
-if ((($response -eq 'Y' -or $response -eq 'y') -or $Overwrite) -and -not $SkipSigning)
-{
-    Write-Verbose "[$scriptName] User chose to copy the executable to the current directory."
-    try
+    if ((($response -eq 'Y' -or $response -eq 'y') -or $Overwrite) -and -not $SkipSigning)
     {
-        Copy-Item -Path $OutputFile -Destination $PWD -Force
-        Write-Host "Executable copied to current directory at $PWD."
-    }
-    catch
-    {
-        Write-Host "Failed to copy executable to current directory."
-        Write-Error $_
-        exit 1
-    }
-}
-else
-{
-    Write-Host "Executable not copied."
-    $message = if ($SkipSigning)
-    {
-        "Skipping copy as signing was skipped." 
+        Write-Verbose "[$scriptName] User chose to copy the executable to the current directory."
+        try
+        {
+            Copy-Item -Path $OutputFile -Destination $PWD -Force
+            Write-Host "Executable copied to current directory at $PWD."
+        }
+        catch
+        {
+            Write-Host "Failed to copy executable to current directory."
+            Write-Error $_
+            exit 1
+        }
     }
     else
     {
-        "User chose not to copy the executable." 
+        Write-Host "Executable not copied."
+        $message = if ($SkipSigning)
+        {
+            "Skipping copy as signing was skipped." 
+        }
+        else
+        {
+            "User chose not to copy the executable." 
+        }
+        Write-Verbose "[$scriptName] $message"
     }
-    Write-Verbose "[$scriptName] $message"
 }
 Write-Host "Script completed successfully."
 Write-Log -logFile $logFile -finishLogging

@@ -1,5 +1,74 @@
 function Get-DelegatedToken()
 {
+    <#
+    .SYNOPSIS
+    Acquires Microsoft Graph API access token using delegated (user) authentication flow.
+
+    .DESCRIPTION
+    This function implements OAuth 2.0 authorization code flow with PKCE for delegated user authentication
+    to Microsoft Graph. It manages the complete token lifecycle including initial authorization, refresh token
+    handling, token caching, and automatic renewal. The function supports interactive browser-based auth and
+    configuration-based refresh tokens with secure storage.
+
+    .PARAMETER tenantId
+    The Azure AD tenant ID.
+
+    .PARAMETER clientId
+    The application (client) ID from Azure AD app registration.
+
+    .PARAMETER clientSecret
+    Optional client secret for confidential client applications.
+
+    .PARAMETER scopes
+    Array of Microsoft Graph permission scopes requested. Defaults to comprehensive device management scopes if not provided.
+
+    .PARAMETER domain
+    The domain name for tenant-specific operations.
+
+    .PARAMETER cacheType
+    The cache storage type: 'file' or 'memory'.
+
+    .PARAMETER cacheTokenFile
+    Path to the cache token file.
+
+    .PARAMETER cacheFolder
+    Path to the cache folder.
+
+    .PARAMETER configFilePath
+    Path to configuration file containing refresh token.
+
+    .PARAMETER configRefreshToken
+    Refresh token from configuration for token renewal without re-authentication.
+
+    .PARAMETER AuthType
+    Authentication type: 'PublicAuthFlow', 'Interactive', or 'Private'. Controls auth flow behavior.
+
+    .PARAMETER NoSaveRefreshToken
+    When specified, prevents saving refresh token to configuration.
+
+    .PARAMETER ForcedRenewal
+    When specified, forces new token acquisition even if cached token is valid.
+
+    .PARAMETER settings
+    Optional settings object. Defaults to script-level $settings.
+
+    .OUTPUTS
+    System.String or System.Security.SecureString
+    Returns the access token (plain text or SecureString), or $null on error.
+
+    .EXAMPLE
+    $token = Get-DelegatedToken -tenantId $tid -clientId $cid -scopes @("User.Read", "Device.Read.All")
+    $token = Get-DelegatedToken -tenantId $tid -clientId $cid -configRefreshToken $rt -cacheType 'memory'
+
+    .NOTES
+    Uses OAuth 2.0 authorization code flow with PKCE for delegated permissions.
+    Manages complete token lifecycle: acquire, cache, refresh, renew.
+    Validates refresh tokens before attempting renewal.
+    Launches browser for interactive user authentication when needed.
+    Saves refresh tokens securely to configuration if NoSaveRefreshToken not specified.
+    Provides default comprehensive scopes if none specified.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [string]$tenantId, 
@@ -75,10 +144,17 @@ function Get-DelegatedToken()
     }
     else
     {
+        Write-Verbose "[$functionName] No existing refresh token found in config."                  
+        write-log -LogFile $LogFile -Module $functionName -Message "No existing refresh token found in config."                                 
         if ($ForcedRenewal)
         {
             Write-Host "No existing refresh token found or refresh token was cleared - proceeding with new authentication flow." -ForegroundColor Yellow
             Write-Log -LogFile $LogFile -Module $functionName -Message "No existing refresh token found or refresh token was cleared - proceeding with new authentication flow."
+        }
+        else
+        {
+            Write-Verbose "[$functionName] Proceeding with new authentication flow."                            
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Proceeding with new authentication flow."                                                   
         }
     }
     # Generate a random state string
@@ -409,6 +485,7 @@ function Get-DelegatedToken()
     if (-not $automaticFlowSuccess)
     {
         Write-Log -LogFile $LogFile -Module $functionName -Message "Automatic flow was not successful, falling back to manual code input"
+        Write-Verbose "[$functionName] Automatic flow was not successful, falling back to manual code input"                        
         # Step 1: Open the authorization URL
         $authUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/authorize?client_id=$clientId&response_type=code&redirect_uri=$encodedRedirectUri&response_mode=query&scope=$encodedScopes&state=$state"
         Write-Verbose "[$functionName] Authorization URL: $authUrl"

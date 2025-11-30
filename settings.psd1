@@ -1,57 +1,63 @@
 ﻿@{
-    cacheSettings  = @{
+    description       = 'This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.'
+    version           = '1.3.0.0'
+    cacheSettings     = @{
         maxCacheSize             = 1000
         defaultExpirationMinutes = 15
-        enabled                  = $true
         cacheTypes               = @{
             Configuration    = @{
-                enabled           = $true
                 expirationMinutes = 60
+                enabled           = $true
             }
             DirectoryObjects = @{
-                enabled           = $true
                 expirationMinutes = 15
+                enabled           = $true
             }
             Devices          = @{
-                enabled           = $true
                 expirationMinutes = 15
+                enabled           = $true
             }
         }
+        enabled                  = $true
     }
-    globalSettings = @{
-        migrateLegacyConfiguration   = $true
-        hideEmptyMenus               = $true
-        operatingSystem              = 'Windows'
-        repoInfo                     = @{
-            repoPath      = 'zuhairmahd'
-            baseURL       = 'https://www.github.com'
-            baseSourceURL = 'https://raw.githubusercontent.com'
-            repoName      = 'Autopilot'
-        }
-        timeInSeconds                = 60
-        maxUserMatchDisplay          = 10
-        maxWaitTime                  = 30
-        appModes                     = @('full')
-        showLicenseBanner            = $true
-        autoUpdate                   = $false
-        strongMappingOptional        = $true
-        validateScopes               = $true
-        maxGroupMatchDisplay         = 10
-        maxMenuItemsPerPage          = 15
-        release                      = 'auto'
-        checkStrongMapping           = $false
-        configFile                   = '.\.secrets\config.json'
-        deviceContactThresholdInDays = 30
+    globalSettings    = @{
+        migrateLegacyConfiguration                = $true
+        operatingSystem                           = 'Windows'
+        documentationURL                          = 'https://github.com/zuhairmahd/Autopilot/blob/master/readme.md'
+        timeInSeconds                             = 60
+        maxMenuItemsPerPage                       = 15
+        maxUserMatchDisplay                       = 10
+        maxWaitTime                               = 30
+        appModes                                  = @('full')
+        autoUpdate                                = $true
+        strongMappingOptional                     = $true
+        preferredBrowser                          = 'Chrome'
+        validateScopes                            = $true
+        licenseURL                                = 'https://github.com/zuhairmahd/Autopilot/blob/master/LICENSE'
+        maxGroupMatchDisplay                      = 10
+        useGridForLogDisplay                      = $true
+        hideEmptyMenus                            = $true
+        privateSession                            = $false
+        DisplayManualFilterSelection              = $false
+        release                                   = 'auto'
+        checkStrongMapping                        = $false
+        includeEnrolledDevicesInNextUserReadiness = $true
+        configFile                                = '.\.secrets\config.json'
+        showLicenseBanner                         = $true
+        deviceContactThresholdInDays              = 30
     }
-    description    = 'This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.'
-    version        = '1.3.0.0'
-    repoInfo       = @{
+    repoInfo          = @{
         repoPath      = 'zuhairmahd'
         baseURL       = 'https://www.github.com'
         baseSourceURL = 'https://raw.githubusercontent.com'
         repoName      = 'Autopilot'
     }
-    requiredScopes = @(
+    corporateSettings = @{
+        useCorporateSettings       = $false
+        corporateDomain            = ''
+        corporateSettingsFilePaths = @()
+    }
+    requiredScopes    = @(
         @{
             Scope     = 'User.Read.All'
             Endpoints = @(
@@ -74,6 +80,11 @@
                 'deviceAppManagement/mobileApps/id/assignments'
             )
             Reason    = 'Required to read application information and manage app assignments.'
+        },
+        @{
+            Scope     = 'Mail.Send'
+            Endpoints = @('me/sendMail')
+            Reason    = 'Required to send emails on behalf of the signed-in user.'
         },
         @{
             Scope     = 'DeviceManagementConfiguration.Read.All'
@@ -108,35 +119,35 @@
             Reason    = 'Required to read BitLocker recovery keys for all devices.'
         },
         @{
-            scope     = 'DeviceManagementConfiguration.ReadWrite.All'
-            endpoints = @('deviceManagement/deviceConfigurations')
-            reason    = 'Required to create, update, and delete Intune device configuration policies.'
+            Scope     = 'DeviceManagementConfiguration.ReadWrite.All'
+            Endpoints = @('deviceManagement/deviceConfigurations')
+            Reason    = 'Required to create, update, and delete Intune device configuration policies.'
         },
         @{
-            scope     = 'DeviceManagementApps.Read.All'
-            endpoints = @('deviceAppManagement/mobileApps')
-            reason    = 'Required to read application information in Intune.'
+            Scope     = 'DeviceManagementApps.Read.All'
+            Endpoints = @('deviceAppManagement/mobileApps')
+            Reason    = 'Required to read application information in Intune.'
         },
         @{
-            scope     = 'DeviceManagementManagedDevices.ReadWrite.All'
-            endpoints = @('deviceManagement/managedDevices')
-            reason    = 'Required to create, update, and delete Intune managed device properties.'
+            Scope     = 'DeviceManagementManagedDevices.ReadWrite.All'
+            Endpoints = @('deviceManagement/managedDevices')
+            Reason    = 'Required to create, update, and delete Intune managed device properties.'
         },
         @{
-            scope     = 'DeviceManagementScripts.Read.All'
-            endpoints = @('deviceManagement/deviceHealthScripts')
-            reason    = 'Required to read Intune device management scripts.'
+            Scope     = 'DeviceManagementScripts.Read.All'
+            Endpoints = @('deviceManagement/deviceHealthScripts')
+            Reason    = 'Required to read Intune device management scripts.'
         },
         @{
-            scope     = 'DeviceManagementScripts.ReadWrite.All'
-            endpoints = @('deviceManagement/deviceHealthScripts')
-            reason    = 'Required to create, update, and delete Intune device management scripts.'
+            Scope     = 'DeviceManagementScripts.ReadWrite.All'
+            Endpoints = @('deviceManagement/deviceHealthScripts')
+            Reason    = 'Required to create, update, and delete Intune device management scripts.'
         }
     )
-    auth           = @{
+    auth              = @{
         noSaveRefreshToken  = $false
+        cacheType           = 'File'
         changePwOnNextStart = $false
-        authType            = 'PublicAuthFlow'
         delegated           = $true
         forceNewToken       = $false
         scope               = @(
@@ -144,11 +155,12 @@
             'DeviceManagementApps.Read.All',
             'DeviceManagementConfiguration.ReadWrite.All',
             'DeviceManagementScripts.Read.All',
+            'Mail.Send',
             'DeviceManagementManagedDevices.PrivilegedOperations.All',
             'DeviceManagementManagedDevices.ReadWrite.All',
             'DeviceManagementServiceConfig.ReadWrite.All'
         )
-        cacheType           = 'Memory'
+        authType            = 'PublicAuthFlow'
         secureString        = $false
         renewalLeadTime     = 5
     }

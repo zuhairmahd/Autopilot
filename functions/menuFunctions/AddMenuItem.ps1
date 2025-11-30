@@ -1,5 +1,44 @@
 function AddMenuItem()
 {
+    <#
+    .SYNOPSIS
+    Adds or updates a menu item in a menu structure.
+
+    .DESCRIPTION
+    This function adds a new menu item or updates an existing item with the same name in the
+    provided menu hashtable. Menu items must have either an Action (scriptblock to execute)
+    or a Submenu (nested menu), but not both. The function supports dynamic menu updates by
+    preserving certain properties like includeInDisplayModes when updating existing items.
+
+    .PARAMETER Menu
+    The menu hashtable to which the item will be added.
+
+    .PARAMETER Name
+    The display name of the menu item.
+
+    .PARAMETER Action
+    A scriptblock to execute when the menu item is selected. Mutually exclusive with Submenu.
+
+    .PARAMETER Submenu
+    A hashtable representing a nested submenu. Mutually exclusive with Action.
+
+    .PARAMETER ReturnsValue
+    When specified, indicates that the Action returns a value that should be processed.
+
+    .OUTPUTS
+    System.Collections.Hashtable
+    Returns the modified menu hashtable with the added/updated item.
+
+    .EXAMPLE
+    $menu = AddMenuItem -Menu $mainMenu -Name "View Logs" -Action { Show-Log }
+    $menu = AddMenuItem -Menu $mainMenu -Name "Settings" -Submenu $settingsMenu
+    $menu = AddMenuItem -Menu $menu -Name "Get Device" -Action { GetDeviceByUser } -ReturnsValue
+
+    .NOTES
+    Throws an error if both Action and Submenu are provided or if neither is provided.
+    Updates existing items with the same name rather than creating duplicates.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true)]

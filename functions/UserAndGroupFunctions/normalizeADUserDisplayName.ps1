@@ -1,5 +1,41 @@
 function normalizeADUserDisplayName()
 {
+    <#
+    .SYNOPSIS
+    Normalizes and parses an Active Directory user display name into components.
+
+    .DESCRIPTION
+    This function parses an AD user display name in the format "Lastname, Firstname Middle (nickname)"
+    and converts it to "Firstname Middle Lastname (nickname)". It extracts and returns individual
+    components (first name, last name, middle initial, nickname) in a hashtable. If the input
+    doesn't match the expected format, it returns the original display name.
+
+    .PARAMETER UserDisplayName
+    The Active Directory user display name to parse and normalize. This parameter is mandatory.
+
+    .OUTPUTS
+    System.Collections.Hashtable
+    Returns a hashtable with keys: FullName, FirstName, LastName, MiddleInitial, Nickname.
+
+    .EXAMPLE
+    $userInfo = normalizeADUserDisplayName -UserDisplayName "Doe, John A. (Johnny)"
+    # Returns: FullName="John A. Doe (Johnny)", FirstName="John", LastName="Doe", MiddleInitial="A.", Nickname="Johnny"
+    
+    $userInfo = normalizeADUserDisplayName -UserDisplayName "Smith, Jane"
+    # Returns: FullName="Jane Smith", FirstName="Jane", LastName="Smith", MiddleInitial=$null, Nickname=$null
+
+    .NOTES
+    Handles various formats:
+    - "Lastname, Firstname"
+    - "Lastname, Firstname Middle"
+    - "Lastname, Firstname M."
+    - "Lastname, Firstname (Nickname)"
+    - "Lastname, Firstname M. (Nickname)"
+    
+    Returns original display name if format doesn't match expected pattern.
+    Uses regular hashtable for PowerShell 5.1 compatibility.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true)]

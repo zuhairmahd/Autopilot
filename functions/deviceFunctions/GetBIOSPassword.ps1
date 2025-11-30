@@ -1,5 +1,32 @@
 function GetBIOSPassword()
 {
+    <#
+    .SYNOPSIS
+    Retrieves BIOS/UEFI password information for a device by serial number.
+
+    .DESCRIPTION
+    This function queries Microsoft Graph to retrieve hardware password details (BIOS/UEFI passwords)
+    for a device identified by its serial number. It returns both current and previous passwords if available.
+    The function includes error handling and performance logging.
+
+    .PARAMETER accessToken
+    The Microsoft Graph API access token for authentication.
+
+    .PARAMETER serialNumber
+    The serial number of the device to query for BIOS password information.
+
+    .OUTPUTS
+    System.Collections.Hashtable[]
+    Returns an array of hashtables containing id, currentPassword, and previousPasswords properties.
+    Returns $null if no hardware password details are found or if an error occurs.
+
+    .EXAMPLE
+    $biosPassword = GetBIOSPassword -accessToken $token -serialNumber "ABC123456"
+
+    .NOTES
+    Requires appropriate Microsoft Graph permissions to access hardware password information.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param (
         [string]$accessToken,

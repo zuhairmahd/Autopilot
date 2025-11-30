@@ -1,28 +1,28 @@
-<#
-.SYNOPSIS
+function ConvertUserDisplayName()
+{
+    <#
+    .SYNOPSIS
     Converts a user display name from "Lastname, Firstname Middle (nickname)" format to "Firstname Middle Lastname (nickname)" format.
 
-.DESCRIPTION
+    .DESCRIPTION
     This function parses a user display name string and rearranges it from the format "Lastname, Firstname Middle (nickname)" 
     to "Firstname Middle Lastname (nickname)". It also handles cases with middle initials and optional nicknames.
     The function returns a hashtable containing the processed full name, first name, last name, middle initial, and nickname.
 
-.PARAMETER UserDisplayName
+    .PARAMETER UserDisplayName
     The display name of the user to convert. Must be in the format "Lastname, Firstname Middle (nickname)" or similar.
 
-.OUTPUTS
+    .OUTPUTS
     [hashtable] Returns a hashtable with keys: FullName, FirstName, LastName, MiddleInitial, Nickname.
 
-.EXAMPLE
+    .EXAMPLE
     $result = ConvertUserDisplayName -UserDisplayName "Doe, John A. (Johnny)"
     # $result['FullName'] = "John A. Doe (Johnny)"
 
-.NOTES
+    .NOTES
     Logging is performed at various stages for diagnostics. 
     Compatible with PowerShell 5.1.
-#>
-function ConvertUserDisplayName()
-{
+    #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true)]

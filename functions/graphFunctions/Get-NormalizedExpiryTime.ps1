@@ -1,5 +1,30 @@
 function Get-NormalizedExpiryTime()
 {
+    <#
+    .SYNOPSIS
+    Normalizes and converts token expiry time to a consistent datetime format.
+
+    .DESCRIPTION
+    This function processes the AbsoluteExpiryTime property from an access token object and
+    converts it to a normalized datetime format in local time. It handles various input formats
+    including string representations, UTC timestamps, and local time values. If parsing fails
+    or no expiry time is present, it returns DateTime.MinValue.
+
+    .PARAMETER accessTokenObject
+    The access token object containing an AbsoluteExpiryTime property.
+
+    .OUTPUTS
+    System.DateTime
+    Returns the normalized expiry time in local time zone, or DateTime.MinValue if not available.
+
+    .EXAMPLE
+    $expiryTime = Get-NormalizedExpiryTime -accessTokenObject $tokenObj
+
+    .NOTES
+    Handles timezone conversions and string parsing automatically.
+    Returns DateTime.MinValue for invalid or missing expiry times.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [object]$accessTokenObject

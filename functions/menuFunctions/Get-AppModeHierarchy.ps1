@@ -1,5 +1,31 @@
 function Get-AppModeHierarchy()
 {
+    <#
+    .SYNOPSIS
+    Retrieves the application mode hierarchy for a given app mode.
+
+    .DESCRIPTION
+    This function returns the hierarchy of application modes for a specified app mode by querying
+    the menu configuration. The hierarchy determines which app modes inherit settings and menus
+    from parent modes. If no hierarchy is defined or menu configuration is unavailable, returns
+    only the current app mode.
+
+    .PARAMETER CurrentAppMode
+    The current application mode to get hierarchy for. This parameter is mandatory.
+
+    .OUTPUTS
+    System.Array
+    Returns array of app mode strings in hierarchical order, or single-element array with current mode if no hierarchy defined.
+
+    .EXAMPLE
+    $hierarchy = Get-AppModeHierarchy -CurrentAppMode "DeviceManagement"
+
+    .NOTES
+    Queries menu configuration for appModeHierarchy definition.
+    Falls back to current mode only if configuration unavailable or undefined.
+    Used for settings and menu inheritance in application mode system.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

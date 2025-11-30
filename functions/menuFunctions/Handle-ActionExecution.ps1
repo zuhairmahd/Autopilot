@@ -1,5 +1,40 @@
 function Handle-ActionExecution()
 {
+    <#
+    .SYNOPSIS
+    Executes a menu item action and handles its return value.
+
+    .DESCRIPTION
+    This function executes the scriptblock action associated with a selected menu item and
+    processes the return value according to the menu system's conventions. It handles special
+    return values like "Back", "Main Menu", exit codes, and application signals. For actions
+    that don't return values, it displays results and waits for user acknowledgment.
+
+    .PARAMETER SelectedItem
+    The selected menu item object containing Name, Action, and ReturnsValue properties.
+
+    .PARAMETER CurrentMenu
+    The current menu hashtable, used for returning to the menu after action completion.
+
+    .OUTPUTS
+    System.Object
+    Returns the action result, navigation command, or menu display result based on the action's behavior.
+
+    .EXAMPLE
+    $result = Handle-ActionExecution -SelectedItem $menuItem -CurrentMenu $menu
+
+    .NOTES
+    Special return values:
+    - "Back": Navigate to previous menu
+    - "Main Menu": Navigate to main menu
+    - 0: Exit application
+    - "EXIT_APPLICATION": Exit application
+    - $returnValues.backoutText: Return to current menu
+    
+    Actions marked with ReturnsValue have their results passed through for processing.
+    Non-returning actions display results and pause for user confirmation.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

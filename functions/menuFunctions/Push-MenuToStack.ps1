@@ -1,5 +1,32 @@
 function Push-MenuToStack()
 {
+    <#
+    .SYNOPSIS
+    Adds a menu to the navigation stack.
+
+    .DESCRIPTION
+    This function implements the push operation for the menu navigation stack. It adds the
+    specified menu to both the History and MenuHistory global stacks, preventing duplicate
+    consecutive entries. The function includes PowerShell 5.1 compatibility fallback for
+    ArrayList operations.
+
+    .PARAMETER Menu
+    The menu hashtable to push onto the stack. Must contain a Title property. This parameter is mandatory.
+
+    .OUTPUTS
+    None. Modifies global $History and $MenuHistory stacks.
+
+    .EXAMPLE
+    Push-MenuToStack -Menu $mainMenu
+    Push-MenuToStack -Menu $settingsMenu
+
+    .NOTES
+    Uses global $History and $MenuHistory stacks for navigation tracking.
+    Prevents pushing duplicate consecutive menu entries.
+    Includes fallback for PowerShell 5.1 ArrayList.Add compatibility.
+    Only adds menu if it's different from the current top of stack.
+    Compatible with PowerShell 5.1.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
