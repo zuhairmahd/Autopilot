@@ -13,6 +13,10 @@ function DisplayNumericMenu()
     .PARAMETER choices
     Array of menu choice strings to display. This parameter is mandatory.
 
+    .PARAMETER descriptions
+    Optional array of description strings corresponding to each choice. When provided, descriptions
+    are displayed on the same line after the choice name in a different color (Gray).
+
     .PARAMETER banner
     Banner message displayed above the menu. Default is "Please press the number of your choice and press enter."
 
@@ -36,18 +40,22 @@ function DisplayNumericMenu()
     .EXAMPLE
     $choice = DisplayNumericMenu -choices @("Option 1", "Option 2", "Option 3")
     $choice = DisplayNumericMenu -choices $items -banner "Select action:" -MaxItemsPerPage 10
+    $choice = DisplayNumericMenu -choices @("Save", "Load") -descriptions @("Save current file", "Load existing file")
 
     .NOTES
     Supports automatic paging when choice count exceeds MaxItemsPerPage.
     Navigation options: "B" or "b" for Back, "M" or "m" for Main Menu, "0" for Exit.
     Page navigation: "N" for next page, "P" for previous page.
     Returns NoMenusConfigured value from $returnValues if choices array is empty.
+    When descriptions are provided, they are displayed in Gray color after the choice name,
+    separated by " - " to distinguish them from the menu item name.
     Compatible with PowerShell 5.1.
     #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true)]
         [string[]]$choices,
+        [string[]]$descriptions = @(),
         [string]$banner = "Please press the number of your choice and press enter.",
         [string]$Prompt = "Please select an option",
         $errorMessage = "Invalid selection. Please try again.",
@@ -116,7 +124,18 @@ function DisplayNumericMenu()
         for ($i = 0; $i -lt $pageChoices.Count; $i++)
         {
             $globalIndex = $startIndex + $i + 1
-            Write-Host "$globalIndex. $($pageChoices[$i])" -ForegroundColor White
+            $actualIndex = $startIndex + $i
+            Write-Host "$globalIndex. $($pageChoices[$i])" -NoNewline -ForegroundColor White
+            
+            # Display description if available for this choice
+            if ($descriptions.Count -gt $actualIndex -and -not [string]::IsNullOrWhiteSpace($descriptions[$actualIndex]))
+            {
+                Write-Host " - $($descriptions[$actualIndex])" -ForegroundColor Gray
+            }
+            else
+            {
+                Write-Host ""
+            }
         }
         Write-Host "0. Exit" -ForegroundColor White
         
