@@ -220,7 +220,7 @@ function ShowMenu()
         $includeItem = Test-MenuItemIncluded -MenuItemName $item.Name -Menus $menusToPass -CurrentMenu $Menu
         if ($includeItem)
         {
-            Write-Verbose "[$functionName] Adding item: $($item.Name) with description: $($item.Description)            "
+            Write-Verbose "[$functionName] Adding item: $($item.Name) with description: $($item.Description)"
             # Build a hashtable with name and description for DisplayNumericMenu
             $choiceItem = @{
                 name        = $item.Name
