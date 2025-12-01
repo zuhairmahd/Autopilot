@@ -1,10 +1,9 @@
 {
-    "date": "2025-11-24 15:52:44",
-    "version": "2025.12.1.31199",
-    "guid": "c2c08149-3c1f-4558-9e4c-87487943bbf5",
-    "hash": "4FC3090A83920822C0843F3FCB47758972DAA8F10362FD9AA605F85E24D8E034",
-    "stringsVersion": "1.3.0.0",
-    "settingsVersion": "1.3.0.0",
-    "releaseNotes": "Added descriptions to menu items throughout the script",
-    "hashUpdated": true
+  "date": "2025-12-01 18:43:54",
+  "version": "2025.12.1.31200",
+  "guid": "c2c08149-3c1f-4558-9e4c-87487943bbf5",
+  "hash": "5A5664F08F8447D2D53D11A7F003858233469987FDB7E43FABDF29B948819880",
+  "stringsVersion": "1.3.0.0",
+  "settingsVersion": "1.3.0.0",
+  "hashUpdated": true
 }
