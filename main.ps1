@@ -1049,6 +1049,7 @@ if ($updateAvailable.success -and $updateAvailable.updateAvailable)
     Write-Host "==========================================================`n" -ForegroundColor Yellow
     Write-Host "An update is available to version $($updateAvailable.version.major).$($updateAvailable.version.minor).$($updateAvailable.version.build) (revision $($updateAvailable.version.revision))" -ForegroundColor Yellow
     Write-Host "Release date: $($updateAvailable.ReleaseDate | FormatDateWithTimeZone)" -ForegroundColor Yellow
+    Write-Host "Release notes: $($updateAvailable.releaseNotes)" -ForegroundColor Yellow
     if ($settings.autoUpdate)
     {
         Write-Host "Automatic updates are enabled." -ForegroundColor Green
@@ -2592,7 +2593,7 @@ else
     if ($null -ne $mainMenu)
     {
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Showing main menu." -LogLevel "Information"
-        $result = ShowMenu -Menu $mainMenu
+        $result = ShowMenu -Menu $mainMenu -Verbose
         if ($null -eq $result)
         {
             Write-Host "`nThank you for using the Intune Helpdesk menu. Goodbye!" -ForegroundColor Green
