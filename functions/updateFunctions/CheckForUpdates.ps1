@@ -55,6 +55,7 @@ function CheckForUpdates()
         remoteVersion   = $null      
         version         = $null  
         ReleaseDate     = $null
+        releaseNotes    = $null    
         Hash            = $null
         success         = $false                        
         updateAvailable = $false
@@ -109,6 +110,7 @@ function CheckForUpdates()
         $returnObject.remoteVersion = [System.Version]::Parse($remoteVersionResponse.version)
         $returnObject.localVersion = $localVersion
         $returnObject.ReleaseDate = [datetime]::Parse($remoteVersionResponse.date).ToLocalTime()
+        $returnObject.releaseNotes = $remoteVersionResponse.releaseNotes
         $returnObject.hash = $remoteVersionResponse.hash
         $returnObject.success = ($null -ne $returnObject.remoteVersion -and $null -ne $returnObject.localVersion -and $null -ne $returnObject.ReleaseDate -and $null -ne $returnObject.hash)
         if ($returnObject.remoteVersion -gt $returnObject.localVersion)
