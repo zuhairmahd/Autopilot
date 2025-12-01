@@ -2593,7 +2593,7 @@ else
     if ($null -ne $mainMenu)
     {
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Showing main menu." -LogLevel "Information"
-        $result = ShowMenu -Menu $mainMenu -verbose 
+        $result = ShowMenu -Menu $mainMenu -Verbose
         if ($null -eq $result)
         {
             Write-Host "`nThank you for using the Intune Helpdesk menu. Goodbye!" -ForegroundColor Green
