@@ -231,7 +231,7 @@ function ShowMenu()
         }
         else
         {
-            Write-Verbose "[$functionName] Excluding item: $($item.Name) with description: $($item.Description)            "
+            Write-Verbose "[$functionName] Excluding item: $($item.Name) with description: $($item.Description)"
             Write-Log -LogFile $LogFile -Module $functionName -Message "Excluding menu item from display: $($item.Name)" -LogLevel "Information"
         }
     }
