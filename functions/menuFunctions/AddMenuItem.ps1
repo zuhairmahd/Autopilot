@@ -8,13 +8,16 @@ function AddMenuItem()
     This function adds a new menu item or updates an existing item with the same name in the
     provided menu hashtable. Menu items must have either an Action (scriptblock to execute)
     or a Submenu (nested menu), but not both. The function supports dynamic menu updates by
-    preserving certain properties like includeInDisplayModes when updating existing items.
+    preserving certain properties like includeInDisplayModes and Description when updating existing items.
 
     .PARAMETER Menu
     The menu hashtable to which the item will be added.
 
     .PARAMETER Name
     The display name of the menu item.
+
+    .PARAMETER Description
+    Optional description for the menu item that will be displayed in supported menu formats.
 
     .PARAMETER Action
     A scriptblock to execute when the menu item is selected. Mutually exclusive with Submenu.
@@ -33,10 +36,12 @@ function AddMenuItem()
     $menu = AddMenuItem -Menu $mainMenu -Name "View Logs" -Action { Show-Log }
     $menu = AddMenuItem -Menu $mainMenu -Name "Settings" -Submenu $settingsMenu
     $menu = AddMenuItem -Menu $menu -Name "Get Device" -Action { GetDeviceByUser } -ReturnsValue
+    $menu = AddMenuItem -Menu $mainMenu -Name "Export Data" -Description "Export all device data" -Action { Export-Data }
 
     .NOTES
     Throws an error if both Action and Submenu are provided or if neither is provided.
     Updates existing items with the same name rather than creating duplicates.
+    Preserves Description and includeInDisplayModes when updating existing items.
     Compatible with PowerShell 5.1.
     #>
     [CmdletBinding()]
@@ -45,6 +50,8 @@ function AddMenuItem()
         [hashtable]$Menu,
         [Parameter(Mandatory = $true)]
         [string]$Name,
+        [Parameter(Mandatory = $false)]
+        [string]$Description,
         [Parameter(Mandatory = $false)]
         [scriptblock]$Action,
         [Parameter(Mandatory = $false)]
@@ -87,11 +94,26 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Found existing menu 
         ReturnsValue = $ReturnsValue
     }
     
-    # Preserve includeInDisplayModes from existing item if updating
-    if ($existingItemIndex -ge 0 -and $Menu.Items[$existingItemIndex].includeInDisplayModes)
+    # Add Description if provided, or preserve from existing item if updating
+    if ($Description)
     {
-        $item.includeInDisplayModes = $Menu.Items[$existingItemIndex].includeInDisplayModes
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Preserving includeInDisplayModes from existing item: $($item.includeInDisplayModes -join ', ')" -LogLevel "Debug"
+        $item.Description = $Description
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Adding Description to menu item: '$Description'" -LogLevel "Debug"
+    }
+    elseif ($existingItemIndex -ge 0 -and $Menu.Items[$existingItemIndex].Description)
+    {
+        $item.Description = $Menu.Items[$existingItemIndex].Description
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Preserving Description from existing item: '$($item.Description)'" -LogLevel "Debug"
+    }
+    
+    # Preserve includeInDisplayModes from existing item if updating
+    if ($existingItemIndex -ge 0)
+    {
+        if ($Menu.Items[$existingItemIndex].includeInDisplayModes)
+        {
+            $item.includeInDisplayModes = $Menu.Items[$existingItemIndex].includeInDisplayModes
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Preserving includeInDisplayModes from existing item: $($item.includeInDisplayModes -join ', ')" -LogLevel "Debug"
+        }
     }
     
     Write-Verbose "[$functionName] Adding/updating menu item:"

@@ -388,7 +388,7 @@ Describe "Function: ShowMenu" -Tags 'Unit', 'menuFunctions' {
             { ShowMenu -Menu $menuNoTitle -StackOperation 'None' } | Should -Not -Throw
         }
         
-        It "Should handle menu without Options" {
+        It "Should handle menu without Options gracefully" {
             $menuNoOptions = @{
                 Title = "Empty Menu"
                 Items = @()
@@ -397,8 +397,9 @@ Describe "Function: ShowMenu" -Tags 'Unit', 'menuFunctions' {
             Mock DisplayNumericMenu { return 0 }
             Mock Handle-MenuItemSelection { }
             
-            # Empty Items array will cause exception - this is expected behavior
-            { ShowMenu -Menu $menuNoOptions -StackOperation 'None' } | Should -Throw
+            # Empty Items array is now handled gracefully - should return null without throwing
+            $result = ShowMenu -Menu $menuNoOptions -StackOperation 'None'
+            $result | Should -BeNullOrEmpty
         }
         
         It "Should handle invalid StackOperation" {

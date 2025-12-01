@@ -211,6 +211,7 @@ function ShowMenu()
     Write-Verbose "[$functionName] Initializing choices and menu items."
     
     # Loop through menu items and add to choices (excluding items in exclusion list)
+    # Build hashtables with name and description for the new DisplayNumericMenu format
     foreach ($item in $Menu.Items)
     {
         # If this menu was prefiltered at build time, skip additional include checks
@@ -219,13 +220,18 @@ function ShowMenu()
         $includeItem = Test-MenuItemIncluded -MenuItemName $item.Name -Menus $menusToPass -CurrentMenu $Menu
         if ($includeItem)
         {
-            Write-Verbose "[$functionName] Adding item: $($item.Name)"
-            $choices += $item.Name
+            Write-Verbose "[$functionName] Adding item: $($item.Name) with description: $($item.Description)"
+            # Build a hashtable with name and description for DisplayNumericMenu
+            $choiceItem = @{
+                name        = $item.Name
+                description = if ($item.Description) { $item.Description } else { "" }
+            }
+            $choices += $choiceItem
             $menuItems += $item
         }
         else
         {
-            Write-Verbose "[$functionName] Excluding item: $($item.Name)"
+            Write-Verbose "[$functionName] Excluding item: $($item.Name) with description: $($item.Description)"
             Write-Log -LogFile $LogFile -Module $functionName -Message "Excluding menu item from display: $($item.Name)" -LogLevel "Information"
         }
     }
@@ -238,12 +244,12 @@ function ShowMenu()
     if ($Global:MenuHistory.Count -gt 1)
     {
         Write-Verbose "[$functionName] Adding 'Back' option since depth is $($Global:MenuHistory.Count)"
-        $choices += "Back"
+        $choices += @{ name = "Back"; description = "Return to the previous menu" }
     }
     if ($Global:MenuHistory.Count -gt 2)
     {
         Write-Verbose "[$functionName] Adding 'Main Menu' option since depth is $($Global:MenuHistory.Count)"
-        $choices += "Main Menu"
+        $choices += @{ name = "Main Menu"; description = "Return to the main menu" }
     }
     #endregion
 

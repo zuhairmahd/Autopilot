@@ -14,7 +14,9 @@ function Handle-MenuItemSelection()
     The user's selected option string. This parameter is mandatory.
 
     .PARAMETER Choices
-    Array of choice strings displayed to the user. This parameter is mandatory.
+    Array of choice items displayed to the user. This parameter is mandatory.
+    Can be either an array of strings (legacy format) or an array of hashtables 
+    with 'name' and optional 'description' keys (new format).
 
     .PARAMETER MenuItems
     Array of menu item objects corresponding to choices. This parameter is mandatory.
@@ -62,8 +64,18 @@ function Handle-MenuItemSelection()
     $selectedIndex = -1
     for ($i = 0; $i -lt $Choices.Count; $i++)
     {
-        Write-Verbose "[$functionName] Checking choice $($i): $($Choices[$i]) against selected option: $SelectedOption"
-        if ($Choices[$i] -eq $SelectedOption)
+        # Extract the name from the choice (handle both hashtable and string formats)
+        $choiceName = if ($Choices[$i] -is [hashtable] -and $Choices[$i].ContainsKey('name'))
+        {
+            $Choices[$i].name
+        }
+        else
+        {
+            $Choices[$i]
+        }
+        
+        Write-Verbose "[$functionName] Checking choice $($i): $choiceName against selected option: $SelectedOption"
+        if ($choiceName -eq $SelectedOption)
         {
             Write-Verbose "[$functionName] Match found at index $i"
             $selectedIndex = $i

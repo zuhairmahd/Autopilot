@@ -163,6 +163,11 @@ function Get-Updates()
         Write-Host "Current version: $localVersion" -ForegroundColor Cyan
         Write-Host "New version: $remoteVersion" -ForegroundColor Cyan
         Write-Host "Release date: $($fileMetaData.date | FormatDateWithTimeZone)" -ForegroundColor Cyan
+        if (-not ([string]::IsNullOrWhiteSpace($fileMetaData.releaseNotes)))
+        {
+            write-log -LogFile $LogFile -Module "$functionName" -Message "Release notes available: $($fileMetaData.releaseNotes)" -LogLevel "Information"
+            Write-Host "Release notes: $($fileMetaData.releaseNotes)" -ForegroundColor Cyan
+        }
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Current version: $localVersion, New version: $remoteVersion" -LogLevel "Information"
         if ($noConfirmation)
         {
