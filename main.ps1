@@ -1737,7 +1737,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import Corporate Device
     if ($deviceIdentifier -and $deviceIdentifier.SerialNumber)
     {
         # For manufacturerModelSerial type, format as comma-separated string
-        $result = AddCorporateDeviceIdentifier -AccessToken $accessToken -DeviceInfo $deviceIdentifier -IdentifierType "manufacturerModelSerial" -OverwriteImportedDeviceIdentities -verbose 
+        $result = AddCorporateDeviceIdentifier -AccessToken $accessToken -DeviceInfo $deviceIdentifier -IdentifierType "manufacturerModelSerial" -OverwriteImportedDeviceIdentities
         if ($result)
         {
             Write-Host "Device successfully added to corporate identifiers." -ForegroundColor Green
@@ -2593,7 +2593,7 @@ else
     if ($null -ne $mainMenu)
     {
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Showing main menu." -LogLevel "Information"
-        $result = ShowMenu -Menu $mainMenu -Verbose
+        $result = ShowMenu -Menu $mainMenu
         if ($null -eq $result)
         {
             Write-Host "`nThank you for using the Intune Helpdesk menu. Goodbye!" -ForegroundColor Green
