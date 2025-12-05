@@ -458,7 +458,6 @@ if ($null -ne $appMetaData.corporateSettings -and $appMetaData.corporateSettings
     $localDomainFileName = Join-Path -Path $scriptPath -ChildPath "$domain.psd1"
     Write-Verbose "[$scriptName] Checking $($appMetaData.corporateSettings.corporateSettingsFilePaths) paths for corporate settings for domain: $domain"
     write-log -logFile $logFile -module $scriptName -Message "Checking $($appMetaData.corporateSettings.corporateSettingsFilePaths) paths for corporate settings for domain: $domain"
-    Write-Host "Looking for corporate settings for domain: $domain" -ForegroundColor Green
     for ($i = 0; $i -lt $appMetaData.corporateSettings.corporateSettingsFilePaths.count; $i++)
     {
         $path = $appMetaData.corporateSettings.corporateSettingsFilePaths[$i]
@@ -473,12 +472,17 @@ if ($null -ne $appMetaData.corporateSettings -and $appMetaData.corporateSettings
         }
         Write-Verbose "[$scriptName] Found corporate settings file: $domainFileName"
         write-log -logFile $logFile -module $scriptName -Message "Found corporate settings file: $domainFileName"
-        Write-Host "Copying corporate settings from $domainFileName to $localDomainFileName" -ForegroundColor Green
         try
         {
             Copy-Item -Path $domainFileName -Destination $localDomainFileName -Force -ErrorAction Stop                
             $fileCopied = $true
-            Write-Host "Successfully copied corporate settings from $domainFileName to $localDomainFileName" -ForegroundColor Green                             
+            write-log -logFile $logFile -module $scriptName -Message "Successfully copied corporate settings from $domainFileName to $localDomainFileName"                              
+            Write-Verbose "[$scriptName] Successfully copied corporate settings from $domainFileName to $localDomainFileName"
+            $numberOfBeeps = 4
+            for ($i = 0; $i -lt $numberOfBeeps; $i++)
+            {
+                [console]::beep(150, 80)                
+            }
             break
         }
         catch
