@@ -738,6 +738,8 @@ function Export-DeviceAssignmentReport()
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to export device assignment report to $outputFile. Error: $_" -LogLevel "Error"
         Write-Verbose "[    $functionName] Failed to export device assignment report to $outputFile. Error: $_"
         $returnObject.success = $false
+        $returnObject.OutputFile = $null
+        $returnObject.message = "Failed to export device assignment report to $outputFile. Error: $_"
     }
     Write-Verbose "[    $functionName] Export-DeviceAssignmentReport completed successfully. Returning $($returnObject | ConvertTo-Json -Compress)"
     return $returnObject
