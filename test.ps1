@@ -10,7 +10,7 @@ param(
     [switch]$showLicenseBanner,
     [switch]$HideEmptyMenus,
     [switch]$showAuth,
-    [switch]$clearCache,                    
+    [switch]$clearCache,
     [switch]$showVersion,
     [switch]$showSettings,
     [switch]$OverwriteLogs,
@@ -88,10 +88,10 @@ if ($testMode)
         menu            = $false  # Never show menu in test mode
         exitAfter       = Get-TestModeOption -ParameterName 'testModeExitAfter' -DefaultValue $true
     }
-    
+
     # Store in script scope
     $script:testModeOptions = $defaultTestModeOptions
-    
+
     Write-Verbose "[$scriptName] Test mode options initialized: $($script:testModeOptions | ConvertTo-Json -Compress)"
 }
 #endregion Initialize test mode
@@ -235,9 +235,9 @@ else
 
 if ($testMode)
 {
-    Write-Verbose "[$scriptName] Test mode enabled: Initializing application metadata in silent mode"   
+    Write-Verbose "[$scriptName] Test mode enabled: Initializing application metadata in silent mode"
     write-log -logFile $logFile -module $scriptName -message "Test mode enabled: Initializing application metadata in silent mode"
-    
+
     # Check if metadata phase should be executed
     if ($script:testModeOptions.metadata)
     {
@@ -291,7 +291,7 @@ if ($null -ne $appMetaData.corporateSettings -and $appMetaData.corporateSettings
         if (-not (Test-Path $domainFileName -ErrorAction SilentlyContinue))
         {
             Write-Verbose "[$scriptName] Path does not exist: $path"
-            write-log -logFile $logFile -module $scriptName -Message "Path does not exist: $path"                
+            write-log -logFile $logFile -module $scriptName -Message "Path does not exist: $path"
             continue
         }
         Write-Verbose "[$scriptName] Found corporate settings file: $domainFileName"
@@ -299,9 +299,9 @@ if ($null -ne $appMetaData.corporateSettings -and $appMetaData.corporateSettings
         Write-Host "Copying corporate settings from $domainFileName to $localDomainFileName" -ForegroundColor Green
         try
         {
-            Copy-Item -Path $domainFileName -Destination $localDomainFileName -Force -ErrorAction Stop                
+            Copy-Item -Path $domainFileName -Destination $localDomainFileName -Force -ErrorAction Stop
             $fileCopied = $true
-            Write-Host "Successfully copied corporate settings from $domainFileName to $localDomainFileName" -ForegroundColor Green                             
+            Write-Host "Successfully copied corporate settings from $domainFileName to $localDomainFileName" -ForegroundColor Green
             break
         }
         catch
@@ -311,12 +311,12 @@ if ($null -ne $appMetaData.corporateSettings -and $appMetaData.corporateSettings
             if ($i -lt ($appMetaData.corporateSettings.corporateSettingsFilePaths.count - 1))
             {
                 Write-Host "Trying next path if available..." -ForegroundColor Yellow
-                write-log -logFile $logFile -module $scriptName -Message "Trying next path if available..."         
+                write-log -logFile $logFile -module $scriptName -Message "Trying next path if available..."
             }
             else
             {
                 Write-Host "No more paths to try." -ForegroundColor Yellow
-                write-log -logFile $logFile -module $scriptName -Message "No more paths to try."    
+                write-log -logFile $logFile -module $scriptName -Message "No more paths to try."
             }
         }
     }
@@ -324,18 +324,18 @@ if ($null -ne $appMetaData.corporateSettings -and $appMetaData.corporateSettings
     {
         Write-Host "Corporate settings file copied successfully." -ForegroundColor Green
         Write-Verbose "[$scriptName] Corporate settings file copied successfully."
-        write-log -logFile $logFile -module $scriptName -Message "Corporate settings file copied successfully."                                        
+        write-log -logFile $logFile -module $scriptName -Message "Corporate settings file copied successfully."
     }
     else
     {
         Write-Host "No files were copied from all specified paths." -ForegroundColor Red
-        write-log -logFile $logFile -module $scriptName -Message "Failed to copy corporate settings file from all specified paths." -LogLevel "Error"                                        
-    }                   
+        write-log -logFile $logFile -module $scriptName -Message "Failed to copy corporate settings file from all specified paths." -LogLevel "Error"
+    }
 }
-else 
+else
 {
-    Write-Verbose "[$scriptName] Corporate settings not enabled or no paths specified."             
-    write-log -logFile $logFile -module $scriptName -Message "Corporate settings not enabled or no paths specified."                                        
+    Write-Verbose "[$scriptName] Corporate settings not enabled or no paths specified."
+    write-log -logFile $logFile -module $scriptName -Message "Corporate settings not enabled or no paths specified."
 }
 $version = if ($null -ne $appMetaData.version)
 {
@@ -411,7 +411,7 @@ elseif ($migrationCheck.migrationNeeded -and -not $migrationCheck.success)
 else
 {
     Write-Verbose "[$scriptName] No migration needed."
-    Write-Log -LogFile $LogFile -Module $scriptName -Message "No migration needed." -LogLevel "Information" 
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "No migration needed." -LogLevel "Information"
 }
 
 #clear cache if requested
@@ -424,7 +424,7 @@ if ($clearCache)
     }
     else
     {
-        Write-Host "No cache files to clear." -ForegroundColor Yellow                           
+        Write-Host "No cache files to clear." -ForegroundColor Yellow
     }
 }
 #endregion  Initialize script parameters
@@ -467,7 +467,7 @@ elseif (Test-Path $configFile)
 {
     # Initialize configuration session (use Silent mode if testMode is active)
     $sessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -PasswordPrompt "Enter your password" -Silent:$testMode
-    
+
     if (-not $sessionResult.Success)
     {
         Write-Host "Error: $($sessionResult.ErrorMessage)" -ForegroundColor Red
@@ -476,13 +476,13 @@ elseif (Test-Path $configFile)
         Write-Log -LogFile $LogFile -FinishLogging
         exit 1
     }
-    
+
     $configContent = $sessionResult.ConfigContent
     $domain = $sessionResult.Domain
     $appId = $sessionResult.AppId
     $tenantId = $sessionResult.TenantId
     $name = $sessionResult.Name
-    
+
     if (-not ($sessionResult.encrypted))
     {
         Write-Host "You need to set a new password to use this application."
@@ -515,13 +515,13 @@ else
         # In test mode, skip first run wizard and create minimal configuration
         Write-Verbose "[$scriptName] Test mode enabled: Skipping first run wizard and using default test configuration"
         Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode: Skipping first run wizard" -LogLevel "Information"
-        
+
         # Set default test values
         $domain = "test.contoso.com"
         $appId = "00000000-0000-0000-0000-000000000000"
         $tenantId = "00000000-0000-0000-0000-000000000000"
         $name = "Test Application"
-        
+
         # Skip config file loading in test mode
         Write-Verbose "[$scriptName] Test mode: Using default test configuration without config file"
         $wizardResult = $true
@@ -531,9 +531,9 @@ else
         # Configuration file not found - launch first run wizard
         Write-Host "Configuration file $configFile not found." -ForegroundColor Yellow
         Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file not found. Starting first run wizard" -LogLevel "Verbose"
-        
+
         Write-Host "Starting first run wizard to set up your configuration..." -ForegroundColor Green
-        
+
         # Launch the first run wizard (pass Silent switch if testMode is active)
         $wizardResult = Start-FirstRunWizard -ConfigFile $configFile -SettingsFile $InitFile -StringsFile "$PWD\strings.psd1" -Silent:$testMode
     }
@@ -543,17 +543,17 @@ else
         {
             Write-Host "First run wizard completed successfully." -ForegroundColor Green
             Write-Log -LogFile $LogFile -Module $scriptName -Message "First run wizard completed successfully" -LogLevel "Information"
-            
+
             # Now try to load the newly created configuration
             Write-Host "Loading the newly created configuration..." -ForegroundColor Cyan
             Write-Log -LogFile $LogFile -Module $scriptName -Message "Loading newly created configuration file" -LogLevel "Information"
-            
+
             # Re-run the configuration loading logic
             if (Test-Path $configFile)
             {
                 # Initialize configuration session after wizard (use Silent mode if testMode is active)
                 $sessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword -PasswordPrompt "Enter your password" -Silent:$testMode
-                
+
                 if (-not $sessionResult.Success)
                 {
                     Write-Host "Configuration file exists but cannot be read: $($sessionResult.ErrorMessage)" -ForegroundColor Red
@@ -562,7 +562,7 @@ else
                     write-log -logFile $logFile -finishLogging
                     exit 1
                 }
-                
+
                 $configContent = $sessionResult.ConfigContent
                 $domain = $sessionResult.Domain
                 $appId = $sessionResult.AppId
@@ -585,7 +585,7 @@ else
             Write-Verbose "[$scriptName] Test mode: Skipping configuration file loading"
             Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode: Using default test configuration" -LogLevel "Information"
         }
-        
+
         #reload settings since they likely have changed.
         Write-Verbose "[$scriptName] Initializing application configuration since the earlier initialization attempt failed or did not take place."
         write-log -logFile $logFile -module $scriptName -message "Initializing application configuration since earlier attempt failed or did not take place."
@@ -603,7 +603,7 @@ else
         $localSettings = $configResult.LocalSettings
         $requiredScopes = $configResult.RequiredScopes
         $repoInfo = $configResult.RepoInfo
-        $global:cacheSettings = $configResult.CacheSettings            
+        $global:cacheSettings = $configResult.CacheSettings
         # Merge global and local settings into a single settings object
         Write-Verbose "[$scriptName] Merging global and local settings"
         $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
@@ -654,7 +654,7 @@ $globalSettings = $configResult.GlobalSettings
 $localSettings = $configResult.LocalSettings
 $requiredScopes = $configResult.RequiredScopes
 $repoInfo = $configResult.RepoInfo
-$global:cacheSettings = $configResult.CacheSettings            
+$global:cacheSettings = $configResult.CacheSettings
 # Merge global and local settings into a single settings object
 Write-Verbose "[$scriptName] Merging global and local settings"
 $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
@@ -662,7 +662,7 @@ $global:settings = MergeSettings -localSettings $localSettings -globalSettings $
 if ($settings.domain -ne $domain)
 {
     Write-Verbose "[$scriptName] Updating settings domain from $($settings.domain) to $domain"
-    write-log -logFile $logFile -module $scriptName -message "Updating settings domain from $($settings.domain) to $domain"     
+    write-log -logFile $logFile -module $scriptName -message "Updating settings domain from $($settings.domain) to $domain"
     Write-Warning "[$scriptName] Settings domain updated from $($settings.domain) to $domain"
     $settings.domain = $domain
 }
@@ -707,18 +707,18 @@ if ($testMode)
     Write-Verbose "[$scriptName] Test mode enabled, skipping password change check."
     write-log -logFile $logFile -Module $scriptName -Message "Test mode enabled, skipping password change check." -LogLevel "Information"
 }
-else 
+else
 {
     if ((Test-Path $configFile) -and $auth.changePWOnNextStart -eq $true)
     {
         Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change required (changePWOnNextStart=true)" -LogLevel "Information"
-    
+
         # Need to reload configContent for password change process
         $tempSessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword -PasswordPrompt "Enter your password" -Silent:$testMode
         if ($tempSessionResult.Success)
         {
             $configContent = $tempSessionResult.ConfigContent
-        
+
             # Invoke password change process
             $passwordChangeResult = Invoke-PasswordChangeProcess -ConfigFile $configFile -ConfigContent $configContent -SettingsFile $InitFile
             if ($passwordChangeResult)
@@ -734,7 +734,7 @@ else
                 Write-Host "Password change failed. Continuing with current password." -ForegroundColor Yellow
                 Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change failed. Continuing with current password." -LogLevel "Warning"
             }
-        
+
             # Clear the config content from memory
             $configContent = $null
         }
@@ -760,7 +760,7 @@ else
 }
 Write-Log -logFile $LogFile -Module $scriptName -Message "Base source URL: $baseSourceURL" -LogLevel "Information"
 $baseURL = if ($repoInfo.baseURL)
-{       
+{
     $repoInfo.baseURL
 }
 else
@@ -794,7 +794,7 @@ $latestRelease = if ($settings.Release)
         $tempRelease = GetLatestGithubRelease -Repository "$repoPath/$repoName"
         Write-Log -logFile $LogFile -Module $scriptName -Message "Latest release fetched: $tempRelease" -LogLevel "Information"
     }
-    else 
+    else
     {
         $tempRelease = $settings.Release
     }
@@ -806,7 +806,7 @@ else
 }
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/lastrun.json"
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
-$updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL -executableFileName "$scriptPath\$scriptName" 
+$updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL -executableFileName "$scriptPath\$scriptName"
 Write-Verbose "[$scriptName] Update available: $($updateAvailable.updateAvailable), Remote version: $($updateAvailable.version | Out-String)"
 write-log -logFile $LogFile -Module $scriptName -Message "Update available: $($updateAvailable.updateAvailable), Remote version: $($updateAvailable.version | Out-String)" -LogLevel "Information"
 $groupsToInclude = $settings.groupsToInclude
@@ -871,7 +871,7 @@ $scope = $auth.scope
 # $deviceConfigurationUri = "deviceManagement/deviceConfigurations"
 # $autopilotCsv = [System.Collections.ArrayList]@()
 # $importedCsv = [System.Collections.ArrayList]@()
-# $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $scope -AuthType 'MGGraph' -verbose 
+# $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $scope -AuthType 'MGGraph' -verbose
 $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $scope -AuthType 'PublicAuthFlow'
 # $accessToken = GetGraphAccessToken -configFile $configFile
 # $autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken -extraParameters $autopilotExtraParameters -consistencyLevel -verbose
@@ -885,14 +885,8 @@ $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $sc
 # }
 #endregion Define variables
 
-$inputFile = Join-Path -Path $scriptPath -ChildPath "users.txt"            
-if (-not (Test-Path -Path $inputFile))
-{
-    Write-Error "Input file 'users.txt' not found at path: $inputFile. Please ensure the file exists before running this script."
-    exit 1
-}
-$users = Get-Content -Path $inputFile | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }                               
-$global:devices = Get-RegisteredDevicesByUser -accessToken $accessToken -usersList $users
+
+Export-DeviceAssignmentReport -accessToken $accessToken -outputPath $PWD -reportType "assigned" -lastContactDateTime (Get-Date).AddDays(-60)
 
 exit 0
 
