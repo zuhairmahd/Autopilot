@@ -15,7 +15,14 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
         . "$script:RepoRoot/functions/graphFunctions/CallGraphApi.ps1"
 
         # Create temp output directory
-        $tempPath = if ($env:TEMP) { $env:TEMP } else { "/tmp" }
+        $tempPath = if ($env:TEMP)
+        {
+            $env:TEMP 
+        }
+        else
+        {
+            "/tmp" 
+        }
         $script:TestOutputPath = New-Item -Path (Join-Path $tempPath "DeviceReportTest_$(Get-Date -Format 'yyyyMMddHHmmss')") -ItemType Directory -Force
 
         # Mock Write-Log globally (no -ModuleName needed for dot-sourced functions)
@@ -415,6 +422,9 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
         BeforeEach {
             # Clear unified cache before each test to ensure clean state
             Clear-UnifiedCache -CacheType 'Devices'
+
+            # Clean up any existing CSV files from previous tests
+            Get-ChildItem -Path $script:TestOutputPath.FullName -Filter "*.csv" -ErrorAction SilentlyContinue | Remove-Item -Force
         }
 
         It "Should handle empty result set gracefully" {
@@ -426,12 +436,15 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
             $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'Assigned'
 
             $result.success | Should -Be $true
+            $result.totalDeviceCount | Should -Be 0
+            $result.filteredDeviceCount | Should -Be 0
             $result.deviceCount | Should -Be 0
             $result.message | Should -Match "No devices found"
+            $result.OutputFile | Should -BeNullOrEmpty
 
-            # Should create file with headers
-            $csvFile = Get-ChildItem -Path $script:TestOutputPath.FullName -Filter "Assigned-*.csv" | Select-Object -First 1
-            $csvFile | Should -Not -BeNullOrEmpty
+            # Should NOT create file when no devices found
+            $csvFile = Get-ChildItem -Path $script:TestOutputPath.FullName -Filter "Assigned-*.csv" -ErrorAction SilentlyContinue
+            $csvFile | Should -BeNullOrEmpty
         }
 
         It "Should return success status when export completes" {
@@ -512,7 +525,9 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
             $result | Should -BeOfType [hashtable]
             $result.Keys | Should -Contain 'ReportType'
             $result.Keys | Should -Contain 'OutputFile'
-            $result.Keys | Should -Contain 'deviceCount'
+            $result.Keys | Should -Contain 'totalDeviceCount'
+            $result.Keys | Should -Contain 'filteredDeviceCount'
+            $result.Keys | Should -Contain 'deviceCount'  # Backward compatibility
             $result.Keys | Should -Contain 'success'
             $result.Keys | Should -Contain 'message'
         }
@@ -555,9 +570,12 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
             $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'Assigned'
 
             $result.success | Should -Be $true
+            $result.totalDeviceCount | Should -Be 0
+            $result.filteredDeviceCount | Should -Be 0
             $result.deviceCount | Should -Be 0
             $result.message | Should -Not -BeNullOrEmpty
             $result.message | Should -Match "No devices found"
+            $result.OutputFile | Should -BeNullOrEmpty
         }
 
         It "Should return different device counts for different report types" {
@@ -566,6 +584,196 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
 
             $assigned.deviceCount | Should -Not -Be $unassigned.deviceCount
             $assigned.deviceCount + $unassigned.deviceCount | Should -BeLessOrEqual 5  # Total in mock data
+        }
+    }
+
+    Context "Total Device Count Tracking" {
+
+        BeforeEach {
+            # Clear unified cache before each test to ensure clean state
+            Clear-UnifiedCache -CacheType 'Devices'
+            Get-ChildItem -Path $script:TestOutputPath.FullName -Filter "*.csv" -ErrorAction SilentlyContinue | Remove-Item -Force
+        }
+
+        It "Should track totalDeviceCount and filteredDeviceCount for Assigned report" {
+            $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'Assigned'
+
+            $result.totalDeviceCount | Should -Be 5
+            $result.filteredDeviceCount | Should -Be 2
+            $result.deviceCount | Should -Be 2  # Backward compatibility
+            $result.filteredDeviceCount | Should -Be $result.deviceCount
+        }
+
+        It "Should track totalDeviceCount and filteredDeviceCount for Unassigned report" {
+            $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'Unassigned'
+
+            $result.totalDeviceCount | Should -Be 5
+            $result.filteredDeviceCount | Should -BeGreaterThan 0
+            $result.filteredDeviceCount | Should -BeLessThan 5
+            $result.deviceCount | Should -Be $result.filteredDeviceCount
+        }
+
+        It "Should track totalDeviceCount and filteredDeviceCount for Preprovisioned report" {
+            $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'Preprovisioned'
+
+            $result.totalDeviceCount | Should -Be 5
+            $result.filteredDeviceCount | Should -BeGreaterThan 0
+            $result.filteredDeviceCount | Should -BeLessThan 5
+            $result.deviceCount | Should -Be $result.filteredDeviceCount
+        }
+
+        It "Should track totalDeviceCount and filteredDeviceCount for All report" {
+            $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'All'
+
+            $result.totalDeviceCount | Should -Be 5
+            $result.filteredDeviceCount | Should -Be 5
+            $result.deviceCount | Should -Be 5
+        }
+
+        It "Should show filtered count less than total when date filter applied" {
+            $filterDate = [datetime]::Parse('2024-09-20T00:00:00Z')
+
+            $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'Assigned' -lastContactDateTime $filterDate
+
+            $result.totalDeviceCount | Should -Be 5
+            $result.filteredDeviceCount | Should -Be 1  # Only SN005
+            $result.filteredDeviceCount | Should -BeLessThan $result.totalDeviceCount
+        }
+
+        It "Should show zero filtered count when no devices match filter criteria" {
+            $filterDate = [datetime]::Parse('2024-01-01T00:00:00Z')
+
+            $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'All' -lastContactDateTime $filterDate
+
+            $result.totalDeviceCount | Should -Be 5
+            $result.filteredDeviceCount | Should -Be 0
+        }
+    }
+
+    Context "No CSV File Creation When No Devices" {
+
+        BeforeEach {
+            # Clear unified cache before each test to ensure clean state
+            Clear-UnifiedCache -CacheType 'Devices'
+            Get-ChildItem -Path $script:TestOutputPath.FullName -Filter "*.csv" -ErrorAction SilentlyContinue | Remove-Item -Force
+        }
+
+        It "Should not create CSV file when no devices returned by API" {
+            Mock CallGraphApi {
+                return @{ value = @() }
+            }
+
+            $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'Assigned'
+
+            $result.success | Should -Be $true
+            $result.OutputFile | Should -BeNullOrEmpty
+            $result.message | Should -Match "No devices found"
+
+            # Verify no CSV file was created
+            $csvFiles = Get-ChildItem -Path $script:TestOutputPath.FullName -Filter "*.csv" -ErrorAction SilentlyContinue
+            $csvFiles | Should -BeNullOrEmpty
+        }
+
+        It "Should not create CSV file when all devices filtered out by date criteria" {
+            $filterDate = [datetime]::Parse('2024-01-01T00:00:00Z')
+
+            $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'All' -lastContactDateTime $filterDate
+
+            $result.success | Should -Be $true
+            $result.OutputFile | Should -BeNullOrEmpty
+            $result.filteredDeviceCount | Should -Be 0
+
+            # Verify no CSV file was created
+            $csvFiles = Get-ChildItem -Path $script:TestOutputPath.FullName -Filter "*.csv" -ErrorAction SilentlyContinue
+            $csvFiles | Should -BeNullOrEmpty
+        }
+
+        It "Should not create CSV file for Assigned report when no assigned devices exist" {
+            # Mock data with no assigned devices (all have empty user info)
+            Mock CallGraphApi {
+                param($ResourcePath)
+                if ($ResourcePath -like '*autopilot*')
+                {
+                    return @{
+                        value = @(
+                            @{
+                                serialNumber    = 'SN100'
+                                groupTag        = 'Test'
+                                manufacturer    = 'Dell'
+                                model           = 'Latitude'
+                                systemFamily    = 'Latitude'
+                                enrollmentState = 'enrolled'
+                                managedDeviceId = 'managed-100'
+                            }
+                        )
+                    }
+                }
+                else
+                {
+                    return @{
+                        value = @(
+                            @{
+                                id                     = 'managed-100'
+                                serialNumber           = 'SN100'
+                                deviceName             = 'TEST-LAPTOP-100'
+                                manufacturer           = 'Dell'
+                                model                  = 'Latitude'
+                                osVersion              = '10.0.19045.3803'
+                                deviceEnrollmentType   = 'windowsAzureADJoin'
+                                enrolledDateTime       = '2024-01-15T10:30:00Z'
+                                lastSyncDateTime       = '2024-10-21T08:00:00Z'
+                                complianceState        = 'compliant'
+                                userPrincipalName      = ''  # Empty
+                                userDisplayName        = ''  # Empty
+                                userId                 = $null
+                                managedDeviceOwnerType = 'company'
+                                azureADRegistered      = $true
+                            }
+                        )
+                    }
+                }
+            }
+
+            $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'Assigned'
+
+            $result.success | Should -Be $true
+            $result.OutputFile | Should -BeNullOrEmpty
+            $result.totalDeviceCount | Should -Be 1
+            $result.filteredDeviceCount | Should -Be 0
+
+            # Verify no CSV file was created
+            $csvFiles = Get-ChildItem -Path $script:TestOutputPath.FullName -Filter "*.csv" -ErrorAction SilentlyContinue
+            $csvFiles | Should -BeNullOrEmpty
+        }
+
+        It "Should create CSV file when at least one device matches filter criteria" {
+            $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'Assigned'
+
+            $result.success | Should -Be $true
+            $result.OutputFile | Should -Not -BeNullOrEmpty
+            $result.filteredDeviceCount | Should -BeGreaterThan 0
+
+            # Verify CSV file was created
+            Test-Path $result.OutputFile | Should -Be $true
+        }
+
+        It "Should set OutputFile to null when no devices to export" {
+            $filterDate = [datetime]::Parse('2024-01-01T00:00:00Z')
+
+            $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'Assigned' -lastContactDateTime $filterDate
+
+            $result.OutputFile | Should -BeNullOrEmpty
+            $result.success | Should -Be $true
+        }
+
+        It "Should include 'No file created' in message when no devices found" {
+            Mock CallGraphApi {
+                return @{ value = @() }
+            }
+
+            $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'All'
+
+            $result.message | Should -Match "No file created"
         }
     }
 
@@ -624,11 +832,20 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
 
             $result.success | Should -Be $true
 
-            $csvFile = Get-ChildItem -Path $script:TestOutputPath.FullName -Filter "Preprovisioned-*.csv" | Select-Object -First 1
-            $csvData = Import-Csv -Path $csvFile.FullName
-
-            # Should not include SN003 (contacted 2024-10-21)
-            $csvData.SerialNumber | Should -Not -Contain 'SN003'
+            # When filter results in no devices, OutputFile should be null and no CSV should be created
+            if ($result.filteredDeviceCount -eq 0)
+            {
+                $result.OutputFile | Should -BeNullOrEmpty
+                $csvFiles = Get-ChildItem -Path $script:TestOutputPath.FullName -Filter "Preprovisioned-*.csv" -ErrorAction SilentlyContinue
+                $csvFiles | Should -BeNullOrEmpty
+            }
+            else
+            {
+                # If devices found, CSV should exist and should not include SN003
+                $csvFile = Get-ChildItem -Path $script:TestOutputPath.FullName -Filter "Preprovisioned-*.csv" | Select-Object -First 1
+                $csvData = Import-Csv -Path $csvFile.FullName
+                $csvData.SerialNumber | Should -Not -Contain 'SN003'
+            }
         }
 
         It "Should filter devices by lastContactDateTime in 'All' report" {
@@ -672,7 +889,14 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
             $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'All' -lastContactDateTime $filterDate
 
             $result.success | Should -Be $true
+            $result.totalDeviceCount | Should -Be 5
+            $result.filteredDeviceCount | Should -Be 0
             $result.deviceCount | Should -Be 0
+            $result.OutputFile | Should -BeNullOrEmpty
+
+            # Should NOT create CSV file when no devices match filter
+            $csvFile = Get-ChildItem -Path $script:TestOutputPath.FullName -Filter "All-*.csv" -ErrorAction SilentlyContinue
+            $csvFile | Should -BeNullOrEmpty
         }
 
         It "Should handle devices with null lastSyncDateTime when filtering" {
