@@ -440,39 +440,38 @@ function Export-DeviceAssignmentReport()
     # Before the switch statement
 
     $createCsvObjectBlock = {
-        param($device)
         [PSCustomObject]@{
-            SerialNumber         = $device.SerialNumber
-            GroupTag             = $device.GroupTag
-            DeviceName           = $device.DeviceName
-            Manufacturer         = $device.Manufacturer
-            Model                = $device.Model
-            SystemFamily         = $device.SystemFamily
-            OSVersion            = $device.OSVersion
-            EnrollmentState      = $device.EnrollmentState
-            DeviceEnrollmentType = $device.DeviceEnrollmentType
-            AzureADRegistered    = $device.AzureADRegistered
-            EnrolledDateTime     = if ([string]::IsNullOrWhiteSpace($device.EnrolledDateTime))
+            SerialNumber         = $_.SerialNumber
+            GroupTag             = $_.GroupTag
+            DeviceName           = $_.DeviceName
+            Manufacturer         = $_.Manufacturer
+            Model                = $_.Model
+            SystemFamily         = $_.SystemFamily
+            OSVersion            = $_.OSVersion
+            EnrollmentState      = $_.EnrollmentState
+            DeviceEnrollmentType = $_.DeviceEnrollmentType
+            AzureADRegistered    = $_.AzureADRegistered
+            EnrolledDateTime     = if ([string]::IsNullOrWhiteSpace($_.EnrolledDateTime))
             {
                 ''
             }
             else
             {
-                $device.EnrolledDateTime | FormatDateWithTimeZone
+                $_.EnrolledDateTime | FormatDateWithTimeZone
             }
-            LastSyncDateTime     = if ([string]::IsNullOrWhiteSpace($device.LastSyncDateTime))
+            LastSyncDateTime     = if ([string]::IsNullOrWhiteSpace($_.LastSyncDateTime))
             {
                 ''
             }
             else
             {
-                $device.LastSyncDateTime | FormatDateWithTimeZone
+                $_.LastSyncDateTime | FormatDateWithTimeZone
             }
-            ComplianceState      = $device.ComplianceState
-            OwnerType            = $device.OwnerType
-            UserPrincipalName    = $device.UserPrincipalName
-            UserDisplayName      = $device.UserDisplayName
-            UserId               = $device.UserId
+            ComplianceState      = $_.ComplianceState
+            OwnerType            = $_.OwnerType
+            UserPrincipalName    = $_.UserPrincipalName
+            UserDisplayName      = $_.UserDisplayName
+            UserId               = $_.UserId
         }
     }
 
@@ -559,6 +558,15 @@ function Export-DeviceAssignmentReport()
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Exporting all autopilot devices..." -LogLevel "Information"
             Write-Verbose "[    $functionName] Exporting all autopilot devices..."
             $filteredDevices = $combinedDevices
+
+            # Apply lastContactDateTime filter if specified
+            if ($PSBoundParameters.ContainsKey('lastContactDateTime'))
+            {
+                $filteredDevices = $filteredDevices | Where-Object {
+                    $null -ne $_.LastSyncDateTimeParsed -and $_.LastSyncDateTimeParsed -le $lastContactDateTime
+                }
+            }
+
             $CSVObject = $filteredDevices | ForEach-Object -Process $createCsvObjectBlock
             $matchedCount = ($combinedDevices | Where-Object { $_.HasManagedDevice -eq $true }).Count
             $unmatchedCount = ($combinedDevices | Where-Object { $_.HasManagedDevice -eq $false }).Count

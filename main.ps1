@@ -1526,7 +1526,6 @@ $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Assigned Window
     {
         $exportParams.lastContactDateTime = $lastContactDateTime
     }
-
     $exportedDeviceAssignment = Export-DeviceAssignmentReport @exportParams
     write-log -logFile $logFile -module $scriptName -message "Assigned device report export result: $($exportedDeviceAssignment | Out-String)" -LogLevel "Information"
     if ($exportedDeviceAssignment.success)
@@ -1534,7 +1533,7 @@ $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Assigned Window
         if ($exportedDeviceAssignment.deviceCount -gt 0)
         {
             write-log -logFile $logFile -module $scriptName -message "Assigned device report exported: File=$($exportedDeviceAssignment.outputFile), DeviceCount=$($exportedDeviceAssignment.deviceCount)" -LogLevel "Information"
-            Write-Host "Assigned device report exported successfully to $($exportedDeviceAssignment.outputFile) with $($exportedDeviceAssignment.deviceCount) devices." -ForegroundColor Green
+            Write-Host " $($exportedDeviceAssignment.deviceCount) Assigned devices exported successfully to $($exportedDeviceAssignment.outputFile)             ." -ForegroundColor Green
         }
         else
         {
@@ -1565,16 +1564,14 @@ $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Unassigned Wind
         reportType  = 'Unassigned'
         fileMode    = 'Overwrite'
     }
-
     $exportedDeviceAssignment = Export-DeviceAssignmentReport @exportParams
     write-log -logFile $logFile -module $scriptName -message "Unassigned device report export result: $($exportedDeviceAssignment | Out-String)" -LogLevel "Information"
-
     if ($exportedDeviceAssignment.success)
     {
         if ($exportedDeviceAssignment.deviceCount -gt 0)
         {
             write-log -logFile $logFile -module $scriptName -message "Unassigned device report exported: File=$($exportedDeviceAssignment.outputFile), DeviceCount=$($exportedDeviceAssignment.deviceCount)" -LogLevel "Information"
-            Write-Host "Unassigned device report exported successfully to $($exportedDeviceAssignment.outputFile) with $($exportedDeviceAssignment.deviceCount) devices." -ForegroundColor Green
+            Write-Host " $($exportedDeviceAssignment.deviceCount) Unassigned devices exported successfully to $($exportedDeviceAssignment.outputFile)                           ." -ForegroundColor Green
         }
         else
         {
@@ -1597,20 +1594,18 @@ $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Pre-provisioned
         reportType  = 'PreProvisioned'
         fileMode    = 'Overwrite'
     }
-
     if ($lastContactDateTime)
     {
         $exportParams.lastContactDateTime = $lastContactDateTime
     }
     $exportedDeviceAssignment = Export-DeviceAssignmentReport @exportParams
     write-log -logFile $logFile -module $scriptName -message "Pre-provisioned device report export result: $($exportedDeviceAssignment | Out-String)" -LogLevel "Information"
-
     if ($exportedDeviceAssignment.success)
     {
         if ($exportedDeviceAssignment.deviceCount -gt 0)
         {
             write-log -logFile $logFile -module $scriptName -message "Pre-provisioned device report exported: File=$($exportedDeviceAssignment.outputFile), DeviceCount=$($exportedDeviceAssignment.deviceCount)" -LogLevel "Information"
-            Write-Host "Pre-provisioned device report exported successfully to $($exportedDeviceAssignment.outputFile) with $($exportedDeviceAssignment.deviceCount) devices." -ForegroundColor Green
+            Write-Host "$($exportedDeviceAssignment.deviceCount) Pre-provisioned devices exported successfully to $($exportedDeviceAssignment.outputFile)." -ForegroundColor Green
         }
         else
         {
@@ -1643,13 +1638,12 @@ $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "All Windows Dev
     }
     $exportedDeviceAssignment = Export-DeviceAssignmentReport @exportParams
     write-log -logFile $logFile -module $scriptName -message "All device report export result: $($exportedDeviceAssignment | Out-String)" -LogLevel "Information"
-
     if ($exportedDeviceAssignment.success)
     {
         if ($exportedDeviceAssignment.deviceCount -gt 0)
         {
             write-log -logFile $logFile -module $scriptName -message "All device report exported: File=$($exportedDeviceAssignment.outputFile), DeviceCount=$($exportedDeviceAssignment.deviceCount)" -LogLevel "Information"
-            Write-Host "All devices report exported successfully to $($exportedDeviceAssignment.outputFile) with $($exportedDeviceAssignment.deviceCount) devices." -ForegroundColor Green
+            Write-Host "All $($exportedDeviceAssignment.deviceCount) devices exported successfully to $($exportedDeviceAssignment.outputFile)." -ForegroundColor Green
         }
         else
         {
