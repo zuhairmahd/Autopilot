@@ -1538,7 +1538,17 @@ $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Assigned Window
         }
         else
         {
-            Write-Host "No assigned devices found to export." -ForegroundColor Yellow
+            if ($lastContactDateTime)
+            {
+                $formattedDate = FormatDateWithTimeZone -DateTime $lastContactDateTime
+                write-log -logFile $logFile -module $scriptName -message "No assigned devices found that have connected to Intune since $formattedDate" -LogLevel "Warning"
+                Write-Host "No assigned devices found that have connected to Intune since $formattedDate" -ForegroundColor Yellow
+            }
+            else
+            {
+                write-log -logFile $logFile -module $scriptName -message "No assigned devices found to export - no devices in scope" -LogLevel "Warning"
+                Write-Host "No reports generated - no assigned devices found." -ForegroundColor Yellow
+            }
         }
     }
     else
@@ -1574,8 +1584,17 @@ $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Unassigned Wind
         }
         else
         {
-            write-log -logFile $logFile -module $scriptName -message "No unassigned devices found to export." -LogLevel "Warning"
-            Write-Host "No unassigned devices found to export." -ForegroundColor Yellow
+            if ($lastContactDateTime)
+            {
+                $formattedDate = FormatDateWithTimeZone -DateTime $lastContactDateTime
+                write-log -logFile $logFile -module $scriptName -message "No unassigned devices found that have connected to Intune since $formattedDate" -LogLevel "Warning"
+                Write-Host "No unassigned devices found that have connected to Intune since $formattedDate" -ForegroundColor Yellow
+            }
+            else
+            {
+                write-log -logFile $logFile -module $scriptName -message "No unassigned devices found to export - no devices in scope" -LogLevel "Warning"
+                Write-Host "No reports generated - no unassigned devices found." -ForegroundColor Yellow
+            }
         }
     }
     else
@@ -1610,8 +1629,17 @@ $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Pre-provisioned
         }
         else
         {
-            write-log -logFile $logFile -module $scriptName -message "No pre-provisioned devices found to export." -LogLevel "Warning"
-            Write-Host "No pre-provisioned devices found to export." -ForegroundColor Yellow
+            if ($lastContactDateTime)
+            {
+                $formattedDate = FormatDateWithTimeZone -DateTime $lastContactDateTime
+                write-log -logFile $logFile -module $scriptName -message "No pre-provisioned devices found that have connected to Intune since $formattedDate" -LogLevel "Warning"
+                Write-Host "No pre-provisioned devices found that have connected to Intune since $formattedDate" -ForegroundColor Yellow
+            }
+            else
+            {
+                write-log -logFile $logFile -module $scriptName -message "No pre-provisioned devices found to export - no devices in scope" -LogLevel "Warning"
+                Write-Host "No reports generated - no pre-provisioned devices found." -ForegroundColor Yellow
+            }
         }
     }
     else
@@ -1647,8 +1675,17 @@ $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "All Windows Dev
         }
         else
         {
-            write-log -logFile $logFile -module $scriptName -message "No devices found to export in all device report." -LogLevel "Warning"
-            Write-Host "No devices found to export." -ForegroundColor Yellow
+            if ($lastContactDateTime)
+            {
+                $formattedDate = FormatDateWithTimeZone -DateTime $lastContactDateTime
+                write-log -logFile $logFile -module $scriptName -message "No devices found that have connected to Intune since $formattedDate" -LogLevel "Warning"
+                Write-Host "No devices found that have connected to Intune since $formattedDate" -ForegroundColor Yellow
+            }
+            else
+            {
+                write-log -logFile $logFile -module $scriptName -message "No devices found to export - no devices in scope" -LogLevel "Warning"
+                Write-Host "No reports generated - no devices found." -ForegroundColor Yellow
+            }
         }
     }
     else
