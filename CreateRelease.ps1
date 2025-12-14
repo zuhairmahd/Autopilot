@@ -81,7 +81,7 @@ param(
     [Parameter(ParameterSetName = 'TargetBuild')]
     [string]$TargetsFile = (Join-Path -Path $PWD -ChildPath "targets.psd1"),
     [Parameter(ParameterSetName = 'TargetBuild')]
-    [string]$TargetName = 'development'
+    [string]$TargetName
 )
 
 $scriptName = $MyInvocation.MyCommand.Name
@@ -163,8 +163,6 @@ else
 $targetConfig = $null
 if ($PSCmdlet.ParameterSetName -eq 'TargetBuild')
 {
-    Write-Host "Loading target configuration: $TargetName from $TargetsFile" -ForegroundColor Cyan
-    
     # Simple target loading before function imports
     try
     {
@@ -175,6 +173,27 @@ if ($PSCmdlet.ParameterSetName -eq 'TargetBuild')
         }
         
         $targetsData = Import-PowerShellDataFile -Path $TargetsFile
+        
+        # Auto-select single target if no target name specified
+        if ([string]::IsNullOrWhiteSpace($TargetName))
+        {
+            $availableTargets = @($targetsData.targets.Keys)
+            if ($availableTargets.Count -eq 1)
+            {
+                $TargetName = $availableTargets[0]
+                Write-Host "Auto-selected single target: $TargetName" -ForegroundColor Cyan
+            }
+            else
+            {
+                Write-Host "No target specified and multiple targets available" -ForegroundColor Red
+                Write-Host "Available targets: $($availableTargets -join ', ')" -ForegroundColor Yellow
+                Write-Host "Please specify a target using -TargetName parameter" -ForegroundColor Yellow
+                exit 1
+            }
+        }
+        
+        Write-Host "Loading target configuration: $TargetName from $TargetsFile" -ForegroundColor Cyan
+        
         if (-not $targetsData.targets -or -not $targetsData.targets.ContainsKey($TargetName))
         {
             Write-Host "Target '$TargetName' not found in targets file" -ForegroundColor Red
@@ -1406,8 +1425,8 @@ $SettingsFile = "$parentFolder\settings.psd1"
 $zipFilePath = Join-Path $parentFolder "script.zip"
 $toolsFolder = Join-Path -Path $PWD -ChildPath "tools"
 $toolsToCopy = @(Get-ChildItem -Path "$toolsFolder\reset.*" | ForEach-Object { $_.FullName })             
-$PSDFilesToCopy = @(Get-ChildItem -Path $PWD -Filter "*.psd1" | ForEach-Object { $_.FullName } ) | Where-Object { $_ -notlike "*targets*" }
-$filesToCopy = $PSDFilesToCopy + $toolsToCopy
+# $PSDFilesToCopy = @(Get-ChildItem -Path $PWD -Filter "*.psd1" | ForEach-Object { $_.FullName } ) | Where-Object { $_ -notlike "*targets*" }
+$filesToCopy = $toolsToCopy
 #endregion
 
 #region initial checks
@@ -1455,21 +1474,51 @@ if ($CreateZipFileOnly)
     }
     Write-Host "Removed $($cleanupResult.RemovedFilesCount) files, of which $($cleanupResult.tempFilesCount) file were temp files."
     Write-Host "Creating zip file only: $zipFilePath"
-    $zipCreated = New-ZipArchive -inputPath $parentFolder -outputPath $zipFilePath -Overwrite
-    if ($zipCreated)
+    $tempFolder = Join-Path -Path $env:TEMP -ChildPath "temp_build-$([guid]::NewGuid().ToString()                   )"
+    $filesToCopy = Get-ChildItem -Path "$parentFolder\*" -Include *.psd1 | ForEach-Object { $_.FullName }                  
+    try
     {
-        Write-Host "Zip file created successfully at $zipFilePath"
-        Write-Log -logFile $logFile -Message "Zip file created successfully at $zipFilePath" -module $scriptName
-        Write-Log -logFile $logFile -finishLogging
-        exit 0
+        Write-Host "Copying files to temporary folder: $tempFolder"
+        if (-not (Test-Path -Path $tempFolder))
+        {
+            New-Item -Path $tempFolder -ItemType Directory -Force | Out-Null                
+        }                           
+        foreach ($file in $filesToCopy)
+        {
+            Write-Host "Copying $file to $tempFolder"
+            Copy-Item -Path $file -Destination $tempFolder -Force
+        }                                           
+        $zipCreated = New-ZipArchive -inputPath $tempFolder -outputPath $zipFilePath -Overwrite
+        if ($zipCreated)
+        {
+            Write-Host "Zip file created successfully at $zipFilePath"
+            Write-Log -logFile $logFile -Message "Zip file created successfully at $zipFilePath" -module $scriptName
+            Write-Log -logFile $logFile -finishLogging
+            exit 0
+        }
+        else
+        {
+            Write-Host "Failed to create zip file at $zipFilePath"
+            Write-Log -logFile $logFile -Message "Failed to create zip file at $zipFilePath" -module $scriptName -LogLevel 'Error'
+            Write-Log -logFile $logFile -finishLogging
+            exit 1
+        }
     }
-    else
+    catch
     {
-        Write-Host "Failed to create zip file at $zipFilePath"
-        Write-Log -logFile $logFile -Message "Failed to create zip file at $zipFilePath" -module $scriptName -LogLevel 'Error'
+        Write-Host "Error occurred while creating zip file: $($_.Exception.Message)"
+        Write-Log -logFile $logFile -Message "Error occurred while creating zip file: $($_.Exception.Message)" -module $scriptName -LogLevel 'Error'
         Write-Log -logFile $logFile -finishLogging
         exit 1
-    }
+    }                           
+    finally
+    {
+        if (Test-Path -Path $tempFolder)
+        {
+            Remove-Item -Path $tempFolder -Recurse -Force | Out-Null
+        }
+    }           
+    exit 0
 }
 
 Write-Verbose "[$scriptName] Updating last run version..."
