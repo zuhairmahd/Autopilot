@@ -253,6 +253,7 @@
                 OutputPath      = 'hd'
                 NoVersionUpdate = $false
                 Overwrite       = $true
+                skipModuleCheck = $true
                 noCleanup       = $false
             }
             
