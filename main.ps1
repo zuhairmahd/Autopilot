@@ -2444,7 +2444,7 @@ $script:ShowGroupAssignmentsAction = {
     }
     write-log -logFile $LogFile -Module $scriptName -Message "Prompting user for group name to view $assignmentScope assignments" -LogLevel "Information"
     $groupName = GetUserInput -Message $messageText -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
-    $needsResolution = if ($IncludeIndirectAssignments -and $groupName -in $specialGroups                                                           )
+    $needsResolution = if ($IncludeIndirectAssignments -and $groupName -in $specialGroups)
     {
         $false
     }
