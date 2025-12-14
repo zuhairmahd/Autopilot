@@ -2436,7 +2436,7 @@ $script:ShowGroupAssignmentsAction = {
     $specialGroups = @("*", "?")
     $messageText = if ($IncludeIndirectAssignments)
     {
-        "Enter the name of the group whose indirect (All Users/All Devices) assignments you want to view. Enter any of $specialGroups             for all assignments"
+        "Enter the name of the group whose indirect (All Users/All Devices) assignments you want to view. Enter any of $specialGroups for all assignments"
     }
     else
     {
