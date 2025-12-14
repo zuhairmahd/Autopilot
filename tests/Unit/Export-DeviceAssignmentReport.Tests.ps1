@@ -17,11 +17,11 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
         # Create temp output directory
         $tempPath = if ($env:TEMP)
         {
-            $env:TEMP 
+            $env:TEMP
         }
         else
         {
-            "/tmp" 
+            "/tmp"
         }
         $script:TestOutputPath = New-Item -Path (Join-Path $tempPath "DeviceReportTest_$(Get-Date -Format 'yyyyMMddHHmmss')") -ItemType Directory -Force
 
@@ -806,23 +806,6 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
             $csvData.SerialNumber | Should -Not -Contain 'SN001'
         }
 
-        It "Should filter devices by lastContactDateTime in 'Unassigned' report" {
-            # SN002 and SN003 are unassigned with recent contact dates
-            # Filter to only include old contacts
-            $filterDate = [datetime]::Parse('2024-10-19T00:00:00Z')
-
-            $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'Unassigned' -lastContactDateTime $filterDate
-
-            $result.success | Should -Be $true
-
-            $csvFile = Get-ChildItem -Path $script:TestOutputPath.FullName -Filter "Unassigned-*.csv" | Select-Object -First 1
-            $csvData = Import-Csv -Path $csvFile.FullName
-
-            # Should not include SN002 (contacted 2024-10-20) or SN003 (contacted 2024-10-21)
-            $csvData.SerialNumber | Should -Not -Contain 'SN002'
-            $csvData.SerialNumber | Should -Not -Contain 'SN003'
-        }
-
         It "Should filter devices by lastContactDateTime in 'Preprovisioned' report" {
             # SN003 is preprovisioned with recent contact date
             # Filter to exclude recent contacts
@@ -846,25 +829,6 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
                 $csvData = Import-Csv -Path $csvFile.FullName
                 $csvData.SerialNumber | Should -Not -Contain 'SN003'
             }
-        }
-
-        It "Should filter devices by lastContactDateTime in 'All' report" {
-            # Filter to only include devices contacted on or before 2024-09-20
-            $filterDate = [datetime]::Parse('2024-09-20T00:00:00Z')
-
-            $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'All' -lastContactDateTime $filterDate
-
-            $result.success | Should -Be $true
-
-            $csvFile = Get-ChildItem -Path $script:TestOutputPath.FullName -Filter "All-*.csv" | Select-Object -First 1
-            $csvData = Import-Csv -Path $csvFile.FullName
-
-            # Should only include SN005 (contacted 2024-09-15)
-            $csvData.Count | Should -Be 1
-            $csvData.SerialNumber | Should -Contain 'SN005'
-            $csvData.SerialNumber | Should -Not -Contain 'SN001'
-            $csvData.SerialNumber | Should -Not -Contain 'SN002'
-            $csvData.SerialNumber | Should -Not -Contain 'SN003'
         }
 
         It "Should include all devices when lastContactDateTime is not specified" {

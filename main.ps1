@@ -1559,17 +1559,11 @@ $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Assigned Window
 }
 $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Unassigned Windows Devices" -Action {
     Write-Host "Exporting unassigned device report..."
-    $lastContactDateTime = Get-DateInput
     $exportParams = @{
         accessToken = $accessToken
         outputPath  = $scriptPath
         reportType  = 'Unassigned'
         fileMode    = 'Overwrite'
-    }
-
-    if ($lastContactDateTime)
-    {
-        $exportParams.lastContactDateTime = $lastContactDateTime
     }
 
     $exportedDeviceAssignment = Export-DeviceAssignmentReport @exportParams
@@ -1584,17 +1578,8 @@ $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Unassigned Wind
         }
         else
         {
-            if ($lastContactDateTime)
-            {
-                $formattedDate = FormatDateWithTimeZone -DateTime $lastContactDateTime
-                write-log -logFile $logFile -module $scriptName -message "No unassigned devices found that have connected to Intune since $formattedDate" -LogLevel "Warning"
-                Write-Host "No unassigned devices found that have connected to Intune since $formattedDate" -ForegroundColor Yellow
-            }
-            else
-            {
-                write-log -logFile $logFile -module $scriptName -message "No unassigned devices found to export - no devices in scope" -LogLevel "Warning"
-                Write-Host "No reports generated - no unassigned devices found." -ForegroundColor Yellow
-            }
+            write-log -logFile $logFile -module $scriptName -message "No unassigned devices found to export - no devices in scope" -LogLevel "Warning"
+            Write-Host "No reports generated - no unassigned devices found." -ForegroundColor Yellow
         }
     }
     else
@@ -1650,19 +1635,12 @@ $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Pre-provisioned
 }
 $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "All Windows Devices" -Action {
     Write-Host "Exporting all devices with their assignment status..."
-    $lastContactDateTime = Get-DateInput
     $exportParams = @{
         accessToken = $accessToken
         outputPath  = $scriptPath
         reportType  = 'All'
         fileMode    = 'Overwrite'
     }
-
-    if ($lastContactDateTime)
-    {
-        $exportParams.lastContactDateTime = $lastContactDateTime
-    }
-
     $exportedDeviceAssignment = Export-DeviceAssignmentReport @exportParams
     write-log -logFile $logFile -module $scriptName -message "All device report export result: $($exportedDeviceAssignment | Out-String)" -LogLevel "Information"
 
@@ -1675,17 +1653,8 @@ $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "All Windows Dev
         }
         else
         {
-            if ($lastContactDateTime)
-            {
-                $formattedDate = FormatDateWithTimeZone -DateTime $lastContactDateTime
-                write-log -logFile $logFile -module $scriptName -message "No devices found that have connected to Intune since $formattedDate" -LogLevel "Warning"
-                Write-Host "No devices found that have connected to Intune since $formattedDate" -ForegroundColor Yellow
-            }
-            else
-            {
-                write-log -logFile $logFile -module $scriptName -message "No devices found to export - no devices in scope" -LogLevel "Warning"
-                Write-Host "No reports generated - no devices found." -ForegroundColor Yellow
-            }
+            write-log -logFile $logFile -module $scriptName -message "No devices found to export - no devices in scope" -LogLevel "Warning"
+            Write-Host "No reports generated - no devices found." -ForegroundColor Yellow
         }
     }
     else

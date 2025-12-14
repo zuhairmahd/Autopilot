@@ -437,6 +437,44 @@ function Export-DeviceAssignmentReport()
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Built $($combinedDevices.Count) combined device objects." -LogLevel "Information"
     Write-Verbose "[    $functionName] Built $($combinedDevices.Count) combined device objects."
     #endregion
+    # Before the switch statement
+
+    $createCsvObjectBlock = {
+        param($device)
+        [PSCustomObject]@{
+            SerialNumber         = $device.SerialNumber
+            GroupTag             = $device.GroupTag
+            DeviceName           = $device.DeviceName
+            Manufacturer         = $device.Manufacturer
+            Model                = $device.Model
+            SystemFamily         = $device.SystemFamily
+            OSVersion            = $device.OSVersion
+            EnrollmentState      = $device.EnrollmentState
+            DeviceEnrollmentType = $device.DeviceEnrollmentType
+            AzureADRegistered    = $device.AzureADRegistered
+            EnrolledDateTime     = if ([string]::IsNullOrWhiteSpace($device.EnrolledDateTime))
+            {
+                ''
+            }
+            else
+            {
+                $device.EnrolledDateTime | FormatDateWithTimeZone
+            }
+            LastSyncDateTime     = if ([string]::IsNullOrWhiteSpace($device.LastSyncDateTime))
+            {
+                ''
+            }
+            else
+            {
+                $device.LastSyncDateTime | FormatDateWithTimeZone
+            }
+            ComplianceState      = $device.ComplianceState
+            OwnerType            = $device.OwnerType
+            UserPrincipalName    = $device.UserPrincipalName
+            UserDisplayName      = $device.UserDisplayName
+            UserId               = $device.UserId
+        }
+    }
 
     switch ($reportType)
     {
@@ -458,44 +496,7 @@ function Export-DeviceAssignmentReport()
                     $null -ne $_.LastSyncDateTimeParsed -and $_.LastSyncDateTimeParsed -le $lastContactDateTime
                 }
             }
-
-            $CSVObject = foreach ($device in $filteredDevices)
-            {
-                [PSCustomObject]@{
-                    SerialNumber         = $device.SerialNumber
-                    GroupTag             = $device.GroupTag
-                    DeviceName           = $device.DeviceName
-                    Manufacturer         = $device.Manufacturer
-                    Model                = $device.Model
-                    SystemFamily         = $device.SystemFamily
-                    OSVersion            = $device.OSVersion
-                    EnrollmentState      = $device.EnrollmentState
-                    DeviceEnrollmentType = $device.DeviceEnrollmentType
-                    AzureADRegistered    = $device.AzureADRegistered
-                    EnrolledDateTime     = if ([string]::IsNullOrWhiteSpace($device.EnrolledDateTime))
-                    {
-                        ''
-                    }
-                    else
-                    {
-                        $device.EnrolledDateTime | FormatDateWithTimeZone
-                    }
-                    LastSyncDateTime     = if ([string]::IsNullOrWhiteSpace($device.LastSyncDateTime))
-                    {
-                        ''
-                    }
-                    else
-                    {
-                        $device.LastSyncDateTime | FormatDateWithTimeZone
-                    }
-                    ComplianceState      = $device.ComplianceState
-                    OwnerType            = $device.OwnerType
-                    UserPrincipalName    = $device.UserPrincipalName
-                    UserDisplayName      = $device.UserDisplayName
-                    UserId               = $device.UserId
-                }
-            }
-
+            $CSVObject = $filteredDevices | ForEach-Object -Process $createCsvObjectBlock
             $returnObject.totalDeviceCount = $combinedDevices.Count
             $returnObject.filteredDeviceCount = @($CSVObject).Count
             $returnObject.deviceCount = $returnObject.filteredDeviceCount  # Backward compatibility
@@ -514,53 +515,7 @@ function Export-DeviceAssignmentReport()
             $filteredDevices = $combinedDevices | Where-Object {
                 $_.IsAssigned -eq $false
             }
-
-            # Apply lastContactDateTime filter if specified (only for devices with managed device data)
-            if ($PSBoundParameters.ContainsKey('lastContactDateTime'))
-            {
-                $filteredDevices = $filteredDevices | Where-Object {
-                    # Only include devices with a valid sync date that meets the date filter
-                    ($null -ne $_.LastSyncDateTimeParsed -and $_.LastSyncDateTimeParsed -le $lastContactDateTime)
-                }
-            }
-
-            $CSVObject = foreach ($device in $filteredDevices)
-            {
-                [PSCustomObject]@{
-                    SerialNumber         = $device.SerialNumber
-                    GroupTag             = $device.GroupTag
-                    DeviceName           = $device.DeviceName
-                    Manufacturer         = $device.Manufacturer
-                    Model                = $device.Model
-                    SystemFamily         = $device.SystemFamily
-                    OSVersion            = $device.OSVersion
-                    EnrollmentState      = $device.EnrollmentState
-                    DeviceEnrollmentType = $device.DeviceEnrollmentType
-                    AzureADRegistered    = $device.AzureADRegistered
-                    EnrolledDateTime     = if ([string]::IsNullOrWhiteSpace($device.EnrolledDateTime))
-                    {
-                        ''
-                    }
-                    else
-                    {
-                        $device.EnrolledDateTime | FormatDateWithTimeZone
-                    }
-                    LastSyncDateTime     = if ([string]::IsNullOrWhiteSpace($device.LastSyncDateTime))
-                    {
-                        ''
-                    }
-                    else
-                    {
-                        $device.LastSyncDateTime | FormatDateWithTimeZone
-                    }
-                    ComplianceState      = $device.ComplianceState
-                    OwnerType            = $device.OwnerType
-                    UserPrincipalName    = $device.UserPrincipalName
-                    UserDisplayName      = $device.UserDisplayName
-                    UserId               = $device.UserId
-                }
-            }
-
+            $CSVObject = $filteredDevices | ForEach-Object -Process $createCsvObjectBlock
             $returnObject.totalDeviceCount = $combinedDevices.Count
             $returnObject.filteredDeviceCount = @($CSVObject).Count
             $returnObject.deviceCount = $returnObject.filteredDeviceCount  # Backward compatibility
@@ -591,44 +546,7 @@ function Export-DeviceAssignmentReport()
                     $null -ne $_.LastSyncDateTimeParsed -and $_.LastSyncDateTimeParsed -le $lastContactDateTime
                 }
             }
-
-            $CSVObject = foreach ($device in $filteredDevices)
-            {
-                [PSCustomObject]@{
-                    SerialNumber         = $device.SerialNumber
-                    GroupTag             = $device.GroupTag
-                    DeviceName           = $device.DeviceName
-                    Manufacturer         = $device.Manufacturer
-                    Model                = $device.Model
-                    SystemFamily         = $device.SystemFamily
-                    OSVersion            = $device.OSVersion
-                    EnrollmentState      = $device.EnrollmentState
-                    DeviceEnrollmentType = $device.DeviceEnrollmentType
-                    AzureADRegistered    = $device.AzureADRegistered
-                    EnrolledDateTime     = if ([string]::IsNullOrWhiteSpace($device.EnrolledDateTime))
-                    {
-                        ''
-                    }
-                    else
-                    {
-                        $device.EnrolledDateTime | FormatDateWithTimeZone
-                    }
-                    LastSyncDateTime     = if ([string]::IsNullOrWhiteSpace($device.LastSyncDateTime))
-                    {
-                        ''
-                    }
-                    else
-                    {
-                        $device.LastSyncDateTime | FormatDateWithTimeZone
-                    }
-                    ComplianceState      = $device.ComplianceState
-                    OwnerType            = $device.OwnerType
-                    UserPrincipalName    = $device.UserPrincipalName
-                    UserDisplayName      = $device.UserDisplayName
-                    UserId               = $device.UserId
-                }
-            }
-
+            $CSVObject = $filteredDevices | ForEach-Object -Process $createCsvObjectBlock
             $returnObject.totalDeviceCount = $combinedDevices.Count
             $returnObject.filteredDeviceCount = @($CSVObject).Count
             $returnObject.deviceCount = $returnObject.filteredDeviceCount  # Backward compatibility
@@ -640,62 +558,10 @@ function Export-DeviceAssignmentReport()
             # Get all autopilot devices with their assignment status
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Exporting all autopilot devices..." -LogLevel "Information"
             Write-Verbose "[    $functionName] Exporting all autopilot devices..."
-
-            # Start with all combined devices
             $filteredDevices = $combinedDevices
-
-            # Apply lastContactDateTime filter if specified
-            # When date filter is specified, only include devices that have managed device data and meet the date criteria
-            # Devices without managed device matches are excluded when filtering by date
-            if ($PSBoundParameters.ContainsKey('lastContactDateTime'))
-            {
-                $filteredDevices = $filteredDevices | Where-Object {
-                    $_.HasManagedDevice -eq $true -and
-                    $null -ne $_.LastSyncDateTimeParsed -and
-                    $_.LastSyncDateTimeParsed -le $lastContactDateTime
-                }
-            }
-
-            $CSVObject = foreach ($device in $filteredDevices)
-            {
-                [PSCustomObject]@{
-                    SerialNumber         = $device.SerialNumber
-                    GroupTag             = $device.GroupTag
-                    DeviceName           = $device.DeviceName
-                    Manufacturer         = $device.Manufacturer
-                    Model                = $device.Model
-                    SystemFamily         = $device.SystemFamily
-                    OSVersion            = $device.OSVersion
-                    EnrollmentState      = $device.EnrollmentState
-                    DeviceEnrollmentType = $device.DeviceEnrollmentType
-                    AzureADRegistered    = $device.AzureADRegistered
-                    EnrolledDateTime     = if ([string]::IsNullOrWhiteSpace($device.EnrolledDateTime))
-                    {
-                        ''
-                    }
-                    else
-                    {
-                        $device.EnrolledDateTime | FormatDateWithTimeZone
-                    }
-                    LastSyncDateTime     = if ([string]::IsNullOrWhiteSpace($device.LastSyncDateTime))
-                    {
-                        ''
-                    }
-                    else
-                    {
-                        $device.LastSyncDateTime | FormatDateWithTimeZone
-                    }
-                    ComplianceState      = $device.ComplianceState
-                    OwnerType            = $device.OwnerType
-                    UserPrincipalName    = $device.UserPrincipalName
-                    UserDisplayName      = $device.UserDisplayName
-                    UserId               = $device.UserId
-                }
-            }
-
+            $CSVObject = $filteredDevices | ForEach-Object -Process $createCsvObjectBlock
             $matchedCount = ($combinedDevices | Where-Object { $_.HasManagedDevice -eq $true }).Count
             $unmatchedCount = ($combinedDevices | Where-Object { $_.HasManagedDevice -eq $false }).Count
-
             $returnObject.totalDeviceCount = $combinedDevices.Count
             $returnObject.filteredDeviceCount = @($CSVObject).Count
             $returnObject.deviceCount = $returnObject.filteredDeviceCount  # Backward compatibility
