@@ -1515,7 +1515,19 @@ $exportMenu = AddMenuItem -menu $exportMenu -name "Export Application Assignment
 #region device reports menu
 $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Assigned Windows Devices" -Action {
     Write-Host "Exporting assigned device report..."
-    $exportedDeviceAssignment = Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'Assigned' -fileMode 'Overwrite'
+    $lastContactDateTime = Get-DateInput
+    $exportParams = @{
+        accessToken = $accessToken
+        outputPath  = $scriptPath
+        reportType  = 'Assigned'
+        fileMode    = 'Overwrite'
+    }
+    if ($lastContactDateTime)
+    {
+        $exportParams.lastContactDateTime = $lastContactDateTime
+    }
+
+    $exportedDeviceAssignment = Export-DeviceAssignmentReport @exportParams
     write-log -logFile $logFile -module $scriptName -message "Assigned device report export result: $($exportedDeviceAssignment | Out-String)" -LogLevel "Information"
     if ($exportedDeviceAssignment.success)
     {
@@ -1537,8 +1549,22 @@ $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Assigned Window
 }
 $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Unassigned Windows Devices" -Action {
     Write-Host "Exporting unassigned device report..."
-    $exportedDeviceAssignment = Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'Unassigned' -fileMode 'Overwrite'
+    $lastContactDateTime = Get-DateInput
+    $exportParams = @{
+        accessToken = $accessToken
+        outputPath  = $scriptPath
+        reportType  = 'Unassigned'
+        fileMode    = 'Overwrite'
+    }
+
+    if ($lastContactDateTime)
+    {
+        $exportParams.lastContactDateTime = $lastContactDateTime
+    }
+
+    $exportedDeviceAssignment = Export-DeviceAssignmentReport @exportParams
     write-log -logFile $logFile -module $scriptName -message "Unassigned device report export result: $($exportedDeviceAssignment | Out-String)" -LogLevel "Information"
+
     if ($exportedDeviceAssignment.success)
     {
         if ($exportedDeviceAssignment.deviceCount -gt 0)
@@ -1560,8 +1586,21 @@ $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Unassigned Wind
 }
 $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Pre-provisioned Windows Devices" -Action {
     Write-Host "Exporting pre-provisioned device report..."
-    $exportedDeviceAssignment = Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'PreProvisioned' -fileMode 'Overwrite'
+    $lastContactDateTime = Get-DateInput
+    $exportParams = @{
+        accessToken = $accessToken
+        outputPath  = $scriptPath
+        reportType  = 'PreProvisioned'
+        fileMode    = 'Overwrite'
+    }
+
+    if ($lastContactDateTime)
+    {
+        $exportParams.lastContactDateTime = $lastContactDateTime
+    }
+    $exportedDeviceAssignment = Export-DeviceAssignmentReport @exportParams
     write-log -logFile $logFile -module $scriptName -message "Pre-provisioned device report export result: $($exportedDeviceAssignment | Out-String)" -LogLevel "Information"
+
     if ($exportedDeviceAssignment.success)
     {
         if ($exportedDeviceAssignment.deviceCount -gt 0)
@@ -1583,8 +1622,22 @@ $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Pre-provisioned
 }
 $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "All Windows Devices" -Action {
     Write-Host "Exporting all devices with their assignment status..."
-    $exportedDeviceAssignment = Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'All' -fileMode 'Overwrite'
+    $lastContactDateTime = Get-DateInput
+    $exportParams = @{
+        accessToken = $accessToken
+        outputPath  = $scriptPath
+        reportType  = 'All'
+        fileMode    = 'Overwrite'
+    }
+
+    if ($lastContactDateTime)
+    {
+        $exportParams.lastContactDateTime = $lastContactDateTime
+    }
+
+    $exportedDeviceAssignment = Export-DeviceAssignmentReport @exportParams
     write-log -logFile $logFile -module $scriptName -message "All device report export result: $($exportedDeviceAssignment | Out-String)" -LogLevel "Information"
+
     if ($exportedDeviceAssignment.success)
     {
         if ($exportedDeviceAssignment.deviceCount -gt 0)
