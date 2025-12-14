@@ -519,8 +519,7 @@ function Export-DeviceAssignmentReport()
             if ($PSBoundParameters.ContainsKey('lastContactDateTime'))
             {
                 $filteredDevices = $filteredDevices | Where-Object {
-                    # Include devices without managed device (no sync date) OR devices that meet the date filter
-                    $_.HasManagedDevice -eq $false -or
+                    # Only include devices with a valid sync date that meets the date filter
                     ($null -ne $_.LastSyncDateTimeParsed -and $_.LastSyncDateTimeParsed -le $lastContactDateTime)
                 }
             }
