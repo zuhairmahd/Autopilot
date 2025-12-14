@@ -38,6 +38,7 @@ function Export-DeviceAssignmentReport()
         [string]$reportType,
         [ValidateSet('Append', 'Overwrite')]
         [string]$fileMode = 'overwrite',
+        [datetime]$lastContactDateTime,
         [switch]$RefreshCache,
         [int]$CacheExpirationMinutes = 15
     )
@@ -59,7 +60,7 @@ function Export-DeviceAssignmentReport()
     #region Fetch device data using Get-DeviceData
     $autopilotDevices = Get-DeviceData -AccessToken $accessToken -DeviceType 'autopilot' -RefreshCache:$RefreshCache -CacheExpirationMinutes $CacheExpirationMinutes
     $managedDevices = Get-DeviceData -AccessToken $accessToken -DeviceType 'managed' -RefreshCache:$RefreshCache -CacheExpirationMinutes $CacheExpirationMinutes
-    
+
     # Diagnostic logging - check what we actually received
     if ($null -eq $autopilotDevices -or $null -eq $autopilotDevices.value)
     {
@@ -72,7 +73,7 @@ function Export-DeviceAssignmentReport()
         Write-Verbose "[    $functionName] WARNING: No managed devices retrieved!"
     }
     #endregion
-    
+
     switch ($reportType)
     {
         'Assigned'
@@ -80,29 +81,40 @@ function Export-DeviceAssignmentReport()
             # Get autopilot devices with assigned users (both userPrincipalName and userDisplayName are populated and not empty)
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Filtering for assigned devices (with user assignment)..." -LogLevel "Information"
             Write-Verbose "[    $functionName] Filtering for assigned devices..."
-            
             $processedCount = 0
             $assignedCount = 0
-            
             $CSVObject = foreach ($autopilotDevice in $autopilotDevices.value)
             {
                 $processedCount++
-                
+
                 # Find matching managed device for user assignment information
-                $matchingManagedDevice = $managedDevices.value | Where-Object { 
+                $matchingManagedDevice = $managedDevices.value | Where-Object {
                     $_.serialNumber -eq $autopilotDevice.serialNumber
                 }
-                
                 if ($matchingManagedDevice)
                 {
                     # Check if device has a user assigned (both userPrincipalName and userDisplayName must be populated)
                     $hasUserPrincipal = -not [string]::IsNullOrWhiteSpace($matchingManagedDevice.userPrincipalName)
                     $hasDisplayName = -not [string]::IsNullOrWhiteSpace($matchingManagedDevice.userDisplayName)
-                    
-                    if ($hasUserPrincipal -and $hasDisplayName)
+
+                    # Apply lastContactDateTime filter if specified
+                    $meetsDateFilter = $true
+                    if ($PSBoundParameters.ContainsKey('lastContactDateTime'))
+                    {
+                        if ($matchingManagedDevice.lastSyncDateTime)
+                        {
+                            $deviceLastSync = [datetime]::Parse($matchingManagedDevice.lastSyncDateTime)
+                            $meetsDateFilter = $deviceLastSync -le $lastContactDateTime
+                        }
+                        else
+                        {
+                            $meetsDateFilter = $false
+                        }
+                    }
+
+                    if ($hasUserPrincipal -and $hasDisplayName -and $meetsDateFilter)
                     {
                         $assignedCount++
-                        
                         [PSCustomObject]@{
                             SerialNumber         = $autopilotDevice.serialNumber
                             GroupTag             = $autopilotDevice.groupTag
@@ -134,29 +146,44 @@ function Export-DeviceAssignmentReport()
             # Get autopilot devices without assigned users (either userPrincipalName or userDisplayName is missing/empty)
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Filtering for unassigned devices (missing user assignment)..." -LogLevel "Information"
             Write-Verbose "[    $functionName] Filtering for unassigned devices..."
-            
+
             $processedCount = 0
             $unassignedCount = 0
-            
+
             $CSVObject = foreach ($autopilotDevice in $autopilotDevices.value)
             {
                 $processedCount++
-                
+
                 # Find matching managed device for user assignment information
-                $matchingManagedDevice = $managedDevices.value | Where-Object { 
+                $matchingManagedDevice = $managedDevices.value | Where-Object {
                     $_.serialNumber -eq $autopilotDevice.serialNumber
                 }
-                
+
                 if ($matchingManagedDevice)
                 {
                     # Check if device is missing user assignment (either userPrincipalName or userDisplayName is empty)
                     $hasUserPrincipal = -not [string]::IsNullOrWhiteSpace($matchingManagedDevice.userPrincipalName)
                     $hasDisplayName = -not [string]::IsNullOrWhiteSpace($matchingManagedDevice.userDisplayName)
-                    
-                    if (-not $hasUserPrincipal -or -not $hasDisplayName)
+
+                    # Apply lastContactDateTime filter if specified
+                    $meetsDateFilter = $true
+                    if ($PSBoundParameters.ContainsKey('lastContactDateTime'))
+                    {
+                        if ($matchingManagedDevice.lastSyncDateTime)
+                        {
+                            $deviceLastSync = [datetime]::Parse($matchingManagedDevice.lastSyncDateTime)
+                            $meetsDateFilter = $deviceLastSync -le $lastContactDateTime
+                        }
+                        else
+                        {
+                            $meetsDateFilter = $false
+                        }
+                    }
+
+                    if ((-not $hasUserPrincipal -or -not $hasDisplayName) -and $meetsDateFilter)
                     {
                         $unassignedCount++
-                        
+
                         [PSCustomObject]@{
                             SerialNumber         = $autopilotDevice.serialNumber
                             GroupTag             = $autopilotDevice.groupTag
@@ -182,7 +209,7 @@ function Export-DeviceAssignmentReport()
                 {
                     # Autopilot device exists but not in managed devices - treat as unassigned
                     $unassignedCount++
-                    
+
                     [PSCustomObject]@{
                         SerialNumber         = $autopilotDevice.serialNumber
                         GroupTag             = $autopilotDevice.groupTag
@@ -213,29 +240,44 @@ function Export-DeviceAssignmentReport()
             # Get autopilot devices that are enrolled but not yet assigned to users
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Filtering for preprovisioned devices (enrolled without user)..." -LogLevel "Information"
             Write-Verbose "[    $functionName] Filtering for preprovisioned devices..."
-            
+
             $processedCount = 0
             $preprovisionedCount = 0
-            
+
             $CSVObject = foreach ($autopilotDevice in $autopilotDevices.value | Where-Object { $_.enrollmentState -eq 'enrolled' })
             {
                 $processedCount++
-                
+
                 # Find matching managed device for user assignment information
-                $matchingManagedDevice = $managedDevices.value | Where-Object { 
+                $matchingManagedDevice = $managedDevices.value | Where-Object {
                     $_.serialNumber -eq $autopilotDevice.serialNumber
                 }
-                
+
                 if ($matchingManagedDevice)
                 {
                     # Check if device is enrolled but has no user (both userPrincipalName and userDisplayName must be empty)
                     $hasUserPrincipal = -not [string]::IsNullOrWhiteSpace($matchingManagedDevice.userPrincipalName)
                     $hasDisplayName = -not [string]::IsNullOrWhiteSpace($matchingManagedDevice.userDisplayName)
-                    
-                    if (-not $hasUserPrincipal -and -not $hasDisplayName)
+
+                    # Apply lastContactDateTime filter if specified
+                    $meetsDateFilter = $true
+                    if ($PSBoundParameters.ContainsKey('lastContactDateTime'))
+                    {
+                        if ($matchingManagedDevice.lastSyncDateTime)
+                        {
+                            $deviceLastSync = [datetime]::Parse($matchingManagedDevice.lastSyncDateTime)
+                            $meetsDateFilter = $deviceLastSync -le $lastContactDateTime
+                        }
+                        else
+                        {
+                            $meetsDateFilter = $false
+                        }
+                    }
+
+                    if (-not $hasUserPrincipal -and -not $hasDisplayName -and $meetsDateFilter)
                     {
                         $preprovisionedCount++
-                        
+
                         [PSCustomObject]@{
                             SerialNumber         = $autopilotDevice.serialNumber
                             GroupTag             = $autopilotDevice.groupTag
@@ -267,21 +309,36 @@ function Export-DeviceAssignmentReport()
             # Get all autopilot devices with their assignment status
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Exporting all autopilot devices..." -LogLevel "Information"
             Write-Verbose "[    $functionName] Exporting all autopilot devices..."
-            
+
             $matchedCount = 0
             $unmatchedCount = 0
-            
+
             $CSVObject = foreach ($autopilotDevice in $autopilotDevices.value)
             {
                 # Find matching managed device for user assignment and additional information
-                $matchingManagedDevice = $managedDevices.value | Where-Object { 
+                $matchingManagedDevice = $managedDevices.value | Where-Object {
                     $_.serialNumber -eq $autopilotDevice.serialNumber
                 }
-                
-                if ($matchingManagedDevice)
+
+                # Apply lastContactDateTime filter if specified
+                $meetsDateFilter = $true
+                if ($PSBoundParameters.ContainsKey('lastContactDateTime') -and $matchingManagedDevice)
+                {
+                    if ($matchingManagedDevice.lastSyncDateTime)
+                    {
+                        $deviceLastSync = [datetime]::Parse($matchingManagedDevice.lastSyncDateTime)
+                        $meetsDateFilter = $deviceLastSync -le $lastContactDateTime
+                    }
+                    else
+                    {
+                        $meetsDateFilter = $false
+                    }
+                }
+
+                if ($matchingManagedDevice -and $meetsDateFilter)
                 {
                     $matchedCount++
-                    
+
                     [PSCustomObject]@{
                         SerialNumber         = $autopilotDevice.serialNumber
                         GroupTag             = $autopilotDevice.groupTag
@@ -302,10 +359,11 @@ function Export-DeviceAssignmentReport()
                         UserId               = $matchingManagedDevice.userId
                     }
                 }
-                else
+                elseif (-not $PSBoundParameters.ContainsKey('lastContactDateTime'))
                 {
+                    # Only include unmatched devices if no date filter is specified
                     $unmatchedCount++
-                    
+
                     # Autopilot device without managed device match
                     [PSCustomObject]@{
                         SerialNumber         = $autopilotDevice.serialNumber
@@ -328,7 +386,14 @@ function Export-DeviceAssignmentReport()
                     }
                 }
             }
-            $returnObject.deviceCount = $autopilotDevices.value.Count
+            $returnObject.deviceCount = if ($PSBoundParameters.ContainsKey('lastContactDateTime'))
+            {
+                $matchedCount 
+            }
+            else
+            {
+                $autopilotDevices.value.Count 
+            }
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Exported $($autopilotDevices.value.Count) autopilot devices ($matchedCount matched with managed devices, $unmatchedCount unmatched)." -LogLevel "Information"
             Write-Verbose "[    $functionName] Exported $($autopilotDevices.value.Count) autopilot devices ($matchedCount matched, $unmatchedCount unmatched)."
         }
@@ -342,7 +407,7 @@ function Export-DeviceAssignmentReport()
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "No devices found matching report type '$reportType'. Generated empty report." -LogLevel "Warning"
             Write-Verbose "[    $functionName] No devices found matching report type '$reportType'."
             $returnObject.message = "No devices found matching report type '$reportType'."
-            
+
             # Create empty file with headers for consistency
             $emptyObject = [PSCustomObject]@{
                 SerialNumber         = ''
@@ -366,7 +431,7 @@ function Export-DeviceAssignmentReport()
             $emptyObject | Export-Csv -Path $outputFile -NoTypeInformation
             $returnObject.success = $true
         }
-        
+
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Exporting $($CSVObject.Count) devices to report." -LogLevel "Information"
         Write-Verbose "[    $functionName] Exporting $($CSVObject.Count) devices to report."
         if ($fileMode -eq 'Append' -and (Test-Path -Path $outputFile))
@@ -385,7 +450,7 @@ function Export-DeviceAssignmentReport()
     {
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to export device assignment report to $outputFile. Error: $_" -LogLevel "Error"
         Write-Verbose "[    $functionName] Failed to export device assignment report to $outputFile. Error: $_"
-        $returnObject.success = $false  
+        $returnObject.success = $false
     }
 
     Write-Verbose "[    $functionName] Export-DeviceAssignmentReport completed successfully. Returning $returnObject."
