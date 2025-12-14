@@ -22,7 +22,7 @@ function Export-DeviceAssignmentReport()
     Specifies whether to 'Append' to or 'Overwrite' the existing CSV file. Default is 'Overwrite'.
 
     .PARAMETER lastContactDateTime
-    Optional datetime filter to include only devices that last contacted before this date/time.
+    Optional datetime filter to include only devices that last contacted on or before this date/time.
 
     .PARAMETER RefreshCache
     Switch to force refresh of cached device data.
