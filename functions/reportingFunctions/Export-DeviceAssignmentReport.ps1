@@ -105,6 +105,7 @@ function Export-DeviceAssignmentReport()
     $managedDeviceLookup = @{}
     if ($managedDevices.value)
     {
+        write-log -LogFile $LogFile -Module "$functionName" -Message "Building managed device lookup table for $($managedDevices.value.Count) devices..." -LogLevel "Information"
         foreach ($device in $managedDevices.value)
         {
             if (-not [string]::IsNullOrWhiteSpace($device.serialNumber))
