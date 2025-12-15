@@ -43,7 +43,7 @@ BeforeAll {
 
     # Set up global variables
     $global:logFile = Join-Path $script:TestEnv.TestFolder "test.log"
-    $global:maxJSONDepth = 10
+    $global:maxJSONDepth = 100
 
     # Test data
     $script:TestAccessToken = "test-token-export-12345"
