@@ -50,7 +50,7 @@ Menus are now defined in `menu.json` using a flat object structure where each ke
         "includeInDisplayModes": ["helpdesk", "registration"]
       },
       {
-        "name": "Check device status", 
+        "name": "Check device status",
         "description": "Troubleshoot a device",
         "blockType": "menu",
         "menuName": "checkMenu"
@@ -266,9 +266,9 @@ This item would only appear when `appMode` is set to "advanced", "admin", or "fu
 ### User Input Handling
 
 - **Numeric Selection**: Type menu number and press Enter
-- **Navigation Shortcuts**: 
+- **Navigation Shortcuts**:
   - 'b' for Back
-  - 'm' for Main Menu  
+  - 'm' for Main Menu
   - 'q', 'e', or '0' for Exit
 - **Input Validation**: Invalid selections prompt for retry
 
@@ -293,7 +293,7 @@ Core menu system functionality for navigation and display.
 - `Handle-MenuItemSelection`: User input processing
 - `Handle-ActionExecution`: Action dispatch
 
-### 2. Setup Functions (23 functions)  
+### 2. Setup Functions (23 functions)
 Configuration, initialization, and first-run setup.
 
 **Key Functions**:
@@ -432,14 +432,14 @@ Security, encryption, and credential management.
 | `GetCachedDeviceEnrollmentState` | Get cached enrollment status | Performance optimization |
 | `getEntraGroup` | Look up Azure AD groups | Group management |
 | `GetEntraUser` | Look up Azure AD users | User management |
-| `GetGroupDirectAssignments` | Get direct group assignments | Assignment analysis |
+| `Get-GroupDirectAssignments` | Get direct group assignments | Assignment analysis |
 | `GetGroupIdsByNames` | Convert group names to IDs | Group resolution |
 | `GetTimeZoneAbbreviation` | Get timezone abbreviations | Date formatting |
 | `GetUserInput` | Validated user input collection | User interface |
 | `Globals` | Global variable definitions | Application state |
 | `normalizeADUserDisplayName` | Normalize AD user names | User name processing |
 | `NormalizeUserName` | Normalize usernames | User name processing |
-| `ShowGroupAssignments` | Display group assignments | Information display |
+| `Show-GroupAssignments` | Display group assignments | Information display |
 | `validateInput` | Input validation functions | Data validation |
 | `Write-Log` | Centralized logging system | Application logging |
 

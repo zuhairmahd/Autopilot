@@ -2475,10 +2475,10 @@ $script:ShowGroupAssignmentsAction = {
     }
     #endregion Resolve group using unified Resolve-DirectoryObject with entity return
 
-    # Call ShowGroupAssignments to display the group's assignments
-    Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName) with IncludeIndirect=$IncludeIndirectAssignments"
-    write-log -logFile $LogFile -Module $scriptName -Message "Building splat for ShowGroupAssignments call" -LogLevel "Information"
-    $showGroupAssignmentsSplat = @{
+    # Call Show-GroupAssignments to display the group's assignments
+    Write-Verbose "[$scriptName] Calling Show-GroupAssignments for group: $($selectedGroup.displayName) with IncludeIndirect=$IncludeIndirectAssignments"
+    write-log -logFile $LogFile -Module $scriptName -Message "Building splat for Show-GroupAssignments call" -LogLevel "Information"
+    $ShowGroupAssignmentsSplat = @{
         AccessToken = $accessToken
         Settings    = $global:settings
         Group       = $selectedGroup
@@ -2486,24 +2486,24 @@ $script:ShowGroupAssignmentsAction = {
 
     if ($IncludeIndirectAssignments)
     {
-        $showGroupAssignmentsSplat['ShowIndirectAssignments'] = $true
-        $showGroupAssignmentsSplat['SpecialGroups'] = $specialGroups
-        write-log -logFile $LogFile -Module $scriptName -Message "Added ShowIndirectAssignments and SpecialGroups parameters to ShowGroupAssignments splat" -LogLevel "Information"
+        $ShowGroupAssignmentsSplat['ShowIndirectAssignments'] = $true
+        $ShowGroupAssignmentsSplat['SpecialGroups'] = $specialGroups
+        write-log -logFile $LogFile -Module $scriptName -Message "Added ShowIndirectAssignments and SpecialGroups parameters to Show-GroupAssignments splat" -LogLevel "Information"
     }
 
     if ($exportInstead)
     {
-        $showGroupAssignmentsSplat['exportInstead'] = $true
-        write-log -logFile $LogFile -Module $scriptName -Message "Added exportInstead parameter to ShowGroupAssignments splat" -LogLevel "Information"
+        $ShowGroupAssignmentsSplat['exportInstead'] = $true
+        write-log -logFile $LogFile -Module $scriptName -Message "Added exportInstead parameter to Show-GroupAssignments splat" -LogLevel "Information"
     }
     if ($settings.HideEmptyMenus)
     {
-        $showGroupAssignmentsSplat['HideEmptyMenus'] = $true
-        write-log -logFile $LogFile -Module $scriptName -Message "Added HideEmptyMenus parameter to ShowGroupAssignments splat" -LogLevel "Information"
+        $ShowGroupAssignmentsSplat['HideEmptyMenus'] = $true
+        write-log -logFile $LogFile -Module $scriptName -Message "Added HideEmptyMenus parameter to Show-GroupAssignments splat" -LogLevel "Information"
     }
-    $ShowGroupAssignmentsResponse = ShowGroupAssignments @showGroupAssignmentsSplat
+    $ShowGroupAssignmentsResponse = Show-GroupAssignments @ShowGroupAssignmentsSplat
     write-log -logFile $LogFile -Module $scriptName -Message "ShowGroupAssignments returned: $($ShowGroupAssignmentsResponse | Out-String)" -LogLevel "Verbose"
-    #region Handle navigation responses from ShowGroupAssignments
+    #region Handle navigation responses from Show-GroupAssignments
     if ($ShowGroupAssignmentsResponse -eq "Back" -or $ShowGroupAssignmentsResponse -eq "back")
     {
         Write-Verbose "[$scriptName] User selected Back from group assignment selection, returning to previous menu"
@@ -2528,7 +2528,7 @@ $script:ShowGroupAssignmentsAction = {
         write-log -logFile $LogFile -Module $scriptName -Message "Continuing script after group assignment selection" -LogLevel "Information"
         return $ShowGroupAssignmentsResponse
     }
-    #endregion Handle navigation responses from ShowGroupAssignments
+    #endregion Handle navigation responses from Show-GroupAssignments
 }
 
 $script:ExportGroupAssignmentsAction = {

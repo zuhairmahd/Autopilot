@@ -1,5 +1,5 @@
-# ShowGroupAssignments.Tests.ps1
-# Unit tests for ShowGroupAssignments function
+# Show-GroupAssignments.Tests.ps1
+# Unit tests for Show-GroupAssignments function
 
 #Requires -Version 5.1
 
@@ -8,22 +8,22 @@ BeforeAll {
     $script:RepoRoot = (Get-Item $PSScriptRoot).Parent.Parent.FullName
     Import-Module "$script:RepoRoot/tests/Helpers/AutopilotTestHelpers.psm1" -Force
     Import-Module "$script:RepoRoot/tests/Helpers/AutopilotMenuMocks.psm1" -Force
-    
+
     # Initialize test environment
     $script:TestEnv = Initialize-AutopilotTestEnvironment
-    
+
     # Load required functions
-    . "$script:RepoRoot/functions/UserAndGroupFunctions/ShowGroupAssignments.ps1"
-    . "$script:RepoRoot/functions/UserAndGroupFunctions/GetGroupDirectAssignments.ps1"
+    . "$script:RepoRoot/functions/UserAndGroupFunctions/Show-GroupAssignments.ps1"
+    . "$script:RepoRoot/functions/UserAndGroupFunctions/Get-GroupDirectAssignments.ps1"
     . "$script:RepoRoot/functions/UserAndGroupFunctions/GetGroupIndirectAssignments.ps1"
     . "$script:RepoRoot/functions/menuFunctions/NewMenu.ps1"
     . "$script:RepoRoot/functions/menuFunctions/AddMenuItem.ps1"
     . "$script:RepoRoot/functions/menuFunctions/ShowMenu.ps1"
     . "$script:RepoRoot/functions/utilityFunctions/Write-Log.ps1"
-    
+
     # Set up global variables required by functions
     $global:logFile = Join-Path $script:TestEnv.TestFolder "test.log"
-    
+
     # Set up test variables
     $script:TestAccessToken = "test-token-12345"
     $script:TestGroupName = "Test Group"
@@ -31,14 +31,14 @@ BeforeAll {
         displayName = $TestGroupName
         id          = "group-guid-12345"
     }
-    
+
     # Mock global returnValues
     $global:returnValues = @{
         noGroupFoundMessage            = "noGroup"
         noGroupAssignmentsFoundMessage = "noAssignments"
         backoutText                    = "Back"
     }
-    
+
     # Mock NewMenu globally to return a valid menu structure
     Mock NewMenu {
         return @{
@@ -47,7 +47,7 @@ BeforeAll {
             MenuItems   = @()
         }
     } -ModuleName $null
-    
+
     # Mock AddMenuItem globally to just return the menu unchanged
     Mock AddMenuItem {
         param($menu)
@@ -55,38 +55,38 @@ BeforeAll {
     } -ModuleName $null
 }
 
-Describe "Function: ShowGroupAssignments" -Tags 'Unit' {
-    
+Describe "Function: Show-GroupAssignments" -Tags 'Unit' {
+
     Context "Parameter Validation" {
         It "Should require accessToken parameter" {
-            Mock GetGroupDirectAssignments { }
+            Mock Get-GroupDirectAssignments { }
             Mock Write-Error { }
-            
-            ShowGroupAssignments -Group $TestGroup
-            
+
+            Show-GroupAssignments -Group $TestGroup
+
             Assert-MockCalled Write-Error -ParameterFilter { $Message -match "Access token" }
         }
-        
+
         It "Should accept group as object" {
-            Mock GetGroupDirectAssignments { return @{ AllAssignments = @() } }
+            Mock Get-GroupDirectAssignments { return @{ AllAssignments = @() } }
             Mock ShowMenu { return "Back" }
             Mock Write-Host { }
-            
-            { ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken } | Should -Not -Throw
+
+            { Show-GroupAssignments -Group $TestGroup -accessToken $TestAccessToken } | Should -Not -Throw
         }
-        
+
         It "Should accept group as string" {
-            Mock GetGroupDirectAssignments { return @{ AllAssignments = @() } }
+            Mock Get-GroupDirectAssignments { return @{ AllAssignments = @() } }
             Mock ShowMenu { return "Back" }
             Mock Write-Host { }
-            
-            { ShowGroupAssignments -Group $TestGroupName -accessToken $TestAccessToken } | Should -Not -Throw
+
+            { Show-GroupAssignments -Group $TestGroupName -accessToken $TestAccessToken } | Should -Not -Throw
         }
     }
-    
+
     Context "Assignment Retrieval" {
-        It "Should call GetGroupDirectAssignments with IncludeBeta" {
-            Mock GetGroupDirectAssignments { 
+        It "Should call Get-GroupDirectAssignments with IncludeBeta" {
+            Mock Get-GroupDirectAssignments {
                 return @{
                     AllAssignments           = @()
                     AppAssignments           = @()
@@ -95,33 +95,33 @@ Describe "Function: ShowGroupAssignments" -Tags 'Unit' {
             }
             Mock ShowMenu { return "Back" }
             Mock Write-Host { }
-            
-            ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken
-            
-            Assert-MockCalled GetGroupDirectAssignments -ParameterFilter { 
-                $includeBeta -eq $true 
+
+            Show-GroupAssignments -Group $TestGroup -accessToken $TestAccessToken
+
+            Assert-MockCalled Get-GroupDirectAssignments -ParameterFilter {
+                $includeBeta -eq $true
             }
         }
-        
+
         It "Should return when no group found" {
-            Mock GetGroupDirectAssignments { return 'noGroup' }
-            
-            $result = ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken
-            
+            Mock Get-GroupDirectAssignments { return 'noGroup' }
+
+            $result = Show-GroupAssignments -Group $TestGroup -accessToken $TestAccessToken
+
             $result | Should -Be "noGroup"
         }
-        
+
         It "Should return when no assignments found" {
-            Mock GetGroupDirectAssignments { 
+            Mock Get-GroupDirectAssignments {
                 return @{ AllAssignments = @() }
             }
-            
-            $result = ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken
-            
+
+            $result = Show-GroupAssignments -Group $TestGroup -accessToken $TestAccessToken
+
             $result | Should -Be "noAssignments"
         }
     }
-    
+
     Context "Menu Creation" {
         It "Should create menu with all assignment type options" {
             $mockAssignments = @{
@@ -140,10 +140,10 @@ Describe "Function: ShowGroupAssignments" -Tags 'Unit' {
                 WindowsInformationProtectionAssignments = @()
                 PolicySetAssignments                    = @()
             }
-            
-            Mock GetGroupDirectAssignments { return $mockAssignments }
+
+            Mock Get-GroupDirectAssignments { return $mockAssignments }
             Mock ShowMenu { return "Back" }
-            Mock NewMenu { 
+            Mock NewMenu {
                 return @{
                     Title = "Group Assignments"
                     Items = @()
@@ -154,9 +154,9 @@ Describe "Function: ShowGroupAssignments" -Tags 'Unit' {
                 return $menu
             }
             Mock Write-Host { }
-            
-            ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken
-            
+
+            Show-GroupAssignments -Group $TestGroup -accessToken $TestAccessToken
+
             # Verify all assignment types are added as menu items
             Assert-MockCalled AddMenuItem -ParameterFilter { $name -match "Application" }
             Assert-MockCalled AddMenuItem -ParameterFilter { $name -match "Device Configurations" }
@@ -164,7 +164,7 @@ Describe "Function: ShowGroupAssignments" -Tags 'Unit' {
             Assert-MockCalled AddMenuItem -ParameterFilter { $name -match "Policy Sets" }
         }
     }
-    
+
     Context "Assignment Display" {
         It "Should create menu with assignment counts" {
             $mockAssignments = @{
@@ -187,20 +187,20 @@ Describe "Function: ShowGroupAssignments" -Tags 'Unit' {
                 WindowsInformationProtectionAssignments = @()
                 PolicySetAssignments                    = @()
             }
-            
-            Mock GetGroupDirectAssignments { return $mockAssignments }
+
+            Mock Get-GroupDirectAssignments { return $mockAssignments }
             Mock ShowMenu { return "Back" }
             Mock Write-Host { }
-            
-            ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken
-            
+
+            Show-GroupAssignments -Group $TestGroup -accessToken $TestAccessToken
+
             # Verify AddMenuItem was called with correct counts
             Assert-MockCalled AddMenuItem -ParameterFilter { $name -match "Application.*\(1\)" }
         }
 
 
     }
-    
+
     Context "Assignment Structure" {
         It "Should verify assignments include description field" {
             $mockAssignments = @{
@@ -222,19 +222,19 @@ Describe "Function: ShowGroupAssignments" -Tags 'Unit' {
                 WindowsInformationProtectionAssignments = @()
                 PolicySetAssignments                    = @()
             }
-            
-            Mock GetGroupDirectAssignments { return $mockAssignments }
+
+            Mock Get-GroupDirectAssignments { return $mockAssignments }
             Mock ShowMenu { return "Back" }
             Mock Write-Host { }
-            
-            ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken
-            
+
+            Show-GroupAssignments -Group $TestGroup -accessToken $TestAccessToken
+
             # Verify assignments structure includes description
             $mockAssignments.AllAssignments[0].Description | Should -Be "Desc1"
             $mockAssignments.AllAssignments[1].Description | Should -Be "Desc2"
         }
     }
-    
+
     Context "Assignment Type Support" {
         It "Should include Windows Information Protection in menu" {
             $mockAssignments = @{
@@ -257,17 +257,17 @@ Describe "Function: ShowGroupAssignments" -Tags 'Unit' {
                 )
                 PolicySetAssignments                    = @()
             }
-            
-            Mock GetGroupDirectAssignments { return $mockAssignments }
+
+            Mock Get-GroupDirectAssignments { return $mockAssignments }
             Mock ShowMenu { return "Back" }
             Mock Write-Host { }
-            
-            ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken
-            
+
+            Show-GroupAssignments -Group $TestGroup -accessToken $TestAccessToken
+
             # Verify WIP menu item was added with count
             Assert-MockCalled AddMenuItem -ParameterFilter { $name -match "Windows Information Protection.*\(1\)" }
         }
-        
+
         It "Should include Policy Sets in menu" {
             $mockAssignments = @{
                 AllAssignments                          = @(
@@ -289,18 +289,18 @@ Describe "Function: ShowGroupAssignments" -Tags 'Unit' {
                     @{Type = "PolicySet"; Name = "Test Policy Set"; Description = "PS Desc"; Id = "ps-1"}
                 )
             }
-            
-            Mock GetGroupDirectAssignments { return $mockAssignments }
+
+            Mock Get-GroupDirectAssignments { return $mockAssignments }
             Mock ShowMenu { return "Back" }
             Mock Write-Host { }
-            
-            ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken
-            
+
+            Show-GroupAssignments -Group $TestGroup -accessToken $TestAccessToken
+
             # Verify Policy Set menu item was added with count
             Assert-MockCalled AddMenuItem -ParameterFilter { $name -match "Policy Sets.*\(1\)" }
         }
     }
-    
+
     Context "Navigation" {
         It "Should return navigation option when user selects Back" {
             $mockAssignments = @{
@@ -319,65 +319,65 @@ Describe "Function: ShowGroupAssignments" -Tags 'Unit' {
                 WindowsInformationProtectionAssignments = @()
                 PolicySetAssignments                    = @()
             }
-            
-            Mock GetGroupDirectAssignments { return $mockAssignments }
+
+            Mock Get-GroupDirectAssignments { return $mockAssignments }
             Mock ShowMenu { return "Back" }
             Mock Write-Host { }
-            Mock AddMenuItem { 
+            Mock AddMenuItem {
                 param($menu)
                 return $menu
             }
-            
-            $result = ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken
-            
+
+            $result = Show-GroupAssignments -Group $TestGroup -accessToken $TestAccessToken
+
             $result | Should -Be "Back"
         }
     }
-    
+
     Context "Indirect Assignments Display" {
         # NOTE: Interactive loop tests with Console.ReadKey are covered in integration tests
         # See: tests/Integration/GroupAssignments.Tests.ps1
-        
-        It "Should pass ShowIndirectAssignments switch to GetGroupDirectAssignments" {
-            Mock GetGroupDirectAssignments { 
+
+        It "Should pass ShowIndirectAssignments switch to Get-GroupDirectAssignments" {
+            Mock Get-GroupDirectAssignments {
                 return @{ AllAssignments = @() }
             }
             Mock Write-Host { }
-            
-            ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken -ShowIndirectAssignments
-            
-            Assert-MockCalled GetGroupDirectAssignments -ParameterFilter { 
-                $IncludeIndirectAssignments -eq $true 
+
+            Show-GroupAssignments -Group $TestGroup -accessToken $TestAccessToken -ShowIndirectAssignments
+
+            Assert-MockCalled Get-GroupDirectAssignments -ParameterFilter {
+                $IncludeIndirectAssignments -eq $true
             }
         }
-        
+
         It "Should not include indirect assignments by default" {
-            Mock GetGroupDirectAssignments { 
+            Mock Get-GroupDirectAssignments {
                 return @{ AllAssignments = @() }
             }
             Mock Write-Host { }
-            
-            ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken
-            
-            Assert-MockCalled GetGroupDirectAssignments -ParameterFilter { 
-                $IncludeIndirectAssignments -ne $true 
+
+            Show-GroupAssignments -Group $TestGroup -accessToken $TestAccessToken
+
+            Assert-MockCalled Get-GroupDirectAssignments -ParameterFilter {
+                $IncludeIndirectAssignments -ne $true
             }
         }
-        
+
         It "Should display message when including indirect assignments" {
-            Mock GetGroupDirectAssignments { 
+            Mock Get-GroupDirectAssignments {
                 return @{ AllAssignments = @() }
             }
             Mock Write-Host { }
-            
-            ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken -ShowIndirectAssignments
-            
-            Assert-MockCalled Write-Host -ParameterFilter { 
-                $Object -match "Including indirect assignments.*All Users and All Devices" 
+
+            Show-GroupAssignments -Group $TestGroup -accessToken $TestAccessToken -ShowIndirectAssignments
+
+            Assert-MockCalled Write-Host -ParameterFilter {
+                $Object -match "Including indirect assignments.*All Users and All Devices"
             }
         }
     }
-    
+
     Context "Assignment Consolidation" {
         It "Should consolidate duplicate assignments with multiple scopes" {
             # Create test assignments with duplicates across different scopes
@@ -440,25 +440,25 @@ Describe "Function: ShowGroupAssignments" -Tags 'Unit' {
                 WindowsInformationProtectionAssignments = @()
                 PolicySetAssignments     = @()
             }
-            
-            Mock GetGroupDirectAssignments { return $mockAssignments }
+
+            Mock Get-GroupDirectAssignments { return $mockAssignments }
             Mock ShowMenu { return "Back" }
             Mock Write-Host { }
             Mock Write-Log { }
-            
+
             # Call the function
-            $result = ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken -ShowIndirectAssignments
-            
+            $result = Show-GroupAssignments -Group $TestGroup -accessToken $TestAccessToken -ShowIndirectAssignments
+
             # Verify Write-Log was called with consolidation messages
             Assert-MockCalled Write-Log -ParameterFilter {
                 $Message -match "Consolidating duplicate assignments.*before: 4"
             }
-            
+
             Assert-MockCalled Write-Log -ParameterFilter {
                 $Message -match "Consolidation complete.*after: 2"
             }
         }
-        
+
         It "Should create AssignmentScope array for single direct assignment" {
             $mockAssignments = @{
                 AllAssignments = @(
@@ -486,20 +486,20 @@ Describe "Function: ShowGroupAssignments" -Tags 'Unit' {
                 WindowsInformationProtectionAssignments = @()
                 PolicySetAssignments = @()
             }
-            
-            Mock GetGroupDirectAssignments { return $mockAssignments }
+
+            Mock Get-GroupDirectAssignments { return $mockAssignments }
             Mock ShowMenu { return "Back" }
             Mock Write-Host { }
             Mock Write-Log { }
-            
-            ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken
-            
+
+            Show-GroupAssignments -Group $TestGroup -accessToken $TestAccessToken
+
             # Should consolidate 1 entry to 1 entry with proper scope
             Assert-MockCalled Write-Log -ParameterFilter {
                 $Message -match "Consolidation complete.*after: 1"
             }
         }
-        
+
         It "Should combine multiple indirect scopes correctly" {
             $mockAssignments = @{
                 AllAssignments = @(
@@ -540,14 +540,14 @@ Describe "Function: ShowGroupAssignments" -Tags 'Unit' {
                 WindowsInformationProtectionAssignments = @()
                 PolicySetAssignments = @()
             }
-            
-            Mock GetGroupDirectAssignments { return $mockAssignments }
+
+            Mock Get-GroupDirectAssignments { return $mockAssignments }
             Mock ShowMenu { return "Back" }
             Mock Write-Host { }
             Mock Write-Log { }
-            
-            ShowGroupAssignments -Group $TestGroup -accessToken $TestAccessToken -ShowIndirectAssignments
-            
+
+            Show-GroupAssignments -Group $TestGroup -accessToken $TestAccessToken -ShowIndirectAssignments
+
             # Should consolidate 2 entries to 1 entry
             Assert-MockCalled Write-Log -ParameterFilter {
                 $Message -match "Consolidation complete.*after: 1"

@@ -15,8 +15,8 @@ Reference: Microsoft Learn documentation for `New-MgBetaDeviceManagementResource
 Implemented a comprehensive error handling framework across three functions to gracefully handle API failures:
 
 1. **GetGroupIndirectAssignments.ps1** - Captures errors when fetching indirect assignments
-2. **GetGroupDirectAssignments.ps1** - Captures errors when fetching direct assignments (including nested helper)
-3. **ShowGroupAssignments.ps1** - Notifies users and logs detailed error information
+2. **Get-GroupDirectAssignments.ps1** - Captures errors when fetching direct assignments (including nested helper)
+3. **Show-GroupAssignments.ps1** - Notifies users and logs detailed error information
 
 ## Implementation Details
 
@@ -42,7 +42,7 @@ if ($response.status -ge 400)
     } else {
         "HTTP $($response.status) error"
     }
-    
+
     $result.FailedResources += [PSCustomObject]@{
         ResourceType = $response.id
         ErrorMessage = $errorMessage
@@ -52,7 +52,7 @@ if ($response.status -ge 400)
 }
 ```
 
-### 2. GetGroupDirectAssignments.ps1
+### 2. Get-GroupDirectAssignments.ps1
 **Changes:**
 - Added `FailedResources` array to result object structure
 - Added try-catch block to nested `Get-ResourceAssignments` helper function
@@ -85,7 +85,7 @@ function Get-ResourceAssignments {
 }
 ```
 
-### 3. ShowGroupAssignments.ps1
+### 3. Show-GroupAssignments.ps1
 **Changes:**
 - Added error notification check after assignments are retrieved
 - User-friendly warning message displays affected resource types
@@ -100,7 +100,7 @@ if ($assignments.FailedResources -and $assignments.FailedResources.Count -gt 0)
     $failedResourceTypes = ($assignments.FailedResources | Select-Object -ExpandProperty ResourceType -Unique) -join ', '
     Write-Host "Warning: Some resources could not be fetched: $failedResourceTypes" -ForegroundColor Yellow
     Write-Log -logFile $LogFile -Module $functionName -Message "Failed to fetch $($assignments.FailedResources.Count) resource type(s)" -logLevel "Warning"
-    
+
     foreach ($failedResource in $assignments.FailedResources)
     {
         Write-Log -logFile $LogFile -Module $functionName -Message "Failed Resource - Type: $($failedResource.ResourceType), Status: $($failedResource.StatusCode), API Version: $($failedResource.ApiVersion), Error: $($failedResource.ErrorMessage)" -logLevel "Error"
@@ -138,8 +138,8 @@ Each failed resource is captured with the following properties:
 
 ## Testing Status
 ### Unit Tests
-- ✅ **ShowGroupAssignments.Tests.ps1**: 18/18 passing (100%)
-- ⚠️ **GetGroupDirectAssignments.Tests.ps1**: 15/22 passing (68%) - pre-existing failures unrelated to error handling
+- ✅ **Show-GroupAssignments.Tests.ps1**: 18/18 passing (100%)
+- ⚠️ **Get-GroupDirectAssignments.Tests.ps1**: 15/22 passing (68%) - pre-existing failures unrelated to error handling
 - ⚠️ **GetGroupIndirectAssignments.Tests.ps1**: Some failures - pre-existing, unrelated to error handling
 
 **Note:** The new error handling code does not break any previously passing tests. Failed tests are pre-existing issues unrelated to this implementation.
@@ -170,8 +170,8 @@ The following scenarios should be tested manually or with integration tests:
 - ResourceAccessProfiles reference: https://learn.microsoft.com/en-us/graph/api/resources/intune-rapolicy-devicemanagementresourceaccessprofilebase
 
 ## Files Modified
-1. `functions/UserAndGroupFunctions/ShowGroupAssignments.ps1`
-2. `functions/UserAndGroupFunctions/GetGroupDirectAssignments.ps1`
+1. `functions/UserAndGroupFunctions/Show-GroupAssignments.ps1`
+2. `functions/UserAndGroupFunctions/Get-GroupDirectAssignments.ps1`
 3. `functions/UserAndGroupFunctions/GetGroupIndirectAssignments.ps1`
 
 ## Author & Date

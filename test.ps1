@@ -177,7 +177,6 @@
 
 [CmdletBinding()]
 param(
-    [switch]$UseBatch,
     [string]$configFile = "$pwd\.secrets\config.json",
     [string]$InitFile = "$pwd\settings.psd1",
     [string]$stringsFile = "$pwd\strings.psd1",
@@ -459,7 +458,6 @@ if ($null -ne $appMetaData.corporateSettings -and $appMetaData.corporateSettings
     $localDomainFileName = Join-Path -Path $scriptPath -ChildPath "$domain.psd1"
     Write-Verbose "[$scriptName] Checking $($appMetaData.corporateSettings.corporateSettingsFilePaths) paths for corporate settings for domain: $domain"
     write-log -logFile $logFile -module $scriptName -Message "Checking $($appMetaData.corporateSettings.corporateSettingsFilePaths) paths for corporate settings for domain: $domain"
-    Write-Host "Looking for corporate settings for domain: $domain" -ForegroundColor Green
     for ($i = 0; $i -lt $appMetaData.corporateSettings.corporateSettingsFilePaths.count; $i++)
     {
         $path = $appMetaData.corporateSettings.corporateSettingsFilePaths[$i]
@@ -474,12 +472,17 @@ if ($null -ne $appMetaData.corporateSettings -and $appMetaData.corporateSettings
         }
         Write-Verbose "[$scriptName] Found corporate settings file: $domainFileName"
         write-log -logFile $logFile -module $scriptName -Message "Found corporate settings file: $domainFileName"
-        Write-Host "Copying corporate settings from $domainFileName to $localDomainFileName" -ForegroundColor Green
         try
         {
             Copy-Item -Path $domainFileName -Destination $localDomainFileName -Force -ErrorAction Stop
             $fileCopied = $true
-            Write-Host "Successfully copied corporate settings from $domainFileName to $localDomainFileName" -ForegroundColor Green
+            write-log -logFile $logFile -module $scriptName -Message "Successfully copied corporate settings from $domainFileName to $localDomainFileName"
+            Write-Verbose "[$scriptName] Successfully copied corporate settings from $domainFileName to $localDomainFileName"
+            $numberOfBeeps = 4
+            for ($i = 0; $i -lt $numberOfBeeps; $i++)
+            {
+                [console]::beep(150, 80)
+            }
             break
         }
         catch
@@ -713,7 +716,7 @@ else
         Write-Host "Starting first run wizard to set up your configuration..." -ForegroundColor Green
 
         # Launch the first run wizard (pass Silent switch if testMode is active)
-        $wizardResult = Start-FirstRunWizard -ConfigFile $configFile -SettingsFile $InitFile -StringsFile $stringsFile -Silent:$testMode
+        $wizardResult = Start-FirstRunWizard -ConfigFile $configFile -SettingsFile $InitFile -StringsFile "$PWD\strings.psd1" -Silent:$testMode
     }
     if ($wizardResult)
     {
@@ -1064,11 +1067,173 @@ $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $sc
 #endregion Define variables
 
 
-Export-DeviceAssignmentReport -accessToken $accessToken -outputPath $PWD -reportType "assigned" -lastContactDateTime (Get-Date).AddDays(-60)
+#region show Group Assignments menu
+$script:ShowGroupAssignmentsAction = {
+    <#
+    This script-scoped variable defines a reusable script block for showing group assignments in the Intune Helpdesk Menu.
+    It is defined at script scope to allow sharing between multiple menu items (e.g., direct and indirect assignment views),
+    avoiding code duplication and ensuring consistent behavior. The script block encapsulates the logic for prompting the user
+    for a group name, resolving the group, and handling navigation commands, and is invoked by different menu actions as needed.
+    #>
+    param(
+        [bool]$IncludeIndirectAssignments,
+        [bool]$exportInstead
+    )
+
+    $assignmentScope = if ($IncludeIndirectAssignments)
+    {
+        "indirect (All Users/All Devices)"
+    }
+    else
+    {
+        "direct"
+    }
+    $specialGroups = @("*", "?")
+    $messageText = if ($IncludeIndirectAssignments)
+    {
+        "Enter the name of the group whose indirect (All Users/All Devices) assignments you want to view. Enter any of $specialGroups for all assignments"
+    }
+    else
+    {
+        "Enter the name of the group whose direct assignments you want to view."
+    }
+    write-log -logFile $LogFile -Module $scriptName -Message "Prompting user for group name to view $assignmentScope assignments" -LogLevel "Information"
+    $groupName = GetUserInput -Message $messageText -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
+    $needsResolution = if ($IncludeIndirectAssignments -and $groupName -in $specialGroups)
+    {
+        $false
+    }
+    else
+    {
+        $true
+    }
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "GroupName: $groupName, IncludeIndirectAssignments: $IncludeIndirectAssignments, AssignmentScope: $assignmentScope, SpecialGroups: $specialGroups, NeedsResolution: $needsResolution"
+
+    if ($null -eq $groupName)
+    {
+        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
+        write-log -logFile $LogFile -Module $scriptName -Message "User pressed Enter without providing a group name. Returning $($returnValues.BackoutText)." -LogLevel "Information"
+        return $returnValues.backoutText
+    }
+
+    if ($groupName)
+    {
+        Write-Verbose "[$scriptName] Got group name: $groupName"
+        write-log -logFile $LogFile -Module $scriptName -Message "Got group name: $groupName" -LogLevel "Information"
+    }
+
+    #region Resolve group using unified Resolve-DirectoryObject with entity return
+    if ($needsResolution)
+    {
+        Write-Verbose "[$scriptName] Resolving group: $groupName"
+        write-log -logFile $LogFile -Module $scriptName -Message "Resolving group: $groupName" -LogLevel "Information"
+        $selectedGroup = Resolve-DirectoryObject -EntityName $groupName -AccessToken $accessToken -Settings $settings -ReturnValues $returnValues -EntityType "Group" -ReturnEntity
+        write-log -logFile $LogFile -Module $scriptName -Message "Resolve-DirectoryObject returned: $($selectedGroup | Out-String)" -LogLevel "Verbose"
+        # Handle navigation commands - check these FIRST before trying to use as group object
+        if ($selectedGroup -eq "EXIT_APPLICATION")
+        {
+            Write-Verbose "[$scriptName] User requested application exit from group resolution"
+            write-log -logFile $LogFile -Module $scriptName -Message "User requested application exit from group resolution" -LogLevel "Information"
+            return "EXIT_APPLICATION"
+        }
+        elseif ($selectedGroup -eq "Main Menu")
+        {
+            Write-Verbose "[$scriptName] User selected Main Menu from group resolution"
+            write-log -logFile $LogFile -Module $scriptName -Message "User selected Main Menu from group resolution" -LogLevel "Information"
+            return "Main Menu"
+        }
+        elseif ($selectedGroup -in $returnValues.Values)
+        {
+            Write-Verbose "[$scriptName] Resolve-DirectoryObject returned navigation command: $selectedGroup"
+            write-log -logFile $LogFile -Module $scriptName -Message "Resolve-DirectoryObject returned navigation command: $selectedGroup" -LogLevel "Information"
+            return $selectedGroup
+        }
+
+        # Validate we got a valid group object
+        if ($null -eq $selectedGroup -or -not $selectedGroup.id -or -not $selectedGroup.displayName)
+        {
+            write-log -logFile $LogFile -Module $scriptName -Message "Invalid group object returned from Resolve-DirectoryObject" -LogLevel "Error"
+            Write-Host "No group found for the specified group name." -ForegroundColor Red
+            return $returnValues.noGroupFoundMessage
+        }
+        Write-Verbose "[$scriptName] Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))"
+        write-log -logFile $LogFile -Module $scriptName -Message "Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))" -LogLevel "Information"
+    }
+    else
+    {
+        Write-Verbose "[$scriptName] Special group selected, skipping resolution: $groupName"
+        write-log -logFile $LogFile -Module $scriptName -Message "Special group selected, skipping resolution: $groupName" -LogLevel "Information"
+        $selectedGroup = $groupName
+    }
+    #endregion Resolve group using unified Resolve-DirectoryObject with entity return
+
+    # Call Show-GroupAssignments to display the group's assignments
+    Write-Verbose "[$scriptName] Calling Show-GroupAssignments for group: $($selectedGroup.displayName) with IncludeIndirect=$IncludeIndirectAssignments"
+    write-log -logFile $LogFile -Module $scriptName -Message "Building splat for Show-GroupAssignments call" -LogLevel "Information"
+    $ShowGroupAssignmentsSplat = @{
+        AccessToken = $accessToken
+        Settings    = $global:settings
+        Group       = $selectedGroup
+    }
+
+    if ($IncludeIndirectAssignments)
+    {
+        $ShowGroupAssignmentsSplat['ShowIndirectAssignments'] = $true
+        $ShowGroupAssignmentsSplat['SpecialGroups'] = $specialGroups
+        write-log -logFile $LogFile -Module $scriptName -Message "Added ShowIndirectAssignments and SpecialGroups parameters to Show-GroupAssignments splat" -LogLevel "Information"
+    }
+
+    if ($exportInstead)
+    {
+        $ShowGroupAssignmentsSplat['exportInstead'] = $true
+        write-log -logFile $LogFile -Module $scriptName -Message "Added exportInstead parameter to Show-GroupAssignments splat" -LogLevel "Information"
+    }
+    if ($settings.HideEmptyMenus)
+    {
+        $ShowGroupAssignmentsSplat['HideEmptyMenus'] = $true
+        write-log -logFile $LogFile -Module $scriptName -Message "Added HideEmptyMenus parameter to Show-GroupAssignments splat" -LogLevel "Information"
+    }
+    $ShowGroupAssignmentsResponse = Show-GroupAssignments @ShowGroupAssignmentsSplat
+    write-log -logFile $LogFile -Module $scriptName -Message "Show-GroupAssignments returned: $($ShowGroupAssignmentsResponse | Out-String)" -LogLevel "Verbose"
+    #region Handle navigation responses from Show-GroupAssignments
+    if ($ShowGroupAssignmentsResponse -eq "Back" -or $ShowGroupAssignmentsResponse -eq "back")
+    {
+        Write-Verbose "[$scriptName] User selected Back from group assignment selection, returning to previous menu"
+        write-log -logFile $LogFile -Module $scriptName -Message "User selected Back from group assignment selection, returning to previous menu" -LogLevel "Information"
+        return $returnValues.backoutText
+    }
+    elseif ($ShowGroupAssignmentsResponse -eq "Main Menu" -or $ShowGroupAssignmentsResponse -eq "main menu")
+    {
+        Write-Verbose "[$scriptName] User selected Main Menu from group assignment selection"
+        write-log -logFile $LogFile -Module $scriptName -Message "User selected Main Menu from group assignment selection" -LogLevel "Information"
+        return "EXIT_APPLICATION"
+    }
+    elseif ([string]::IsNullOrWhiteSpace($ShowGroupAssignmentsResponse) -or $null -eq $ShowGroupAssignmentsResponse)
+    {
+        Write-Verbose "[$scriptName] User requested application exit from group assignment selection."
+        write-log -logFile $LogFile -Module $scriptName -Message "User requested application exit from group assignment selection" -LogLevel "Information"
+        return "EXIT_APPLICATION"
+    }
+    else
+    {
+        Write-Verbose "[$scriptName] Continuing script..."
+        write-log -logFile $LogFile -Module $scriptName -Message "Continuing script after group assignment selection" -LogLevel "Information"
+        return $ShowGroupAssignmentsResponse
+    }
+    #endregion Handle navigation responses from Show-GroupAssignments
+}
+
+#"View direct group assignments"
+& $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $false -exportInstead $false
+
+#View indirect group assignments (All Users/All Devices)
+& $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $true -exportInstead $false
+#endregion Show Group Assignments menu
+
+
+
 
 exit 0
-
-Send-EmailWithAttachments -accessToken $accessToken -to 'zuhair@accesstojobs.com' -Subject 'test' -body 'this is a test' -AttachmentPaths $logfile
 #region Usage examples for GetGraphObjectMetadata
 # Example 1: Get metadata for users collection
 $usersResponse = CallGraphAPI -accessToken $accessToken -ResourcePath "users"

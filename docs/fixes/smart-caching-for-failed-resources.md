@@ -35,7 +35,7 @@ This approach ensures:
 
 ### Files Modified
 1. **`GetGroupIndirectAssignments.ps1`** - Fully implemented
-2. **`GetGroupDirectAssignments.ps1`** - Fully implemented
+2. **`Get-GroupDirectAssignments.ps1`** - Fully implemented
 
 Both files follow the same pattern with 4 key changes each.
 
@@ -105,9 +105,9 @@ Write-Log -logFile $LogFile -module $functionName `
 # Check for resources marked as $null (previously failed) and retry them
 $resourcesToRetry = @()
 $resourceRetryMap = @{
-    'mobileApps' = @{ 
+    'mobileApps' = @{
         endpoint = "deviceAppManagement/mobileApps?`$filter=isAssigned eq true&`$select=id,displayName,description"
-        variable = 'mobileApps' 
+        variable = 'mobileApps'
     }
     # ... (all other resource types)
 }
@@ -159,10 +159,10 @@ if ($resourcesToRetry.Count -gt 0)
             {
                 # Retry failed - track error again
                 $failedResourceIds += $response.id
-                $errorMsg = if ($response.body.error.message) { 
-                    $response.body.error.message 
-                } else { 
-                    "Unknown error (Status: $($response.status))" 
+                $errorMsg = if ($response.body.error.message) {
+                    $response.body.error.message
+                } else {
+                    "Unknown error (Status: $($response.status))"
                 }
                 Add-FailedResourceError -FailedResources $FailedResources `
                     -ResourceType $response.id `
@@ -263,12 +263,12 @@ Get-CachedData -CacheKey "ResourceLists_beta" -CacheType Configuration
 5. **Minimal Overhead**: Only failed resources trigger additional API calls
 
 ## Related Changes
-- **Previous Session:** Implemented error tracking in `Get-ResourceAssignments`, `Add-FailedResourceError`, and display logic in `ShowGroupAssignments.ps1`
+- **Previous Session:** Implemented error tracking in `Get-ResourceAssignments`, `Add-FailedResourceError`, and display logic in `Show-GroupAssignments.ps1`
 - **This Session:** Extended error tracking to resource list caching layer
 
 ## Files Validation
 - ✅ `GetGroupIndirectAssignments.ps1` - Syntax validated
-- ✅ `GetGroupDirectAssignments.ps1` - Syntax validated
+- ✅ `Get-GroupDirectAssignments.ps1` - Syntax validated
 - ✅ Both files follow identical 4-step pattern
 - ✅ All 8 changes applied successfully (4 per file)
 

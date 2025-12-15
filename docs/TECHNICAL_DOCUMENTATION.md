@@ -34,7 +34,7 @@ The codebase has been reorganized into the following functional categories:
 functions/
 ├── autopilotFunctions/     # Autopilot device management
 │   ├── v1/                # Legacy Autopilot functions
-│   ├── v2/                # Updated Autopilot functions  
+│   ├── v2/                # Updated Autopilot functions
 │   └── GetDeviceInfo.ps1  # Common device information
 ├── deviceFunctions/        # Device operations and queries
 ├── encryptionFunctions/    # Security and encryption utilities
@@ -604,7 +604,7 @@ GetNextUserReadinessReport -enrollmentState <Object>
 - **Validation Checks**:
   - Autopilot profile assignment and correctness
   - Device enrollment state and remediation status
-  - RAM requirements and hardware specifications  
+  - RAM requirements and hardware specifications
   - User associations and validity
   - Network connectivity and last contact date
 - **Action Prioritization**: Uses intelligent priority system to determine primary action when multiple issues exist
@@ -797,11 +797,11 @@ GetAppAssignmentTypes -AccessToken <String> [-Export] [-outputPath <String>] [-f
 - Supports CSV export with resolved group names
 - Returns categorized app assignment data (Required, Available, Unassigned)
 
-#### GetGroupDirectAssignments.ps1
+#### Get-GroupDirectAssignments.ps1
 
-**GetGroupDirectAssignments**
+**Get-GroupDirectAssignments**
 ```powershell
-GetGroupDirectAssignments -GroupName <String> [-AccessToken <String>] [-IncludeBeta] [-ShowSummary] [-BatchSize <Int32>]
+Get-GroupDirectAssignments -GroupName <String> [-AccessToken <String>] [-IncludeBeta] [-ShowSummary] [-BatchSize <Int32>]
 ```
 - Retrieves comprehensive group assignment analysis across all Intune object types
 - Supports both v1.0 and beta Microsoft Graph API endpoints for maximum coverage
@@ -819,9 +819,9 @@ GetGroupDirectAssignments -GroupName <String> [-AccessToken <String>] [-IncludeB
   - **Configuration Policies**: Settings catalog policies (beta only)
   - **Group Policy Configurations**: ADMX-based group policies (beta only)
 
-**ShowGroupAssignments**
+**Show-GroupAssignments**
 ```powershell
-ShowGroupAssignments -GroupName <String> [-accessToken <String>]
+Show-GroupAssignments -GroupName <String> [-accessToken <String>]
 ```
 - Interactive menu-driven interface for viewing and exporting group assignments
 - Provides filtered views by assignment type with detailed information display
@@ -978,8 +978,8 @@ This allows the same function to behave differently based on how it was accessed
 ├── SettingsHelperFunctions.ps1       # Configuration
 ├── EncryptionFunctions.ps1           # Security
 ├── GetAppAssignmentTypes.ps1         # App reporting
-├── GetGroupDirectAssignments.ps1     # Comprehensive group assignment analysis
-└── ShowGroupAssignments.ps1          # Interactive group assignment viewer
+├── Get-GroupDirectAssignments.ps1     # Comprehensive group assignment analysis
+└── Show-GroupAssignments.ps1          # Interactive group assignment viewer
 ```
 
 ## Testing Framework
@@ -996,7 +996,7 @@ The Windows Autopilot Management Tool uses a **unified testing framework** with 
 # Standard test execution (replaces run-all-tests.ps1)
 .\TestScripts\Test-Runner.ps1 -TestCategory all
 
-# Category-based testing  
+# Category-based testing
 .\TestScripts\Test-Runner.ps1 -TestCategory syntax       # Quick validation (~5 seconds)
 .\TestScripts\Test-Runner.ps1 -TestCategory core         # Essential tests (~30-60 seconds)
 .\TestScripts\Test-Runner.ps1 -TestCategory unit         # Unit tests (~2-4 minutes)
@@ -1090,7 +1090,7 @@ Tests are automatically discovered and categorized through a centralized **Test 
 
 The test framework validates performance improvements:
 - **PSD1 Migration**: Verifies 89.6% performance improvement claims
-- **Caching Effectiveness**: Validates cache hit rates and performance gains  
+- **Caching Effectiveness**: Validates cache hit rates and performance gains
 - **Function Loading**: Monitors startup time and memory usage
 - **API Efficiency**: Tests Graph API batching and throttling management
 
@@ -1112,12 +1112,12 @@ try {
     # Load functions at script level (critical for proper scoping)
     $loadSuccess = Load-AllFunctions -RootPath $rootPath
     if (-not $loadSuccess) { throw "Failed to load functions" }
-    
+
     # Initialize unified test environment
     $testContext = Start-UnifiedTest -TestName "Test Name" -SkipFunctionCheck
-    
+
     # Test execution logic...
-    
+
     # Complete with proper cleanup
     $success = Complete-UnifiedTest -TestContext $testContext -PassedTests $passed -FailedTests $failed -TotalTests $total
     exit $(if ($success) { 0 } else { 1 })
@@ -1134,7 +1134,7 @@ The `test-helper.ps1` provides the unified testing infrastructure:
 
 #### Core Framework Functions
 - **`Load-AllFunctions`**: Function loading with proper scoping
-- **`Start-UnifiedTest`**: Test environment initialization  
+- **`Start-UnifiedTest`**: Test environment initialization
 - **`Complete-UnifiedTest`**: Cleanup and result reporting
 - **`Initialize-TestEnvironment`**: Mock data and global variable setup
 - **`Cleanup-TestEnvironment`**: Resource cleanup
@@ -1198,17 +1198,17 @@ try {
 # Fast validation (< 1 minute)
 - name: Syntax Tests
   run: pwsh -File "./TestScripts/Test-Runner.ps1" -TestCategory syntax
-  
-# Core functionality (1-2 minutes)  
+
+# Core functionality (1-2 minutes)
 - name: Core Tests
   run: pwsh -File "./TestScripts/Test-Runner.ps1" -TestCategory core
-  
+
 # Standard test suite (5-10 minutes)
 - name: Unit and Integration Tests
   run: |
     pwsh -File "./TestScripts/Test-Runner.ps1" -TestCategory unit
     pwsh -File "./TestScripts/Test-Runner.ps1" -TestCategory integration
-  
+
 # Full validation (15+ minutes)
 - name: Comprehensive Tests
   run: pwsh -File "./TestScripts/Test-Runner.ps1" -TestCategory all
@@ -1242,7 +1242,7 @@ For complete testing framework documentation, see [UNIFIED_TESTING_FRAMEWORK.md]
 # Switch to GAO configuration
 .\gao.bat
 
-# Switch to ZM configuration  
+# Switch to ZM configuration
 .\zmc.bat
 ```
 
