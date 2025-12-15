@@ -57,8 +57,33 @@ BeforeAll {
             [Parameter(Mandatory)]
             [array]$BatchItems
         )
-        return @{
-            value          = $BatchItems
+        # Convert batch items to PSCustomObjects for proper .PSObject.Properties handling
+        # The function checks $assignmentData.PSObject.Properties['value'] which only works with PSCustomObject, not hashtables
+        $convertedItems = $BatchItems | ForEach-Object {
+            $bodyObj = if ($_.body)
+            {
+                # Convert body hashtable to PSCustomObject recursively
+                $bodyProps = @{}
+                foreach ($key in $_.body.Keys)
+                {
+                    $bodyProps[$key] = $_.body[$key]
+                }
+                [PSCustomObject]$bodyProps
+            }
+            else
+            {
+                $null
+            }
+
+            [PSCustomObject]@{
+                id     = $_.id
+                status = $_.status
+                body   = $bodyObj
+            }
+        }
+
+        return [PSCustomObject]@{
+            value          = $convertedItems
             batchProcessed = $true
             successCount   = ($BatchItems | Where-Object { $_.status -eq 200 }).Count
             failureCount   = ($BatchItems | Where-Object { $_.status -ne 200 }).Count
@@ -80,6 +105,136 @@ BeforeAll {
             @{ id = "8"; status = 200; body = @{ value = @() } }
         )
     }
+
+    # Mock Write-Log and Write-Verbose globally to reduce output and prevent deep JSON serialization warnings
+    Mock Write-Log {}
+    Mock Write-Verbose {}
+    Mock Write-Host {}  # Prevent console output during tests
+    Mock Get-CachedData { return $null }  # Prevent cache lookups in tests
+
+    # Mock ConvertTo-Json completely to prevent serialization hangs
+    Mock ConvertTo-Json { return "{}" }
+
+    # Mock Export-Csv to write CSV data for test verification without real file I/O complications
+    Mock Export-Csv {
+        param($InputObject, $Path, $NoTypeInformation, $Encoding)
+        # Write CSV data manually to avoid encoding issues in PowerShell 7
+        if ($Path -and $InputObject)
+        {
+            # Ensure parent directory exists
+            $parentDir = Split-Path -Parent $Path
+            if ($parentDir -and -not (Test-Path $parentDir))
+            {
+                New-Item -Path $parentDir -ItemType Directory -Force | Out-Null
+            }
+
+            # Convert to array if single object
+            $data = @($InputObject)
+
+            if ($data.Count -gt 0)
+            {
+                # Get property names from first object
+                $properties = $data[0].PSObject.Properties.Name
+
+                # Write CSV manually
+                $csvLines = @()
+                $csvLines += ($properties -join ',')  # Header
+
+                foreach ($item in $data)
+                {
+                    $values = $properties | ForEach-Object {
+                        $val = $item.$_
+                        if ($val -match '[,"]')
+                        {
+                            "`"$($val -replace '"', '""')`""  # Escape quotes and wrap in quotes
+                        }
+                        else
+                        {
+                            $val
+                        }
+                    }
+                    $csvLines += ($values -join ',')
+                }
+
+                $csvLines | Out-File -FilePath $Path -Encoding UTF8
+            }
+        }
+    }
+
+    # Mock Test-ResourcePlatformMatch (platform filtering)
+    Mock Test-ResourcePlatformMatch { return $true }
+
+    # Mock Get-AppProtectionPolicyAssignments
+    Mock Get-AppProtectionPolicyAssignments {
+        return @{ value = @() }
+    }
+
+    # Mock Test-HasRealAssignment
+    Mock Test-HasRealAssignment {
+        param($Assignments)
+        return $Assignments.Count -gt 0
+    }
+
+    # CRITICAL: Mock Get-ResourceListEndpoints to return minimal test data
+    Mock Get-ResourceListEndpoints {
+        return @(
+            @{ id = "mobileApps"; url = "deviceAppManagement/mobileApps"; extraParams = "`$select=id,displayName,description" }
+            @{ id = "deviceConfigs"; url = "deviceManagement/deviceConfigurations"; extraParams = "`$select=id,displayName,description" }
+            @{ id = "compliancePolicies"; url = "deviceManagement/deviceCompliancePolicies"; extraParams = "`$select=id,displayName,description" }
+            @{ id = "deviceScripts"; url = "deviceManagement/deviceManagementScripts"; extraParams = "`$select=id,displayName,description" }
+            @{ id = "appProtectionPolicies"; url = "deviceAppManagement/managedAppPolicies"; extraParams = "`$select=id,displayName,description" }
+            @{ id = "intents"; url = "deviceManagement/intents"; extraParams = "`$select=id,displayName,description" }
+            @{ id = "resourceAccessProfiles"; url = "deviceManagement/resourceAccessProfiles"; extraParams = "`$select=id,displayName,description" }
+            @{ id = "policySets"; url = "deviceAppManagement/policySets"; extraParams = "`$select=id,displayName,description" }
+        )
+    }
+
+    # CRITICAL: Mock CallGraphAPI globally to prevent any real API calls and test hangs
+    # The mock needs to handle the actual function's behavior where it might call with empty arrays
+    Mock CallGraphAPI {
+        param($accessToken, $ResourcePath, $APIVersion, $Method)
+
+        # Check if Parameter binding will fail (empty array causes $null binding)
+        # This handles the edge case where the function has no resources and tries to fetch assignments
+        try
+        {
+            $pathCount = if ($ResourcePath)
+            {
+                $ResourcePath.Count 
+            }
+            else
+            {
+                0 
+            }
+        }
+        catch
+        {
+            $pathCount = 0
+        }
+
+        # Handle empty/null - return valid empty response
+        if ($pathCount -eq 0)
+        {
+            return @{
+                value          = @()
+                batchProcessed = $true
+                successCount   = 0
+                failureCount   = 0
+                totalCount     = 0
+            }
+        }
+
+        # For resource fetching (array of endpoint URLs)
+        if ($ResourcePath -is [array])
+        {
+            return New-EmptyBatchResponse
+        }
+
+        # For single path (assignments)
+        return @{
+            value = @()
+        }
+    }
 }
 
 AfterAll {
@@ -88,12 +243,6 @@ AfterAll {
         Remove-TestEnvironment -TestContext $script:TestEnv
     }
 }
-
-# Mock Write-Log and Write-Verbose globally to reduce output and prevent deep JSON serialization warnings
-Mock Write-Log {}
-Mock Write-Verbose {}
-Mock Get-CachedData { return $null }  # Prevent cache lookups in tests
-Mock Export-Csv { Write-Host "[MOCK] Export-Csv called for $Path"; return $true }  # Mock CSV export
 
 Describe "Function: Export-ConfigurationAssignments" -Tags 'Unit', 'Export', 'GroupAssignments' {
 
@@ -112,11 +261,7 @@ Describe "Function: Export-ConfigurationAssignments" -Tags 'Unit', 'Export', 'Gr
         }
 
         It "Should accept valid parameters" {
-            Mock CallGraphAPI {
-                Write-Host "MOCK CALLED: CallGraphAPI" -ForegroundColor Magenta
-                return New-EmptyBatchResponse
-            }
-
+            # No additional mock needed - global mock handles it
             $result = Export-ConfigurationAssignments -AccessToken $script:TestAccessToken -OutputPath $script:TestOutputFolder
             $result.Success | Should -Be $true
         }
@@ -211,8 +356,35 @@ Describe "Function: Export-ConfigurationAssignments" -Tags 'Unit', 'Export', 'Gr
             Mock CallGraphAPI {
                 param($AccessToken, $ResourcePath)
 
-                if ($ResourcePath -is [array])
+                # Check if this is an assignment fetch (array OR single string with "assignments")
+                $isAssignmentFetch = ($ResourcePath -is [array] -and $ResourcePath.Count -gt 0 -and $ResourcePath[0] -match 'assignments') -or
+                ($ResourcePath -is [string] -and $ResourcePath -match 'assignments')
+
+                if ($isAssignmentFetch)
                 {
+                    # Return batch response for assignment fetch
+                    return New-MockBatchResponse -BatchItems @(
+                        @{
+                            id     = "1"
+                            status = 200
+                            body   = @{
+                                value = @(
+                                    @{
+                                        id     = "assignment-1"
+                                        intent = "required"
+                                        target = @{
+                                            '@odata.type' = '#microsoft.graph.groupAssignmentTarget'
+                                            groupId       = $testGroupId
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    )
+                }
+                elseif ($ResourcePath -is [array])
+                {
+                    # Return batch response for resource fetch
                     return New-MockBatchResponse -BatchItems @(
                         @{
                             id     = "1"
@@ -231,21 +403,6 @@ Describe "Function: Export-ConfigurationAssignments" -Tags 'Unit', 'Export', 'Gr
                         @{ id = "7"; status = 200; body = @{ value = @() } }
                         @{ id = "8"; status = 200; body = @{ value = @() } }
                     )
-                }
-                elseif ($ResourcePath -match 'assignments')
-                {
-                    return @{
-                        value = @(
-                            @{
-                                id     = "assignment-1"
-                                intent = "required"
-                                target = @{
-                                    '@odata.type' = '#microsoft.graph.groupAssignmentTarget'
-                                    groupId       = $testGroupId
-                                }
-                            }
-                        )
-                    }
                 }
                 else
                 {
@@ -271,8 +428,34 @@ Describe "Function: Export-ConfigurationAssignments" -Tags 'Unit', 'Export', 'Gr
             Mock CallGraphAPI {
                 param($AccessToken, $ResourcePath)
 
-                if ($ResourcePath -is [array])
+                # Check if this is an assignment fetch (array OR single string with "assignments")
+                $isAssignmentFetch = ($ResourcePath -is [array] -and $ResourcePath.Count -gt 0 -and $ResourcePath[0] -match 'assignments') -or
+                ($ResourcePath -is [string] -and $ResourcePath -match 'assignments')
+
+                if ($isAssignmentFetch)
                 {
+                    # Return batch response for assignment fetch
+                    return New-MockBatchResponse -BatchItems @(
+                        @{
+                            id     = "1"
+                            status = 200
+                            body   = @{
+                                value = @(
+                                    @{
+                                        id     = "assignment-1"
+                                        intent = "required"
+                                        target = @{
+                                            '@odata.type' = '#microsoft.graph.allLicensedUsersAssignmentTarget'
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    )
+                }
+                elseif ($ResourcePath -is [array])
+                {
+                    # Return batch response for resource fetch
                     return New-MockBatchResponse -BatchItems @(
                         @{
                             id     = "1"
@@ -330,8 +513,34 @@ Describe "Function: Export-ConfigurationAssignments" -Tags 'Unit', 'Export', 'Gr
             Mock CallGraphAPI {
                 param($AccessToken, $ResourcePath)
 
-                if ($ResourcePath -is [array])
+                # Check if this is an assignment fetch (array OR single string with "assignments")
+                $isAssignmentFetch = ($ResourcePath -is [array] -and $ResourcePath.Count -gt 0 -and $ResourcePath[0] -match 'assignments') -or
+                ($ResourcePath -is [string] -and $ResourcePath -match 'assignments')
+
+                if ($isAssignmentFetch)
                 {
+                    # Return batch response for assignment fetch
+                    return New-MockBatchResponse -BatchItems @(
+                        @{
+                            id     = "1"
+                            status = 200
+                            body   = @{
+                                value = @(
+                                    @{
+                                        id     = "assignment-1"
+                                        intent = "required"
+                                        target = @{
+                                            '@odata.type' = '#microsoft.graph.allDevicesAssignmentTarget'
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    )
+                }
+                elseif ($ResourcePath -is [array])
+                {
+                    # Return batch response for resource fetch
                     return New-MockBatchResponse -BatchItems @(
                         @{
                             id     = "1"
@@ -391,8 +600,42 @@ Describe "Function: Export-ConfigurationAssignments" -Tags 'Unit', 'Export', 'Gr
             Mock CallGraphAPI {
                 param($AccessToken, $ResourcePath)
 
-                if ($ResourcePath -is [array])
+                # Check if this is an assignment fetch (array OR single string with "assignments")
+                $isAssignmentFetch = ($ResourcePath -is [array] -and $ResourcePath.Count -gt 0 -and $ResourcePath[0] -match 'assignments') -or
+                ($ResourcePath -is [string] -and $ResourcePath -match 'assignments')
+
+                if ($isAssignmentFetch)
                 {
+                    # Return batch response for assignment fetch with both direct and indirect
+                    return New-MockBatchResponse -BatchItems @(
+                        @{
+                            id     = "1"
+                            status = 200
+                            body   = @{
+                                value = @(
+                                    @{
+                                        id     = "assignment-1"
+                                        intent = "required"
+                                        target = @{
+                                            '@odata.type' = '#microsoft.graph.groupAssignmentTarget'
+                                            groupId       = $testGroupId
+                                        }
+                                    },
+                                    @{
+                                        id     = "assignment-2"
+                                        intent = "required"
+                                        target = @{
+                                            '@odata.type' = '#microsoft.graph.allLicensedUsersAssignmentTarget'
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    )
+                }
+                elseif ($ResourcePath -is [array])
+                {
+                    # Return batch response for resource fetch
                     return New-MockBatchResponse -BatchItems @(
                         @{
                             id     = "1"
@@ -458,8 +701,26 @@ Describe "Function: Export-ConfigurationAssignments" -Tags 'Unit', 'Export', 'Gr
             Mock CallGraphAPI {
                 param($AccessToken, $ResourcePath)
 
-                if ($ResourcePath -is [array])
+                # Check if this is an assignment fetch (array OR single string with "assignments")
+                $isAssignmentFetch = ($ResourcePath -is [array] -and $ResourcePath.Count -gt 0 -and $ResourcePath[0] -match 'assignments') -or
+                ($ResourcePath -is [string] -and $ResourcePath -match 'assignments')
+
+                if ($isAssignmentFetch)
                 {
+                    # Return batch response for assignment fetch with no assignments
+                    return New-MockBatchResponse -BatchItems @(
+                        @{
+                            id     = "1"
+                            status = 200
+                            body   = @{
+                                value = @()
+                            }
+                        }
+                    )
+                }
+                elseif ($ResourcePath -is [array])
+                {
+                    # Return batch response for resource fetch
                     return New-MockBatchResponse -BatchItems @(
                         @{
                             id     = "1"
@@ -512,8 +773,34 @@ Describe "Function: Export-ConfigurationAssignments" -Tags 'Unit', 'Export', 'Gr
             Mock CallGraphAPI {
                 param($AccessToken, $ResourcePath)
 
-                if ($ResourcePath -is [array])
+                # Check if this is an assignment fetch (array OR single string with "assignments")
+                $isAssignmentFetch = ($ResourcePath -is [array] -and $ResourcePath.Count -gt 0 -and $ResourcePath[0] -match 'assignments') -or
+                ($ResourcePath -is [string] -and $ResourcePath -match 'assignments')
+
+                if ($isAssignmentFetch)
                 {
+                    # Return batch response for assignment fetch
+                    return New-MockBatchResponse -BatchItems @(
+                        @{
+                            id     = "1"
+                            status = 200
+                            body   = @{
+                                value = @(
+                                    @{
+                                        id     = "assignment-1"
+                                        intent = "required"
+                                        target = @{
+                                            '@odata.type' = '#microsoft.graph.allDevicesAssignmentTarget'
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    )
+                }
+                elseif ($ResourcePath -is [array])
+                {
+                    # Return batch response for resource fetch
                     return New-MockBatchResponse -BatchItems @(
                         @{
                             id     = "1"
@@ -571,8 +858,35 @@ Describe "Function: Export-ConfigurationAssignments" -Tags 'Unit', 'Export', 'Gr
             Mock CallGraphAPI {
                 param($AccessToken, $ResourcePath)
 
-                if ($ResourcePath -is [array])
+                # Check if this is an assignment fetch (array OR single string with "assignments")
+                $isAssignmentFetch = ($ResourcePath -is [array] -and $ResourcePath.Count -gt 0 -and $ResourcePath[0] -match 'assignments') -or
+                ($ResourcePath -is [string] -and $ResourcePath -match 'assignments')
+
+                if ($isAssignmentFetch)
                 {
+                    # Return batch response for assignment fetch
+                    return New-MockBatchResponse -BatchItems @(
+                        @{
+                            id     = "1"
+                            status = 200
+                            body   = @{
+                                value = @(
+                                    @{
+                                        id     = "assignment-1"
+                                        intent = "required"
+                                        target = @{
+                                            '@odata.type' = '#microsoft.graph.groupAssignmentTarget'
+                                            groupId       = $testGroupId
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    )
+                }
+                elseif ($ResourcePath -is [array])
+                {
+                    # Return batch response for resource fetch
                     return New-MockBatchResponse -BatchItems @(
                         @{
                             id     = "1"
