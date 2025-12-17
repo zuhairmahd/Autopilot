@@ -15,7 +15,7 @@ jobs:
     if: github.event_name == 'release' && github.event.action == 'published'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Verify PowerShell 7
         shell: pwsh
@@ -24,7 +24,7 @@ jobs:
           if ($PSVersionTable.PSVersion.Major -lt 7) { Write-Error "PowerShell 7+ is required."; exit 1 }
 
       - name: Cache Pester module
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~\Documents\PowerShell\Modules\Pester
           key: ${{ runner.os }}-pester-${{ hashFiles('**/Invoke-PesterTests.ps1') }}
@@ -44,7 +44,7 @@ jobs:
 
       - name: Upload unit test results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: unit-test-results
           path: |
@@ -60,10 +60,10 @@ jobs:
     if: github.event_name == 'release' && github.event.action == 'published'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Cache Pester module
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~\Documents\PowerShell\Modules\Pester
           key: ${{ runner.os }}-pester-${{ hashFiles('**/Invoke-PesterTests.ps1') }}
@@ -83,7 +83,7 @@ jobs:
 
       - name: Upload comprehensive test results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: comprehensive-test-results
           path: |
@@ -99,10 +99,10 @@ jobs:
     if: github.event_name == 'release' && github.event.action == 'published'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Cache Pester module
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~\Documents\PowerShell\Modules\Pester
           key: ${{ runner.os }}-pester-${{ hashFiles('**/Invoke-PesterTests.ps1') }}
@@ -122,7 +122,7 @@ jobs:
 
       - name: Upload integration test results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: integration-test-results
           path: |
@@ -138,10 +138,10 @@ jobs:
     if: github.event_name == 'release' && github.event.action == 'published'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Cache PowerShell modules
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~\Documents\PowerShell\Modules
           key: ${{ runner.os }}-pwsh-modules-${{ hashFiles('CreateRelease.ps1') }}
@@ -167,14 +167,14 @@ jobs:
           write-host "Build complete (release using target: production). Executable and lastrun.json are in the hd directory."
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: autopilot-build
           path: hd
 
       - name: Upload build logs
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: build-logs
           path: logs/CreateRelease.log
@@ -192,13 +192,13 @@ jobs:
       AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           persist-credentials: true
           fetch-depth: 0
 
       - name: Download build artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: autopilot-build
           path: hd
@@ -239,7 +239,7 @@ jobs:
           .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName production -Overwrite -updateHash
 
       - name: Upload signed artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: signed-artifacts
           path: |
@@ -253,7 +253,7 @@ jobs:
     if: github.event_name == 'release' && github.event.action == 'published'
     steps:
       - name: Download signed artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: signed-artifacts
           path: ./release-assets
