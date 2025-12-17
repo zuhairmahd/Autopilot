@@ -107,6 +107,19 @@
                 )
             },
             @{
+                description           = 'Perform a series of quality assurance checks on a device'
+                name                  = 'Device quality assurance checks'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin',
+                    'advanced',
+                    'registration',
+                    'advancedRegistration',
+                    'helpdesk'
+                )
+            }
+            @{
                 menuName              = 'checkMenu'
                 description           = 'Troubleshoot a device'
                 name                  = 'Check device status'
@@ -579,7 +592,7 @@
                     'advanced',
                     'helpdesk',
                     'registration'
-                )                                   
+                )
             },
             @{
                 description           = 'View the application License Terms'
@@ -591,7 +604,7 @@
                     'advanced',
                     'helpdesk',
                     'registration'
-                )                                   
+                )
             },
             @{
                 description           = 'Send a message to support including logs'
@@ -669,7 +682,7 @@
                     'advanced',
                     'registration',
                     'advancedRegistration'
-                )                           
+                )
             }
         )
         includeInDisplayModes = @(
