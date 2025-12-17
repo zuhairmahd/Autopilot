@@ -1514,49 +1514,145 @@ $exportMenu = AddMenuItem -menu $exportMenu -name "Export Application Assignment
 #region device reports menu
 $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Assigned Windows Devices" -Action {
     Write-Host "Exporting assigned device report..."
-    $exportedDeviceAssignment = Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'Assigned' -fileMode 'Overwrite'
+    $lastContactDateTime = Get-DateInput
+    $exportParams = @{
+        accessToken = $accessToken
+        outputPath  = $scriptPath
+        reportType  = 'Assigned'
+        fileMode    = 'Overwrite'
+    }
+    if ($lastContactDateTime)
+    {
+        $exportParams.lastContactDateTime = $lastContactDateTime
+    }
+    $exportedDeviceAssignment = Export-DeviceAssignmentReport @exportParams
+    write-log -logFile $logFile -module $scriptName -message "Assigned device report export result: $($exportedDeviceAssignment | Out-String)" -LogLevel "Information"
     if ($exportedDeviceAssignment.success)
     {
-        Write-Host "Assigned device report exported successfully to $($exportedDeviceAssignment.outputFile) with $($exportedDeviceAssignment.deviceCount) devices." -ForegroundColor Green
+        if ($exportedDeviceAssignment.deviceCount -gt 0)
+        {
+            write-log -logFile $logFile -module $scriptName -message "Assigned device report exported: File=$($exportedDeviceAssignment.outputFile), DeviceCount=$($exportedDeviceAssignment.deviceCount)" -LogLevel "Information"
+            Write-Host " $($exportedDeviceAssignment.deviceCount) Assigned devices exported successfully to $($exportedDeviceAssignment.outputFile)             ." -ForegroundColor Green
+        }
+        else
+        {
+            if ($lastContactDateTime)
+            {
+                $formattedDate = FormatDateWithTimeZone -DateTime $lastContactDateTime
+                write-log -logFile $logFile -module $scriptName -message "No assigned devices found that have connected to Intune since $formattedDate" -LogLevel "Warning"
+                Write-Host "No assigned devices found that have connected to Intune since $formattedDate" -ForegroundColor Yellow
+            }
+            else
+            {
+                write-log -logFile $logFile -module $scriptName -message "No assigned devices found to export - no devices in scope" -LogLevel "Warning"
+                Write-Host "No reports generated - no assigned devices found." -ForegroundColor Yellow
+            }
+        }
     }
     else
     {
+        write-log -logFile $logFile -module $scriptName -message "Failed to export assigned device report: $($exportedDeviceAssignment.message)" -LogLevel "Error"
         Write-Host $exportedDeviceAssignment.message -ForegroundColor Red
     }
 }
 $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Unassigned Windows Devices" -Action {
     Write-Host "Exporting unassigned device report..."
-    $exportedDeviceAssignment = Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'Unassigned' -fileMode 'Overwrite'
+    $exportParams = @{
+        accessToken = $accessToken
+        outputPath  = $scriptPath
+        reportType  = 'Unassigned'
+        fileMode    = 'Overwrite'
+    }
+    $exportedDeviceAssignment = Export-DeviceAssignmentReport @exportParams
+    write-log -logFile $logFile -module $scriptName -message "Unassigned device report export result: $($exportedDeviceAssignment | Out-String)" -LogLevel "Information"
     if ($exportedDeviceAssignment.success)
     {
-        Write-Host "Unassigned device report exported successfully to $($exportedDeviceAssignment.outputFile) with $($exportedDeviceAssignment.deviceCount) devices." -ForegroundColor Green
+        if ($exportedDeviceAssignment.deviceCount -gt 0)
+        {
+            write-log -logFile $logFile -module $scriptName -message "Unassigned device report exported: File=$($exportedDeviceAssignment.outputFile), DeviceCount=$($exportedDeviceAssignment.deviceCount)" -LogLevel "Information"
+            Write-Host " $($exportedDeviceAssignment.deviceCount) Unassigned devices exported successfully to $($exportedDeviceAssignment.outputFile)                           ." -ForegroundColor Green
+        }
+        else
+        {
+            write-log -logFile $logFile -module $scriptName -message "No unassigned devices found to export - no devices in scope" -LogLevel "Warning"
+            Write-Host "No reports generated - no unassigned devices found." -ForegroundColor Yellow
+        }
     }
     else
     {
+        write-log -logFile $logFile -module $scriptName -message "Failed to export unassigned device report: $($exportedDeviceAssignment.message)" -LogLevel "Error"
         Write-Host $exportedDeviceAssignment.message -ForegroundColor Red
     }
 }
 $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Pre-provisioned Windows Devices" -Action {
     Write-Host "Exporting pre-provisioned device report..."
-    $exportedDeviceAssignment = Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'PreProvisioned' -fileMode 'Overwrite'
+    $lastContactDateTime = Get-DateInput
+    $exportParams = @{
+        accessToken = $accessToken
+        outputPath  = $scriptPath
+        reportType  = 'PreProvisioned'
+        fileMode    = 'Overwrite'
+    }
+    if ($lastContactDateTime)
+    {
+        $exportParams.lastContactDateTime = $lastContactDateTime
+    }
+    $exportedDeviceAssignment = Export-DeviceAssignmentReport @exportParams
+    write-log -logFile $logFile -module $scriptName -message "Pre-provisioned device report export result: $($exportedDeviceAssignment | Out-String)" -LogLevel "Information"
     if ($exportedDeviceAssignment.success)
     {
-        Write-Host "Pre-provisioned device report exported successfully to $($exportedDeviceAssignment.outputFile) with $($exportedDeviceAssignment.deviceCount) devices." -ForegroundColor Green
+        if ($exportedDeviceAssignment.deviceCount -gt 0)
+        {
+            write-log -logFile $logFile -module $scriptName -message "Pre-provisioned device report exported: File=$($exportedDeviceAssignment.outputFile), DeviceCount=$($exportedDeviceAssignment.deviceCount)" -LogLevel "Information"
+            Write-Host "$($exportedDeviceAssignment.deviceCount) Pre-provisioned devices exported successfully to $($exportedDeviceAssignment.outputFile)." -ForegroundColor Green
+        }
+        else
+        {
+            if ($lastContactDateTime)
+            {
+                $formattedDate = FormatDateWithTimeZone -DateTime $lastContactDateTime
+                write-log -logFile $logFile -module $scriptName -message "No pre-provisioned devices found that have connected to Intune since $formattedDate" -LogLevel "Warning"
+                Write-Host "No pre-provisioned devices found that have connected to Intune since $formattedDate" -ForegroundColor Yellow
+            }
+            else
+            {
+                write-log -logFile $logFile -module $scriptName -message "No pre-provisioned devices found to export - no devices in scope" -LogLevel "Warning"
+                Write-Host "No reports generated - no pre-provisioned devices found." -ForegroundColor Yellow
+            }
+        }
     }
     else
     {
+        write-log -logFile $logFile -module $scriptName -message "Failed to export pre-provisioned device report: $($exportedDeviceAssignment.message)" -LogLevel "Error"
         Write-Host $exportedDeviceAssignment.message -ForegroundColor Red
     }
 }
 $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "All Windows Devices" -Action {
     Write-Host "Exporting all devices with their assignment status..."
-    $exportedDeviceAssignment = Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'All' -fileMode 'Overwrite'
+    $exportParams = @{
+        accessToken = $accessToken
+        outputPath  = $scriptPath
+        reportType  = 'All'
+        fileMode    = 'Overwrite'
+    }
+    $exportedDeviceAssignment = Export-DeviceAssignmentReport @exportParams
+    write-log -logFile $logFile -module $scriptName -message "All device report export result: $($exportedDeviceAssignment | Out-String)" -LogLevel "Information"
     if ($exportedDeviceAssignment.success)
     {
-        Write-Host "All devices report exported successfully to $($exportedDeviceAssignment.outputFile) with $($exportedDeviceAssignment.deviceCount) devices." -ForegroundColor Green
+        if ($exportedDeviceAssignment.deviceCount -gt 0)
+        {
+            write-log -logFile $logFile -module $scriptName -message "All device report exported: File=$($exportedDeviceAssignment.outputFile), DeviceCount=$($exportedDeviceAssignment.deviceCount)" -LogLevel "Information"
+            Write-Host "All $($exportedDeviceAssignment.deviceCount) devices exported successfully to $($exportedDeviceAssignment.outputFile)." -ForegroundColor Green
+        }
+        else
+        {
+            write-log -logFile $logFile -module $scriptName -message "No devices found to export - no devices in scope" -LogLevel "Warning"
+            Write-Host "No reports generated - no devices found." -ForegroundColor Yellow
+        }
     }
     else
     {
+        write-log -logFile $logFile -module $scriptName -message "Failed to export all device report: $($exportedDeviceAssignment.message)" -LogLevel "Error"
         Write-Host $exportedDeviceAssignment.message -ForegroundColor Red
     }
 }
@@ -2302,7 +2398,7 @@ $script:ShowGroupAssignmentsAction = {
     $specialGroups = @("*", "?")
     $messageText = if ($IncludeIndirectAssignments)
     {
-        "Enter the name of the group whose indirect (All Users/All Devices) assignments you want to view. Enter any of $specialGroups             for all assignments"
+        "Enter the name of the group whose indirect (All Users/All Devices) assignments you want to view. Enter any of $specialGroups for all assignments"
     }
     else
     {
@@ -2310,7 +2406,7 @@ $script:ShowGroupAssignmentsAction = {
     }
     write-log -logFile $LogFile -Module $scriptName -Message "Prompting user for group name to view $assignmentScope assignments" -LogLevel "Information"
     $groupName = GetUserInput -Message $messageText -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
-    $needsResolution = if ($IncludeIndirectAssignments -and $groupName -in $specialGroups                                                           )
+    $needsResolution = if ($IncludeIndirectAssignments -and $groupName -in $specialGroups)
     {
         $false
     }

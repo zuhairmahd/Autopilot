@@ -483,6 +483,8 @@ if ($null -ne $appMetaData.corporateSettings -and $appMetaData.corporateSettings
             {
                 [console]::beep(150, 80)
             }
+            =======
+            Write-Host "Successfully copied corporate settings from $domainFileName to $localDomainFileName" -ForegroundColor Green
             break
         }
         catch
@@ -1075,6 +1077,7 @@ if (-not (Test-Path -Path $inputFile))
 $users = Get-Content -Path $inputFile | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
 $global:devices = Get-RegisteredDevicesByUser -accessToken $accessToken -usersList $users
 $global:pivTest = Test-PIVReader
+Export-DeviceAssignmentReport -accessToken $accessToken -outputPath $PWD -reportType "assigned" -lastContactDateTime (Get-Date).AddDays(-60)
 
 exit 0
 
