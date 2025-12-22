@@ -1803,6 +1803,31 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Quick Import device int
         Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
         return $null
     }
+    if ($settings.verifyAutopilotDeviceMinimumSpecs)
+    {
+        Write-Host "Verifying device meets $($settings.companyName) minimum specifications for Autopilot enrollment..."
+        write-log -logFile $LogFile -Module $scriptName -Message "Verifying device meets $($settings.companyName) minimum specifications for Autopilot enrollment." -LogLevel "Information"
+        $minimumSpecResult = Test-MinimumSpecs -settings $settings -writeToConsole
+        if ($minimumSpecResult.Success)
+        {
+            Write-Verbose "[$scriptName] Device meets minimum specifications for Autopilot."
+            write-log -logFile $LogFile -Module $scriptName -Message "Device meets minimum specifications for Autopilot." -LogLevel "Information"
+            Write-Host "This device meets the minimum specifications for Autopilot enrollment as defined in the settings." -ForegroundColor Green
+        }
+        else
+        {
+            Write-Host "This device does not meet the minimum specifications for Autopilot enrollment as defined in the settings." -ForegroundColor Red
+            Write-Host "Details: $($minimumSpecResult.Message)" -ForegroundColor Yellow
+            foreach ($check in $minimumSpecResult.Checks | Where-Object { $_.Passed -ne $true })
+            {
+                Write-Host " - $($check.Name): expected $($check.Expected); actual $($check.Actual)" -ForegroundColor Yellow
+            }
+            Write-Host "Please review and adjust the settings if you wish to proceed with importing this device." -ForegroundColor Red
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Device does not meet minimum specifications for Autopilot. $($minimumSpecResult.Message)" -LogLevel "Error"
+            return $returnValues.minimumSpecsNotMetMessage
+        }
+    }
+
     $result = PrepareImportDevice -accessToken $accessToken
     Write-Verbose "[$scriptName] Result of quick import: $result"
 }
@@ -2655,14 +2680,42 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Device quality assurance checks" 
     Write-Host "Checking system compatibility..."
     $systemInformation = Get-SystemInformation
     $PIVReaderStatus = Test-PIVReader
-    $hasCorrectMemory = if ($null -ne $settings.minimumDevicePhysicalMemoryInGB -and $null -ne $systemInformation.TotalMemoryGB) { $systemInformation.TotalMemoryGB -ge $settings.minimumDevicePhysicalMemoryInGB } else { $null }                      
-    $hasCorrectOS = if ($null -ne $settings.operatingSystem -and $null -ne $systemInformation.OSName) { $systemInformation.OSName -like "*$($settings.operatingSystem)*" } else { $null }               
-    $hasMinimumOS = if ($null -ne $systemInformation.OSBuild -and $null -ne $settings.OSBuild) { $systemInformation.OSBuild -eq $settings.OSBuild } else { $null }                          
-    $PIVReaderOK = if ($PIVReaderStatus.Success) { $true } else { $false }                                   
-    Write-Host "Has correct OS: $hasCorrectOS" -ForegroundColor Cyan                
-    Write-Host "Has minimum OS build: $hasMinimumOS" -ForegroundColor Cyan                              
-    Write-Host "Has correct memory: $hasCorrectMemory" -ForegroundColor Cyan                                
-    Write-Host "Piv reader status OK: $PIVReaderOK" -ForegroundColor Cyan               
+    $hasCorrectMemory = if ($null -ne $settings.minimumDevicePhysicalMemoryInGB -and $null -ne $systemInformation.TotalMemoryGB)
+    {
+        $systemInformation.TotalMemoryGB -ge $settings.minimumDevicePhysicalMemoryInGB
+    }
+    else
+    {
+        $null
+    }
+    $hasCorrectOS = if ($null -ne $settings.operatingSystem -and $null -ne $systemInformation.OSName)
+    {
+        $systemInformation.OSName -like "*$($settings.operatingSystem)*"
+    }
+    else
+    {
+        $null
+    }
+    $hasMinimumOS = if ($null -ne $systemInformation.OSBuild -and $null -ne $settings.OSBuild)
+    {
+        $systemInformation.OSBuild -eq $settings.OSBuild
+    }
+    else
+    {
+        $null
+    }
+    $PIVReaderOK = if ($PIVReaderStatus.Success)
+    {
+        $true
+    }
+    else
+    {
+        $false
+    }
+    Write-Host "Has correct OS: $hasCorrectOS" -ForegroundColor Cyan
+    Write-Host "Has minimum OS build: $hasMinimumOS" -ForegroundColor Cyan
+    Write-Host "Has correct memory: $hasCorrectMemory" -ForegroundColor Cyan
+    Write-Host "Piv reader status OK: $PIVReaderOK" -ForegroundColor Cyan
 }
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status" -Submenu $CheckMenu
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopilotMenu

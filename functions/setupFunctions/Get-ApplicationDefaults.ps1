@@ -121,6 +121,9 @@ function Get-ApplicationDefaults()
             maxMenuItemsPerPage                       = 15
             release                                   = "auto"
             operatingSystem                           = "Windows"
+            minimumOSBuild                            = 26100
+            verifyAutopilotDeviceMinimumSpecs         = $true
+            runPIVTest                                = $false
             preferredBrowser                          = 'Chrome'
             documentationURL                          = "https://github.com/zuhairmahd/Autopilot/blob/master/readme.md"
             licenseURL                                = "https://github.com/zuhairmahd/Autopilot/blob/master/LICENSE"
@@ -228,7 +231,10 @@ function Get-ApplicationDefaults()
             }
             autoUpdate                                = $true
             deviceNamePrefix                          = ""
+            verifyAutopilotDeviceMinimumSpecs         = $true
+            runPIVTest                                = $false
             operatingSystem                           = "Windows"
+            minimumOSBuild                            = 26100
             minUsernameLength                         = 3
             maxUserNameLength                         = 50
             maxSerialNumberLength                     = 50
@@ -393,6 +399,7 @@ function Get-ApplicationDefaults()
                 invalidFileType                = "Invalid file type."
                 InvalidSignatureMessage        = "The signature is invalid. The update will be aborted."
                 manufacturerNotAllowed         = "You are not allowed to import this device using this script.  Please contact your system administrator."
+                minimumSpecsNotMetMessage      = "The device does not meet the minimum specifications required for Autopilot enrollment."
                 noBitLockerKeysFoundMessage    = "No BitLocker keys found for this device."
                 noDeviceFound                  = "No device found"
                 noGroupAssignmentsFoundMessage = "No assignments found for the specified group."
