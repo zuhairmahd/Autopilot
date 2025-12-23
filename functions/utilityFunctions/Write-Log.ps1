@@ -450,15 +450,60 @@ function Write-Log()
         {
             if ($streamWriter)
             {
-                $streamWriter.Close(); $streamWriter.Dispose() 
+                try
+                {
+                    $streamWriter.Close()
+                }
+                catch
+                {
+                    Write-Warning "Write-Log: Failed to close StreamWriter: $($_.Exception.Message)"
+                }
+                try
+                {
+                    $streamWriter.Dispose()
+                }
+                catch
+                {
+                    Write-Warning "Write-Log: Failed to dispose StreamWriter: $($_.Exception.Message)"
+                }
             }
             if ($fileStream)
             {
-                $fileStream.Close(); $fileStream.Dispose() 
+                try
+                {
+                    $fileStream.Close()
+                }
+                catch
+                {
+                    Write-Warning "Write-Log: Failed to close FileStream: $($_.Exception.Message)"
+                }
+                try
+                {
+                    $fileStream.Dispose()
+                }
+                catch
+                {
+                    Write-Warning "Write-Log: Failed to dispose FileStream: $($_.Exception.Message)"
+                }
             }
             if ($mutex)
             {
-                $mutex.ReleaseMutex(); $mutex.Dispose() 
+                try
+                {
+                    $mutex.ReleaseMutex()
+                }
+                catch
+                {
+                    Write-Warning "Write-Log: Failed to release mutex: $($_.Exception.Message)"
+                }
+                try
+                {
+                    $mutex.Dispose()
+                }
+                catch
+                {
+                    Write-Warning "Write-Log: Failed to dispose mutex: $($_.Exception.Message)"
+                }
             }
         }
 

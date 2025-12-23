@@ -38,7 +38,7 @@ function Test-PIVReader()
     Author: Autopilot Team
     Requires: Smart card reader hardware and appropriate drivers
     Dependencies: advapi32.dll, crypt32.dll, Write-Log function
-    
+
     The function performs the following operations:
     1. Detects connected smart card readers
     2. Acquires cryptographic context from the Microsoft Base Smart Card Crypto Provider
@@ -340,7 +340,7 @@ public static extern bool CertFreeCertificateContext(IntPtr pCertContext);
             Write-Log -LogFile $logFile -Module $functionName -Message "Function execution completed" -LogLevel "Information"
         }
     }
-    
+
     # Get certificates from smart card
     $result = Get-SCUserStore
 
@@ -348,12 +348,12 @@ public static extern bool CertFreeCertificateContext(IntPtr pCertContext);
     {
         if ($displayCerts)
         {
-            Write-Host "Smart Card Reader:" ((Get-WmiObject win32_PnPSignedDriver | Where-Object {$_.deviceID -like "*smartcard*"}).devicename)
+            Write-Host "Smart Card Reader:" ((Get-CimInstance -ClassName win32_PnPSignedDriver | Where-Object {$_.deviceID -like "*smartcard*"}).devicename)
             Write-Host ""
             Write-Host "Found $($result.Certificates.Count) certificate(s) on smart card"
             Write-Host ""
-            
-            Write-Host "=== Certificates on Smart Card ===      "
+
+            Write-Host "=== Certificates on Smart Card ==="
             foreach ($cert in $result.Certificates)
             {
                 Write-Host "Subject: $($cert.Subject)"
