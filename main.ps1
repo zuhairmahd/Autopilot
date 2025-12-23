@@ -1827,7 +1827,10 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Quick Import device int
             return $returnValues.minimumSpecsNotMetMessage
         }
     }
-
+    else
+    {
+        write-log -logFile $LogFile -Module $scriptName -Message "Skipping minimum specifications check for Autopilot as it is disabled in settings." -LogLevel "Information"
+    }
     $result = PrepareImportDevice -accessToken $accessToken
     Write-Verbose "[$scriptName] Result of quick import: $result"
 }
@@ -1843,6 +1846,42 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Custom import device in
         Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
         Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
         return $null
+    }
+    Write-Host "Would you like to perform the minimum device specification check before proceeding with the custom import?"
+    $performCheck = Read-Host -Prompt "Enter 'yes' to perform the check or 'no' to skip"
+    while ($performCheck -notin @('yes', 'no', 'y', 'n'))
+    {
+        Write-Host "Invalid choice. Please enter 'yes' or 'no'." -ForegroundColor Red
+        [console]::beep(1000, 500)
+        $performCheck = Read-Host -Prompt "Enter 'yes' to perform the check or 'no' to skip"
+    }
+    if ($performCheck -in @('yes', 'y'))
+    {
+        Write-Host "Verifying device meets $($settings.companyName) minimum specifications for Autopilot enrollment..."
+        write-log -logFile $LogFile -Module $scriptName -Message "Verifying device meets $($settings.companyName) minimum specifications for Autopilot enrollment." -LogLevel "Information"
+        $minimumSpecResult = Test-MinimumSpecs -settings $settings -writeToConsole
+        if ($minimumSpecResult.Success)
+        {
+            Write-Verbose "[$scriptName] Device meets minimum specifications for Autopilot."
+            write-log -logFile $LogFile -Module $scriptName -Message "Device meets minimum specifications for Autopilot." -LogLevel "Information"
+            Write-Host "This device meets the minimum specifications for Autopilot enrollment as defined in the settings." -ForegroundColor Green
+        }
+        else
+        {
+            Write-Host "This device does not meet the minimum specifications for Autopilot enrollment as defined in the settings." -ForegroundColor Red
+            Write-Host "Details: $($minimumSpecResult.Message)" -ForegroundColor Yellow
+            foreach ($check in $minimumSpecResult.Checks | Where-Object { $_.Passed -ne $true })
+            {
+                Write-Host " - $($check.Name): expected $($check.Expected); actual $($check.Actual)" -ForegroundColor Yellow
+            }
+            Write-Host "Please review and adjust the settings if you wish to proceed with importing this device." -ForegroundColor Red
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Device does not meet minimum specifications for Autopilot. $($minimumSpecResult.Message)" -LogLevel "Error"
+            return $returnValues.minimumSpecsNotMetMessage
+        }
+    }
+    else
+    {
+        write-log -logFile $LogFile -Module $scriptName -Message "Skipping minimum specifications check for Autopilot as per user choice." -LogLevel "Information"
     }
     $result = PrepareImportDevice -accessToken $accessToken -CustomImport
     if ($result -eq $returnValues.backoutText)
