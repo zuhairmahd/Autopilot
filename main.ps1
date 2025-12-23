@@ -2676,47 +2676,6 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         Write-Log -LogFile $LogFile -Module $scriptName -Message "User $userName is not ready. Issues: $($readinessResult.IssueCount), Warnings: $($readinessResult.WarningCount)" -LogLevel Warning
     }
 }
-$mainMenu = AddMenuItem -Menu $mainMenu -Name "Device quality assurance checks" -Action {
-    Write-Host "Checking system compatibility..."
-    $systemInformation = Get-SystemInformation
-    $PIVReaderStatus = Test-PIVReader
-    $hasCorrectMemory = if ($null -ne $settings.minimumDevicePhysicalMemoryInGB -and $null -ne $systemInformation.TotalMemoryGB)
-    {
-        $systemInformation.TotalMemoryGB -ge $settings.minimumDevicePhysicalMemoryInGB
-    }
-    else
-    {
-        $null
-    }
-    $hasCorrectOS = if ($null -ne $settings.operatingSystem -and $null -ne $systemInformation.OSName)
-    {
-        $systemInformation.OSName -like "*$($settings.operatingSystem)*"
-    }
-    else
-    {
-        $null
-    }
-    $hasMinimumOS = if ($null -ne $systemInformation.OSBuild -and $null -ne $settings.OSBuild)
-    {
-        $systemInformation.OSBuild -eq $settings.OSBuild
-    }
-    else
-    {
-        $null
-    }
-    $PIVReaderOK = if ($PIVReaderStatus.Success)
-    {
-        $true
-    }
-    else
-    {
-        $false
-    }
-    Write-Host "Has correct OS: $hasCorrectOS" -ForegroundColor Cyan
-    Write-Host "Has minimum OS build: $hasMinimumOS" -ForegroundColor Cyan
-    Write-Host "Has correct memory: $hasCorrectMemory" -ForegroundColor Cyan
-    Write-Host "Piv reader status OK: $PIVReaderOK" -ForegroundColor Cyan
-}
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status" -Submenu $CheckMenu
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopilotMenu
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu

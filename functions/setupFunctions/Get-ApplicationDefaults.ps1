@@ -535,19 +535,6 @@ function Get-ApplicationDefaults()
                         )
                     },
                     @{
-                        description           = 'Perform a series of quality assurance checks on a device'
-                        name                  = 'Device quality assurance checks'
-                        blockType             = 'action'
-                        includeInDisplayModes = @(
-                            'full',
-                            'admin',
-                            'advanced',
-                            'registration',
-                            'advancedRegistration',
-                            'helpdesk'
-                        )
-                    }
-                    @{
                         menuName              = 'checkMenu'
                         description           = 'Troubleshoot a device'
                         name                  = 'Check device status'
