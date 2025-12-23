@@ -216,7 +216,6 @@ if (-not $skipLogin)
                 {
                     [console]::beep(150, 80)
                 }
-                =======
                 Write-Host "Successfully copied corporate settings from $domainFileName to $localDomainFileName" -ForegroundColor Green
                 break
             }
