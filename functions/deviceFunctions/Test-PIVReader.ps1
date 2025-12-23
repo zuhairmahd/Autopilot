@@ -50,7 +50,7 @@ function Test-PIVReader()
     .LINK
     https://docs.microsoft.com/en-us/windows/win32/api/wincrypt/
     #>
-    [CmdletBinding()                            ]
+    [CmdletBinding()]
     param(
         [switch]$displayCerts
     )
