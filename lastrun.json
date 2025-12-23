@@ -1,10 +1,9 @@
 {
-  "date": "2025-12-14 16:28:14",
-  "version": "2025.12.1.31201",
+  "date": "2025-12-23 17:46:40",
+  "version": "2025.12.1.31202",
   "guid": "c2c08149-3c1f-4558-9e4c-87487943bbf5",
-  "hash": "E20AC7E118D28477DFD9E3CA25CEC84C265EC399C5640F0A1BA8252DC6B4F440",
+  "hash": "C3B3536ABBE0EE9390E0B1A780C2D00542F859ACE06F42044BDC1C7039AF778E",
   "stringsVersion": "1.3.0.0",
   "settingsVersion": "1.3.0.0",
-  "releaseNotes": "Added a new feature to check that the device meets minimum specifications before Autopilot registration",
   "hashUpdated": true
 }

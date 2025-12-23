@@ -160,6 +160,9 @@
         maxMenuItemsPerPage = 15
         release = 'auto'
         operatingSystem = 'Windows'
+        minimumOSBuild = 26100
+        verifyAutopilotDeviceMinimumSpecs = $true
+        runPIVTest = $false
         preferredBrowser = 'Chrome'
         documentationURL = 'https://github.com/zuhairmahd/Autopilot/blob/master/readme.md'
         licenseURL = 'https://github.com/zuhairmahd/Autopilot/blob/master/LICENSE'
