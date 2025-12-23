@@ -3,37 +3,37 @@ function Get-ApplicationDefaults()
     <#
     .SYNOPSIS
         Single source of truth for all application default values and overwrite configurations.
-    
+
     .DESCRIPTION
         Provides all default configuration structures for the application including
         settings, auth, menus, strings, and overwrite configurations. This function serves as the centralized
         repository for all default values and force-overwrite settings to ensure consistency across the application.
-    
+
     .PARAMETER DefaultType
         Type of defaults to return: 'Settings', 'Auth', 'Global', 'Domain', 'Menus', 'Strings', 'Overwrite', 'All'
-    
+
     .PARAMETER DomainName
         Domain name to use for domain-specific defaults.
-    
+
     .PARAMETER Version
         Version string to use in configurations. If not provided, uses global version.
-    
+
     .OUTPUTS
         System.Collections.Hashtable
         Returns hashtable with requested default configuration or overwrite settings.
-    
+
     .EXAMPLE
         $authDefaults = Get-ApplicationDefaults -DefaultType "Auth"
-    
+
     .EXAMPLE
         $overwriteConfig = Get-ApplicationDefaults -DefaultType "Overwrite"
-    
+
     .EXAMPLE
         $allDefaults = Get-ApplicationDefaults -DefaultType "All"
-    
+
     .EXAMPLE
         $domainDefaults = Get-ApplicationDefaults -DefaultType "Domain" -DomainName "contoso.com"
-    
+
     .NOTES
         - Maintains PowerShell 5.1 compatibility
         - Single source of truth for all default values and overwrite configurations
@@ -49,7 +49,7 @@ function Get-ApplicationDefaults()
         [string]$DomainName,
         [string]$Version
     )
-    
+
     $functionName = $MyInvocation.MyCommand.Name
     # Initialize script-level cache if not exists
     $script:defaultsCache = New-Object 'System.Collections.Concurrent.ConcurrentDictionary[string,object]'
@@ -74,10 +74,10 @@ function Get-ApplicationDefaults()
     }
     Write-Verbose "[$functionName] Cache miss for defaults: $cacheKey"
     Write-Verbose "[$functionName] Getting default values for type: $DefaultType (cache miss: $cacheKey)"
-    
+
     # Define all default structures
     $defaults = [ordered]@{
-        
+
         # Authentication defaults - single source of truth
         Auth              = [ordered]@{
             changePwOnNextStart = $false
@@ -99,7 +99,7 @@ function Get-ApplicationDefaults()
             secureString        = $false
             delegated           = $true
         }
-        
+
         # Global settings defaults - single source of truth
         Global            = [ordered]@{
             configFile                                = ".\.secrets\config.json"
@@ -108,7 +108,7 @@ function Get-ApplicationDefaults()
             validateScopes                            = $true
             deviceContactThresholdInDays              = 30
             includeEnrolledDevicesInNextUserReadiness = $true
-            useGridForLogDisplay                      = $true     
+            useGridForLogDisplay                      = $true
             DisplayManualFilterSelection              = $false
             appModes                                  = @(
                 "full"
@@ -121,16 +121,19 @@ function Get-ApplicationDefaults()
             maxMenuItemsPerPage                       = 15
             release                                   = "auto"
             operatingSystem                           = "Windows"
+            minimumOSBuild                            = 26100
+            verifyAutopilotDeviceMinimumSpecs         = $true
+            runPIVTest                                = $false
             preferredBrowser                          = 'Chrome'
             documentationURL                          = "https://github.com/zuhairmahd/Autopilot/blob/master/readme.md"
             licenseURL                                = "https://github.com/zuhairmahd/Autopilot/blob/master/LICENSE"
-            privateSession                            = $false           
+            privateSession                            = $false
             migrateLegacyConfiguration                = $true
             hideEmptyMenus                            = $true
             autoUpdate                                = $true
         }
 
-        #cache settings defaults - single source of truth   
+        #cache settings defaults - single source of truth
         cacheSettings     = [ordered]@{
             enabled                  = $true
             defaultExpirationMinutes = 15
@@ -151,7 +154,7 @@ function Get-ApplicationDefaults()
             }
         }
 
-        # Repository information defaults - single source of truth  
+        # Repository information defaults - single source of truth
         repoInfo          = [ordered]@{
             repoName      = 'Autopilot'
             baseSourceURL = 'https://raw.githubusercontent.com'
@@ -228,7 +231,10 @@ function Get-ApplicationDefaults()
             }
             autoUpdate                                = $true
             deviceNamePrefix                          = ""
+            verifyAutopilotDeviceMinimumSpecs         = $true
+            runPIVTest                                = $false
             operatingSystem                           = "Windows"
+            minimumOSBuild                            = 26100
             minUsernameLength                         = 3
             maxUserNameLength                         = 50
             maxSerialNumberLength                     = 50
@@ -237,16 +243,16 @@ function Get-ApplicationDefaults()
             maxNumberOfDevicesAllowed                 = 15
             preferredBrowser                          = "Chrome"
             privateSession                            = $false
-            userPatternsToExclude                     = @( 
+            userPatternsToExclude                     = @(
                 "-test",
                 "onmicrosoft.com"
             )
-            groupPatternsToExclude                    = @()  
+            groupPatternsToExclude                    = @()
             groupTag                                  = ''
             assignedUser                              = ''
             additionalScopes                          = @()
         }
-        
+
         # Required scopes for Microsoft Graph API
         RequiredScopes    = @(
             @{
@@ -276,8 +282,8 @@ function Get-ApplicationDefaults()
             },
             @{
                 scope     = 'Mail.Send'
-                endpoints = @('me/sendMail')                                    
-                reason    = 'Required to send emails on behalf of the signed-in user.'              
+                endpoints = @('me/sendMail')
+                reason    = 'Required to send emails on behalf of the signed-in user.'
             },
             @{
                 Scope     = "DeviceManagementConfiguration.Read.All"
@@ -353,7 +359,7 @@ function Get-ApplicationDefaults()
                 )
             }
         )
-        
+
         # Strings defaults - UI text and localization
         Strings           = [ordered]@{
             Description   = "This is the strings file for the Intune Helpdesk script. It contains all the user-facing strings used in the script."
@@ -393,6 +399,7 @@ function Get-ApplicationDefaults()
                 invalidFileType                = "Invalid file type."
                 InvalidSignatureMessage        = "The signature is invalid. The update will be aborted."
                 manufacturerNotAllowed         = "You are not allowed to import this device using this script.  Please contact your system administrator."
+                minimumSpecsNotMetMessage      = "The device does not meet the minimum specifications required for Autopilot enrollment."
                 noBitLockerKeysFoundMessage    = "No BitLocker keys found for this device."
                 noDeviceFound                  = "No device found"
                 noGroupAssignmentsFoundMessage = "No assignments found for the specified group."
@@ -412,8 +419,8 @@ function Get-ApplicationDefaults()
                 userCanceledMessage            = "Operation canceled by user"
             }
         }
-        
-        # Menu defaults - complete menu structure 
+
+        # Menu defaults - complete menu structure
         Menus             = [ordered]@{
             version                   = '1.3.0.0'
             name                      = 'menu.psd1'
@@ -861,7 +868,7 @@ function Get-ApplicationDefaults()
                             'full',
                             'admin',
                             'advanced'
-                        )               
+                        )
                     }
                 )
                 type                  = 'static'
@@ -1002,7 +1009,7 @@ function Get-ApplicationDefaults()
                             'advanced',
                             'helpdesk',
                             'registration'
-                        )                                   
+                        )
                     },
                     @{
                         description           = 'View the application License Terms'
@@ -1014,7 +1021,7 @@ function Get-ApplicationDefaults()
                             'advanced',
                             'helpdesk',
                             'registration'
-                        )                                   
+                        )
                     },
                     @{
                         description           = 'Send a message to support including logs'
@@ -1092,7 +1099,7 @@ function Get-ApplicationDefaults()
                             'advanced',
                             'registration',
                             'advancedRegistration'
-                        )                           
+                        )
                     }
                 )
                 type                  = 'static'
@@ -1101,7 +1108,7 @@ function Get-ApplicationDefaults()
                     'admin',
                     'advanced'
                 )
-            }               
+            }
             serialNumberMenu          = @{
                 Title                 = 'Lookup by Serial Number'
                 Description           = 'How would you like to enter the serial number?'
@@ -1401,23 +1408,23 @@ function Get-ApplicationDefaults()
                     },
                     @{
                         description           = 'Export direct group assignments to a CSV file'
-                        name                  = 'Export direct group assignments'        
+                        name                  = 'Export direct group assignments'
                         blockType             = 'action'
                         includeInDisplayModes = @(
                             'full',
                             'admin',
                             'advanced'
-                        )                       
+                        )
                     },
                     @{
                         description           = 'Export indirect group assignments to a CSV file'
-                        name                  = 'Export indirect group assignments (All Users/All Devices)'        
+                        name                  = 'Export indirect group assignments (All Users/All Devices)'
                         blockType             = 'action'
                         includeInDisplayModes = @(
                             'full',
                             'admin',
                             'advanced'
-                        )                                           
+                        )
                     },
                     @{
                         description           = 'Export all Windows configurations and their assignments to a CSV file'
@@ -1427,7 +1434,7 @@ function Get-ApplicationDefaults()
                             'full',
                             'admin',
                             'advanced'
-                        )           
+                        )
                     }
                     @{
                         description           = 'Export all tenant configurations and their assignments to a CSV file'
@@ -1437,7 +1444,7 @@ function Get-ApplicationDefaults()
                             'full',
                             'admin',
                             'advanced'
-                        )               
+                        )
                     }
                 )
                 type                  = 'static'
@@ -1631,19 +1638,19 @@ function Get-ApplicationDefaults()
             }
         }
     }
-    
+
     # Complete settings structure combining all components
     $defaults.Settings = [ordered]@{
         description       = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
         version           = $Version
         auth              = $defaults.Auth
         cacheSettings     = $defaults.cacheSettings
-        repoInfo          = $defaults.repoInfo 
+        repoInfo          = $defaults.repoInfo
         requiredScopes    = $defaults.RequiredScopes
-        corporateSettings = $defaults.corporateSettings 
+        corporateSettings = $defaults.corporateSettings
         globalSettings    = $defaults.Global
     }
-    
+
     # Overwrite configurations - centralized force-overwrite settings
     $defaults.Overwrite = [ordered]@{
         # Global settings that should be forcibly overwritten
@@ -1651,22 +1658,22 @@ function Get-ApplicationDefaults()
         GlobalSettings    = @{
             #input global settings here
         }
-        
+
         # Local/domain settings that should be forcibly overwritten
         # These settings will only be applied during domain settings processing
         LocalSettings     = @{
             # Enter local settings here
         }
-        
+
         # Universal settings that apply to both global and local contexts
         # These will be applied to both global and domain settings processing
         UniversalSettings = @{
             # Enter universal settings here
         }
     }
-    
+
     Write-Verbose "[$functionName] Default structures created for: $($defaults.Keys -join ', ')"
-    
+
     # Return requested defaults
     switch ($DefaultType)
     {
@@ -1697,14 +1704,14 @@ function Get-ApplicationDefaults()
             $result = $defaults.repoInfo
             $script:defaultsCache[$cacheKey] = $result
             return $result
-        }                                   
+        }
         'corporateSettings'
         {
             Write-Verbose "[$functionName] Returning corporate settings defaults"
             $result = $defaults.corporateSettings
             $script:defaultsCache[$cacheKey] = $result
             return $result
-        }                                               
+        }
         'Domain'
         {
             Write-Verbose "[$functionName] Returning domain template defaults for: $DomainName"
@@ -1739,7 +1746,7 @@ function Get-ApplicationDefaults()
             $result = $defaults.RequiredScopes
             $script:defaultsCache[$cacheKey] = $result
             return $result
-        }                               
+        }
         'Overwrite'
         {
             Write-Verbose "[$functionName] Returning overwrite configuration"
@@ -1768,13 +1775,13 @@ function Get-AuthDefaults()
     <#
     .SYNOPSIS
         Returns the default auth configuration structure (backward compatibility).
-    
+
     .DESCRIPTION
         Wrapper function for backward compatibility. Calls Get-ApplicationDefaults.
     #>
     [CmdletBinding()]
     param()
-    
+
     return Get-ApplicationDefaults -DefaultType "Auth"
 }
 
@@ -1783,13 +1790,13 @@ function Get-GlobalDefaults()
     <#
     .SYNOPSIS
         Returns the default global settings structure.
-    
+
     .DESCRIPTION
         Wrapper function that calls Get-ApplicationDefaults for global settings.
     #>
     [CmdletBinding()]
     param()
-    
+
     return Get-ApplicationDefaults -DefaultType "Global"
 }
 
@@ -1798,7 +1805,7 @@ function Get-DomainDefaults()
     <#
     .SYNOPSIS
         Returns the default domain configuration template.
-    
+
     .DESCRIPTION
         Wrapper function that calls Get-ApplicationDefaults for domain template.
     #>
@@ -1806,7 +1813,7 @@ function Get-DomainDefaults()
     param(
         [string]$DomainName
     )
-    
+
     return Get-ApplicationDefaults -DefaultType "Domain" -DomainName $DomainName
 }
 
@@ -1815,41 +1822,41 @@ function Get-CacheDefaults()
     <#
     .SYNOPSIS
         Returns the default cache settings structure.
-    
+
     .DESCRIPTION
         Wrapper function that calls Get-ApplicationDefaults for cache settings.
     #>
     [CmdletBinding()]
     param()
-    
+
     return Get-ApplicationDefaults -DefaultType "cacheSettings"
-}                                                       
+}
 
 function Get-RepoInfoDefaults()
 {
     <#
     .SYNOPSIS
         Returns the default repository information structure.
-    
+
     .DESCRIPTION
         Wrapper function that calls Get-ApplicationDefaults for repository information.
     #>
     [CmdletBinding()]
     param()
-    
+
     return Get-ApplicationDefaults -DefaultType "repoInfo"
-}                                   
+}
 function Get-CorporateSettingsDefaults()
 {
     <#
     .SYNOPSIS
         Returns the default corporate settings structure.
-    
+
     .DESCRIPTION
         Wrapper function that calls Get-ApplicationDefaults for corporate settings.
     #>
     [CmdletBinding()]
     param()
-    
+
     return Get-ApplicationDefaults -DefaultType "corporateSettings"
-}                                                                                           
+}
