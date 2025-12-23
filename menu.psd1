@@ -579,7 +579,7 @@
                     'advanced',
                     'helpdesk',
                     'registration'
-                )                                   
+                )
             },
             @{
                 description           = 'View the application License Terms'
@@ -591,7 +591,7 @@
                     'advanced',
                     'helpdesk',
                     'registration'
-                )                                   
+                )
             },
             @{
                 description           = 'Send a message to support including logs'
@@ -669,7 +669,7 @@
                     'advanced',
                     'registration',
                     'advancedRegistration'
-                )                           
+                )
             }
         )
         includeInDisplayModes = @(

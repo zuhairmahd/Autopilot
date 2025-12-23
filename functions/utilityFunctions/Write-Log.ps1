@@ -1,69 +1,5 @@
 function Write-Log()
 {
-    <#
-    .SYNOPSIS
-    Writes log messages to a file with support for multiple log levels and formats.
-
-    .DESCRIPTION
-    This function provides comprehensive logging capabilities with support for standard and CMTrace
-    formats, log rotation, minimum log level filtering, and multiple parameter sets (Normal, StartLogging,
-    FinishLogging). It automatically creates log directories, manages log file size, and supports
-    optional console output. The function is designed for enterprise-level logging with proper
-    error handling and validation.
-
-    .PARAMETER Message
-    The log message to write (required for Normal parameter set).
-
-    .PARAMETER LogFile
-    The path to the log file. Parent directory is created if it doesn't exist.
-
-    .PARAMETER Module
-    The name of the module or function writing the log entry (required for Normal parameter set).
-
-    .PARAMETER WriteToConsole
-    When specified, writes the message to console in addition to the log file.
-
-    .PARAMETER LogLevel
-    The severity level of the message. Valid values: Verbose, Debug, Information, Warning, Error.
-    Default is Information.
-
-    .PARAMETER CMTraceFormat
-    When specified, formats log entries for CMTrace log viewer compatibility.
-
-    .PARAMETER MaxLogSizeMB
-    Maximum log file size in megabytes before rotation. Default is 10 MB.
-
-    .PARAMETER PassThru
-    When specified, returns the log entry object after writing.
-
-    .PARAMETER StartLogging
-    Initializes logging and optionally overwrites existing log file (StartLogging parameter set).
-
-    .PARAMETER OverwriteLog
-    When used with StartLogging, overwrites the existing log file.
-
-    .PARAMETER FinishLogging
-    Writes a log completion entry (FinishLogging parameter set).
-
-    .PARAMETER MinimumLogLevel
-    Filters messages below this severity level. Uses global $MinimumLogLevel if not specified.
-
-    .OUTPUTS
-    System.Management.Automation.PSCustomObject
-    Returns log entry object when PassThru is specified.
-
-    .EXAMPLE
-    Write-Log -LogFile "C:\Logs\app.log" -Module "MyModule" -Message "Operation completed" -LogLevel "Information"
-    Write-Log -LogFile $logPath -Module "MyModule" -Message "Error occurred" -LogLevel "Error" -WriteToConsole
-    Write-Log -LogFile $logPath -StartLogging -OverwriteLog
-    Write-Log -LogFile $logPath -FinishLogging
-
-    .NOTES
-    Supports log rotation when size exceeds MaxLogSizeMB.
-    Creates log directory structure automatically.
-    Thread-safe file operations with error handling.
-    Compatible with PowerShell 5.1.
-    #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true, ParameterSetName = 'Normal')]
@@ -72,7 +8,17 @@ function Write-Log()
         [Parameter(Mandatory = $true, ParameterSetName = 'StartLogging')]
         [Parameter(Mandatory = $true, ParameterSetName = 'FinishLogging')]
         [ValidateScript({
-                $parentDir = Split-Path $_ -Parent
+                # Convert PSDrive paths to filesystem paths for validation
+                try
+                {
+                    $resolvedPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($_)
+                    $parentDir = Split-Path $resolvedPath -Parent
+                }
+                catch
+                {
+                    $parentDir = Split-Path $_ -Parent
+                }
+
                 if (-not (Test-Path $parentDir))
                 {
                     try
@@ -116,9 +62,21 @@ function Write-Log()
         [ValidateSet('Error', 'Warning', 'Information', 'Verbose', 'Debug')]
         [string]$MinimumLogLevel
     )
-    
+
     try
     {
+        # Convert PSDrive paths (like TestDrive:\test.log) to real filesystem paths
+        # This is necessary because .NET methods like [System.IO.File]::Open() don't understand PowerShell PSDrives
+        try
+        {
+            $LogFile = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($LogFile)
+        }
+        catch
+        {
+            # If conversion fails, use the original path (it might already be a valid filesystem path)
+            Write-Verbose "Could not resolve PSDrive path, using original: $LogFile"
+        }
+
         # Use global minimum log level if not provided
         if (-not $MinimumLogLevel -and $Global:MinimumLogLevel)
         {
@@ -128,7 +86,7 @@ function Write-Log()
         {
             $MinimumLogLevel = 'Information'
         }
-        
+
         # Define log level hierarchy (higher numbers = more detailed logging)
         $logLevelHierarchy = @{
             'Error'       = 1
@@ -137,14 +95,14 @@ function Write-Log()
             'Verbose'     = 4
             'Debug'       = 5
         }
-        
+
         # Handle StartLogging and FinishLogging switches
         if ($StartLogging -or $FinishLogging)
         {
             # Set default values when using StartLogging or FinishLogging
             $Module = $MyInvocation.MyCommand.Name
             $LogLevel = "Information"
-            
+
             # Create separator line with appropriate message
             if ($StartLogging)
             {
@@ -154,19 +112,19 @@ function Write-Log()
             {
                 $separatorLine = "=" * 30 + " end of log session " + "=" * 30
             }
-            
+
             # Ensure log directory exists
             $logDir = Split-Path $LogFile -Parent
             if (-not (Test-Path $logDir))
             {
                 New-Item -Path $logDir -ItemType Directory -Force | Out-Null
             }
-            
+
             if ($OverwriteLog)
             {
                 Remove-Item -Path $LogFile -Force -ErrorAction SilentlyContinue | Out-Null
-            }   
-            
+            }
+
             # Check for log rotation if file exists and is too large
             if ((Test-Path $LogFile) -and (Get-Item $LogFile).Length -gt ($MaxLogSizeMB * 1MB))
             {
@@ -174,7 +132,7 @@ function Write-Log()
                 Move-Item -Path $LogFile -Destination $archiveFile -Force
                 Write-Verbose "Log file rotated to: $archiveFile"
             }
-            
+
             if ($CMTraceFormat)
             {
                 # For CMTrace format, still use the separator but in CMTrace format
@@ -188,22 +146,129 @@ function Write-Log()
                 # For standard format, just use the separator line without timestamp
                 $logEntry = $separatorLine
             }
-            
+
             # Use mutex for thread safety
-            $mutexName = "LogMutex_" + ($LogFile -replace '[\\/:*?"<>|]', '_')
-            $mutex = New-Object System.Threading.Mutex($false, $mutexName)
-            
+            $mutexName = "Global\LogMutex_" + ($LogFile -replace '[\\/:*?"<>|]', '_')
+            $mutex = $null
+            $streamWriter = $null
+            $fileStream = $null
+
             try
             {
+                $mutex = New-Object System.Threading.Mutex($false, $mutexName)
                 $mutex.WaitOne() | Out-Null
-                Add-Content -Path $LogFile -Value $logEntry -Encoding UTF8 -Force
+
+                # Use StreamWriter with FileShare.ReadWrite to allow concurrent access
+                $fileStream = [System.IO.File]::Open(
+                    $LogFile,
+                    [System.IO.FileMode]::Append,
+                    [System.IO.FileAccess]::Write,
+                    [System.IO.FileShare]::ReadWrite
+                )
+                $streamWriter = New-Object System.IO.StreamWriter($fileStream, [System.Text.Encoding]::UTF8)
+                $streamWriter.WriteLine($logEntry)
+                $streamWriter.Flush()
+            }
+            catch [System.IO.IOException]
+            {
+                # If file is still locked, retry with exponential backoff
+                $retryCount = 0
+                $maxRetries = 5
+                $success = $false
+
+                while (-not $success -and $retryCount -lt $maxRetries)
+                {
+                    $retryCount++
+                    Start-Sleep -Milliseconds (100 * [Math]::Pow(2, $retryCount))
+
+                    try
+                    {
+                        $fileStream = [System.IO.File]::Open(
+                            $LogFile,
+                            [System.IO.FileMode]::Append,
+                            [System.IO.FileAccess]::Write,
+                            [System.IO.FileShare]::ReadWrite
+                        )
+                        $streamWriter = New-Object System.IO.StreamWriter($fileStream, [System.Text.Encoding]::UTF8)
+                        $streamWriter.WriteLine($logEntry)
+                        $streamWriter.Flush()
+                        $success = $true
+                    }
+                    catch [System.IO.IOException]
+                    {
+                        if ($retryCount -ge $maxRetries)
+                        {
+                            Write-Warning "Failed to write to log after $maxRetries retries: $($_.Exception.Message)"
+                        }
+                    }
+                }
             }
             finally
             {
-                $mutex.ReleaseMutex()
-                $mutex.Dispose()
+                if ($streamWriter)
+                {
+                    try
+                    {
+                        $streamWriter.Close()
+                    }
+                    catch
+                    {
+                        Write-Warning "Write-Log: Failed to close StreamWriter: $($_.Exception.Message)"
+                    }
+
+                    try
+                    {
+                        $streamWriter.Dispose()
+                    }
+                    catch
+                    {
+                        Write-Warning "Write-Log: Failed to dispose StreamWriter: $($_.Exception.Message)"
+                    }
+                }
+
+                if ($fileStream)
+                {
+                    try
+                    {
+                        $fileStream.Close()
+                    }
+                    catch
+                    {
+                        Write-Warning "Write-Log: Failed to close FileStream: $($_.Exception.Message)"
+                    }
+
+                    try
+                    {
+                        $fileStream.Dispose()
+                    }
+                    catch
+                    {
+                        Write-Warning "Write-Log: Failed to dispose FileStream: $($_.Exception.Message)"
+                    }
+                }
+
+                if ($mutex)
+                {
+                    try
+                    {
+                        $mutex.ReleaseMutex()
+                    }
+                    catch
+                    {
+                        Write-Warning "Write-Log: Failed to release mutex: $($_.Exception.Message)"
+                    }
+
+                    try
+                    {
+                        $mutex.Dispose()
+                    }
+                    catch
+                    {
+                        Write-Warning "Write-Log: Failed to dispose mutex: $($_.Exception.Message)"
+                    }
+                }
             }
-            
+
             # Write to console
             if ($WriteToConsole)
             {
@@ -211,14 +276,14 @@ function Write-Log()
             }
             return
         }
-        
+
         # Check if this log entry should be written based on minimum log level
         # Only continue if the current log level meets or exceeds the minimum threshold
         if (-not ($StartLogging -or $FinishLogging))
         {
             $currentLogLevelValue = $logLevelHierarchy[$LogLevel]
             $minimumLogLevelValue = $logLevelHierarchy[$MinimumLogLevel]
-            
+
             if ($currentLogLevelValue -gt $minimumLogLevelValue)
             {
                 # Current log level is more detailed than the minimum, skip logging to file
@@ -229,28 +294,28 @@ function Write-Log()
                     {
                         if ($WriteToConsole)
                         {
-                            Write-Error "[$Module] $Message" -ErrorAction SilentlyContinue 
+                            Write-Error "[$Module] $Message" -ErrorAction SilentlyContinue
                         }
                     }
                     "Warning"
                     {
                         if ($WriteToConsole)
                         {
-                            Write-Warning "[$Module] $Message" 
+                            Write-Warning "[$Module] $Message"
                         }
                     }
                     "Verbose"
                     {
                         if ($WriteToConsole)
                         {
-                            Write-Verbose "[$Module] $Message" 
+                            Write-Verbose "[$Module] $Message"
                         }
                     }
                     "Debug"
                     {
                         if ($WriteToConsole)
                         {
-                            Write-Debug "[$Module] $Message" 
+                            Write-Debug "[$Module] $Message"
                         }
                     }
                     default
@@ -261,14 +326,14 @@ function Write-Log()
                 return
             }
         }
-        
+
         # Ensure log directory exists
         $logDir = Split-Path $LogFile -Parent
         if (-not (Test-Path $logDir))
         {
             New-Item -Path $logDir -ItemType Directory -Force | Out-Null
         }
-        
+
         # Check for log rotation if file exists and is too large
         if ((Test-Path $LogFile) -and (Get-Item $LogFile).Length -gt ($MaxLogSizeMB * 1MB))
         {
@@ -276,12 +341,12 @@ function Write-Log()
             Move-Item -Path $LogFile -Destination $archiveFile -Force
             Write-Verbose "Log file rotated to: $archiveFile"
         }
-        
+
         $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
         $thread = [System.Threading.Thread]::CurrentThread.ManagedThreadId
-        
+
         # Get context in a cross-platform way
-        try 
+        try
         {
             if ($IsWindows -or ($null -eq $IsWindows -and $env:OS -eq "Windows_NT"))
             {
@@ -292,28 +357,29 @@ function Write-Log()
                 $Context = $env:USER
             }
         }
-        catch 
+        catch
         {
             $Context = "Unknown"
         }
+
         if ($CMTraceFormat)
         {
-            # True CMTrace format: 
+            # True CMTrace format:
             $cmTime = Get-Date -Format "HH:mm:ss.fff+000"
             $cmDate = Get-Date -Format "MM-dd-yyyy"
             $severity = switch ($LogLevel)
             {
                 "Error"
                 {
-                    3 
+                    3
                 }
                 "Warning"
                 {
-                    2 
+                    2
                 }
                 default
                 {
-                    1 
+                    1
                 }
             }
             $logEntry = "<![LOG[$Message]LOG]!><time=`"$cmTime`" date=`"$cmDate`" component=`"$Module`" context=`"`" type=`"$severity`" thread=`"$thread`" file=`"`">"
@@ -323,22 +389,124 @@ function Write-Log()
             # Enhanced standard format with thread ID
             $logEntry = "$timestamp [$LogLevel] [$Module] [Thread:$thread] [Context:$Context] $Message"
         }
-        
+
         # Use mutex for thread safety in concurrent scenarios
-        $mutexName = "LogMutex_" + ($LogFile -replace '[\\/:*?"<>|]', '_')
-        $mutex = New-Object System.Threading.Mutex($false, $mutexName)
-        
+        $mutexName = "Global\LogMutex_" + ($LogFile -replace '[\\/:*?"<>|]', '_')
+        $mutex = $null
+        $streamWriter = $null
+        $fileStream = $null
+
         try
         {
+            $mutex = New-Object System.Threading.Mutex($false, $mutexName)
             $mutex.WaitOne() | Out-Null
-            Add-Content -Path $LogFile -Value $logEntry -Encoding UTF8 -Force
+
+            # Use StreamWriter with FileShare.ReadWrite to allow concurrent access
+            $fileStream = [System.IO.File]::Open(
+                $LogFile,
+                [System.IO.FileMode]::Append,
+                [System.IO.FileAccess]::Write,
+                [System.IO.FileShare]::ReadWrite
+            )
+            $streamWriter = New-Object System.IO.StreamWriter($fileStream, [System.Text.Encoding]::UTF8)
+            $streamWriter.WriteLine($logEntry)
+            $streamWriter.Flush()
+        }
+        catch [System.IO.IOException]
+        {
+            # If file is still locked, retry with exponential backoff
+            $retryCount = 0
+            $maxRetries = 5
+            $success = $false
+
+            while (-not $success -and $retryCount -lt $maxRetries)
+            {
+                $retryCount++
+                Start-Sleep -Milliseconds (100 * [Math]::Pow(2, $retryCount))
+
+                try
+                {
+                    $fileStream = [System.IO.File]::Open(
+                        $LogFile,
+                        [System.IO.FileMode]::Append,
+                        [System.IO.FileAccess]::Write,
+                        [System.IO.FileShare]::ReadWrite
+                    )
+                    $streamWriter = New-Object System.IO.StreamWriter($fileStream, [System.Text.Encoding]::UTF8)
+                    $streamWriter.WriteLine($logEntry)
+                    $streamWriter.Flush()
+                    $success = $true
+                }
+                catch [System.IO.IOException]
+                {
+                    if ($retryCount -ge $maxRetries)
+                    {
+                        Write-Warning "Failed to write to log after $maxRetries retries: $($_.Exception.Message)"
+                    }
+                }
+            }
         }
         finally
         {
-            $mutex.ReleaseMutex()
-            $mutex.Dispose()
+            if ($streamWriter)
+            {
+                try
+                {
+                    $streamWriter.Close()
+                }
+                catch
+                {
+                    Write-Warning "Write-Log: Failed to close StreamWriter: $($_.Exception.Message)"
+                }
+                try
+                {
+                    $streamWriter.Dispose()
+                }
+                catch
+                {
+                    Write-Warning "Write-Log: Failed to dispose StreamWriter: $($_.Exception.Message)"
+                }
+            }
+            if ($fileStream)
+            {
+                try
+                {
+                    $fileStream.Close()
+                }
+                catch
+                {
+                    Write-Warning "Write-Log: Failed to close FileStream: $($_.Exception.Message)"
+                }
+                try
+                {
+                    $fileStream.Dispose()
+                }
+                catch
+                {
+                    Write-Warning "Write-Log: Failed to dispose FileStream: $($_.Exception.Message)"
+                }
+            }
+            if ($mutex)
+            {
+                try
+                {
+                    $mutex.ReleaseMutex()
+                }
+                catch
+                {
+                    Write-Warning "Write-Log: Failed to release mutex: $($_.Exception.Message)"
+                }
+                try
+                {
+                    $mutex.Dispose()
+                }
+                catch
+                {
+                    Write-Warning "Write-Log: Failed to dispose mutex: $($_.Exception.Message)"
+                }
+            }
         }
-        
+
         # Write to appropriate PowerShell stream based on log level
         switch ($LogLevel)
         {
@@ -346,39 +514,39 @@ function Write-Log()
             {
                 if ($WriteToConsole)
                 {
-                    Write-Error "[$Module] $Message" -ErrorAction SilentlyContinue 
+                    Write-Error "[$Module] $Message" -ErrorAction SilentlyContinue
                 }
             }
             "Warning"
             {
                 if ($WriteToConsole)
                 {
-                    Write-Warning "[$Module] $Message" 
+                    Write-Warning "[$Module] $Message"
                 }
             }
             "Verbose"
             {
                 if ($WriteToConsole)
                 {
-                    Write-Verbose "[$Module] $Message" 
+                    Write-Verbose "[$Module] $Message"
                 }
             }
             "Debug"
             {
                 if ($WriteToConsole)
                 {
-                    Write-Debug "[$Module] $Message" 
+                    Write-Debug "[$Module] $Message"
                 }
             }
             default
             {
                 if ($WriteToConsole)
                 {
-                    Write-Verbose "Logged: $logEntry" 
+                    Write-Verbose "Logged: $logEntry"
                 }
             }
         }
-        
+
         # Return log entry if PassThru is specified
         if ($PassThru)
         {
@@ -402,19 +570,19 @@ function Write-Log()
             {
                 "Error"
                 {
-                    "Red" 
+                    "Red"
                 }
                 "Warning"
                 {
-                    "Yellow" 
+                    "Yellow"
                 }
                 "Debug"
                 {
-                    "Cyan" 
+                    "Cyan"
                 }
                 default
                 {
-                    "White" 
+                    "White"
                 }
             }
         )
