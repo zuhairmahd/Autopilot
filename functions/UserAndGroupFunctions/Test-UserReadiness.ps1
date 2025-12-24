@@ -76,7 +76,28 @@ function Test-UserReadiness()
     # Track overall success
     $allChecksPassed = $true
     
-    #region Check 1: Group Membership
+    #region Check 1: Account Enabled Status
+    Write-Verbose "[$functionName] Performing account enabled status check..."
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Performing account enabled status check for $UserName" -LogLevel Information
+    
+    $accountEnabledCheck = Test-UserAccountEnabled -UserName $UserName -AccessToken $AccessToken
+    $result.Checks += $accountEnabledCheck
+    
+    if (-not $accountEnabledCheck.Passed)
+    {
+        $allChecksPassed = $false
+        if ($accountEnabledCheck.Severity -eq "Error")
+        {
+            $result.IssueCount++
+        }
+        else
+        {
+            $result.WarningCount++
+        }
+    }
+    #endregion
+    
+    #region Check 2: Group Membership
     Write-Verbose "[$functionName] Performing group membership check..."
     Write-Log -LogFile $LogFile -Module $functionName -Message "Performing group membership check for $UserName" -LogLevel Information
     
@@ -103,7 +124,7 @@ function Test-UserReadiness()
     }
     #endregion
     
-    #region Check 2: Device Count
+    #region Check 3: Device Count
     Write-Verbose "[$functionName] Performing device count check..."
     Write-Log -LogFile $LogFile -Module $functionName -Message "Performing device count check for $UserName" -LogLevel Information
     
@@ -124,7 +145,7 @@ function Test-UserReadiness()
     }
     #endregion
     
-    #region Check 3: Strong Certificate Mapping (if enabled)
+    #region Check 4: Strong Certificate Mapping (if enabled)
     if ($Settings.checkStrongMapping)
     {
         Write-Verbose "[$functionName] Performing strong certificate mapping check..."
