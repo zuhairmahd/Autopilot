@@ -93,6 +93,7 @@ function Test-UserAccountEnabled()
         {
             $checkResult.Passed = $true
             $checkResult.AccountEnabled = $true
+            $checkResult.Severity = "Information"
             $checkResult.Message = "User account is enabled"
             $checkResult.Details += "Account status: Enabled"
             $checkResult.Details += "User can be assigned a device"

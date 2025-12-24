@@ -95,7 +95,7 @@ Describe "Test-UserAccountEnabled Function" -Tags 'Unit', 'User', 'AccountStatus
             $result.CheckName | Should -Be "Account Status"
             $result.AccountEnabled | Should -Be $true
             $result.Message | Should -Be "User account is enabled"
-            $result.Severity | Should -Be "Error"
+            $result.Severity | Should -Be "Information"
         }
         
         It "Should include correct details for enabled account" {
