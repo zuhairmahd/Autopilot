@@ -19,7 +19,7 @@ function Test-UserAccountEnabled()
         Returns a PSCustomObject representing the check result with properties:
         - CheckName: Name of the check
         - Passed: Boolean indicating if check passed
-        - Severity: "Error" or "Warning"
+        - Severity: "Error", "Warning", or "Information"
         - Message: Description of the result
         - Details: Additional information
         - SuggestedResolution: Steps to resolve if check failed
