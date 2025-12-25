@@ -1,5 +1,86 @@
 function Write-Log()
 {
+    <#
+.SYNOPSIS
+Writes log entries to a file with optional CMTrace formatting, rotation, and console output.
+
+.DESCRIPTION
+Write-Log supports:
+- Minimum log level filtering (Error, Warning, Information, Verbose, Debug)
+- Thread-safe appends via a named mutex and FileShare.ReadWrite
+- Log rotation by size with timestamped archive
+- CMTrace-compatible output
+- Start/Finish session separators
+- Optional console stream output per level
+- PassThru to return a structured log object
+
+PARAMETER SETS
+- Normal:        -Message -LogFile -Module [-WriteToConsole] [-LogLevel] [-CMTraceFormat] [-MaxLogSizeMB] [-PassThru] [-MinimumLogLevel]
+- StartLogging:  -StartLogging -LogFile [-OverwriteLog] [-CMTraceFormat] [-MaxLogSizeMB] [-MinimumLogLevel]
+- FinishLogging: -FinishLogging -LogFile [-CMTraceFormat] [-MaxLogSizeMB] [-MinimumLogLevel]
+
+.PARAMETER Message
+Text of the log entry (Normal set only).
+
+.PARAMETER LogFile
+Path to the log file. Parent folder is created if missing.
+
+.PARAMETER Module
+Module/component name to include in the entry (Normal set only).
+
+.PARAMETER WriteToConsole
+Also writes to the appropriate PowerShell stream (Error, Warning, Verbose, Debug).
+
+.PARAMETER LogLevel
+Severity for the entry. Default: Information.
+
+.PARAMETER CMTraceFormat
+Writes entries in CMTrace-compatible format.
+
+.PARAMETER MaxLogSizeMB
+Max size before rotation. Default: 10 MB.
+
+.PARAMETER PassThru
+Returns a PSCustomObject with log details.
+
+.PARAMETER StartLogging
+Writes a "start of log session" separator.
+
+.PARAMETER OverwriteLog
+Deletes existing log before starting a new session (with -StartLogging).
+
+.PARAMETER FinishLogging
+Writes an "end of log session" separator.
+
+.PARAMETER MinimumLogLevel
+Minimum severity to write to file. Default: Information.
+Error=1, Warning=2, Information=3, Verbose=4, Debug=5.
+Entries with higher (more detailed) level than the minimum are skipped for file output.
+
+.OUTPUTS
+- None by default
+- PSCustomObject when -PassThru is specified
+
+.EXAMPLE
+Write-Log -StartLogging -LogFile "C:\Logs\App.log" -OverwriteLog -CMTraceFormat
+
+Starts a new log session, optionally overwriting the existing file, using CMTrace format.
+
+.EXAMPLE
+Write-Log -Message "Initialized configuration" -Module "Bootstrap" -LogFile "C:\Logs\App.log" -LogLevel Information -MinimumLogLevel Information -WriteToConsole
+
+Writes an information entry if MinimumLogLevel allows it and echoes to console.
+
+.EXAMPLE
+Write-Log -Message "Verbose details for diagnostics" -Module "Worker" -LogFile "C:\Logs\App.log" -LogLevel Verbose -MinimumLogLevel Information
+
+Skips file write because Verbose is more detailed than the Information minimum.
+
+.EXAMPLE
+Write-Log -FinishLogging -LogFile "C:\Logs\App.log"
+
+Writes an end-of-session separator.
+    #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true, ParameterSetName = 'Normal')]

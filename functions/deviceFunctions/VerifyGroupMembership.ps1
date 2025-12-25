@@ -347,7 +347,7 @@ function VerifyGroupMembership()
     {
         Write-Verbose "[$functionName] Getting user information for $userName"
         $userUri = "users/$($userName)" 
-        $user = CallGraphApi -accessToken $accessToken -ResourcePath $userUri -extraparameters "select=displayName,mail,userPrincipalName,id"
+        $user = CallGraphApi -accessToken $accessToken -ResourcePath $userUri -extraparameters "select=displayName,mail,userPrincipalName,id,accountEnabled"
         Write-Verbose "[$functionName] Got user information: $($user | ConvertTo-Json -Depth 3)"
         Write-Log -logFile $logFile -module $functionName -Message "Got user information: $($user | ConvertTo-Json -Depth $maxJsonDepth)"
         # Check if user was found
