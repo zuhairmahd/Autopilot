@@ -1,62 +1,4 @@
-﻿@{
-    description       = 'This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.'
-    version           = '1.3.0.0'
-    cacheSettings     = @{
-        maxCacheSize             = 1000
-        defaultExpirationMinutes = 15
-        cacheTypes               = @{
-            Configuration    = @{
-                expirationMinutes = 60
-                enabled           = $true
-            }
-            DirectoryObjects = @{
-                expirationMinutes = 15
-                enabled           = $true
-            }
-            Devices          = @{
-                expirationMinutes = 15
-                enabled           = $true
-            }
-        }
-        enabled                  = $true
-    }
-    globalSettings    = @{
-        migrateLegacyConfiguration                = $true
-        operatingSystem                           = 'Windows'
-        documentationURL                          = 'https://github.com/zuhairmahd/Autopilot/blob/master/readme.md'
-        timeInSeconds                             = 60
-        maxMenuItemsPerPage                       = 15
-        maxUserMatchDisplay                       = 10
-        maxWaitTime                               = 30
-        appModes                                  = @('full')
-        autoUpdate                                = $true
-        strongMappingOptional                     = $true
-        preferredBrowser                          = 'Chrome'
-        validateScopes                            = $true
-        licenseURL                                = 'https://github.com/zuhairmahd/Autopilot/blob/master/LICENSE'
-        maxGroupMatchDisplay                      = 10
-        useGridForLogDisplay                      = $true
-        hideEmptyMenus                            = $true
-        privateSession                            = $false
-        DisplayManualFilterSelection              = $false
-        release                                   = 'auto'
-        checkStrongMapping                        = $false
-        includeEnrolledDevicesInNextUserReadiness = $true
-        configFile                                = '.\.secrets\config.json'
-        showLicenseBanner                         = $true
-        deviceContactThresholdInDays              = 30
-    }
-    repoInfo          = @{
-        repoPath      = 'zuhairmahd'
-        baseURL       = 'https://www.github.com'
-        baseSourceURL = 'https://raw.githubusercontent.com'
-        repoName      = 'Autopilot'
-    }
-    corporateSettings = @{
-        useCorporateSettings       = $false
-        corporateDomain            = ''
-        corporateSettingsFilePaths = @()
-    }
+@{
     requiredScopes    = @(
         @{
             Scope     = 'User.Read.All'
@@ -145,11 +87,9 @@
         }
     )
     auth              = @{
+        authType            = 'PublicAuthFlow'
         noSaveRefreshToken  = $false
-        cacheType           = 'File'
         changePwOnNextStart = $false
-        delegated           = $true
-        forceNewToken       = $false
         scope               = @(
             'Device.ReadWrite.All',
             'DeviceManagementApps.Read.All',
@@ -160,8 +100,77 @@
             'DeviceManagementManagedDevices.ReadWrite.All',
             'DeviceManagementServiceConfig.ReadWrite.All'
         )
-        authType            = 'PublicAuthFlow'
-        secureString        = $false
         renewalLeadTime     = 5
+        forceNewToken       = $false
+        secureString        = $false
+        cacheType           = 'File'
+        delegated           = $true
     }
+    repoInfo          = @{
+        repoName      = 'Autopilot'
+        baseSourceURL = 'https://raw.githubusercontent.com'
+        baseURL       = 'https://www.github.com'
+        repoPath      = 'zuhairmahd'
+    }
+    cacheSettings     = @{
+        maxCacheSize             = 1000
+        cacheTypes               = @{
+            Devices          = @{
+                enabled           = $true
+                expirationMinutes = 15
+            }
+            Configuration    = @{
+                enabled           = $true
+                expirationMinutes = 60
+            }
+            DirectoryObjects = @{
+                enabled           = $true
+                expirationMinutes = 15
+            }
+        }
+        defaultExpirationMinutes = 15
+        enabled                  = $true
+    }
+    corporateSettings = @{
+        useCorporateSettings       = $false
+        corporateDomain            = ''
+        corporateSettingsFilePaths = @()
+    }
+    globalSettings    = @{
+        release                                   = 'auto'
+        maxUserMatchDisplay                       = 10
+        includeEnrolledDevicesInNextUserReadiness = $true
+        runPIVTest                                = $false
+        hideEmptyMenus                            = $true
+        appModes                                  = @('full')
+        strongMappingOptional                     = $true
+        checkStrongMapping                        = $false
+        deviceContactThresholdInDays              = 30
+        maxWaitTime                               = 30
+        configFile                                = '.\.secrets\config.json'
+        validateScopes                            = $true
+        DisplayManualFilterSelection              = $false
+        maxMenuItemsPerPage                       = 15
+        documentationURL                          = 'https://github.com/zuhairmahd/Autopilot/blob/master/readme.md'
+        licenseURL                                = 'https://github.com/zuhairmahd/Autopilot/blob/master/LICENSE'
+        operatingSystem                           = 'Windows'
+        autoUpdate                                = $true
+        preferredBrowser                          = 'Chrome'
+        showLicenseBanner                         = $true
+        maxGroupMatchDisplay                      = 10
+        migrateLegacyConfiguration                = $true
+        timeInSeconds                             = 60
+        useGridForLogDisplay                      = $true
+        privateSession                            = $false
+        minimumOSBuild                            = 26100
+        repoInfo                                  = @{
+            repoPath      = 'zuhairmahd'
+            baseSourceURL = 'https://raw.githubusercontent.com'
+            repoName      = 'Autopilot'
+            baseURL       = 'https://www.github.com'
+        }
+        verifyAutopilotDeviceMinimumSpecs         = $true
+    }
+    description       = 'This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.'
+    version           = '1.3.0.0'
 }
