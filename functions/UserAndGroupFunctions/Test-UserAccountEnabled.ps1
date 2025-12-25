@@ -3,18 +3,18 @@ function Test-UserAccountEnabled()
     <#
     .SYNOPSIS
         Validates that a user account is enabled in Entra ID.
-    
+
     .DESCRIPTION
         Checks if a user's account is enabled in Entra ID. A disabled account will fail
         the user readiness check and prevent device assignment. Returns detailed information
         about the account status.
-    
+
     .PARAMETER UserName
         The user principal name (email address) of the user to check.
-    
+
     .PARAMETER AccessToken
         Microsoft Graph API access token for authentication.
-    
+
     .OUTPUTS
         Returns a PSCustomObject representing the check result with properties:
         - CheckName: Name of the check
@@ -24,7 +24,7 @@ function Test-UserAccountEnabled()
         - Details: Additional information
         - SuggestedResolution: Steps to resolve if check failed
         - AccountEnabled: Boolean indicating if account is enabled
-    
+
     .EXAMPLE
         $result = Test-UserAccountEnabled -UserName "john.doe@contoso.com" -AccessToken $token
         if ($result.Passed) {
@@ -33,7 +33,6 @@ function Test-UserAccountEnabled()
             Write-Host "User account is disabled: $($result.Message)"
         }
     #>
-    
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -41,11 +40,11 @@ function Test-UserAccountEnabled()
         [Parameter(Mandatory = $true)]
         [string]$AccessToken
     )
-    
+
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Checking account status for user: $UserName"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Checking account status for user: $UserName" -LogLevel Verbose
-    
+
     # Initialize check result
     $checkResult = [PSCustomObject]@{
         CheckName           = "Account Status"
@@ -56,16 +55,16 @@ function Test-UserAccountEnabled()
         SuggestedResolution = ""
         AccountEnabled      = $false
     }
-    
+
     try
     {
         # Query user account status
         $userUri = "users/$UserName"
         Write-Verbose "[$functionName] Querying user account status from Graph API"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Querying user account status from Graph API" -LogLevel Verbose
-        
+
         $user = CallGraphApi -AccessToken $AccessToken -ResourcePath $userUri -extraparameters "select=accountEnabled,displayName,userPrincipalName"
-        
+
         if ($null -eq $user)
         {
             $checkResult.Passed = $false
@@ -75,7 +74,7 @@ function Test-UserAccountEnabled()
             Write-Log -LogFile $LogFile -Module $functionName -Message "User query returned null for $UserName" -LogLevel Error
             return $checkResult
         }
-        
+
         # Check if accountEnabled property exists
         if ($null -eq $user.accountEnabled)
         {
@@ -93,10 +92,10 @@ function Test-UserAccountEnabled()
         {
             $checkResult.Passed = $true
             $checkResult.AccountEnabled = $true
-            $checkResult.Severity = "Information"
             $checkResult.Message = "User account is enabled"
             $checkResult.Details += "Account status: Enabled"
             $checkResult.Details += "User can be assigned a device"
+            $checkResult.Severity = "Information"
             Write-Verbose "[$functionName] User account is enabled"
             Write-Log -LogFile $LogFile -Module $functionName -Message "User account $UserName is enabled" -LogLevel Verbose
         }
@@ -120,9 +119,9 @@ function Test-UserAccountEnabled()
         $checkResult.SuggestedResolution = "Verify network connectivity and Graph API permissions. Contact support if issue persists."
         Write-Log -LogFile $LogFile -Module $functionName -Message "Error checking account status for $UserName : $($_.Exception.Message)" -LogLevel Error
     }
-    
+
     Write-Verbose "[$functionName] Account status check completed. Passed: $($checkResult.Passed)"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Account status check completed for $UserName. Passed: $($checkResult.Passed)" -LogLevel Verbose
-    
+
     return $checkResult
 }
