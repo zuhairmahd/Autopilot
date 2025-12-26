@@ -551,7 +551,7 @@ if ($testMode -and -not $script:testModeOptions.cleanup)
 }
 else
 {
-    $filesCleaned = cleanupTempFiles
+    $filesCleaned = Remove-TempFiles
     if ($filesCleaned.AllRemoved)
     {
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
@@ -629,8 +629,6 @@ if ($testMode -and -not $script:testModeOptions.config)
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode: Skipping configuration loading" -LogLevel "Information"
     # Set minimal test values
     $domain = "test.contoso.com"
-    $appId = "00000000-0000-0000-0000-000000000000"
-    $tenantId = "00000000-0000-0000-0000-000000000000"
     $name = "Test Application"
 }
 # In test mode without a test password and config file exists, skip config loading
@@ -640,8 +638,6 @@ elseif ($testMode -and -not $TestPassword -and (Test-Path $configFile))
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode enabled without test password, skipping encrypted config file loading" -LogLevel "Information"
     # Set dummy values for required variables
     $domain = "test.local"
-    $appId = "test-app-id"
-    $tenantId = "test-tenant-id"
     $name = "Test Configuration"
 }
 elseif (Test-Path $configFile)
@@ -660,8 +656,6 @@ elseif (Test-Path $configFile)
 
     $configContent = $sessionResult.ConfigContent
     $domain = $sessionResult.Domain
-    $appId = $sessionResult.AppId
-    $tenantId = $sessionResult.TenantId
     $name = $sessionResult.Name
 
     if (-not ($sessionResult.encrypted))
@@ -699,8 +693,6 @@ else
 
         # Set default test values
         $domain = "test.contoso.com"
-        $appId = "00000000-0000-0000-0000-000000000000"
-        $tenantId = "00000000-0000-0000-0000-000000000000"
         $name = "Test Application"
 
         # Skip config file loading in test mode
@@ -746,8 +738,6 @@ else
 
                 $configContent = $sessionResult.ConfigContent
                 $domain = $sessionResult.Domain
-                $appId = $sessionResult.AppId
-                $tenantId = $sessionResult.TenantId
                 $name = $sessionResult.Name
                 Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully for domain: $domain" -LogLevel "Information"
                 # Clear the config content from memory
@@ -811,50 +801,87 @@ else
 
 #region initialize script objects
 Write-Host "Loading configuration..."
-# Use domain if available, otherwise default to contoso.com
-$domainForDefaults = if ($domain)
-{
-    $domain
-}
-else
-{
-    "contoso.com"
-}
+
 $startTime = Get-Date
-if (-not $fastStart)
+
+#region Attempting fast start
+$filesLoaded = $true
+write-log -logFile $logFile -module $scriptName -message "Attempting fast start configuration load."
+Write-Verbose "[$scriptName] Attempting fast start configuration load."
+if (Test-Path $InitFile)
 {
-    Write-Verbose "[$scriptName] Initializing application configuration"
-    write-log -logFile $logFile -module $scriptName -message "Initializing application configuration"
-    $configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -BoundParameters $PSBoundParameters
+    write-log -logFile $logFile -module $scriptName -message "Loading init file: $InitFile"
+    Write-Verbose "[$scriptName] Loading init file: $InitFile"
+    $initContent = Import-PowerShellDataFile -Path $InitFile
 }
 else
 {
-    try
-    {
-        $initContent = Import-PowerShellDataFile -Path $InitFile
-        $stringContent = Import-PowerShellDataFile -Path $stringsFile
-        $domainContent = Import-PowerShellDataFile -Path "$domain.psd1"
-        $menuContent = Import-PowerShellDataFile -Path $menuFile
-    }
-    catch
-    {
-        Write-Host "Error loading configuration files in fast start mode: $_" -ForegroundColor Red
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Error loading configuration files in fast start mode: $_" -LogLevel "Error"
-        write-log -logFile $logFile -finishLogging
-        exit 1
-    }
-    $configResult = @{
-        auth           = $initContent.auth
-        globalSettings = $initContent.globalSettings
-        localSettings  = $domainContent
-        RepoInfo       = $initContent.repoInfo
-        RequiredScopes = $initContent.requiredScopes
-        CacheSettings  = $initContent.cacheSettings
-        menu           = $menuContent
-        strings        = $stringContent
-        Success        = ($null -ne $initContent.auth -and $null -ne $initContent.globalSettings -and $null -ne $initContent.repoInfo -and $null -ne $initContent.requiredScopes -and $null -ne $initContent.cacheSettings -and $null -ne $domainContent -and $null -ne $menuContent -and $null -ne $stringContent)
-    }
+    $filesLoaded = $false
+    write-log -logFile $logFile -module $scriptName -message "Init file not found: $InitFile"
+    Write-Verbose "[$scriptName] Init file not found: $InitFile"
 }
+if (Test-Path $stringsFile)
+{
+    write-log -logFile $logFile -module $scriptName -message "Loading strings file: $stringsFile"
+    Write-Verbose "[$scriptName] Loading strings file: $stringsFile"
+    $stringContent = Import-PowerShellDataFile -Path $stringsFile
+}
+else
+{
+    $filesLoaded = $false
+    write-log -logFile $logFile -module $scriptName -message "Strings file not found: $stringsFile"
+    Write-Verbose "[$scriptName] Strings file not found: $stringsFile"
+}
+if (Test-Path "$domain.psd1")
+{
+    write-log -logFile $logFile -module $scriptName -message "Loading domain settings file: $domain.psd1"
+    Write-Verbose "[$scriptName] Loading domain settings file: $domain.psd1"
+    $domainContent = Import-PowerShellDataFile -Path "$domain.psd1"
+}
+else
+{
+    $filesLoaded = $false
+    write-log -logFile $logFile -module $scriptName -message "Domain settings file not found: $domain.psd1"
+    Write-Verbose "[$scriptName] Domain settings file not found: $domain.psd1"
+}
+if (Test-Path $menuFile)
+{
+    write-log -logFile $logFile -module $scriptName -message "Loading menu file: $menuFile"
+    Write-Verbose "[$scriptName] Loading menu file: $menuFile"
+    $menuContent = Import-PowerShellDataFile -Path $menuFile
+}
+else
+{
+    $filesLoaded = $false
+    write-log -logFile $logFile -module $scriptName -message "Menu file not found: $menuFile"
+    Write-Verbose "[$scriptName] Menu file not found: $menuFile"
+}
+$configResult = @{
+    auth           = $initContent.auth
+    globalSettings = $initContent.globalSettings
+    localSettings  = $domainContent
+    RepoInfo       = $initContent.repoInfo
+    RequiredScopes = $initContent.requiredScopes
+    CacheSettings  = $initContent.cacheSettings
+    menu           = $menuContent
+    strings        = $stringContent
+    Success        = ($null -ne $initContent.auth -and $null -ne $initContent.globalSettings -and $null -ne $initContent.repoInfo -and $null -ne $initContent.requiredScopes -and $null -ne $initContent.cacheSettings -and $null -ne $domainContent -and $null -ne $menuContent -and $null -ne $stringContent)
+}
+if ($filesLoaded -eq $false -or (-not $configResult.Success))
+{
+    write-log -logFile $logFile -module $scriptName -message "Fast start configuration load failed, falling back to full initialization."
+    Write-Verbose "[$scriptName] Fast start configuration load failed, falling back to full initialization."
+    Write-Host "Performing full configuration initialization..."
+    $configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domain -BoundParameters $PSBoundParameters
+}
+else
+{
+    write-log -logFile $logFile -module $scriptName -message "Fast start configuration load succeeded."
+    Write-Verbose "[$scriptName] Fast start configuration load succeeded."
+    Write-Host "Fast start configuration load succeeded."
+}
+#endregion Attempting fast start
+
 if (-not $configResult.Success)
 {
     Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
@@ -1431,10 +1458,12 @@ if ($testMode -and $script:testModeOptions.exitAfter)
     exit 0
 }
 #endregion initialization block with access token
+
 $endTime = Get-Date
 #display the duration in minutes and seconds.
 $duration = $endTime - $startTime
 Write-Host "Initialization completed in $($duration.Minutes) minutes and $($duration.Seconds) seconds." -ForegroundColor Green
+
 #region Create menus
 # Clear menu configuration cache to ensure fresh menu loading
 # Write-Verbose "[$scriptName] Clearing menu configuration cache"
@@ -2126,6 +2155,37 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Auto
 #endregion Autopilot menu
 
 #region Environment menu
+$environmentMenu = AddMenuItem -menu $environmentMenu -Name "View global environment settings" -Action {
+    Write-Host "Displaying global environment settings..." -ForegroundColor Cyan
+    $success = Show-SettingsViewer -SettingsType "Global" -SettingsFile $InitFile
+    if ($success)
+    {
+        Write-Host "`nGlobal settings displayed successfully." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "`nFailed to display global settings. Please check the logs for details." -ForegroundColor Red
+    }
+}
+$environmentMenu = AddMenuItem -menu $environmentMenu -Name "View domain specific environment settings" -Action {
+    Write-Host "Displaying domain-specific environment settings..." -ForegroundColor Cyan
+    # Get the current domain from settings
+    $currentDomain = $domain
+    if ([string]::IsNullOrWhiteSpace($currentDomain))
+    {
+        Write-Host "No domain specified. Cannot view domain-specific settings." -ForegroundColor Red
+        return $returnValues.backoutText
+    }
+    $success = Show-SettingsViewer -SettingsType "Domain" -DomainName $currentDomain -SettingsFile $InitFile
+    if ($success)
+    {
+        Write-Host "`nDomain settings for '$currentDomain' displayed successfully." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "`nFailed to display domain settings. Please check the logs for details." -ForegroundColor Red
+    }
+}
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "View group inclusion/exclusion settings for all domains" -Action {
     Write-Host "Displaying group inclusion/exclusion settings..." -ForegroundColor Cyan
     Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
@@ -2184,6 +2244,8 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change authenticati
     }
 }
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change inclusion/exclusion" -subMenu $inclusionExclusionMenu
+#endregion Environment menu
+
 $inclusionExclusionMenu = AddMenuItem -menu $inclusionExclusionMenu -Name "Change group inclusion/exclusion" -Action {
     Write-Host "Launching groups editor..." -ForegroundColor Cyan
     Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
@@ -2232,7 +2294,6 @@ $inclusionExclusionMenu = AddMenuItem -menu $inclusionExclusionMenu -Name "Chang
         return $result
     }
 }
-#endregion Environment menu
 
 #region Settings menu
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment settings" -subMenu $environmentMenu
@@ -2290,7 +2351,7 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settin
     {
         Write-Host "Auto Update settings saved successfully." -ForegroundColor Green
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Auto Update settings saved successfully." -LogLevel "Information"
-        $filesCleaned = cleanupTempFiles
+        $filesCleaned = Remove-TempFiles
         if ($filesCleaned.AllRemoved)
         {
             Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
@@ -2850,7 +2911,7 @@ else
 Clear-SecureMemory -ClearScriptVariables
 
 # Cleanup temporary files
-$filesCleaned = cleanupTempFiles
+$filesCleaned = Remove-TempFiles
 if ($filesCleaned.AllRemoved)
 {
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"

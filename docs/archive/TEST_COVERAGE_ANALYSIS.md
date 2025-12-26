@@ -23,7 +23,7 @@ This document provides a comprehensive analysis of test coverage for the Windows
 
 ### 1. test-enhanced-menu-functions.ps1
 **Purpose**: Tests newly enhanced menu navigation functions
-**Coverage**: 
+**Coverage**:
 - Handle-ActionExecution
 - Handle-BackNavigation
 - Handle-MainMenuNavigation
@@ -48,7 +48,7 @@ This document provides a comprehensive analysis of test coverage for the Windows
 - FormatDateWithTimeZone
 - normalizeADUserDisplayName
 - ShowGroupAssignments
-- cleanupTempFiles
+- Remove-TempFiles
 - Set-SettingsJsonStructure
 - Test-AuthDefaults
 - Write-SafeLog
@@ -120,7 +120,7 @@ pwsh -File "./TestScripts/final-validation-comprehensive.ps1"
 ### Menu Functions (17/17 tested - 100%)
 All menu functions now have test coverage including the enhanced navigation handlers.
 
-### Setup Functions (23/23 tested - 100%)  
+### Setup Functions (23/23 tested - 100%)
 Complete coverage including First Run Wizard functions and configuration management.
 
 ### Utility Functions (18/18 tested - 100%)
