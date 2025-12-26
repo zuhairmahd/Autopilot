@@ -52,7 +52,7 @@ function Get-Updates()
         [switch]$noConfirmation
     )
 
-    #region define variables and write logs 
+    #region define variables and write logs
     $functionName = $MyInvocation.MyCommand.Name
     $updateTest = $false
     $returnMessage = $returnValues.UpdateSuccessMessage
@@ -70,7 +70,7 @@ function Get-Updates()
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "No similar executable found." -LogLevel "Warning"
         }
         Write-Verbose "[$functionName] Found similar executable: $executableFileName"
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found similar executable: $executableFileName" -LogLevel "Information"        
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found similar executable: $executableFileName" -LogLevel "Information"
         $updateTest = $true
     }
     $fileName = Split-Path -Path $executableFileName -Leaf
@@ -107,33 +107,33 @@ function Get-Updates()
         }
         Write-Verbose "[$functionName] Downloading file from $url to $outputFile"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Downloading file from $url to $outputFile" -LogLevel "Information"
-        try 
+        try
         {
-            $response = Invoke-WebRequest -Uri $url -OutFile $outputFile -Method Get -ErrorAction SilentlyContinue -PassThru
+            $response = Invoke-WebRequest -Uri $url -OutFile $outputFile -Method Get -ErrorAction SilentlyContinue -PassThru -UseBasicParsing
             Write-Verbose "[$functionName] Response received from $($url): $($response.StatusCode)"
             $returnObject.Success = $true
             $returnObject.StatusCode = $response.StatusCode
             $returnObject.Content = $response.Content
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Response received from $($url): $($response.StatusCode)" -LogLevel "Information"
-        }   
-        catch 
+        }
+        catch
         {
             Write-Verbose "[$functionName] Error downloading file from $($url): $($_.Exception.Message)"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error downloading file from $($url): $($_.Exception.Message)" -LogLevel "Error"
             $returnObject.Success = $false
             $returnObject.StatusCode = $_.Exception.Response.StatusCode.Value__
             $returnObject.Content = $_.Exception.Message
-        }    
+        }
         return $returnObject
     }
     #endregion
-    
+
     [version]$localVersion = (Get-FileVersion -executableFileName $executableFileName).version
-    
+
     #region get the remote version.
     Write-Verbose "[$functionName] Getting metadata from $metaDataURL"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting metadata from $metaDataURL" -LogLevel "Information"
-    try 
+    try
     {
         $fileMetaData = Invoke-RestMethod -Uri $metaDataURL -UseBasicParsing
         Write-Verbose "[$functionName] Metadata retrieved successfully."
@@ -145,7 +145,7 @@ function Get-Updates()
         #convert $fileMetaData.date to a datetime object in local time.
         $fileMetaData.date = [datetime]::Parse($fileMetaData.date).ToLocalTime()
     }
-    catch 
+    catch
     {
         Write-Error "[$functionName] Failed to retrieve metadata from $metaDataURL. Please check the URL and try again."
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to retrieve metadata from $metaDataURL. Please check the URL and try again." -LogLevel "Error"
@@ -153,7 +153,7 @@ function Get-Updates()
     }
     Write-Verbose "[$functionName] remoteVersion = $remoteVersion"
     #endregion
-    
+
     #region compare versions
     Write-Verbose "[$functionName] Comparing local version $localVersion with remote version $remoteVersion"
     if ($remoteVersion -gt $localVersion)
@@ -217,13 +217,13 @@ function Get-Updates()
         {
             Write-Host "File signature is invalid. Aborting update." -ForegroundColor Red
             return $returnValues.InvalidSignatureMessage
-        }   
+        }
         Write-Host "File signature is valid"
         Write-Verbose "[$functionName] File signature is valid."
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "File signature is valid." -LogLevel "Information"
         Write-Verbose "[$functionName] Getting file hash for $tempUpdateFile"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting file hash for $tempUpdateFile" -LogLevel "Information"
-        $fileHash = Get-FileHash -Path $tempUpdateFile -Algorithm SHA256        
+        $fileHash = Get-FileHash -Path $tempUpdateFile -Algorithm SHA256
         Write-Verbose "[$functionName] File hash for $($tempUpdateFile) is $($fileHash.Hash)"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "File hash for $tempUpdateFile is $($fileHash.Hash)" -LogLevel "Information"
         Write-Host "Comparing file hash..."
@@ -246,7 +246,7 @@ function Get-Updates()
             Write-Host "Aborting update." -ForegroundColor Red
             return $returnValues.InvalidFileHash
         }
-        if (-not $updateTest)    
+        if (-not $updateTest)
         {
             Write-Verbose "[$functionName] Proceeding with update installation."
             $backupFile = Join-Path -Path $env:TEMP -ChildPath "$fileName.bak"
@@ -331,11 +331,11 @@ function Get-Updates()
                 return $false
             }
         }
-        else 
+        else
         {
             Write-Host "Since this is a development run, no update will be downloaded."
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Development run - skipping update download." -LogLevel "Information"
-            $returnMessage = $returnValues.testUpdateMessage              
+            $returnMessage = $returnValues.testUpdateMessage
         }
     }
     else

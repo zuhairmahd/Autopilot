@@ -187,6 +187,97 @@ function Get-FunctionCalls()
     }
     return $calls
 }
+
+function Build-FunctionUsageMap()
+{
+    <#
+    .SYNOPSIS
+        Traverses calls starting from main.ps1 and marks reachable functions with a boolean Used property on each functionsList entry.
+    .PARAMETER functionsList
+        The PSCustomObject array from Find-AllDefinedFunctions.
+    .PARAMETER mainScriptFile
+        Path to main.ps1, used as the entry point for traversal.
+    .OUTPUTS
+        Returns the updated functionsList with an added `Used` property on each item.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [PSCustomObject[]]$functionsList,
+        [Parameter(Mandatory = $true)]
+        [string]$mainScriptFile
+    )
+
+    # Map function name -> object for quick lookup
+    $funcByName = @{}
+    foreach ($f in $functionsList)
+    {
+        if (-not $funcByName.ContainsKey($f.functionName))
+        {
+            $funcByName[$f.functionName] = $f
+        }
+    }
+    Write-Host "Function map contains $($funcByName.Count) entries."
+    # Initialize Used=false on all entries
+    foreach ($f in $functionsList)
+    {
+        if (-not ($f.PSObject.Properties.Name -contains 'Used'))
+        {
+            Add-Member -InputObject $f -MemberType NoteProperty -Name Used -Value $false -Force
+        }
+        else
+        {
+            $f.Used = $false
+        }
+    }
+    # Seed with functions called directly by main.ps1
+    $initialCalls = Get-FunctionCalls -functionsList $functionsList -fileName $mainScriptFile
+    Write-Host "Number of functions used in main: $($initialCalls.Count)"
+    $visited = @{}
+    $queue = [System.Collections.Queue]::new()
+    foreach ($name in $initialCalls)
+    {
+        if (-not $visited.ContainsKey($name))
+        {
+            $visited[$name] = $true
+            $queue.Enqueue($name)
+        }
+    }
+    Write-Host "Visited function count: $($visited.Count)   "
+    # BFS over function calls
+    while ($queue.Count -gt 0)
+    {
+        $current = $queue.Dequeue()
+        if ($funcByName.ContainsKey($current))
+        {
+            # Mark Used = true
+            $funcByName[$current].Used = $true
+
+            $defFile = $funcByName[$current].definedIn
+            $innerCalls = Get-FunctionCalls -functionsList $functionsList -fileName $defFile | Where-Object { $_ -ne $current }
+            foreach ($c in $innerCalls)
+            {
+                if (-not $visited.ContainsKey($c))
+                {
+                    $visited[$c] = $true
+                    $queue.Enqueue($c)
+                }
+            }
+        }
+    }
+    Write-Host "Final visited function count: $($visited.Count)   "
+    # Mark any remaining visited names as Used even if definitions were missing
+    foreach ($kv in $visited.GetEnumerator())
+    {
+        $n = $kv.Key
+        if ($funcByName.ContainsKey($n))
+        {
+            $funcByName[$n].Used = $true
+        }
+    }
+
+    return $functionsList
+}
 #endregion
 
 
@@ -198,7 +289,8 @@ if (-not $functionsFolder)
 }
 $mainScriptFile = "$(Split-Path -Path $functionsFolder -Parent)\main.ps1"
 $functionsList = Find-AllDefinedFunctions -FolderPath $functionsFolder | Sort-Object definedIn
-$global:calls = Get-FunctionCalls -functionsList $functionsList -fileName "$mainScriptFile
+$calls = Get-FunctionCalls -functionsList $functionsList -fileName $mainScriptFile
 
-
-"
+# Enhance functionsList with a boolean Used flag indicating reachability from main.ps1
+$functionsList = Build-FunctionUsageMap -functionsList $functionsList -mainScriptFile $mainScriptFile
+$functionsList | Export-Csv -Path "function_usage_report.csv" -NoTypeInformation -Encoding UTF8
