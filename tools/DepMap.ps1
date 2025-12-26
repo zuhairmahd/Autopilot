@@ -1,3 +1,7 @@
+[cmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Low')]
+param(
+    [switch]$findTests
+)
 
 #region Helper Functions
 function Find-FolderPath()
@@ -158,7 +162,17 @@ function Find-AllDefinedFunctions()
 
 function Get-FunctionCalls()
 {
-    [CmdletBinding()                            ]
+    <#
+    .SYNOPSIS
+        Extracts function call references from a PowerShell file.
+    .PARAMETER functionsList
+        The array of function objects to search for in the file.
+    .PARAMETER fileName
+        Path to the file to scan for function calls.
+    .OUTPUTS
+        Returns an array of function names that are called in the file.
+    #>
+    [CmdletBinding()]
     param(
         [PSCustomObject]$functionsList,
         [string]$fileName
@@ -186,6 +200,153 @@ function Get-FunctionCalls()
         Write-Warning "Failed to read file ${FilePath}: $_"
     }
     return $calls
+}
+
+function Get-FunctionTestFiles()
+{
+    <#
+    .SYNOPSIS
+        Finds all test files that reference a given function.
+    .PARAMETER functionName
+        The name of the function to search for in test files.
+    .PARAMETER testsFolder
+        Path to the tests folder to search.
+    .OUTPUTS
+        Returns an array of relative paths to test files that mention the function.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$functionName,
+        [Parameter(Mandatory = $true)]
+        [string]$testsFolder
+    )
+
+    $testFiles = @()
+
+    try
+    {
+        # Get all test files (.Tests.ps1)
+        $allTestFiles = Get-ChildItem -Path $testsFolder -Filter "*.Tests.ps1" -Recurse -File -ErrorAction SilentlyContinue
+
+        foreach ($file in $allTestFiles)
+        {
+            # Check if function name appears in filename
+            if ($file.Name -match [regex]::Escape($functionName))
+            {
+                $relativePath = $file.FullName.Substring($testsFolder.Length).TrimStart('\\')
+                $testFiles += $relativePath
+                Write-Verbose "Found function '$functionName' in test filename: $relativePath"
+                continue
+            }
+
+            # Check if function name appears in file content
+            try
+            {
+                $content = Get-Content -Path $file.FullName -Raw -ErrorAction Stop
+                # Remove comments to avoid false positives
+                $content = $content -replace '(?m)^\s*#.*$', ''
+                $content = $content -replace '<#[\s\S]*?#>', ''
+                $pattern = "\b$([regex]::Escape($functionName))\b"
+                if ($content -match $pattern)
+                {
+                    $relativePath = $file.FullName.Substring($testsFolder.Length).TrimStart('\\')
+                    $testFiles += $relativePath
+                    Write-Verbose "Found function '$functionName' in test file content: $relativePath"
+                }
+            }
+            catch
+            {
+                Write-Warning "Failed to read test file ${file.FullName}: $_"
+            }
+        }
+    }
+    catch
+    {
+        Write-Warning "Failed to search test files for function ${functionName}: $_"
+    }
+
+    return $testFiles
+}
+
+function Add-PesterTestInfo()
+{
+    <#
+    .SYNOPSIS
+        Adds Pester test tracking information to the functionsList.
+    .PARAMETER functionsList
+        The PSCustomObject array from Find-AllDefinedFunctions.
+    .PARAMETER testsFolder
+        Path to the tests folder to search for test files.
+    .OUTPUTS
+        Returns the updated functionsList with added hasPesterTests and testFiles properties.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [PSCustomObject[]]$functionsList,
+        [Parameter(Mandatory = $true)]
+        [string]$testsFolder
+    )
+
+    Write-Host "Adding Pester test information..." -ForegroundColor Cyan
+
+    $totalFunctions = $functionsList.Count
+    $currentFunction = 0
+    $functionsWithTests = 0
+    $startTime = Get-Date
+    $lastProgressTime = $startTime
+    $progressFrequency = 10
+    foreach ($func in $functionsList)
+    {
+        $currentFunction++
+        $percentComplete = [int](($currentFunction / $totalFunctions) * 100)
+        Write-Progress -Activity "Analyzing Pester Tests" -Status "Processing $($func.functionName)" -PercentComplete $percentComplete
+
+        # Check if 30 seconds have passed since last progress message
+        $currentTime = Get-Date
+        $timeSinceLastProgress = ($currentTime - $lastProgressTime).TotalSeconds
+        if ($timeSinceLastProgress -ge $progressFrequency)
+        {
+            Write-Host "  Analyzing Pester Tests: $percentComplete% complete ($currentFunction/$totalFunctions functions)" -ForegroundColor Yellow
+            $lastProgressTime = $currentTime
+        }
+
+        # Initialize properties if not present
+        if (-not ($func.PSObject.Properties.Name -contains 'hasPesterTests'))
+        {
+            Add-Member -InputObject $func -MemberType NoteProperty -Name hasPesterTests -Value $false -Force
+        }
+        else
+        {
+            $func.hasPesterTests = $false
+        }
+
+        if (-not ($func.PSObject.Properties.Name -contains 'testFiles'))
+        {
+            Add-Member -InputObject $func -MemberType NoteProperty -Name testFiles -Value @() -Force
+        }
+        else
+        {
+            $func.testFiles = @()
+        }
+
+        # Find test files for this function
+        $testFiles = Get-FunctionTestFiles -functionName $func.functionName -testsFolder $testsFolder
+
+        if ($testFiles.Count -gt 0)
+        {
+            $func.hasPesterTests = $true
+            $func.testFiles = $testFiles
+            $functionsWithTests++
+            Write-Verbose "Function '$($func.functionName)' has tests in $($testFiles.Count) file(s)"
+        }
+    }
+
+    Write-Progress -Activity "Analyzing Pester Tests" -Completed
+    Write-Host "  Found tests for $functionsWithTests out of $totalFunctions functions." -ForegroundColor Green
+
+    return $functionsList
 }
 
 function Build-FunctionUsageMap()
@@ -243,7 +404,6 @@ function Build-FunctionUsageMap()
             $queue.Enqueue($name)
         }
     }
-    Write-Host "Visited function count: $($visited.Count)   "
     # BFS over function calls
     while ($queue.Count -gt 0)
     {
@@ -265,7 +425,6 @@ function Build-FunctionUsageMap()
             }
         }
     }
-    Write-Host "Final visited function count: $($visited.Count)   "
     # Mark any remaining visited names as Used even if definitions were missing
     foreach ($kv in $visited.GetEnumerator())
     {
@@ -280,11 +439,16 @@ function Build-FunctionUsageMap()
 }
 #endregion
 
-
 $functionsFolder = Find-FolderPath -Path (Get-Location).Path -FolderName "functions"
 if (-not $functionsFolder)
 {
     Write-Error "Functions folder not found in the directory hierarchy."
+    exit 1
+}
+$testsFolder = Find-FolderPath -Path (Get-Location).Path -FolderName "tests"
+if (-not $testsFolder)
+{
+    Write-Error "Tests folder not found in the directory hierarchy."
     exit 1
 }
 $mainScriptFile = "$(Split-Path -Path $functionsFolder -Parent)\main.ps1"
@@ -293,4 +457,11 @@ $calls = Get-FunctionCalls -functionsList $functionsList -fileName $mainScriptFi
 
 # Enhance functionsList with a boolean Used flag indicating reachability from main.ps1
 $functionsList = Build-FunctionUsageMap -functionsList $functionsList -mainScriptFile $mainScriptFile
+
+# Enhance functionsList with Pester test tracking information if requested
+if ($findTests)
+{
+    $functionsList = Add-PesterTestInfo -functionsList $functionsList -testsFolder $testsFolder
+}
+
 $functionsList | Export-Csv -Path "function_usage_report.csv" -NoTypeInformation -Encoding UTF8
