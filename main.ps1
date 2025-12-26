@@ -820,6 +820,7 @@ else
 {
     "contoso.com"
 }
+$startTime = Get-Date
 if (-not $fastStart)
 {
     Write-Verbose "[$scriptName] Initializing application configuration"
@@ -853,31 +854,6 @@ else
         strings        = $stringContent
         Success        = ($null -ne $initContent.auth -and $null -ne $initContent.globalSettings -and $null -ne $initContent.repoInfo -and $null -ne $initContent.requiredScopes -and $null -ne $initContent.cacheSettings -and $null -ne $domainContent -and $null -ne $menuContent -and $null -ne $stringContent)
     }
-    foreach ($key in $configResult.Keys)
-    {
-        $value = $configResult[$key]
-        if ($null -ne $value)
-        {
-            if ($value -is [System.Collections.IDictionary] -or $value -is [System.Collections.IEnumerable])
-            {
-                $count = ($value | Measure-Object).Count
-                Write-Host "[$scriptName] ConfigResult[$key] is a collection with count: $count"
-                write-log -logFile $logFile -module $scriptName -message "ConfigResult[$key] is a collection with count: $count"
-            }
-            else
-            {
-                Write-Host "[$scriptName] ConfigResult[$key]: $value"
-                write-log -logFile $logFile -module $scriptName -message "ConfigResult[$key]: $value"
-            }
-        }
-        else
-        {
-            Write-Host "[$scriptName] ConfigResult[$key] is null"
-            write-log -logFile $logFile -module $scriptName -message "ConfigResult[$key] is null"
-        }
-    }
-
-    #log the values of the configResult for debugging
 }
 if (-not $configResult.Success)
 {
@@ -1455,7 +1431,10 @@ if ($testMode -and $script:testModeOptions.exitAfter)
     exit 0
 }
 #endregion initialization block with access token
-
+$endTime = Get-Date
+#display the duration in minutes and seconds.
+$duration = $endTime - $startTime
+Write-Host "Initialization completed in $($duration.Minutes) minutes and $($duration.Seconds) seconds." -ForegroundColor Green
 #region Create menus
 # Clear menu configuration cache to ensure fresh menu loading
 # Write-Verbose "[$scriptName] Clearing menu configuration cache"
