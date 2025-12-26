@@ -185,6 +185,7 @@ param(
     [String] $GroupTag,
     [switch]$showLicenseBanner,
     [switch]$HideEmptyMenus,
+    [switch]$fastStart,
     [switch]$showAuth,
     [switch]$clearCache,
     [switch]$showVersion,
@@ -819,8 +820,65 @@ else
 {
     "contoso.com"
 }
+if (-not $fastStart)
+{
+    Write-Verbose "[$scriptName] Initializing application configuration"
+    write-log -logFile $logFile -module $scriptName -message "Initializing application configuration"
+    $configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -BoundParameters $PSBoundParameters
+}
+else
+{
+    try
+    {
+        $initContent = Import-PowerShellDataFile -Path $InitFile
+        $stringContent = Import-PowerShellDataFile -Path $stringsFile
+        $domainContent = Import-PowerShellDataFile -Path "$domain.psd1"
+        $menuContent = Import-PowerShellDataFile -Path $menuFile
+    }
+    catch
+    {
+        Write-Host "Error loading configuration files in fast start mode: $_" -ForegroundColor Red
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Error loading configuration files in fast start mode: $_" -LogLevel "Error"
+        write-log -logFile $logFile -finishLogging
+        exit 1
+    }
+    $configResult = @{
+        auth           = $initContent.auth
+        globalSettings = $initContent.globalSettings
+        localSettings  = $domainContent
+        RepoInfo       = $initContent.repoInfo
+        RequiredScopes = $initContent.requiredScopes
+        CacheSettings  = $initContent.cacheSettings
+        menu           = $menuContent
+        strings        = $stringContent
+        Success        = ($null -ne $initContent.auth -and $null -ne $initContent.globalSettings -and $null -ne $initContent.repoInfo -and $null -ne $initContent.requiredScopes -and $null -ne $initContent.cacheSettings -and $null -ne $domainContent -and $null -ne $menuContent -and $null -ne $stringContent)
+    }
+    foreach ($key in $configResult.Keys)
+    {
+        $value = $configResult[$key]
+        if ($null -ne $value)
+        {
+            if ($value -is [System.Collections.IDictionary] -or $value -is [System.Collections.IEnumerable])
+            {
+                $count = ($value | Measure-Object).Count
+                Write-Host "[$scriptName] ConfigResult[$key] is a collection with count: $count"
+                write-log -logFile $logFile -module $scriptName -message "ConfigResult[$key] is a collection with count: $count"
+            }
+            else
+            {
+                Write-Host "[$scriptName] ConfigResult[$key]: $value"
+                write-log -logFile $logFile -module $scriptName -message "ConfigResult[$key]: $value"
+            }
+        }
+        else
+        {
+            Write-Host "[$scriptName] ConfigResult[$key] is null"
+            write-log -logFile $logFile -module $scriptName -message "ConfigResult[$key] is null"
+        }
+    }
 
-$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -BoundParameters $PSBoundParameters
+    #log the values of the configResult for debugging
+}
 if (-not $configResult.Success)
 {
     Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
@@ -1012,7 +1070,6 @@ if ($showAuth)
 {
     Write-Host "$($key): $($getTokenParams[$key])" -ForegroundColor Cyan
     $global:previousMenu = New-Object System.Collections.Hashtable
-    # Device enrollment state cache content has been migrated to the unified cache system.
 }
 Write-Verbose "[$scriptName] Using authentication parameters: $($getTokenParams | ConvertTo-Json -Depth $maxJSONDepth)"
 Write-Verbose "[$scriptName] Loading strings from: $stringsFile"

@@ -130,7 +130,9 @@ if (-not $skipLogin)
     Write-Host "Starting script..."
     $global:maxJSONDepth = 20
     # Set global log level for all Write-Log calls
-    $global:LogFile = $logFilePath
+    $global:LogFile = Join-Path -Path $PWD -ChildPath "logs\$scriptName.log"
+    $configFile = Join-Path -Path $ScriptPath -ChildPath ".secrets\config.json"
+    $initFile = Join-Path -Path $ScriptPath -ChildPath "settings.psd1"
     $Global:MinimumLogLevel = $LogLevel
     if ($OverwriteLogs)
     {
@@ -555,18 +557,12 @@ if (-not $skipLogin)
         "contoso.com"
     }
 
-    $configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -BoundParameters $PSBoundParameters
-    if (-not $configResult.Success)
-    {
-        Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration initialization failed: $($configResult.ErrorMessage)" -LogLevel "Error"
-        write-log -logFile $logFile -finishLogging
-        exit 1
-    }
+    $configResult = Import-PowerShellDataFile -Path $initFile
+
     # Extract configuration results
     $auth = $configResult.Auth
     $globalSettings = $configResult.GlobalSettings
-    $localSettings = $configResult.LocalSettings
+    $localSettings = Join-Path -Path $scriptPath -ChildPath "$domain.psd1   "
     $requiredScopes = $configResult.RequiredScopes
     $repoInfo = $configResult.RepoInfo
     $global:cacheSettings = $configResult.CacheSettings
