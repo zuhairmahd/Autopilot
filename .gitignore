@@ -47,6 +47,7 @@ TestResults/
 *.html
 *.xml
 *.backup.*
+menu-cache.json
 config.json
 *.zuh
 *temp*
@@ -65,3 +66,4 @@ gao.gov.psd1
 *.txt
 *.zip
 targets-gao.psd1
+.psd1

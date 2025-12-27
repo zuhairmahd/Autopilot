@@ -47,11 +47,11 @@ function ProcessDevice()
         [string]$action,
         [switch]$CustomImport
     )
-    
+
     #region check and initialize variables
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Checking access token..."
-        
+
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking access token..." -LogLevel "Verbose"
     if ($accessToken)
     {
@@ -80,20 +80,21 @@ function ProcessDevice()
     Write-Verbose "[$functionName] The model is $model"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "The model is $model" -LogLevel "Information"
     #endregion check and initialize variables
-    
+
     switch ($action)
     {
         'import'
         {
             Write-Verbose "[$functionName] Importing device with serial number $serialNumber."
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Importing device with serial number $serialNumber." -LogLevel "Information"
+            #region Check if device is already in Intune
             Write-Host "Checking to make sure the device hash is not already in Intune..."
             $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken
             Write-Verbose "[$functionName] Device assignment check returned: $deviceAssignment"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device assignment check returned: $deviceAssignment" -LogLevel "Information"
             if ($null -ne $deviceAssignment -and $deviceAssignment -notin $returnValues.values)
             {
-                $assignmentStatusObject = DisplayDeviceAssignmentStatus -deviceAssignment $deviceAssignment 
+                $assignmentStatusObject = DisplayDeviceAssignmentStatus -deviceAssignment $deviceAssignment
                 Write-Verbose "[$functionName] Device assignment object: $($assignmentStatusObject | ConvertTo-Json -Depth 4)"
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device assignment object IsAssigned=$($assignmentStatusObject.IsAssigned) Status=$($assignmentStatusObject.AssignmentStatus) Category=$($assignmentStatusObject.StatusCategory)" -LogLevel "Information"
                 if ($assignmentStatusObject.IsAssigned)
@@ -113,15 +114,16 @@ function ProcessDevice()
                             return $returnValues.deviceAssignmentPendingMessage
                         }
                     }
-                    Write-Host "The device is in Intune but not assigned to a profile." 
+                    Write-Host "The device is in Intune but not assigned to a profile."
                 }
-                return $returnValues.deviceIsInIntuneMessage 
+                return $returnValues.deviceIsInIntuneMessage
             }
             else
             {
-                Write-Host "The device is not in Intune." 
+                Write-Host "The device is not in Intune."
             }
-            
+            #endregion Check if device is already in Intune
+
             #region Add the device to Intune
             Write-Host "This will import the device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model) into Autopilot."
             $choice = Read-Host "Are you sure you want to import this device? (yes/no)"
@@ -163,7 +165,7 @@ function ProcessDevice()
             $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken
             if ($null -ne $deviceAssignment -and $deviceAssignment -notin $returnValues.values)
             {
-                $assignmentStatusObject = DisplayDeviceAssignmentStatus -deviceAssignment $deviceAssignment 
+                $assignmentStatusObject = DisplayDeviceAssignmentStatus -deviceAssignment $deviceAssignment
                 if ($assignmentStatusObject.IsAssigned)
                 {
                     return HandleDeviceEnrollmentState -deviceAssignment $deviceAssignment -serialNumber $serialNumber -accessToken $accessToken -returnValues $returnValues -domain $domain
@@ -205,7 +207,7 @@ function ProcessDevice()
                         {
                             Write-Verbose "[$functionName] RestartDevice function returned false."
                             Write-Log -LogFile $LogFile -Module "$functionName" -Message "RestartDevice function returned false." -LogLevel "Information"
-                            return $returnValues.noRestartMessage 
+                            return $returnValues.noRestartMessage
                         }
                     }
                     $deviceWaitMenu = AddMenuItem -Menu $deviceWaitMenu -Name "Continue to wait for profile assignment" -Action {
@@ -241,7 +243,7 @@ function ProcessDevice()
                         Write-Log -LogFile $LogFile -Module "$functionName" -Message "User selected to exit the application." -LogLevel "Information"
                         return "EXIT_APPLICATION"
                     }
-                    else 
+                    else
                     {
                         return $result
                     }
@@ -275,7 +277,7 @@ function ProcessDevice()
             {
                 Write-Host "The device with serial number $serialNumber is not in Autopilot." -ForegroundColor Yellow
                 Write-Host "No action taken." -ForegroundColor Yellow
-                return $returnValues.deviceNotInIntuneMessage 
+                return $returnValues.deviceNotInIntuneMessage
             }
         }
         default
