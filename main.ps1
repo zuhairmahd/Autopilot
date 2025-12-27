@@ -374,7 +374,6 @@ function Find-FolderPath()
         return $null
     }
 }
-
 $functionsFolder = find-folderPath -Path $scriptPath -FolderName 'functions'
 if (Test-Path $functionsFolder)
 {
@@ -399,6 +398,7 @@ $global:maxJSONDepth = 20
 # Set global log level for all Write-Log calls
 $global:LogFile = $logFilePath
 $Global:MinimumLogLevel = $LogLevel
+$menuCacheFile = Join-Path -Path $scriptPath -ChildPath "menu-cache.json"
 if ($OverwriteLogs)
 {
     Write-Verbose "[$scriptName] Overwriting log file: $LogFile"
@@ -784,9 +784,8 @@ else
         Write-Verbose "[$scriptName] Global settings count: $($globalSettings.Count)"
         Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
         Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
-        Write-Verbose "[$scriptName] Menus count: $($menus.Count)"
         Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
     }
     else
     {
@@ -804,83 +803,28 @@ Write-Host "Loading configuration..."
 
 $startTime = Get-Date
 
-#region Attempting fast start
-$filesLoaded = $true
-write-log -logFile $logFile -module $scriptName -message "Attempting fast start configuration load."
-Write-Verbose "[$scriptName] Attempting fast start configuration load."
-if (Test-Path $InitFile)
+$configResult = Initialize-FastStart -initFile $InitFile -stringsFile $stringsFile -menuFile $menuFile -menuCacheFile $menuCacheFile -domain $domain -ScriptPath $ScriptPath
+if ($configResult.success)
 {
-    write-log -logFile $logFile -module $scriptName -message "Loading init file: $InitFile"
-    Write-Verbose "[$scriptName] Loading init file: $InitFile"
-    $initContent = Import-PowerShellDataFile -Path $InitFile
+    write-log -logFile $logFile -module $scriptName -message "Fast start configuration load succeeded."
+    Write-Verbose "[$scriptName] Fast start configuration load succeeded."
+    Write-Host "Fast start configuration load succeeded."
+    $script:menus = if ($configResult.menu)
+    {
+        $configResult.menu
+    }
+    else
+    {
+        $null
+    }
 }
 else
-{
-    $filesLoaded = $false
-    write-log -logFile $logFile -module $scriptName -message "Init file not found: $InitFile"
-    Write-Verbose "[$scriptName] Init file not found: $InitFile"
-}
-if (Test-Path $stringsFile)
-{
-    write-log -logFile $logFile -module $scriptName -message "Loading strings file: $stringsFile"
-    Write-Verbose "[$scriptName] Loading strings file: $stringsFile"
-    $stringContent = Import-PowerShellDataFile -Path $stringsFile
-}
-else
-{
-    $filesLoaded = $false
-    write-log -logFile $logFile -module $scriptName -message "Strings file not found: $stringsFile"
-    Write-Verbose "[$scriptName] Strings file not found: $stringsFile"
-}
-if (Test-Path "$domain.psd1")
-{
-    write-log -logFile $logFile -module $scriptName -message "Loading domain settings file: $domain.psd1"
-    Write-Verbose "[$scriptName] Loading domain settings file: $domain.psd1"
-    $domainContent = Import-PowerShellDataFile -Path "$domain.psd1"
-}
-else
-{
-    $filesLoaded = $false
-    write-log -logFile $logFile -module $scriptName -message "Domain settings file not found: $domain.psd1"
-    Write-Verbose "[$scriptName] Domain settings file not found: $domain.psd1"
-}
-if (Test-Path $menuFile)
-{
-    write-log -logFile $logFile -module $scriptName -message "Loading menu file: $menuFile"
-    Write-Verbose "[$scriptName] Loading menu file: $menuFile"
-    $menuContent = Import-PowerShellDataFile -Path $menuFile
-}
-else
-{
-    $filesLoaded = $false
-    write-log -logFile $logFile -module $scriptName -message "Menu file not found: $menuFile"
-    Write-Verbose "[$scriptName] Menu file not found: $menuFile"
-}
-$configResult = @{
-    auth           = $initContent.auth
-    globalSettings = $initContent.globalSettings
-    localSettings  = $domainContent
-    RepoInfo       = $initContent.repoInfo
-    RequiredScopes = $initContent.requiredScopes
-    CacheSettings  = $initContent.cacheSettings
-    menu           = $menuContent
-    strings        = $stringContent
-    Success        = ($null -ne $initContent.auth -and $null -ne $initContent.globalSettings -and $null -ne $initContent.repoInfo -and $null -ne $initContent.requiredScopes -and $null -ne $initContent.cacheSettings -and $null -ne $domainContent -and $null -ne $menuContent -and $null -ne $stringContent)
-}
-if ($filesLoaded -eq $false -or (-not $configResult.Success))
 {
     write-log -logFile $logFile -module $scriptName -message "Fast start configuration load failed, falling back to full initialization."
     Write-Verbose "[$scriptName] Fast start configuration load failed, falling back to full initialization."
     Write-Host "Performing full configuration initialization..."
     $configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domain -BoundParameters $PSBoundParameters
 }
-else
-{
-    write-log -logFile $logFile -module $scriptName -message "Fast start configuration load succeeded."
-    Write-Verbose "[$scriptName] Fast start configuration load succeeded."
-    Write-Host "Fast start configuration load succeeded."
-}
-#endregion Attempting fast start
 
 if (-not $configResult.Success)
 {
@@ -915,7 +859,7 @@ Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
 Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
 Write-Verbose "[$scriptName] Menus count: $($configResult.menu.Count)"
 Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
-Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
 if (-not $version.version)
 {
     Write-Verbose "[$scriptName] Unable to get file version."
@@ -1105,7 +1049,7 @@ if ($settings.showLicenseBanner)
     Write-Host "Use at your own risk. The author is not responsible for any damage or data loss." -ForegroundColor Red
     Write-Host "==========================================================`n" -ForegroundColor White
 }
-if ($updateAvailable.success -and $updateAvailable.updateAvailable)
+if ($updateAvailable.success -and $updateAvailable.updateAvailable -and $scriptName.EndsWith('exe'))
 {
     Write-Verbose "[$scriptName] An update is available: $($updateAvailable.version.major).$($updateAvailable.version.minor).$($updateAvailable.version.build) ($($updateAvailable.version.revision))"
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "An update is available: $($updateAvailable.version.major).$($updateAvailable.version.minor).$($updateAvailable.version.build) (revision $($updateAvailable.version.revision))"
@@ -1459,19 +1403,23 @@ if ($testMode -and $script:testModeOptions.exitAfter)
 }
 #endregion initialization block with access token
 
-$endTime = Get-Date
-#display the duration in minutes and seconds.
-$duration = $endTime - $startTime
-Write-Host "Initialization completed in $($duration.Minutes) minutes and $($duration.Seconds) seconds." -ForegroundColor Green
+
 
 #region Create menus
-# Clear menu configuration cache to ensure fresh menu loading
-# Write-Verbose "[$scriptName] Clearing menu configuration cache"
-# Invoke-CacheManagement -Action ClearSpecific -CacheType Menu
-#Now load the menu configuration
-$menuConfig = $configResult.menu
-if ($menuConfig)
+#load menus from cache if they were returned by the Invoke-FastStart function
+if ($null -ne $script:menus)
 {
+    Write-Verbose "[$scriptName] Using cached menus from $menuCacheFile"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Using cached menus from $menuCacheFile" -LogLevel "Information"
+    Write-Host "Loaded $($script:menus.Count) menu items from cache." -ForegroundColor Green
+}
+else
+{
+    # Clear menu configuration cache to ensure fresh menu loading
+    Write-Verbose "[$scriptName] Clearing menu configuration cache"
+    Invoke-CacheManagement -Action ClearSpecific -CacheType Menu
+    #Now load the menu configuration
+    $menuConfig = $configResult.menu
     # Convert the flat menu.psd1 structure to array format for Test-MenuItemIncluded
     foreach ($menuName in $menuConfig.keys)
     {
@@ -1483,7 +1431,22 @@ if ($menuConfig)
         }
     }
     Write-Verbose "Loaded $($script:menus.Count) menu items for filtering"
+    $script:menus | ConvertTo-Json -Depth $maxJSONDepth | Out-File -FilePath $menuCacheFile -Encoding UTF8 -Force
+    if (Test-Path $menuCacheFile)
+    {
+        Write-Verbose "[$scriptName] Menu configuration cached to $menuCacheFile"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Menu configuration cached to $menuCacheFile" -LogLevel "Information"
+    }
+    else
+    {
+        Write-Verbose "[$scriptName] Failed to cache menu configuration to $menuCacheFile"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to cache menu configuration to $menuCacheFile" -LogLevel "Warning"
+    }
 }
+
+$duration = (Get-Date) - $startTime
+Write-Host "Initialization completed in $($duration.Minutes) minutes and $($duration.Seconds) seconds." -ForegroundColor Green
+
 $mainMenu = NewMenu -MenuName "mainMenu"
 $CheckMenu = NewMenu -MenuName "checkMenu"
 $serialNumberMenu = NewMenu -MenuName "serialNumberMenu"
@@ -1970,11 +1933,11 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import Corporate Device
     }
     $deviceIdentifier = GetDeviceInfo -nohash
     Write-Verbose "[$scriptName] Device identifier: $($deviceIdentifier | Out-String)"
-    write-log -logFile $LogFile -Module $functionName -Message "Device identifier: $($deviceIdentifier | Out-String)" -LogLevel "Verbose"
+    write-log -logFile $LogFile -Module $scriptName -Message "Device identifier: $($deviceIdentifier | Out-String)" -LogLevel "Verbose"
     if ($deviceIdentifier.deviceAllowed -eq $false)
     {
         Write-Host "The device manufacturer $($deviceIdentifier.manufacturer) is not allowed." -ForegroundColor Red
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Device manufacturer $($deviceIdentifier.manufacturer) is not allowed" -LogLevel "Error"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Device manufacturer $($deviceIdentifier.manufacturer) is not allowed" -LogLevel "Error"
         return $returnValues.manufacturerNotAllowed
     }
     if ($deviceIdentifier -and $deviceIdentifier.SerialNumber)
@@ -2396,19 +2359,19 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings"
         }
         if ($saveResult)
         {
-            Write-Log -LogFile $logFile -Module $functionName -Message "Successfully saved app mode configuration to $storageType" -LogLevel "Information"
+            Write-Log -LogFile $logFile -Module $scriptName -Message "Successfully saved app mode configuration to $storageType" -LogLevel "Information"
             Write-Host "App mode configuration saved successfully to $storageType" -ForegroundColor Green
         }
         else
         {
-            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to save app mode configuration" -LogLevel "Error"
+            Write-Log -LogFile $logFile -Module $scriptName -Message "Failed to save app mode configuration" -LogLevel "Error"
             Write-Host "Failed to save app mode configuration" -ForegroundColor Red
         }
     }
     catch
     {
         $errorMessage = "Error saving app mode configuration: $($_.Exception.Message)"
-        Write-Log -LogFile $logFile -Module $functionName -Message $errorMessage -LogLevel "Error"
+        Write-Log -LogFile $logFile -Module $scriptName -Message $errorMessage -LogLevel "Error"
         Write-Host $errorMessage -ForegroundColor Red
         return $null
     }

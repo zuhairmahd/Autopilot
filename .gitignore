@@ -47,6 +47,7 @@ TestResults/
 *.html
 *.xml
 *.backup.*
+menu-cache.json
 config.json
 *.zuh
 *temp*

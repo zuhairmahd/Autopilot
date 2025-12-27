@@ -1,6 +1,7 @@
 [cmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Low')]
 param(
-    [switch]$findTests
+    [switch]$findTests,
+    [string]$outputFile = Join-Path -Path (Get-Location).Path -ChildPath "function_usage_report.csv"
 )
 
 #region Helper Functions
@@ -463,5 +464,29 @@ if ($findTests)
 {
     $functionsList = Add-PesterTestInfo -functionsList $functionsList -testsFolder $testsFolder
 }
-
-$functionsList | Export-Csv -Path "function_usage_report.csv" -NoTypeInformation -Encoding UTF8
+if (Test-Path -Path $outputFile)
+{
+    Write-Host "Overwriting existing output file: $outputFile" -ForegroundColor Yellow
+    $choice = Read-Host "Do you want to overwrite it? (Y/N)"
+    while ($choice -notin @('Y', 'N', 'y', 'n'))
+    {
+        $choice = Read-Host "Please enter Y or N"
+        [System.Console]::Beep(800, 200)
+    }
+    if ($choice -in @('N', 'n'))
+    {
+        Write-Host "Enter a new file name for output:"
+        $outputFile = Read-Host "Output File Name"
+        while (Test-Path -Path $outputFile -and $null -ne $outputFile)
+        {
+            Write-Host "File $outputFile already exists. Please enter a different name." -ForegroundColor Yellow
+            $outputFile = Read-Host "Output File Name"
+        }
+    }
+    else
+    {
+        Write-Host "Overwriting file $outputFile..." -ForegroundColor Green
+        Remove-Item -Path $outputFile -Force -ErrorAction SilentlyContinue
+    }
+}
+$functionsList | Export-Csv -Path $outputFile -NoTypeInformation -Encoding UTF8
