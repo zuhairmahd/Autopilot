@@ -1,4 +1,4 @@
-function ImportAutopilotDevice() 
+function ImportAutopilotDevice()
 {
     <#
     .SYNOPSIS
@@ -84,7 +84,8 @@ function ImportAutopilotDevice()
     Write-Verbose "[$functionName] Model: $model"
     $hash = $DeviceObject.hardwareHash
     Write-Log -LogFile $LogFile -Module $functionName -Message "Prepared import object for serial=$serialNumber make='$make' model='$model' groupTag='$GroupTag' assignedUser='$AssignedUser'" -LogLevel "Information"
-    #endregion  
+    #endregion
+
     #region prepare import object.
     if ($CustomImport -eq $true)
     {
@@ -196,12 +197,12 @@ function ImportAutopilotDevice()
     "deviceErrorName": ""
   },
   "assignedUserPrincipalName": "$AssignedUser",
-}    
+}
 "@
-  
+
     $imported = callGraphApi -AccessToken $AccessToken -ResourcePath $uri -Method POST -Body $json
     Write-Log -LogFile $LogFile -Module $functionName -Message "POST import request submitted for serial=$serialNumber" -LogLevel "Information"
-    
+
     if ($null -eq $imported)
     {
         Write-Host "The device import failed."
@@ -237,7 +238,7 @@ function ImportAutopilotDevice()
     Write-Verbose "[$functionName] The index count is $index."
     if (($device.state.deviceImportStatus -eq 'unknown') -and ($index -gt $maxWaitTime))
     {
-        Write-Host "The import is taking too long (over $maxWaitTime minutes)." 
+        Write-Host "The import is taking too long (over $maxWaitTime minutes)."
         Write-Host 'Please check the Intune portal or contact an Intune administrator.'
         Write-Log -LogFile $LogFile -Module $functionName -Message "Timeout waiting for import completion (status still unknown)" -LogLevel "Warning"
         return $null

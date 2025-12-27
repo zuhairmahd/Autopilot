@@ -92,21 +92,21 @@ $logFile = $Log
 if (-not $skipModuleCheck)
 {
     $requiredModules = @(
-        @{ 
+        @{
             Name           = 'ps2exe'
             MinimumVersion = '1.0.0'
-            install        = if ($SkipExecutable) { $false } else { $true }                
+            install        = if ($SkipExecutable) { $false } else { $true }
         },
-        @{ 
+        @{
             Name           = 'TrustedSigning'
             MinimumVersion = '0.0.1'
             install        = if ($SkipSigning) { $false } else { $true }
-            
+
         }
     )
     Write-Verbose "[$scriptName] $($requiredModules.count) Required modules."
-    $modulesToCheck = $requiredModules | Where-Object { $_.install -eq $true }      
-    Write-Verbose "[$scriptName] $($modulesToCheck.count) Modules    to check."
+    $modulesToCheck = $requiredModules | Where-Object { $_.install -eq $true }
+    Write-Verbose "[$scriptName] $($modulesToCheck.count) Modules to check."
 
     if ($modulesToCheck.Count -gt 0)
     {
@@ -157,7 +157,7 @@ else
 {
     Write-Verbose "[$scriptName] Module check is skipped as per user request."
     Write-Host "Module check is skipped as per user request." -ForegroundColor Yellow
-}       
+}
 #endregion Module Dependencies
 
 $targetConfig = $null
@@ -171,9 +171,9 @@ if ($PSCmdlet.ParameterSetName -eq 'TargetBuild')
             Write-Host "Targets file not found: $TargetsFile" -ForegroundColor Red
             exit 1
         }
-        
+
         $targetsData = Import-PowerShellDataFile -Path $TargetsFile
-        
+
         # Auto-select single target if no target name specified
         if ([string]::IsNullOrWhiteSpace($TargetName))
         {
@@ -191,9 +191,9 @@ if ($PSCmdlet.ParameterSetName -eq 'TargetBuild')
                 exit 1
             }
         }
-        
+
         Write-Host "Loading target configuration: $TargetName from $TargetsFile" -ForegroundColor Cyan
-        
+
         if (-not $targetsData.targets -or -not $targetsData.targets.ContainsKey($TargetName))
         {
             Write-Host "Target '$TargetName' not found in targets file" -ForegroundColor Red
@@ -201,7 +201,7 @@ if ($PSCmdlet.ParameterSetName -eq 'TargetBuild')
             Write-Host "Available targets: $availableTargets" -ForegroundColor Yellow
             exit 1
         }
-        
+
         $targetConfig = $targetsData.targets[$TargetName]
     }
     catch
@@ -261,7 +261,7 @@ function Find-FolderPath()
             $parent = Split-Path -Path $currentPath -Parent
             if ($parent -eq $currentPath -or [string]::IsNullOrEmpty($parent))
             {
-                break 
+                break
             } # Reached root
             Write-Verbose "[$functionName] Searching children of parent: $parent for folder named $FolderName"
             $siblingMatch = Get-ChildItem -Path $parent -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -ieq $FolderName } | Select-Object -First 1
@@ -328,29 +328,29 @@ function New-ZipArchive()
             if (Test-Path -Path $outputPath)
             {
                 Remove-Item -Path $outputPath -Force
-            }                                   
+            }
         }
         if (Test-Path -Path $inputPath -PathType Container  )
         {
             Compress-Archive -Path "$inputPath\*" -DestinationPath $tempZipFilePath -Force
-            Write-Verbose "[$functionName] Compressed folder $inputPath into $tempZipFilePath"  
+            Write-Verbose "[$functionName] Compressed folder $inputPath into $tempZipFilePath"
         }
-        elseif (Test-Path -Path $inputPath -PathType Leaf)      
+        elseif (Test-Path -Path $inputPath -PathType Leaf)
         {
             Compress-Archive -Path $inputPath -DestinationPath $tempZipFilePath -Force
-            Write-Verbose "[$functionName] Compressed file $inputPath into $tempZipFilePath"                
-        }                   
+            Write-Verbose "[$functionName] Compressed file $inputPath into $tempZipFilePath"
+        }
         else
         {
             throw "Input path '$inputPath' does not exist."
-        }       
+        }
         Write-Host "Zip archive created successfully: $tempZipFilePath"
-        Move-Item -Path $tempZipFilePath -Destination $outputPath -Force       
-        Write-Host "Moved zip archive to final destination: $outputPath"    
-        return $true        
+        Move-Item -Path $tempZipFilePath -Destination $outputPath -Force
+        Write-Host "Moved zip archive to final destination: $outputPath"
+        return $true
     }
     catch
-    {   
+    {
         Write-Host "Failed to create zip archive: $tempZipFilePath"
         Write-Error $_
         return $false
@@ -442,7 +442,7 @@ function Update-LastRunVersion()
         $versionParts = $Version.Split('.')
         while ($versionParts.Count -lt 4)
         {
-            $versionParts += '0' 
+            $versionParts += '0'
         }
         $updatedVersion = ($versionParts[0..3]) -join '.'
     }
@@ -454,7 +454,7 @@ function Update-LastRunVersion()
         $lrParts = $LastRun.version.Split('.')
         while ($lrParts.Count -lt 4)
         {
-            $lrParts += '0' 
+            $lrParts += '0'
         }
         $lastRunVersion = ($lrParts[0..3]) -join '.'
     }
@@ -481,15 +481,15 @@ function Update-LastRunVersion()
         $cmp = $supObj.CompareTo($lastObj)
         $relation = if ($cmp -gt 0)
         {
-            'greater than' 
+            'greater than'
         }
         elseif ($cmp -lt 0)
         {
-            'less than' 
+            'less than'
         }
         else
         {
-            'equal to' 
+            'equal to'
         }
         Write-Host "Supplied version: $updatedVersion"
         Write-Host "Last run version: $lastRunVersion"
@@ -506,15 +506,15 @@ function Update-LastRunVersion()
         {
             'S'
             {
-                Write-Host "Using supplied version: $updatedVersion"; $maintainCurrentVersion = $true 
+                Write-Host "Using supplied version: $updatedVersion"; $maintainCurrentVersion = $true
             }
             'L'
             {
-                Write-Host "Using last run version: $lastRunVersion"; $updatedVersion = $lastRunVersion 
+                Write-Host "Using last run version: $lastRunVersion"; $updatedVersion = $lastRunVersion
             }
             'E'
             {
-                Write-Host 'Exiting script.'; exit 0 
+                Write-Host 'Exiting script.'; exit 0
             }
         }
     }
@@ -546,25 +546,25 @@ function Update-LastRunVersion()
         # Ensure exactly 4 parts (defensive)
         while ($parts.Count -lt 4)
         {
-            $parts += '0' 
+            $parts += '0'
         }
         switch ($PartToIncrement)
         {
             'Major'
             {
-                $parts[0] = ([int]$parts[0] + 1); $parts[1] = 0; $parts[2] = 0; $parts[3] = 0 
+                $parts[0] = ([int]$parts[0] + 1); $parts[1] = 0; $parts[2] = 0; $parts[3] = 0
             }
             'Minor'
             {
-                $parts[1] = ([int]$parts[1] + 1); $parts[2] = 0; $parts[3] = 0 
+                $parts[1] = ([int]$parts[1] + 1); $parts[2] = 0; $parts[3] = 0
             }
             'Build'
             {
-                $parts[2] = ([int]$parts[2] + 1); $parts[3] = 0 
+                $parts[2] = ([int]$parts[2] + 1); $parts[3] = 0
             }
             'Revision'
             {
-                $parts[3] = ([int]$parts[3] + 1) 
+                $parts[3] = ([int]$parts[3] + 1)
             }
         }
         $finalVersion = ($parts[0..3]) -join '.'
@@ -606,10 +606,10 @@ function UpdateHash()
         Write-Log -logFile $logFile -Message "File not found: $executableFilePath" -module $functionName -logLevel "Error"
         return $false
     }
-    
+
     # Get the hash of the executable file
     $fileHash = Get-FileHash -Path $executableFilePath -Algorithm SHA256
-    
+
     if ($fileHash)
     {
         Write-Host "File hash (SHA256) of $($executableFilePath): $($fileHash.Hash)"
@@ -742,7 +742,7 @@ function MergeFunctions()
     {
         Write-Verbose "[$functionName] No comments will be added to the merged content."
     }
-    
+
     # Process each file
     foreach ($filePath in $FilesToMerge)
     {
@@ -796,26 +796,26 @@ function MergeFunctions()
     {
         Write-Verbose "[$functionName] No footer comments will be added to the merged content."
     }
-    
+
     #Check if we are given a destination file with a path
     if ([System.IO.Path]::IsPathRooted($DestinationFile))
     {
         Write-Verbose "[$functionName] Destination file contains a path: $DestinationFile"
-        $destinationDir = Split-Path -Parent $DestinationFile    
+        $destinationDir = Split-Path -Parent $DestinationFile
     }
     else
     {
         Write-Verbose "[$functionName] Destination file does not contain a path, using current directory: $PWD"
         $destinationDir = $PWD
     }
-    
+
     # Ensure the destination directory exists
     if (-not (Test-Path -Path $destinationDir))
     {
         Write-Verbose "[$functionName] Creating destination directory: $destinationDir"
         New-Item -ItemType Directory -Path $destinationDir -Force | Out-Null
     }
-    
+
     try
     {
         # Save the merged content to the destination file
@@ -852,7 +852,7 @@ function EncryptSecretsFile()
         Write-Log -logFile $logFile -Message "No encryption key provided. Generating a random key." -module $functionName
         $EncryptionKey = [guid]::NewGuid().ToString()
     }
-    if ((Invoke-JsonFileEncryption -FilePath $FilePath -Key $EncryptionKey).success)  
+    if ((Invoke-JsonFileEncryption -FilePath $FilePath -Key $EncryptionKey).success)
     {
         Write-Host "Secrets file encrypted successfully."
         Write-Log -logFile $logFile -Message "Secrets file encrypted successfully." -module $functionName
@@ -890,7 +890,7 @@ function CopySecrets()
     Write-Verbose "[$functionName] Overwrite: $Overwrite"
     Write-Log -logFile $logFile -Message "Overwrite: $Overwrite" -module $functionName
     #endregion
-    
+
     if (Test-Path -Path "$DestinationFolder\.secrets")
     {
         Write-Host "the folder $DestinationFolder\.secrets already exists."
@@ -901,7 +901,7 @@ function CopySecrets()
             Write-Log -logFile $logFile -Message "Overwrite is set to true. Removing .secrets folder." -module $functionName
             Remove-Item -Path "$DestinationFolder\.secrets" -Recurse -Force | Out-Null
         }
-        else 
+        else
         {
             Write-Log -logFile $logFile -Message "The folder $DestinationFolder\.secrets already exists. Getting user input." -module $functionName
             $response = Read-Host 'Overwrite? (Y/N)'
@@ -910,7 +910,7 @@ function CopySecrets()
             while ($response -notin 'Y', 'N', 'yes', 'no')
             {
                 $response = Read-Host 'Invalid input. Please enter Y or N: '
-                
+
                 Write-Verbose "[$functionName] User response: $response"
                 Write-Log -logFile $logFile -Message "User response: $response" -module $functionName
                 [console]::beep(500, 300)
@@ -926,7 +926,7 @@ function CopySecrets()
                 Write-Host 'Secrets will not be copied.'
                 Write-Log -logFile $logFile -Message "User chose not to overwrite. Exiting without copying secrets." -module $functionName
                 return $false
-            }   
+            }
         }
     }
     else
@@ -935,9 +935,9 @@ function CopySecrets()
         Write-Log -logFile $logFile -Message "Creating .secrets folder in: $DestinationFolder" -module $functionName
         New-Item -ItemType Directory -Path "$DestinationFolder\.secrets" -Force | Out-Null
     }
-    
+
     Write-Host 'Looking for secrets...'
-    Write-Log -logFile $logFile -Message "Looking for secrets in $SourceFolder\.secrets" -module $functionName  
+    Write-Log -logFile $logFile -Message "Looking for secrets in $SourceFolder\.secrets" -module $functionName
     $secrets = Get-ChildItem -Path "$SourceFolder\.secrets" -Filter config*.json -Recurse
     if ($secrets.Count -eq 0)
     {
@@ -945,7 +945,7 @@ function CopySecrets()
         Write-Log -logFile $logFile -Message "No secrets found in $SourceFolder\.secrets" -module $functionName
         return $false
     }
-    
+
     if (-not $Overwrite)
     {
         Write-Host 'Please choose the secret you would like to copy to the release folder.'
@@ -968,7 +968,7 @@ function CopySecrets()
                 Write-Log -logFile $logFile -Message "Secret $fileName is encrypted." -module $functionName
                 Write-Verbose "[$functionName] Secret $fileName is encrypted."
             }
-            else 
+            else
             {
                 $data = Get-Content -Path $secrets[$i].FullName | ConvertFrom-Json
                 $name = $data.name
@@ -1029,12 +1029,12 @@ function CopySecrets()
         Write-Log -logFile $logFile -Message "Copying default secret in $SourceFolder\.secrets" -module $functionName
         $secret = Get-ChildItem -Path "$SourceFolder\.secrets" -Filter config*.json -Recurse | Where-Object { $_.Name -eq 'config.json' }
         Write-Host "Using default secrets file: $($secret.Name)"
-        Write-Log -logFile $logFile -Message "Using default secrets file: $($secret.Name)" -module $functionName    
+        Write-Log -logFile $logFile -Message "Using default secrets file: $($secret.Name)" -module $functionName
     }
     Write-Verbose "[$functionName] Selected secret: $($secret.Name)"
     Write-Log -logFile $logFile -Message "Selected secret: $($secret.Name)" -module $functionName
     Write-Host "Copying $($secret.FullName) to $DestinationFolder"
-    Write-Log -logFile $logFile -Message "Copying $($secret.FullName) to $DestinationFolder\.secrets" -module $functionName 
+    Write-Log -logFile $logFile -Message "Copying $($secret.FullName) to $DestinationFolder\.secrets" -module $functionName
     try
     {
         Write-Host "Copying $($secret.FullName) to $DestinationFolder\.secrets"
@@ -1088,20 +1088,20 @@ function Update-TargetSettings()
     <#
     .SYNOPSIS
         Applies target settings to global and domain configuration files.
-    
+
     .DESCRIPTION
         Merges target settings into the appropriate configuration files using existing
         settings management functions. Creates default configurations if files don't exist.
-    
+
     .PARAMETER TargetConfig
         Target configuration hashtable containing settings to apply.
-    
+
     .PARAMETER SettingsFilePath
         Path to the main settings.psd1 file.
-    
+
     .PARAMETER ConfigurationPath
         Directory path where configuration files are located.
-    
+
     .OUTPUTS
         System.Boolean
         Returns $true if settings were applied successfully, $false otherwise.
@@ -1115,11 +1115,11 @@ function Update-TargetSettings()
         [Parameter(Mandatory = $false)]
         [string]$ConfigurationPath = $PWD
     )
-    
+
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Applying target settings to configuration files"
     Write-Log -LogFile $logFile -Message "Applying target settings to configuration files" -Module $functionName -LogLevel "Information"
-    
+
     try
     {
         # Load or create main settings file
@@ -1133,33 +1133,33 @@ function Update-TargetSettings()
             Write-Verbose "[$functionName] Creating new settings file from defaults"
             $currentSettings = Get-ApplicationDefaults -DefaultType "Settings"
         }
-        
+
         # Apply global settings if specified
         if ($TargetConfig.globalSettings -and $TargetConfig.globalSettings.Count -gt 0)
         {
             Write-Verbose "[$functionName] Applying $($TargetConfig.globalSettings.Count) global settings"
             Write-Log -LogFile $logFile -Message "Applying $($TargetConfig.globalSettings.Count) global settings" -Module $functionName -LogLevel "Verbose"
-            
+
             foreach ($key in $TargetConfig.globalSettings.Keys)
             {
                 $currentSettings.globalSettings[$key] = $TargetConfig.globalSettings[$key]
                 Write-Verbose "[$functionName] Applied global setting: $key = $($TargetConfig.globalSettings[$key])"
             }
         }
-        
+
         # Apply auth settings if specified
         if ($TargetConfig.authSettings -and $TargetConfig.authSettings.Count -gt 0)
         {
             Write-Verbose "[$functionName] Applying $($TargetConfig.authSettings.Count) auth settings"
             Write-Log -LogFile $logFile -Message "Applying $($TargetConfig.authSettings.Count) auth settings" -Module $functionName -LogLevel "Verbose"
-            
+
             foreach ($key in $TargetConfig.authSettings.Keys)
             {
                 $currentSettings.auth[$key] = $TargetConfig.authSettings[$key]
                 Write-Verbose "[$functionName] Applied auth setting: $key = $($TargetConfig.authSettings[$key])"
             }
         }
-        
+
         #Apply specified settings from target config
         $sections = @{
             corporateSettings = 'corporate setting'
@@ -1178,29 +1178,29 @@ function Update-TargetSettings()
                 $pluralName = if ($sectionName -eq 'repoInfo') { 'repo info settings' } else { $sectionName -replace 'Settings', ' settings' }
                 Write-Verbose "[$functionName] Applying $($targetSection.Count) $pluralName"
                 Write-Log -LogFile $logFile -Message "Applying $($targetSection.Count) $pluralName" -Module $functionName -LogLevel "Verbose"
-        
+
                 foreach ($key in $targetSection.Keys)
                 {
                     $currentSettings.$sectionName[$key] = $targetSection[$key]
                     Write-Verbose "[$functionName] Applied $($singularName): $key = $($targetSection[$key])"
                 }
             }
-        }   
-        
+        }
+
         # Save updated main settings file
         Write-Verbose "[$functionName] Saving updated settings file"
         $currentSettings | Export-PowerShellDataFile -Path $SettingsFilePath -Validate -Force
         Write-Log -LogFile $logFile -Message "Updated settings file saved: $SettingsFilePath" -Module $functionName -LogLevel "Information"
-        
+
         # Handle domain-specific settings if specified
         if ($TargetConfig.domain -and $TargetConfig.domainSettings -and $TargetConfig.domainSettings.Count -gt 0)
         {
             Write-Verbose "[$functionName] Processing domain settings for: $($TargetConfig.domain)"
             Write-Log -LogFile $logFile -Message "Processing domain settings for: $($TargetConfig.domain)" -Module $functionName -LogLevel "Information"
-            
+
             # Load or create domain configuration
             $domainConfig = Get-DomainConfigurationFromFiles -DomainName $TargetConfig.domain -ConfigurationPath $ConfigurationPath
-            
+
             # Ensure we have a proper hashtable or ordered dictionary
             if ($null -eq $domainConfig)
             {
@@ -1227,9 +1227,9 @@ function Update-TargetSettings()
                 Write-Warning "[$functionName] Domain config is not a hashtable or ordered dictionary (type: $($domainConfig.GetType().Name)), creating new ordered dictionary"
                 $domainConfig = [ordered]@{}
             }
-            
+
             Write-Verbose "[$functionName] Domain config type after validation: $($domainConfig.GetType().Name)"
-            
+
             # Apply domain settings
             foreach ($key in $TargetConfig.domainSettings.Keys)
             {
@@ -1246,7 +1246,7 @@ function Update-TargetSettings()
                 }
                 Write-Verbose "[$functionName] Applied domain setting: $key = $($TargetConfig.domainSettings[$key])"
             }
-            
+
             # Save domain configuration
             $saveResult = Save-DomainConfiguration -DomainName $TargetConfig.domain -DomainConfiguration $domainConfig -ConfigurationPath $ConfigurationPath
             if ($saveResult)
@@ -1259,7 +1259,7 @@ function Update-TargetSettings()
                 Write-Log -LogFile $logFile -Message "Failed to save domain configuration for: $($TargetConfig.domain)" -Module $functionName -LogLevel "Warning"
             }
         }
-        
+
         Write-Verbose "[$functionName] Target settings applied successfully"
         Write-Log -LogFile $logFile -Message "Target settings applied successfully" -Module $functionName -LogLevel "Information"
         return $true
@@ -1277,14 +1277,14 @@ function Set-ParametersFromTarget()
     <#
     .SYNOPSIS
         Sets script parameters based on target configuration.
-    
+
     .DESCRIPTION
         Extracts build parameters from target configuration and applies them to
         script variables, ensuring target parameters override command-line parameters.
-    
+
     .PARAMETER TargetConfig
         Target configuration hashtable containing build parameters.
-    
+
     .OUTPUTS
         System.Collections.Hashtable
         Returns hashtable of parameters to use for the build.
@@ -1294,13 +1294,13 @@ function Set-ParametersFromTarget()
         [Parameter(Mandatory = $true)]
         [hashtable]$TargetConfig
     )
-    
+
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Setting parameters from target configuration"
     Write-Log -LogFile $logFile -Message "Setting parameters from target configuration" -Module $functionName -LogLevel "Information"
-    
+
     $params = @{}
-    
+
     # Copy build parameters from target if they exist
     if ($TargetConfig.buildParameters)
     {
@@ -1311,7 +1311,7 @@ function Set-ParametersFromTarget()
         }
         Write-Log -LogFile $logFile -Message "Applied $($TargetConfig.buildParameters.Count) build parameters from target" -Module $functionName -LogLevel "Verbose"
     }
-    
+
     return $params
 }
 #endregion helper functions
@@ -1337,43 +1337,43 @@ if ($targetConfig)
         {
             'Version'
             {
-                $Version = $value 
+                $Version = $value
             }
             'OutputPath'
             {
-                $OutputPath = $value 
+                $OutputPath = $value
             }
             'SkipSigning'
             {
-                $SkipSigning = $value 
+                $SkipSigning = $value
             }
             'NoVersionUpdate'
             {
-                $NoVersionUpdate = $value 
+                $NoVersionUpdate = $value
             }
             'Overwrite'
             {
-                $Overwrite = $value 
+                $Overwrite = $value
             }
             'noCleanup'
             {
-                $noCleanup = $value 
+                $noCleanup = $value
             }
             'AddDebug'
             {
-                $AddDebug = $value 
+                $AddDebug = $value
             }
             'CompanyName'
             {
-                $CompanyName = $value 
+                $CompanyName = $value
             }
             'Author'
             {
-                $Author = $value 
+                $Author = $value
             }
             default
             {
-                Write-Verbose "[$scriptName] Unknown target parameter: $key" 
+                Write-Verbose "[$scriptName] Unknown target parameter: $key"
             }
         }
         Write-Verbose "[$scriptName] Set $key to $value of type $($value.GetType().Name)"
@@ -1424,7 +1424,7 @@ $parentFolder = Split-Path -Parent $OutputFile
 $SettingsFile = "$parentFolder\settings.psd1"
 $zipFilePath = Join-Path $parentFolder "script.zip"
 $toolsFolder = Join-Path -Path $PWD -ChildPath "tools"
-$toolsToCopy = @(Get-ChildItem -Path "$toolsFolder\reset.*" | ForEach-Object { $_.FullName })             
+$toolsToCopy = @(Get-ChildItem -Path "$toolsFolder\reset.*" | ForEach-Object { $_.FullName })
 # $PSDFilesToCopy = @(Get-ChildItem -Path $PWD -Filter "*.psd1" | ForEach-Object { $_.FullName } ) | Where-Object { $_ -notlike "*targets*" }
 $filesToCopy = $toolsToCopy
 #endregion
@@ -1467,7 +1467,7 @@ if ($updateHash)
 if ($CreateZipFileOnly)
 {
     Write-Host "Cleaning backup and temporary files..."
-    $cleanupResult = cleanupTempFiles -Path $parentFolder
+    $cleanupResult = Remove-TempFiles -Path $parentFolder
     if ($cleanupResult.AllRemoved)
     {
         Write-Host "Cleanup completed successfully."
@@ -1475,19 +1475,19 @@ if ($CreateZipFileOnly)
     Write-Host "Removed $($cleanupResult.RemovedFilesCount) files, of which $($cleanupResult.tempFilesCount) file were temp files."
     Write-Host "Creating zip file only: $zipFilePath"
     $tempFolder = Join-Path -Path $env:TEMP -ChildPath "temp_build-$([guid]::NewGuid().ToString()                   )"
-    $filesToCopy = Get-ChildItem -Path "$parentFolder\*" -Include *.psd1 | ForEach-Object { $_.FullName }                  
+    $filesToCopy = Get-ChildItem -Path "$parentFolder\*" -Include *.psd1 | ForEach-Object { $_.FullName }
     try
     {
         Write-Host "Copying files to temporary folder: $tempFolder"
         if (-not (Test-Path -Path $tempFolder))
         {
-            New-Item -Path $tempFolder -ItemType Directory -Force | Out-Null                
-        }                           
+            New-Item -Path $tempFolder -ItemType Directory -Force | Out-Null
+        }
         foreach ($file in $filesToCopy)
         {
             Write-Host "Copying $file to $tempFolder"
             Copy-Item -Path $file -Destination $tempFolder -Force
-        }                                           
+        }
         $zipCreated = New-ZipArchive -inputPath $tempFolder -outputPath $zipFilePath -Overwrite
         if ($zipCreated)
         {
@@ -1510,14 +1510,14 @@ if ($CreateZipFileOnly)
         Write-Log -logFile $logFile -Message "Error occurred while creating zip file: $($_.Exception.Message)" -module $scriptName -LogLevel 'Error'
         Write-Log -logFile $logFile -finishLogging
         exit 1
-    }                           
+    }
     finally
     {
         if (Test-Path -Path $tempFolder)
         {
             Remove-Item -Path $tempFolder -Recurse -Force | Out-Null
         }
-    }           
+    }
     exit 0
 }
 
@@ -1545,7 +1545,7 @@ if (-not $Overwrite)
         do
         {
             $response = Read-Host 'Choose O to overwrite, C to continue or E to exit (O/C/E)'
-        } 
+        }
         until ($response -in 'O', 'C', 'E')
         switch ($response)
         {
@@ -1687,7 +1687,7 @@ if (-not $CreateModule)
             }
             $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
             Write-Log -Message "Header timestamp set to: $timestamp" -Module $scriptName -LogLevel "Debug" -LogFile $logFile
-        
+
             $headerBlock = @"
 <#
 ================================================================================
@@ -1702,9 +1702,9 @@ Description:    Auto-generated release build with inlined functions
 #>
 
 "@
-        
+
             Write-Log -Message "Created header block for output script" -Module $scriptName -LogLevel "Debug" -LogFile $logFile
-        
+
             #add the header block and version string to the top of the script
             $newscriptContent = $headerBlock + $newscriptContent
             Write-Log -Message "Added header block to script content" -Module $scriptName -LogLevel "Information" -LogFile $logFile
@@ -1805,7 +1805,7 @@ else
             exit 1
         }
     }
-    else 
+    else
     {
         Write-Host "Skipping signing of executable as per -SkipSigning flag."
     }
@@ -1863,24 +1863,24 @@ if ($filesToCopy.Count -gt 0)
         try
         {
             Copy-Item -Path $file -Destination $parentFolder -Force
-            Write-Host "Copied file: $file"                    
+            Write-Host "Copied file: $file"
         }
         catch
         {
             Write-Host "Failed to copy file: $file to $parentFolder"
             Write-Error $_
-        }                       
+        }
     }
 }
 else
 {
     Write-Host "No files to copy."
-}                                       
+}
 
 if (-not $SkipZipArchive)
 {
     Write-Host "Cleaning backup and temporary files..."
-    $cleanupResult = cleanupTempFiles -Path $parentFolder
+    $cleanupResult = Remove-TempFiles -Path $parentFolder
     if ($cleanupResult.AllRemoved)
     {
         Write-Host "Cleanup completed successfully."
@@ -1947,7 +1947,7 @@ if (-not $noCleanup)
         Write-Host "No backup files found to remove."
     }
 }
-else 
+else
 {
     Write-Host "Skipping cleanup as per -noCleanup flag."
 }
@@ -1968,7 +1968,7 @@ if (-not $SkipExecutable)
             Write-Host "Invalid response. Please enter Y or N."
             [console]::beep(1000, 500)
             $response = Read-Host "Enter 'y' to copy, 'n' to skip"
-        }   
+        }
     }
 
     if ((($response -eq 'Y' -or $response -eq 'y') -or $Overwrite) -and -not $SkipSigning)
@@ -1991,11 +1991,11 @@ if (-not $SkipExecutable)
         Write-Host "Executable not copied."
         $message = if ($SkipSigning)
         {
-            "Skipping copy as signing was skipped." 
+            "Skipping copy as signing was skipped."
         }
         else
         {
-            "User chose not to copy the executable." 
+            "User chose not to copy the executable."
         }
         Write-Verbose "[$scriptName] $message"
     }

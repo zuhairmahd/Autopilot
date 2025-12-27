@@ -185,6 +185,7 @@ param(
     [String] $GroupTag,
     [switch]$showLicenseBanner,
     [switch]$HideEmptyMenus,
+    [switch]$fastStart,
     [switch]$showAuth,
     [switch]$clearCache,
     [switch]$showVersion,
@@ -373,7 +374,6 @@ function Find-FolderPath()
         return $null
     }
 }
-
 $functionsFolder = find-folderPath -Path $scriptPath -FolderName 'functions'
 if (Test-Path $functionsFolder)
 {
@@ -398,6 +398,7 @@ $global:maxJSONDepth = 20
 # Set global log level for all Write-Log calls
 $global:LogFile = $logFilePath
 $Global:MinimumLogLevel = $LogLevel
+$menuCacheFile = Join-Path -Path $scriptPath -ChildPath "menu-cache.json"
 if ($OverwriteLogs)
 {
     Write-Verbose "[$scriptName] Overwriting log file: $LogFile"
@@ -550,7 +551,7 @@ if ($testMode -and -not $script:testModeOptions.cleanup)
 }
 else
 {
-    $filesCleaned = cleanupTempFiles
+    $filesCleaned = Remove-TempFiles
     if ($filesCleaned.AllRemoved)
     {
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
@@ -628,8 +629,6 @@ if ($testMode -and -not $script:testModeOptions.config)
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode: Skipping configuration loading" -LogLevel "Information"
     # Set minimal test values
     $domain = "test.contoso.com"
-    $appId = "00000000-0000-0000-0000-000000000000"
-    $tenantId = "00000000-0000-0000-0000-000000000000"
     $name = "Test Application"
 }
 # In test mode without a test password and config file exists, skip config loading
@@ -639,8 +638,6 @@ elseif ($testMode -and -not $TestPassword -and (Test-Path $configFile))
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode enabled without test password, skipping encrypted config file loading" -LogLevel "Information"
     # Set dummy values for required variables
     $domain = "test.local"
-    $appId = "test-app-id"
-    $tenantId = "test-tenant-id"
     $name = "Test Configuration"
 }
 elseif (Test-Path $configFile)
@@ -659,8 +656,6 @@ elseif (Test-Path $configFile)
 
     $configContent = $sessionResult.ConfigContent
     $domain = $sessionResult.Domain
-    $appId = $sessionResult.AppId
-    $tenantId = $sessionResult.TenantId
     $name = $sessionResult.Name
 
     if (-not ($sessionResult.encrypted))
@@ -698,8 +693,6 @@ else
 
         # Set default test values
         $domain = "test.contoso.com"
-        $appId = "00000000-0000-0000-0000-000000000000"
-        $tenantId = "00000000-0000-0000-0000-000000000000"
         $name = "Test Application"
 
         # Skip config file loading in test mode
@@ -745,8 +738,6 @@ else
 
                 $configContent = $sessionResult.ConfigContent
                 $domain = $sessionResult.Domain
-                $appId = $sessionResult.AppId
-                $tenantId = $sessionResult.TenantId
                 $name = $sessionResult.Name
                 Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully for domain: $domain" -LogLevel "Information"
                 # Clear the config content from memory
@@ -793,9 +784,8 @@ else
         Write-Verbose "[$scriptName] Global settings count: $($globalSettings.Count)"
         Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
         Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
-        Write-Verbose "[$scriptName] Menus count: $($menus.Count)"
         Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
     }
     else
     {
@@ -810,17 +800,32 @@ else
 
 #region initialize script objects
 Write-Host "Loading configuration..."
-# Use domain if available, otherwise default to contoso.com
-$domainForDefaults = if ($domain)
+
+$startTime = Get-Date
+
+$configResult = Initialize-FastStart -initFile $InitFile -stringsFile $stringsFile -menuFile $menuFile -menuCacheFile $menuCacheFile -domain $domain -ScriptPath $ScriptPath
+if ($configResult.success)
 {
-    $domain
+    write-log -logFile $logFile -module $scriptName -message "Fast start configuration load succeeded."
+    Write-Verbose "[$scriptName] Fast start configuration load succeeded."
+    Write-Host "Fast start configuration load succeeded."
+    $script:menus = if ($configResult.menus)
+    {
+        $configResult.menus
+    }
+    else
+    {
+        $null
+    }
 }
 else
 {
-    "contoso.com"
+    write-log -logFile $logFile -module $scriptName -message "Fast start configuration load failed, falling back to full initialization."
+    Write-Verbose "[$scriptName] Fast start configuration load failed, falling back to full initialization."
+    Write-Host "Performing full configuration initialization..."
+    $configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domain -BoundParameters $PSBoundParameters
 }
 
-$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -BoundParameters $PSBoundParameters
 if (-not $configResult.Success)
 {
     Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
@@ -854,7 +859,7 @@ Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
 Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
 Write-Verbose "[$scriptName] Menus count: $($configResult.menu.Count)"
 Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
-Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
 if (-not $version.version)
 {
     Write-Verbose "[$scriptName] Unable to get file version."
@@ -1012,7 +1017,6 @@ if ($showAuth)
 {
     Write-Host "$($key): $($getTokenParams[$key])" -ForegroundColor Cyan
     $global:previousMenu = New-Object System.Collections.Hashtable
-    # Device enrollment state cache content has been migrated to the unified cache system.
 }
 Write-Verbose "[$scriptName] Using authentication parameters: $($getTokenParams | ConvertTo-Json -Depth $maxJSONDepth)"
 Write-Verbose "[$scriptName] Loading strings from: $stringsFile"
@@ -1045,7 +1049,7 @@ if ($settings.showLicenseBanner)
     Write-Host "Use at your own risk. The author is not responsible for any damage or data loss." -ForegroundColor Red
     Write-Host "==========================================================`n" -ForegroundColor White
 }
-if ($updateAvailable.success -and $updateAvailable.updateAvailable)
+if ($updateAvailable.success -and $updateAvailable.updateAvailable -and $scriptName.EndsWith('.exe'))
 {
     Write-Verbose "[$scriptName] An update is available: $($updateAvailable.version.major).$($updateAvailable.version.minor).$($updateAvailable.version.build) ($($updateAvailable.version.revision))"
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "An update is available: $($updateAvailable.version.major).$($updateAvailable.version.minor).$($updateAvailable.version.build) (revision $($updateAvailable.version.revision))"
@@ -1384,29 +1388,23 @@ else
         }
     }
 }
-
-# Early exit point for test mode when exitAfter is true
-if ($testMode -and $script:testModeOptions.exitAfter)
-{
-    Write-Verbose "[$scriptName] Test mode: Exiting after initialization phases (testModeOptions.exitAfter = true)"
-    Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode: Exiting after initialization phases complete" -LogLevel "Information"
-    Write-Host "Test mode: Initialization phases completed successfully" -ForegroundColor Green
-
-    # Cleanup before exit
-    Clear-SecureMemory -ClearScriptVariables
-    Write-Log -LogFile $LogFile -FinishLogging
-    exit 0
-}
 #endregion initialization block with access token
 
 #region Create menus
-# Clear menu configuration cache to ensure fresh menu loading
-# Write-Verbose "[$scriptName] Clearing menu configuration cache"
-# Invoke-CacheManagement -Action ClearSpecific -CacheType Menu
-#Now load the menu configuration
-$menuConfig = $configResult.menu
-if ($menuConfig)
+#load menus from cache if they were returned by the Invoke-FastStart function
+if ($null -ne $script:menus)
 {
+    Write-Verbose "[$scriptName] Using cached menus from $menuCacheFile"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Using cached menus from $menuCacheFile" -LogLevel "Information"
+    Write-Host "Loaded $($script:menus.Count) menu items from cache." -ForegroundColor Green
+}
+else
+{
+    # Clear menu configuration cache to ensure fresh menu loading
+    Write-Verbose "[$scriptName] Clearing menu configuration cache"
+    Invoke-CacheManagement -Action ClearSpecific -CacheType Menu
+    #Now load the menu configuration
+    $menuConfig = $configResult.menu
     # Convert the flat menu.psd1 structure to array format for Test-MenuItemIncluded
     foreach ($menuName in $menuConfig.keys)
     {
@@ -1418,6 +1416,35 @@ if ($menuConfig)
         }
     }
     Write-Verbose "Loaded $($script:menus.Count) menu items for filtering"
+    $script:menus | ConvertTo-Json -Depth $maxJSONDepth | Out-File -FilePath $menuCacheFile -Encoding UTF8 -Force
+    if (Test-Path $menuCacheFile)
+    {
+        Write-Verbose "[$scriptName] Menu configuration cached to $menuCacheFile"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Menu configuration cached to $menuCacheFile" -LogLevel "Information"
+    }
+    else
+    {
+        Write-Verbose "[$scriptName] Failed to cache menu configuration to $menuCacheFile"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to cache menu configuration to $menuCacheFile" -LogLevel "Warning"
+    }
+}
+
+$duration = (Get-Date) - $startTime
+$durationMs = $duration.TotalMilliseconds
+Write-Host "Initialization completed in $($duration.Minutes) minutes and $($duration.Seconds) seconds ($([math]::Round($durationMs, 2)) ms)." -ForegroundColor Green
+write-log -logFile $logFile -module $scriptName -message "Initialization completed in $([math]::Round($durationMs, 2)) milliseconds." -LogLevel "Information"
+
+# Early exit point for test mode when exitAfter is true (after duration is calculated)
+if ($testMode -and $script:testModeOptions.exitAfter)
+{
+    Write-Verbose "[$scriptName] Test mode: Exiting after initialization complete with duration measurement (testModeOptions.exitAfter = true)"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode: Exiting after initialization complete. Duration: $([math]::Round($durationMs, 2)) milliseconds." -LogLevel "Information"
+    Write-Host "Test mode: Initialization completed in $([math]::Round($durationMs, 2)) ms" -ForegroundColor Green
+
+    # Cleanup before exit
+    Clear-SecureMemory -ClearScriptVariables
+    Write-Log -LogFile $LogFile -FinishLogging
+    exit 0
 }
 $mainMenu = NewMenu -MenuName "mainMenu"
 $CheckMenu = NewMenu -MenuName "checkMenu"
@@ -1905,11 +1932,11 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import Corporate Device
     }
     $deviceIdentifier = GetDeviceInfo -nohash
     Write-Verbose "[$scriptName] Device identifier: $($deviceIdentifier | Out-String)"
-    write-log -logFile $LogFile -Module $functionName -Message "Device identifier: $($deviceIdentifier | Out-String)" -LogLevel "Verbose"
+    write-log -logFile $LogFile -Module $scriptName -Message "Device identifier: $($deviceIdentifier | Out-String)" -LogLevel "Verbose"
     if ($deviceIdentifier.deviceAllowed -eq $false)
     {
         Write-Host "The device manufacturer $($deviceIdentifier.manufacturer) is not allowed." -ForegroundColor Red
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Device manufacturer $($deviceIdentifier.manufacturer) is not allowed" -LogLevel "Error"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Device manufacturer $($deviceIdentifier.manufacturer) is not allowed" -LogLevel "Error"
         return $returnValues.manufacturerNotAllowed
     }
     if ($deviceIdentifier -and $deviceIdentifier.SerialNumber)
@@ -2090,6 +2117,37 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Auto
 #endregion Autopilot menu
 
 #region Environment menu
+$environmentMenu = AddMenuItem -menu $environmentMenu -Name "View global environment settings" -Action {
+    Write-Host "Displaying global environment settings..." -ForegroundColor Cyan
+    $success = Show-SettingsViewer -SettingsType "Global" -SettingsFile $InitFile
+    if ($success)
+    {
+        Write-Host "`nGlobal settings displayed successfully." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "`nFailed to display global settings. Please check the logs for details." -ForegroundColor Red
+    }
+}
+$environmentMenu = AddMenuItem -menu $environmentMenu -Name "View domain specific environment settings" -Action {
+    Write-Host "Displaying domain-specific environment settings..." -ForegroundColor Cyan
+    # Get the current domain from settings
+    $currentDomain = $domain
+    if ([string]::IsNullOrWhiteSpace($currentDomain))
+    {
+        Write-Host "No domain specified. Cannot view domain-specific settings." -ForegroundColor Red
+        return $returnValues.backoutText
+    }
+    $success = Show-SettingsViewer -SettingsType "Domain" -DomainName $currentDomain -SettingsFile $InitFile
+    if ($success)
+    {
+        Write-Host "`nDomain settings for '$currentDomain' displayed successfully." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "`nFailed to display domain settings. Please check the logs for details." -ForegroundColor Red
+    }
+}
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "View group inclusion/exclusion settings for all domains" -Action {
     Write-Host "Displaying group inclusion/exclusion settings..." -ForegroundColor Cyan
     Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
@@ -2148,6 +2206,8 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change authenticati
     }
 }
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change inclusion/exclusion" -subMenu $inclusionExclusionMenu
+#endregion Environment menu
+
 $inclusionExclusionMenu = AddMenuItem -menu $inclusionExclusionMenu -Name "Change group inclusion/exclusion" -Action {
     Write-Host "Launching groups editor..." -ForegroundColor Cyan
     Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
@@ -2196,7 +2256,6 @@ $inclusionExclusionMenu = AddMenuItem -menu $inclusionExclusionMenu -Name "Chang
         return $result
     }
 }
-#endregion Environment menu
 
 #region Settings menu
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment settings" -subMenu $environmentMenu
@@ -2254,7 +2313,7 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settin
     {
         Write-Host "Auto Update settings saved successfully." -ForegroundColor Green
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Auto Update settings saved successfully." -LogLevel "Information"
-        $filesCleaned = cleanupTempFiles
+        $filesCleaned = Remove-TempFiles
         if ($filesCleaned.AllRemoved)
         {
             Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
@@ -2299,19 +2358,19 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings"
         }
         if ($saveResult)
         {
-            Write-Log -LogFile $logFile -Module $functionName -Message "Successfully saved app mode configuration to $storageType" -LogLevel "Information"
+            Write-Log -LogFile $logFile -Module $scriptName -Message "Successfully saved app mode configuration to $storageType" -LogLevel "Information"
             Write-Host "App mode configuration saved successfully to $storageType" -ForegroundColor Green
         }
         else
         {
-            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to save app mode configuration" -LogLevel "Error"
+            Write-Log -LogFile $logFile -Module $scriptName -Message "Failed to save app mode configuration" -LogLevel "Error"
             Write-Host "Failed to save app mode configuration" -ForegroundColor Red
         }
     }
     catch
     {
         $errorMessage = "Error saving app mode configuration: $($_.Exception.Message)"
-        Write-Log -LogFile $logFile -Module $functionName -Message $errorMessage -LogLevel "Error"
+        Write-Log -LogFile $logFile -Module $scriptName -Message $errorMessage -LogLevel "Error"
         Write-Host $errorMessage -ForegroundColor Red
         return $null
     }
@@ -2814,7 +2873,7 @@ else
 Clear-SecureMemory -ClearScriptVariables
 
 # Cleanup temporary files
-$filesCleaned = cleanupTempFiles
+$filesCleaned = Remove-TempFiles
 if ($filesCleaned.AllRemoved)
 {
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
