@@ -1388,22 +1388,7 @@ else
         }
     }
 }
-
-# Early exit point for test mode when exitAfter is true
-if ($testMode -and $script:testModeOptions.exitAfter)
-{
-    Write-Verbose "[$scriptName] Test mode: Exiting after initialization phases (testModeOptions.exitAfter = true)"
-    Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode: Exiting after initialization phases complete" -LogLevel "Information"
-    Write-Host "Test mode: Initialization phases completed successfully" -ForegroundColor Green
-
-    # Cleanup before exit
-    Clear-SecureMemory -ClearScriptVariables
-    Write-Log -LogFile $LogFile -FinishLogging
-    exit 0
-}
 #endregion initialization block with access token
-
-
 
 #region Create menus
 #load menus from cache if they were returned by the Invoke-FastStart function
@@ -1445,8 +1430,22 @@ else
 }
 
 $duration = (Get-Date) - $startTime
-Write-Host "Initialization completed in $($duration.Minutes) minutes and $($duration.Seconds) seconds." -ForegroundColor Green
+$durationMs = $duration.TotalMilliseconds
+Write-Host "Initialization completed in $($duration.Minutes) minutes and $($duration.Seconds) seconds ($([math]::Round($durationMs, 2)) ms)." -ForegroundColor Green
+write-log -logFile $logFile -module $scriptName -message "Initialization completed in $([math]::Round($durationMs, 2)) milliseconds." -LogLevel "Information"
 
+# Early exit point for test mode when exitAfter is true (after duration is calculated)
+if ($testMode -and $script:testModeOptions.exitAfter)
+{
+    Write-Verbose "[$scriptName] Test mode: Exiting after initialization complete with duration measurement (testModeOptions.exitAfter = true)"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode: Exiting after initialization complete. Duration: $([math]::Round($durationMs, 2)) milliseconds." -LogLevel "Information"
+    Write-Host "Test mode: Initialization completed in $([math]::Round($durationMs, 2)) ms" -ForegroundColor Green
+
+    # Cleanup before exit
+    Clear-SecureMemory -ClearScriptVariables
+    Write-Log -LogFile $LogFile -FinishLogging
+    exit 0
+}
 $mainMenu = NewMenu -MenuName "mainMenu"
 $CheckMenu = NewMenu -MenuName "checkMenu"
 $serialNumberMenu = NewMenu -MenuName "serialNumberMenu"
