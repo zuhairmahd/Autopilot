@@ -104,6 +104,7 @@ BeforeAll {
         timeInSeconds = 60
         autoUpdate = `$false
         showLicenseBanner = `$false
+        validateScopes = `$false
         domain = '$domainName'
     }
 
@@ -151,15 +152,7 @@ BeforeAll {
     groupsToInclude = @()
     groupsToExclude = @()
     LogLevel = 'Information'
-}
-"@ | Out-File -FilePath $domainFilePath -Encoding UTF8
-
-        # Create menu.psd1
-        @"
-@{
-    mainMenu = @{
-        Title = 'Main Menu'
-        Type = 'menu'
+    validateScopes = `$false
         Items = @()
     }
     checkMenu = @{
@@ -200,7 +193,7 @@ BeforeAll {
             [string]$CustomLogFile = $null
         )
 
-        # Always include testMode, disable autoUpdate, and overwrite logs
+        # Always include testMode, disable autoUpdate, overwrite logs, and skip scope validation
         $Parameters['testMode'] = $true
         $Parameters['autoUpdate'] = $false
         $Parameters['OverwriteLogs'] = $true
@@ -503,6 +496,7 @@ Describe "Main.ps1 - FastStart Configuration Loading" -Tags 'Integration', 'Main
     groupsToInclude = @()
     groupsToExclude = @()
     LogLevel = 'Information'
+    validateScopes = `$false
 }
 "@ | Out-File -FilePath $domainFilePath -Encoding UTF8
 
@@ -789,6 +783,7 @@ Describe "Main.ps1 - FastStart Configuration Loading" -Tags 'Integration', 'Main
     groupsToInclude = @()
     groupsToExclude = @()
     LogLevel = 'Information'
+    validateScopes = `$false
 }
 "@ | Out-File -FilePath $domainFilePath -Encoding UTF8
 

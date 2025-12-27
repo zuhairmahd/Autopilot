@@ -55,7 +55,7 @@ jobs:
   test-comprehensive:
     name: Comprehensive Tests (pwsh on Windows)
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     needs: test-unit
     if: github.event_name == 'release' && github.event.action == 'published'
     steps:
@@ -94,7 +94,7 @@ jobs:
   test-integration:
     name: Integration Tests (pwsh on Windows)
     runs-on: windows-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
     needs: [test-unit, test-comprehensive]
     if: github.event_name == 'release' && github.event.action == 'published'
     steps:
@@ -232,14 +232,14 @@ jobs:
       - name: update hash
         shell: pwsh
         run: |
-          if (Test-Path -Path "hd\main.exe") 
-          { 
-            Copy-Item -Path .\hd\main.exe -Destination .\main.exe -Force 
+          if (Test-Path -Path "hd\main.exe")
+          {
+            Copy-Item -Path .\hd\main.exe -Destination .\main.exe -Force
             Write-Host "Copied .\hd\main.exe to .\main.exe."
-          }         
-          if (Test-Path -Path .\hd\lastrun.json) 
-          { 
-            Copy-Item -Path .\hd\lastrun.json -Destination .\lastrun.json -Force 
+          }
+          if (Test-Path -Path .\hd\lastrun.json)
+          {
+            Copy-Item -Path .\hd\lastrun.json -Destination .\lastrun.json -Force
             Write-Host   "Copied .\hd\lastrun.json to .\lastrun.json."
           }
           .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName production -Overwrite -updateHash
