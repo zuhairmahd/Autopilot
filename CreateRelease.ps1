@@ -106,7 +106,7 @@ if (-not $skipModuleCheck)
     )
     Write-Verbose "[$scriptName] $($requiredModules.count) Required modules."
     $modulesToCheck = $requiredModules | Where-Object { $_.install -eq $true }
-    Write-Verbose "[$scriptName] $($modulesToCheck.count) Modules    to check."
+    Write-Verbose "[$scriptName] $($modulesToCheck.count) Modules to check."
 
     if ($modulesToCheck.Count -gt 0)
     {
