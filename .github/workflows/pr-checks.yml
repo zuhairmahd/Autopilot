@@ -26,9 +26,9 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "Using PowerShell version: $($PSVersionTable.PSVersion)"
-          if ($PSVersionTable.PSVersion.Major -lt 7) { 
+          if ($PSVersionTable.PSVersion.Major -lt 7) {
             Write-Error "PowerShell 7+ is required."
-            exit 1 
+            exit 1
           }
 
       - name: Cache Pester module
@@ -80,9 +80,9 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "Using PowerShell version: $($PSVersionTable.PSVersion)"
-          if ($PSVersionTable.PSVersion.Major -lt 7) { 
+          if ($PSVersionTable.PSVersion.Major -lt 7) {
             Write-Error "PowerShell 7+ is required."
-            exit 1 
+            exit 1
           }
 
       - name: Cache Pester module
@@ -122,6 +122,60 @@ jobs:
           check_name: Comprehensive Test Results
           comment_mode: off
 
+  test-integration:
+    name: Integration Tests
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify PowerShell 7
+        shell: pwsh
+        run: |
+          Write-Host "Using PowerShell version: $($PSVersionTable.PSVersion)"
+          if ($PSVersionTable.PSVersion.Major -lt 7) {
+            Write-Error "PowerShell 7+ is required."
+            exit 1
+          }
+
+      - name: Cache Pester module
+        uses: actions/cache@v4
+        with:
+          path: ~\Documents\PowerShell\Modules\Pester
+          key: ${{ runner.os }}-pester-${{ hashFiles('**/Invoke-PesterTests.ps1') }}
+          restore-keys: |
+            ${{ runner.os }}-pester-
+
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name Pester -MinimumVersion 5.0.0 -Scope CurrentUser -Force -SkipPublisherCheck
+
+      - name: Run integration Tests with Code Coverage
+        shell: pwsh
+        run: |
+          .\Invoke-PesterTests.ps1 -TestType Integration -EnableCodeCoverage -CI -OutputVerbosity Detailed
+
+      - name: Upload integration test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: |
+            TestResults*.xml
+            coverage.xml
+          retention-days: 7
+
+      - name: Publish Integration Test Results
+        uses: EnricoMi/publish-unit-test-result-action/windows@v2
+        if: always()
+        with:
+          files: TestResults*.xml
+          check_name: Integration Test Results
+          comment_mode: off
+
   code-quality:
     name: Code Quality Checks
     runs-on: windows-latest
@@ -142,9 +196,9 @@ jobs:
             $results | Format-Table -AutoSize
             $errorCount = ($results | Where-Object Severity -eq 'Error').Count
             $warningCount = ($results | Where-Object Severity -eq 'Warning').Count
-            
+
             Write-Host "`nSummary: $errorCount errors, $warningCount warnings" -ForegroundColor $(if ($errorCount -gt 0) { 'Red' } else { 'Yellow' })
-            
+
             if ($errorCount -gt 0) {
               Write-Error "PSScriptAnalyzer found $errorCount error(s). Please fix them before merging."
               exit 1
