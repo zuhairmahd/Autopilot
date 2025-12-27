@@ -809,9 +809,9 @@ if ($configResult.success)
     write-log -logFile $logFile -module $scriptName -message "Fast start configuration load succeeded."
     Write-Verbose "[$scriptName] Fast start configuration load succeeded."
     Write-Host "Fast start configuration load succeeded."
-    $script:menus = if ($configResult.menu)
+    $script:menus = if ($configResult.menus)
     {
-        $configResult.menu
+        $configResult.menus
     }
     else
     {
