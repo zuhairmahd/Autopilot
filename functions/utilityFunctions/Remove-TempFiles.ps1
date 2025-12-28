@@ -1,4 +1,4 @@
-function cleanupTempFiles()
+function Remove-TempFiles()
 {
     <#
     .SYNOPSIS
@@ -15,7 +15,7 @@ function cleanupTempFiles()
     Returns an object with properties: tempFilesCount, RemovedFilesCount, and AllRemoved (boolean).
 
     .EXAMPLE
-    $cleanupResult = cleanupTempFiles
+    $cleanupResult = Remove-TempFiles
     Write-Host "Cleaned up $($cleanupResult.RemovedFilesCount) files"
 
     .NOTES
