@@ -4,7 +4,7 @@
     "guid": "c2c08149-3c1f-4558-9e4c-87487943bbf5",
     "hash": "BD85BAA86CF22D06F8700AB07D1E5B647DE203417A2CE4C7A61D9020F35C6BD2",
     "stringsVersion": "1.3.0.0",
-    "releaseNotes": "Disabled accounts will now fail the user readiness tests",
+    "releaseNotes": "Added code to load faster",
     "settingsVersion": "1.3.0.0",
     "hashUpdated": true
 }
