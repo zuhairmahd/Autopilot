@@ -1394,12 +1394,13 @@ else
 #load menus from cache if they were returned by the Invoke-FastStart function
 if ($null -ne $script:menus)
 {
-    Write-Verbose "[$scriptName] Using cached menus from $menuCacheFile"
-    Write-Log -LogFile $LogFile -Module $scriptName -Message "Using cached menus from $menuCacheFile" -LogLevel "Information"
-    Write-Host "Loaded $($script:menus.Count) menu items from cache." -ForegroundColor Green
+    Write-Verbose "[$scriptName] Loaded $($script:menus.Count) menu items from cache."
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Loaded $($script:menus.Count) menu items from cache."
+    Write-Host "Menus initialized through fast start." -ForegroundColor Green
 }
 else
 {
+    Write-Host "Loading menu configuration..."
     # Clear menu configuration cache to ensure fresh menu loading
     Write-Verbose "[$scriptName] Clearing menu configuration cache"
     Invoke-CacheManagement -Action ClearSpecific -CacheType Menu
@@ -1416,16 +1417,20 @@ else
         }
     }
     Write-Verbose "Loaded $($script:menus.Count) menu items for filtering"
+    Write-Host "Building menu cache..."
     $script:menus | ConvertTo-Json -Depth $maxJSONDepth | Out-File -FilePath $menuCacheFile -Encoding UTF8 -Force
     if (Test-Path $menuCacheFile)
     {
         Write-Verbose "[$scriptName] Menu configuration cached to $menuCacheFile"
         Write-Log -LogFile $LogFile -Module $scriptName -Message "Menu configuration cached to $menuCacheFile" -LogLevel "Information"
+        Write-Host "Menu configuration cached successfully." -ForegroundColor Green
     }
     else
     {
         Write-Verbose "[$scriptName] Failed to cache menu configuration to $menuCacheFile"
         Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to cache menu configuration to $menuCacheFile" -LogLevel "Warning"
+        Write-Host "Failed to cache menu configuration." -ForegroundColor Yellow -NoNewline
+        Write-Host "Will try next time."
     }
 }
 
