@@ -102,9 +102,9 @@ function Get-SystemInformation()
         Write-Verbose "[$functionName] Retrieving memory information"
 
         $totalMemoryGB = [math]::Round($computerInfo.TotalPhysicalMemory / 1GB, 0)
-        $freeMemoryGB = [math]::Round($osInfo.FreePhysicalMemory / 1MB, 2)
+        $freeMemoryGB = [math]::Round($osInfo.FreePhysicalMemory / 1MB, 0)
 
-        Write-Log -LogFile $logFile -Module $functionName -Message "Total Memory: $totalMemoryGB GB, Free Memory: $freeMemoryGB GB" -LogLevel "Information"
+        Write-Log -LogFile $logFile -Module $logFile -Module $functionName -Message "Total Memory: $totalMemoryGB GB, Free Memory: $freeMemoryGB GB" -LogLevel "Information"
 
         # Gather BIOS Information
         Write-Log -LogFile $logFile -Module $functionName -Message "Retrieving BIOS information" -LogLevel "Verbose"
