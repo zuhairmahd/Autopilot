@@ -1,9 +1,10 @@
 {
-  "date": "2025-12-30 04:10:40",
-  "version": "2025.12.3.31201",
-  "guid": "c2c08149-3c1f-4558-9e4c-87487943bbf5",
-  "hash": "BDEDB062F992C8E6363892F45D6054129E3E2CFF8ADC12F48F8BDCF40C1CAE1B",
-  "stringsVersion": "1.3.0.0",
-  "settingsVersion": "1.3.0.0",
-  "hashUpdated": true
+    "date": "2025-12-04 09:35:54",
+    "version": "2026.1.0.31200",
+    "guid": "c2c08149-3c1f-4558-9e4c-87487943bbf5",
+    "hash": "BD85BAA86CF22D06F8700AB07D1E5B647DE203417A2CE4C7A61D9020F35C6BD2",
+    "stringsVersion": "1.3.0.0",
+    "releaseNotes": "Fixed memory calculation check bug in Autopilot enrollment",
+    "settingsVersion": "1.3.0.0",
+    "hashUpdated": true
 }

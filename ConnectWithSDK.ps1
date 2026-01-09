@@ -3,23 +3,36 @@
 [CmdletBinding()]
 param(
     [string]$configFilesPath = ".secrets",
+    [switch]$useDelegatedAuthentication,
+    [switch]$useDeviceCode,
     [switch]$disconnect
 )
 
-if ($disconnect.IsPresent)
+$scopes = @(
+    'Device.ReadWrite.All',
+    'DeviceManagementApps.Read.All',
+    'DeviceManagementConfiguration.ReadWrite.All',
+    'DeviceManagementScripts.Read.All',
+    'Mail.Send',
+    'DeviceManagementManagedDevices.PrivilegedOperations.All',
+    'DeviceManagementManagedDevices.ReadWrite.All',
+    'DeviceManagementServiceConfig.ReadWrite.All'
+)
+
+if ($disconnect)
 {
     Write-Host "Disconnecting from Microsoft Graph SDK..."
     Disconnect-MgGraph
     Write-Host "Disconnected."
     exit 0
-}                                   
+}
 #Get all .json files in the folder.
 $configFiles = Get-ChildItem -Path $configFilesPath -Filter config-*.json -Force -ErrorAction SilentlyContinue
 if ($configFiles.count -eq 0)
 {
     Write-Host "No configuration files found in the specified path: $configFilesPath"
     exit 1
-}             
+}
 foreach ($file in $configFiles)
 {
     #read the name content property from each file and display in a menu along with the file name.
@@ -43,8 +56,8 @@ $selection = Read-Host "Enter the number corresponding to your choice"
 while (-not ($selection -match '^[0-' + $menuItems.count + ']$'))
 {
     $selection = Read-Host "Invalid selection. Please enter a number between 1 and $($menuItems.count)"
-    [console]::beep(500, 300)                        
-}                                   
+    [console]::beep(500, 300)
+}
 #exit if the user selects 0
 if ($selection -eq 0)
 {
@@ -52,49 +65,65 @@ if ($selection -eq 0)
     exit 0
 }
 #print the name of the selected file.
-$selectedItem = $menuItems[$selection - 1]          
-Write-Host "You selected: $($selectedItem.DisplayName) - $($selectedItem.FileName)"             
-$config = Get-Content -Path (Join-Path -Path $configFilesPath -ChildPath $selectedItem.FileName) | ConvertFrom-Json         
+$selectedItem = $menuItems[$selection - 1]
+Write-Host "You selected: $($selectedItem.DisplayName) - $($selectedItem.FileName)"
+$config = Get-Content -Path (Join-Path -Path $configFilesPath -ChildPath $selectedItem.FileName) | ConvertFrom-Json
 if ([string]::IsNullOrEmpty($config.appId) -or [string]::IsNullOrEmpty($config.tenantId))
 {
     Write-Host "The selected configuration file is missing required properties (appId or tenantId)."
     exit 1
-}                       
-#we also need either a client secret or a certificate thumbprint to proceed.
-if ([string]::IsNullOrEmpty($config.AppSecret) -and [string]::IsNullOrEmpty($config.thumbprint))
-{
-    Write-Host "The selected configuration file must contain either a clientSecret or a certificateThumbprint."
-    exit 1
 }
 
-if (-not [string]::IsNullOrEmpty($config.AppSecret))
+if ($useDelegatedAuthentication)
 {
-    Write-Host "Using Client Secret authentication method."
-    $secureSecret = ConvertTo-SecureString -String $config.AppSecret -AsPlainText -Force
-    $credentials = New-Object -TypeName Microsoft.Graph.Auth.ClientSecretCredential -ArgumentList $config.appId, $secureSecret
+    Write-Host "Using Delegated Authentication method."
     $connectParams = @{
-        noWelcome              = $true
-        TenantId               = $config.tenantId
-        ClientSecretCredential = $credentials
-        Scopes                 = "https://graph.microsoft.com/.default"
+        noWelcome = $true
+        TenantId  = $config.tenantId
+        Scopes    = $scopes | ForEach-Object { $_.Trim() }
+    }
+    if ($useDeviceCode)
+    {
+        Write-Host "Using Device Code flow for authentication."
+        $connectParams.useDeviceCode = $true
     }
 }
-elseif (-not [string]::IsNullOrEmpty($config.Thumbprint))
+else
 {
-    Write-Host "Using Certificate Thumbprint authentication method."            
-    $connectParams = @{
-        noWelcome             = $true
-        TenantId              = $config.tenantId
-        clientId              = $config.appId
-        CertificateThumbprint = $config.Thumbprint
+    #we also need either a client secret or a certificate thumbprint to proceed.
+    if ([string]::IsNullOrEmpty($config.AppSecret) -and [string]::IsNullOrEmpty($config.thumbprint))
+    {
+        Write-Host "The selected configuration file must contain either a clientSecret or a certificateThumbprint."
+        exit 1
     }
-}                       
-else 
-{
-    Write-Host "No valid authentication method found in the configuration file."
-    exit 1
+    if (-not [string]::IsNullOrEmpty($config.AppSecret))
+    {
+        Write-Host "Using Client Secret authentication method."
+        $secureSecret = ConvertTo-SecureString -String $config.AppSecret -AsPlainText -Force
+        $credentials = New-Object -TypeName Microsoft.Graph.Auth.ClientSecretCredential -ArgumentList $config.appId, $secureSecret
+        $connectParams = @{
+            noWelcome              = $true
+            TenantId               = $config.tenantId
+            ClientSecretCredential = $credentials
+            Scopes                 = "https://graph.microsoft.com/.default"
+        }
+    }
+    elseif (-not [string]::IsNullOrEmpty($config.Thumbprint))
+    {
+        Write-Host "Using Certificate Thumbprint authentication method."
+        $connectParams = @{
+            noWelcome             = $true
+            TenantId              = $config.tenantId
+            clientId              = $config.appId
+            CertificateThumbprint = $config.Thumbprint
+        }
+    }
+    else
+    {
+        Write-Host "No valid authentication method found in the configuration file."
+        exit 1
+    }
 }
-
 #Connect to Microsoft Graph using the selected configuration.
 try
 {
@@ -105,4 +134,4 @@ catch
 {
     Write-Host "Failed to connect to Microsoft Graph SDK. Error: $_"
     exit 1
-}                   
+}
