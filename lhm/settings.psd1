@@ -73,8 +73,8 @@
             Scope = 'DeviceManagementApps.ReadWrite.All'
         },
         @{
-            reason = 'Required to send emails on behalf of the signed-in user.'
             endpoints = @('me/sendMail')
+            reason = 'Required to send emails on behalf of the signed-in user.'
             scope = 'Mail.Send'
         },
         @{
