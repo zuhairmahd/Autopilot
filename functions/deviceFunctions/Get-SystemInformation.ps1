@@ -105,7 +105,7 @@ function Get-SystemInformation()
         $freeMemoryGB = [math]::Round($osInfo.FreePhysicalMemory / 1MB, 0)
         Write-Log -LogFile $logFile -Module $functionName -Message "Total Memory: $totalMemoryGB GB, Free Memory: $freeMemoryGB GB" -LogLevel "Information"
         # Gather BIOS Information
-        Write-Log -LogFile $logFile -Module $functionName -Message "Retrieving BIOS information" -LogLevel "Verbose"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Retrieving BIOS information"
         Write-Verbose "[$functionName] Retrieving BIOS information"
         $biosInfo = Get-CimInstance -ClassName Win32_BIOS -ErrorAction Stop
         Write-Log -LogFile $logFile -Module $functionName -Message "BIOS: $($biosInfo.Manufacturer), Version: $($biosInfo.SMBIOSBIOSVersion), Serial: $($biosInfo.SerialNumber)" -LogLevel "Information"
