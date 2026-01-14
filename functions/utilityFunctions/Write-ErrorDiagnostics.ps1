@@ -1,84 +1,77 @@
-<#
-.SYNOPSIS
-    Writes comprehensive error diagnostics, typically from catch blocks.
-
-.DESCRIPTION
-    This function provides detailed error information including exception details,
-    stack traces, invocation info, and environment context. It's primarily designed
-    to be called from catch blocks to provide maximum diagnostic information, but
-    it can also analyze any ErrorRecord that is explicitly passed to it.
-
-.PARAMETER ErrorRecord
-    The error record to analyze. If not provided, uses $_ from the current scope.
-    This allows the function to be used both inside catch blocks (with $_) and
-    outside of catch blocks when you pass an ErrorRecord explicitly.
-
-.PARAMETER FunctionName
-    The name of the function where the error occurred. Used for logging context.
-
-.PARAMETER ModuleName
-    The name of the module where the error occurred. Used for logging context.
-
-.PARAMETER AdditionalContext
-    A hashtable of additional context information to include in the diagnostics.
-
-.PARAMETER IncludeEnvironment
-    Include PowerShell version and OS information in the output.
-
-.PARAMETER IncludeModules
-    Include loaded module versions in the output. Can specify module names.
-
-.PARAMETER LogLevel
-    The log level to use when writing to the log file. Default is "Error".
-
-.PARAMETER SuppressConsoleOutput
-    If specified, suppresses writing to the error stream (only logs to file).
-
-.EXAMPLE
-    try {
-        # Some operation
-    }
-    catch {
-        Write-ErrorDiagnostics -FunctionName $MyInvocation.MyCommand.Name
-    }
-
-.EXAMPLE
-    try {
-        # Some operation
-    }
-    catch {
-        Write-ErrorDiagnostics -ErrorRecord $_ -FunctionName "MyFunction" -AdditionalContext @{
-            UserID = $userID
-            Operation = "Device Assignment"
-        }
-    }
-#>
 function Write-ErrorDiagnostics
 {
+    <#
+    .SYNOPSIS
+        Writes comprehensive error diagnostics, typically from catch blocks.
+
+    .DESCRIPTION
+        This function provides detailed error information including exception details,
+        stack traces, invocation info, and environment context. It's primarily designed
+        to be called from catch blocks to provide maximum diagnostic information, but
+        it can also analyze any ErrorRecord that is explicitly passed to it.
+
+    .PARAMETER ErrorRecord
+        The error record to analyze. If not provided, uses $_ from the current scope.
+        This allows the function to be used both inside catch blocks (with $_) and
+        outside of catch blocks when you pass an ErrorRecord explicitly.
+
+    .PARAMETER FunctionName
+        The name of the function where the error occurred. Used for logging context.
+
+    .PARAMETER ModuleName
+        The name of the module where the error occurred. Used for logging context.
+
+    .PARAMETER AdditionalContext
+        A hashtable of additional context information to include in the diagnostics.
+
+    .PARAMETER IncludeEnvironment
+        Include PowerShell version and OS information in the output.
+
+    .PARAMETER IncludeModules
+        Include loaded module versions in the output. Can specify module names.
+
+    .PARAMETER LogLevel
+        The log level to use when writing to the log file. Default is "Error".
+
+    .PARAMETER SuppressConsoleOutput
+        If specified, suppresses writing to the error stream (only logs to file).
+
+    .EXAMPLE
+        try {
+            # Some operation
+        }
+        catch {
+            Write-ErrorDiagnostics -FunctionName $MyInvocation.MyCommand.Name
+        }
+
+    .EXAMPLE
+        try {
+            # Some operation
+        }
+        catch {
+            Write-ErrorDiagnostics -ErrorRecord $_ -FunctionName "MyFunction" -AdditionalContext @{
+                UserID = $userID
+                Operation = "Device Assignment"
+            }
+        }
+    #>
     [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline = $true)]
         [System.Management.Automation.ErrorRecord]$ErrorRecord,
-
         [Parameter()]
         [string]$FunctionName,
-
         [Parameter()]
         [string]$ModuleName,
-
         [Parameter()]
         [hashtable]$AdditionalContext,
-
         [Parameter()]
         [switch]$IncludeEnvironment,
-
         [Parameter()]
         [string[]]$IncludeModules,
-
         [Parameter()]
-        [ValidateSet("Error", "Warning", "Info", "Debug", "Verbose")]
+        [ValidateSet("Error", "Warning", "Information", "Debug", "Verbose")]
         [string]$LogLevel = "Error",
-
         [Parameter()]
         [switch]$SuppressConsoleOutput
     )
@@ -88,12 +81,19 @@ function Write-ErrorDiagnostics
         $currentFunctionName = $MyInvocation.MyCommand.Name
 
         # Helper function to write diagnostic messages
-        function Write-DiagnosticMessage
+        function Write-DiagnosticMessage()
         {
             param(
                 [Parameter(Mandatory = $true)]
                 [string]$Message,
-                [string]$Module = $(if ($PSBoundParameters.ContainsKey('FunctionName') -and $PSBoundParameters['FunctionName']) { $PSBoundParameters['FunctionName'] } else { $functionName }),
+                [string]$Module = $(if ($PSBoundParameters.ContainsKey('FunctionName') -and $PSBoundParameters['FunctionName'])
+                    {
+                        $PSBoundParameters['FunctionName']
+                    }
+                    else
+                    {
+                        $functionName
+                    }),
                 [string]$Level = $LogLevel
             )
 
@@ -110,11 +110,11 @@ function Write-ErrorDiagnostics
                 {
                     $logFileToUse = if ($script:logFile)
                     {
-                        $script:logFile 
+                        $script:logFile
                     }
                     else
                     {
-                        $global:logFile 
+                        $global:logFile
                     }
                     Write-Log -logFile $logFileToUse -Module $Module -Message $Message -LogLevel $Level
                 }
@@ -158,7 +158,7 @@ function Write-ErrorDiagnostics
             foreach ($key in $AdditionalContext.Keys)
             {
                 $value = $AdditionalContext[$key]
-                if ($value -is [hashtable] -or $value -is [PSCustomObject])
+                if ($null -ne $value -and ($value -is [hashtable] -or $value -is [PSCustomObject]))
                 {
                     $valueStr = $value | ConvertTo-Json -Depth 2 -Compress -ErrorAction SilentlyContinue
                 }
