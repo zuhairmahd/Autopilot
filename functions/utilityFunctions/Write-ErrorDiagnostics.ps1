@@ -90,7 +90,7 @@ function Write-ErrorDiagnostics
             param(
                 [Parameter(Mandatory = $true)]
                 [string]$Message,
-                [string]$Module = $FunctionName,
+                [string]$Module = $(if ($PSBoundParameters.ContainsKey('FunctionName') -and $PSBoundParameters['FunctionName']) { $PSBoundParameters['FunctionName'] } else { $functionName }),
                 [string]$Level = $LogLevel
             )
 
