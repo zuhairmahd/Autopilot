@@ -1,14 +1,17 @@
 <#
 .SYNOPSIS
-    Writes comprehensive error diagnostics for use in catch blocks.
+    Writes comprehensive error diagnostics, typically from catch blocks.
 
 .DESCRIPTION
     This function provides detailed error information including exception details,
-    stack traces, invocation info, and environment context. It's designed to be
-    called from catch blocks to provide maximum diagnostic information.
+    stack traces, invocation info, and environment context. It's primarily designed
+    to be called from catch blocks to provide maximum diagnostic information, but
+    it can also analyze any ErrorRecord that is explicitly passed to it.
 
 .PARAMETER ErrorRecord
     The error record to analyze. If not provided, uses $_ from the current scope.
+    This allows the function to be used both inside catch blocks (with $_) and
+    outside of catch blocks when you pass an ErrorRecord explicitly.
 
 .PARAMETER FunctionName
     The name of the function where the error occurred. Used for logging context.
