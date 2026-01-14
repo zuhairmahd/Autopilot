@@ -270,7 +270,21 @@ function Write-ErrorDiagnostics
             }
             catch
             {
-                Write-DiagnosticMessage " Target Object: $($ErrorRecord.TargetObject.ToString())"
+                try
+                {
+                    if ($ErrorRecord.TargetObject -ne $null)
+                    {
+                        Write-DiagnosticMessage " Target Object: $($ErrorRecord.TargetObject.ToString())"
+                    }
+                    else
+                    {
+                        Write-DiagnosticMessage " Target Object: <null>"
+                    }
+                }
+                catch
+                {
+                    Write-DiagnosticMessage " Target Object: <unavailable>"
+                }
             }
         }
 
