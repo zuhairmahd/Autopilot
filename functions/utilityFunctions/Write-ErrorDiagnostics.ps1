@@ -82,7 +82,7 @@ function Write-ErrorDiagnostics
 
     begin
     {
-        $functionName = $MyInvocation.MyCommand.Name
+        $currentFunctionName = $MyInvocation.MyCommand.Name
 
         # Helper function to write diagnostic messages
         function Write-DiagnosticMessage
