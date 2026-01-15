@@ -737,7 +737,7 @@ $scope = $auth.scope
 # $autopilotCsv = [System.Collections.ArrayList]@()
 # $importedCsv = [System.Collections.ArrayList]@()
 # $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $scope -AuthType 'MGGraph' -verbose
-# $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $scope -AuthType 'PublicAuthFlow'
+$accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $scope -AuthType 'PublicAuthFlow'
 # $accessToken = GetGraphAccessToken -configFile $configFile
 # $autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken -extraParameters $autopilotExtraParameters -consistencyLevel -verbose
 # $importedDevices = CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken -consistencyLevel -extraParameters $importedAutopilotDeviceExtraParameters -verbose
@@ -749,13 +749,20 @@ $scope = $auth.scope
 # "unmanaged" = $unmanagedDevices
 # }
 #endregion Define variables
-
-$global:systemInformation = Get-SystemInformation
-foreach ($property in $systemInformation.PSObject.Properties)
-{
-    Write-Host "$($property.Name): $($property.Value)" -ForegroundColor Yellow
+$DMServers = @{
+    'DM10-01-GOAL4_NETOPS' = 'WINDM16-01'
+    'DM10-02-ALL_STAFF'    = 'WINDM16-02'
+    'DM10-03-ALL_STAFF'    = 'WINDM16-03'
+    'DM10-04-ALL_STAFF'    = 'WINDM16-04'
+    'DM10-06-ALL_STAFF'    = 'WINDM16-06'
+    'DM10-07-ALL_STAFF'    = 'WINDM16-07'
+    'DM10-ET-01-ALL_STAFF' = 'WINDM16-ET-01'
+    'DM10-CT-01-ALL_STAFF' = 'WINDM16-CT-01'
+    'DM10-MT-01-ALL_STAFF' = 'WINDM16-MT-01'
+    'DM10-WT-01-ALL_STAFF' = 'WINDM16-WT-01'
 }
-
+$dmGroups = @($DMServers.Keys)
+$global:groupIds = GetGroupIdsByNames -accessToken $accessToken -groupNames $dmGroups
 exit 0
 
 Send-EmailWithAttachments -accessToken $accessToken -to 'zuhair@accesstojobs.com' -Subject 'test' -body 'this is a test' -AttachmentPaths $logfile
