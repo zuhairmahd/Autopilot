@@ -79,10 +79,11 @@ function Write-ErrorDiagnostics
     begin
     {
         $currentFunctionName = $MyInvocation.MyCommand.Name
-
+        Write-Verbose "Write-ErrorDiagnostics: Invoked from function '$currentFunctionName'."
         # Helper function to write diagnostic messages
         function Write-DiagnosticMessage()
         {
+            [CmdletBinding()]
             param(
                 [Parameter(Mandatory = $true)]
                 [string]$Message,
@@ -164,7 +165,14 @@ function Write-ErrorDiagnostics
                 }
                 else
                 {
-                    $valueStr = $value.ToString()
+                    if ($null -ne $value)
+                    {
+                        $valueStr = $value.ToString()
+                    }
+                    else
+                    {
+                        $valueStr = "<null>"
+                    }
                 }
                 Write-DiagnosticMessage " $key : $valueStr"
             }
@@ -275,7 +283,7 @@ function Write-ErrorDiagnostics
             {
                 try
                 {
-                    if ($ErrorRecord.TargetObject -ne $null)
+                    if ($null -ne $ErrorRecord.TargetObject)
                     {
                         Write-DiagnosticMessage " Target Object: $($ErrorRecord.TargetObject.ToString())"
                     }
