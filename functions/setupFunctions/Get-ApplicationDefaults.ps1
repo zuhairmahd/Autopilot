@@ -406,6 +406,7 @@ function Get-ApplicationDefaults()
                 noGroupFoundInDirectoryMessage = "This group does not exist"
                 noLAPSFoundMessage             = "No LAPS password found for this device."
                 noRestartMessage               = "Device not restarted."
+                noValidInputMessage            = "No valid input provided."
                 notContactedMessage            = "The device has not contacted the enrollment service."
                 noUserDeviceFoundMessage       = "No user or device found."
                 noUserFoundInDirectoryMessage  = "This user does not exist"

@@ -103,7 +103,7 @@ function ProcessSerialNumber()
     if ([string]::IsNullOrWhiteSpace($SerialNumber))
     {
         Write-Host "Serial number cannot be empty or null." -ForegroundColor Red
-        return $null # Return null to signal no valid serial number
+        return $returnValues.noValidInputMessage
     }
     $SerialNumber = $SerialNumber.Trim()
     Write-Host "`nLooking up device information for serial number: $SerialNumber" -ForegroundColor Cyan
@@ -470,7 +470,7 @@ function ProcessSerialNumber()
     {
         # Explicitly return $null if no enrollmentState
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device lookup failed or no enrollment state found" -LogLevel "Verbose"
-        return $null
+        return $returnValues.noDeviceFound
     }
 
     # Return success status for calling functions
