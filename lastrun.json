@@ -1,10 +1,9 @@
 {
-    "date": "2025-12-04 09:35:54",
-    "version": "2026.1.1.31200",
-    "guid": "c2c08149-3c1f-4558-9e4c-87487943bbf5",
-    "hash": "BD85BAA86CF22D06F8700AB07D1E5B647DE203417A2CE4C7A61D9020F35C6BD2",
-    "stringsVersion": "1.3.0.0",
-    "releaseNotes": "Fixed a bug causing the application to unexpectedly exit while vieweing a device",
-    "settingsVersion": "1.3.0.0",
-    "hashUpdated": true
+  "date": "2026-01-28 17:41:12",
+  "version": "2026.1.1.31201",
+  "guid": "c2c08149-3c1f-4558-9e4c-87487943bbf5",
+  "hash": "A55254E397EB5C1A8B68622FC00875103B4858F29AB92496A25941D2F7A5E23F",
+  "stringsVersion": "1.3.0.0",
+  "settingsVersion": "1.3.0.0",
+  "hashUpdated": true
 }
