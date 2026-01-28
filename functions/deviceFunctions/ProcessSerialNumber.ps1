@@ -35,10 +35,10 @@ function ProcessSerialNumber()
       * Additional user readiness assessment properties
 
     When serial number is invalid:
-    - $null: If serial number is empty, whitespace, or null
+    - String: $returnValues.noValidInputMessage indicating invalid input
 
     When device lookup fails:
-    - $null: If Get-CachedDeviceEnrollmentStatus returns no enrollment state
+    - String: $returnValues.noDeviceFound indicating no device found
 
     When device has pending actions:
     - String: Returns $returnValues.deviceActionPendingMessage to indicate pending operations
@@ -103,7 +103,7 @@ function ProcessSerialNumber()
     if ([string]::IsNullOrWhiteSpace($SerialNumber))
     {
         Write-Host "Serial number cannot be empty or null." -ForegroundColor Red
-        return $null # Return null to signal no valid serial number
+        return $returnValues.noValidInputMessage
     }
     $SerialNumber = $SerialNumber.Trim()
     Write-Host "`nLooking up device information for serial number: $SerialNumber" -ForegroundColor Cyan
@@ -468,9 +468,9 @@ function ProcessSerialNumber()
     }
     else
     {
-        # Explicitly return $null if no enrollmentState
+        # Return standardized noDeviceFound status if no enrollmentState
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device lookup failed or no enrollment state found" -LogLevel "Verbose"
-        return $null
+        return $returnValues.noDeviceFound
     }
 
     # Return success status for calling functions

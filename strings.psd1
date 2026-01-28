@@ -53,6 +53,7 @@
         deviceWipeFailedMessage        = 'The device wipe failed.'
         '1001'                         = 'Some updates were installed'
         serialNumberNotFoundMessage    = 'The serial number was not found.'
+        noValidInputMessage            = 'No valid input provided.'
         noLAPSFoundMessage             = 'No LAPS password found for this device.'
     }
 }
