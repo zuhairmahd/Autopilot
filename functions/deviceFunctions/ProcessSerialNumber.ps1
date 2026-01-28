@@ -468,7 +468,7 @@ function ProcessSerialNumber()
     }
     else
     {
-        # Explicitly return $null if no enrollmentState
+        # Return standardized noDeviceFound status if no enrollmentState
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device lookup failed or no enrollment state found" -LogLevel "Verbose"
         return $returnValues.noDeviceFound
     }
