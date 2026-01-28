@@ -1,10 +1,10 @@
 {
     "date": "2025-12-04 09:35:54",
-    "version": "2026.1.0.31200",
+    "version": "2026.1.1.31200",
     "guid": "c2c08149-3c1f-4558-9e4c-87487943bbf5",
     "hash": "BD85BAA86CF22D06F8700AB07D1E5B647DE203417A2CE4C7A61D9020F35C6BD2",
     "stringsVersion": "1.3.0.0",
-    "releaseNotes": "Fixed memory calculation check bug in Autopilot enrollment",
+    "releaseNotes": "Fixed a bug causing the application to unexpectedly exit while vieweing a device",
     "settingsVersion": "1.3.0.0",
     "hashUpdated": true
 }
