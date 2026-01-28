@@ -1765,7 +1765,11 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial nu
             Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
             return "EXIT_APPLICATION"
         }
-        elseif ($result -eq $true -or $result -in $returnValues.Values)
+        elseif ($result -eq $true)
+        {
+            Write-Verbose "[$scriptName] Operation completed successfully for serial number $serialNumber."
+        }
+        elseif ($result -in $returnValues.Values)
         {
             Write-Host $result
         }
