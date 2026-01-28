@@ -35,10 +35,10 @@ function ProcessSerialNumber()
       * Additional user readiness assessment properties
 
     When serial number is invalid:
-    - $null: If serial number is empty, whitespace, or null
+    - String: $returnValues.noValidInputMessage indicating invalid input
 
     When device lookup fails:
-    - $null: If Get-CachedDeviceEnrollmentStatus returns no enrollment state
+    - String: $returnValues.noDeviceFound indicating no device found
 
     When device has pending actions:
     - String: Returns $returnValues.deviceActionPendingMessage to indicate pending operations

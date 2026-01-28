@@ -1763,19 +1763,25 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial nu
         if ($null -eq $result)
         {
             Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
+            write-log -logFile $logFile -module $scriptName -message "ProcessSerialNumber returned exit signal" -LogLevel "Information"
             return "EXIT_APPLICATION"
         }
         elseif ($result -eq $true)
         {
             Write-Verbose "[$scriptName] Operation completed successfully for serial number $serialNumber."
+            write-log -logFile $logFile -module $scriptName -message "Operation completed successfully for serial number $serialNumber." -LogLevel "Information"
         }
-        elseif ($result -in $returnValues.Values)
+        elseif ($result -in @($returnValues.exitString, $returnValues.backoutText, "Main Menu"))
         {
+            Write-Verbose "[$scriptName] Returning special value: $result"
+            write-log -logFile $logFile -module $scriptName -message "Returning special value from serial number processing: $result" -LogLevel "Information"
+            return $result
+        }
+        elseif ($result) # Catches any other non-null, non-false, non-empty-string result
+        {
+            Write-Verbose "[$scriptName] Operation returned result for serial number $($serialNumber): $result"
+            write-log -logFile $logFile -module $scriptName -message "Operation returned result for serial number $($serialNumber): $result" -LogLevel "Information"
             Write-Host $result
-        }
-        else
-        {
-            Write-Host "Failed to fetch information for device with serial number: $serialNumber" -ForegroundColor Red
         }
     }
     else
