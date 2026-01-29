@@ -167,7 +167,7 @@ function Invoke-CacheManagement()
                 if ($global:CacheStats)
                 {
                     $global:CacheStats.Operations.Misses++
-                    write-log -logFile $LogFile -Module $functionName -Message "Incremented cache miss count" -LogLevel "Debug" -logLevel "DEBUG"
+                    write-log -logFile $LogFile -Module $functionName -Message "Incremented cache miss count" -LogLevel "Debug"
                 }
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Cache miss for $CacheType`: $Key" -LogLevel "Debug"
             }
@@ -295,7 +295,7 @@ function Invoke-CacheManagement()
             # Check if this is a unified cache type
             if ($CacheType -in @('Configuration', 'DirectoryObjects', 'Devices'))
             {
-                $cleared = $true
+                Clear-UnifiedCache -CacheType $CacheType
                 Write-Host "Cleared unified $CacheType cache" -ForegroundColor Green
                 $cleared = $true
                 Write-Verbose "[$functionName] Cleared unified $CacheType cache"
