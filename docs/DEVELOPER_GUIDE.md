@@ -270,9 +270,9 @@ $config = Get-CachedConfiguration -FilePath "settings.psd1"
 
 The project uses **Pester v5** for testing:
 
-- **Unit tests**: 144+ tests in `tests/Unit/`
-- **Integration tests**: 36+ tests in `tests/Integration/`
-- **Comprehensive tests**: End-to-end scenarios in `tests/Comprehensive/`
+- **Unit tests**: 73 test files in `tests/Unit/`
+- **Integration tests**: 14 test files in `tests/Integration/`
+- **Comprehensive tests**: 8 end-to-end test files in `tests/Comprehensive/`
 
 **CRITICAL**: Tests must run in PowerShell 7+ (`pwsh.exe`), not PowerShell 5.1.
 
