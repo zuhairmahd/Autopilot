@@ -123,6 +123,10 @@ else
     exit 1
 }
 #endregion import functions.
+$csvFilesLocation = "$env:userprofile\Downloads\hardwareHash"
+$filesList = (Get-ChildItem -Path $csvFilesLocation -Filter '*.csv' -ErrorAction SilentlyContinue).FullName
+
+exit 0
 
 if (-not $skipLogin)
 {
