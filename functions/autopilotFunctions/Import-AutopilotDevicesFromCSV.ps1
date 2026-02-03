@@ -173,7 +173,6 @@ function Import-AutopilotDevicesFromCSV()
     {
         Write-Verbose "[$functionName] Processing file: $inputFile"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Processing input file: $inputFile" -LogLevel "Information"
-
         [string]$resolvedInput = $null
         try
         {
@@ -194,7 +193,6 @@ function Import-AutopilotDevicesFromCSV()
             $result.Statistics.FailedFiles++
             continue
         }
-
         if (-not (Test-Path -Path $resolvedInput -PathType Leaf))
         {
             $errorMsg = "Input file '$inputFile' does not exist or is not a file."
@@ -218,7 +216,6 @@ function Import-AutopilotDevicesFromCSV()
             Write-Log -LogFile $LogFile -Module $functionName -Message $errorMsg -LogLevel "Warning"
         }
 
-        $fileProcessedSuccessfully = $true
         $fileEntryCount = 0
         $fileValidCount = 0
         $fileInvalidCount = 0
@@ -230,7 +227,6 @@ function Import-AutopilotDevicesFromCSV()
 
             # Import CSV and process each row
             $csvData = Import-Csv -Path $resolvedInput -ErrorAction Stop
-
             if ($null -eq $csvData -or $csvData.Count -eq 0)
             {
                 $errorMsg = "CSV file '$resolvedInput' is empty or contains no data rows."
@@ -258,10 +254,8 @@ function Import-AutopilotDevicesFromCSV()
             {
                 $fileEntryCount++
                 $result.Statistics.TotalEntriesProcessed++
-
                 Write-Verbose "[$functionName] Processing entry $fileEntryCount"
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Processing CSV entry $fileEntryCount of $($csvData.Count)" -LogLevel "Debug"
-
                 try
                 {
                     # Extract and normalize field names (CSV column names can vary)
@@ -323,7 +317,7 @@ function Import-AutopilotDevicesFromCSV()
                     # Validate required fields
                     if ([string]::IsNullOrWhiteSpace($serialNumber))
                     {
-                        $errorMsg = "Entry $fileEntryCount: Missing required field 'Serial Number'"
+                        $errorMsg = "Entry $($fileEntryCount): Missing required field 'Serial Number'"
                         Write-Verbose "[$functionName] $errorMsg"
                         Write-Log -LogFile $LogFile -Module $functionName -Message $errorMsg -LogLevel "Warning"
                         $result.Errors += @{
@@ -359,7 +353,7 @@ function Import-AutopilotDevicesFromCSV()
                     # Check for duplicate serial numbers
                     if ($serialNumberTracker.ContainsKey($serialNumber))
                     {
-                        $errorMsg = "Entry $fileEntryCount: Duplicate serial number detected: $serialNumber (already processed from file: $($serialNumberTracker[$serialNumber]))"
+                        $errorMsg = "Entry $($fileEntryCount): Duplicate serial number detected: $serialNumber (already processed from file: $($serialNumberTracker[$serialNumber]))"
                         Write-Verbose "[$functionName] $errorMsg"
                         Write-Log -LogFile $LogFile -Module $functionName -Message $errorMsg -LogLevel "Warning"
                         $result.Errors += @{
@@ -441,7 +435,7 @@ function Import-AutopilotDevicesFromCSV()
                 }
                 catch
                 {
-                    $errorMsg = "Entry $fileEntryCount: Failed to process CSV row. Error: $($_.Exception.Message)"
+                    $errorMsg = "Entry $($fileEntryCount): Failed to process CSV row. Error: $($_.Exception.Message)"
                     Write-Verbose "[$functionName] $errorMsg"
                     Write-Log -LogFile $LogFile -Module $functionName -Message $errorMsg -LogLevel "Error"
                     $result.Errors += @{
@@ -488,7 +482,6 @@ function Import-AutopilotDevicesFromCSV()
                 Exception = $_.Exception.Message
             }
             $result.Statistics.FailedFiles++
-            $fileProcessedSuccessfully = $false
         }
     }
 
@@ -559,18 +552,18 @@ function Import-AutopilotDevicesFromCSV()
         if ($result.Errors.Count -gt 0 -and $result.Errors.Count -le 10)
         {
             Write-Host "Error Details:" -ForegroundColor Yellow
-            foreach ($error in $result.Errors)
+            foreach ($errorMessage in $result.Errors)
             {
-                Write-Host "  [$($error.Type)] $($error.Message)" -ForegroundColor Red
+                Write-Host "  [$($errorMessage.Type)] $($errorMessage.Message)" -ForegroundColor Red
             }
             Write-Host ""
         }
         elseif ($result.Errors.Count -gt 10)
         {
             Write-Host "Error Details: ($($result.Errors.Count) errors - showing first 10)" -ForegroundColor Yellow
-            foreach ($error in $result.Errors[0..9])
+            foreach ($errorMessage in $result.Errors[0..9])
             {
-                Write-Host "  [$($error.Type)] $($error.Message)" -ForegroundColor Red
+                Write-Host "  [$($errorMessage.Type)] $($errorMessage.Message)" -ForegroundColor Red
             }
             Write-Host "  ... and $($result.Errors.Count - 10) more errors" -ForegroundColor Red
             Write-Host ""
