@@ -7,22 +7,22 @@ function Send-DiagnosticInformation()
 .DESCRIPTION
     This function implements a comprehensive diagnostic information collection and
     transmission system for activation failures. The system provides:
-    
+
     Diagnostic Collection:
     - Gathers detailed log files with error context
     - Collects system and environment information
-    
+
     User Interface:
     - Presents user-friendly options for diagnostic sharing
     - Supports both automated email transmission and manual file saving
     - Allows users to control how diagnostic information is handled
-    
+
     Transmission Methods:
     - Email (Graph API): Automated sending via Microsoft Graph API
     - Email (Outlook COM): Opens Classic Outlook for manual review and sending
     - Zip File: Manual save to user-specified location
     - Secure handling of sensitive diagnostic data
-    
+
     The function ensures that sensitive information is handled appropriately and
     provides multiple options for getting diagnostic data to support personnel.
 
@@ -46,39 +46,39 @@ function Send-DiagnosticInformation()
     - Microsoft Graph PowerShell module
     - Appropriate permissions for Mail.Send
     - Valid organizational email configuration
-    
+
     Privacy Considerations:
     - Log files may contain system information but no credentials
     - Users control how diagnostic information is transmitted
-    
+
     The function automatically cleans up temporary files after processing.
     #>
     [CmdletBinding()]
     param(
         [string]$ErrorMessage = 'Support Request'
     )
-    
+
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Starting diagnostic information collection"
     Write-Log -Message "Starting diagnostic information collection for error: $ErrorMessage" -Module $functionName -LogLevel "Information" -LogFile $logFile
-    
+
     try
     {
         $userChoice = Read-Host -Prompt "How would you like to send diagnostic information to support? ([E]mail/[Z]ip/[C]ancel)"
         Write-Log -Message "User selected diagnostic option: $userChoice" -Module $functionName -LogLevel "Information" -LogFile $logFile
-        Write-Verbose "[$functionName] User selected option: $userChoice"   
+        Write-Verbose "[$functionName] User selected option: $userChoice"
         while ($userChoice -notin @("E", "Z", "C", "e", "z", "c"))
         {
             Write-Host "Invalid selection. Please enter E, Z, or C." -ForegroundColor Yellow
-            [console]::beep(1000, 300)                       
+            [console]::beep(1000, 300)
             $userChoice = Read-Host -Prompt "How would you like to send diagnostic information to support? ([E]mail/[Z]ip/[C]ancel)"
             Write-Log -Message "User re-selected diagnostic option: $userChoice" -Module $functionName -LogLevel "Information" -LogFile $logFile
-            Write-Verbose "[$functionName] User re-selected option: $userChoice"   
-        }                                               
+            Write-Verbose "[$functionName] User re-selected option: $userChoice"
+        }
         if ($userChoice -eq "E" -or $userChoice -eq "e")
         {
             Write-Log -Message "User chose to send diagnostic information via email" -Module $functionName -LogLevel "Information" -LogFile $logFile
-            
+
             # Ask user which email method to use
             Write-Host ""
             Write-Host "Select email sending method:" -ForegroundColor Cyan
@@ -86,7 +86,7 @@ function Send-DiagnosticInformation()
             Write-Host "  [M] - MAPI/Outlook (opens email client for manual review)" -ForegroundColor White
             $emailMethod = Read-Host -Prompt "Choose email method ([G]raph/[M]API)"
             Write-Log -Message "User selected email method: $emailMethod" -Module $functionName -LogLevel "Information" -LogFile $logFile
-            
+
             while ($emailMethod -notin @("G", "M", "g", "m"))
             {
                 Write-Host "Invalid selection. Please enter G or M." -ForegroundColor Yellow
@@ -94,7 +94,7 @@ function Send-DiagnosticInformation()
                 $emailMethod = Read-Host -Prompt "Choose email method ([G]raph/[M]API)"
                 Write-Log -Message "User re-selected email method: $emailMethod" -Module $functionName -LogLevel "Information" -LogFile $logFile
             }
-            
+
             # Prepare email content
             $emailSubject = "Intune Helpdesk Utility - Diagnostic Information"
             $emailBody = @"
@@ -107,14 +107,14 @@ Please find the attached log file for further analysis.
 
 Best regards,
 "@
-            
+
             # Collect files for email
             $attachmentFiles = @()
             if (Test-Path $logFile)
             {
                 $attachmentFiles += $logFile
             }
-            
+
             # Validate supportEmail before sending
             if ([string]::IsNullOrWhiteSpace($settings.supportEmail))
             {
@@ -136,7 +136,7 @@ Best regards,
                     $emailSent = Send-EmailWithAttachments -AccessToken $accessToken -To $settings.supportEmail -Subject $emailSubject -Body $emailBody -AttachmentPaths $attachmentFiles
                 }
             }
-            
+
             if ($emailSent)
             {
                 if ($emailMethod -eq "M" -or $emailMethod -eq "m")
@@ -153,7 +153,7 @@ Best regards,
             else
             {
                 Write-Host "Failed to send diagnostic information email" -ForegroundColor Red
-                Write-Log -Message "Failed to send diagnostic information email" -Module $functionName -LogLevel "Error" -LogFile $logFile                                                                          
+                Write-Log -Message "Failed to send diagnostic information email" -Module $functionName -LogLevel "Error" -LogFile $logFile
             }
         }
         elseif ($userChoice -eq "Z" -or $userChoice -eq "z")
@@ -164,40 +164,40 @@ Best regards,
             if (Test-Path $logFile)
             {
                 $zipFiles += $logFile
-                $zipFileName = "DiagnosticInformation_$(Get-Date -Format 'yyyyMMdd_HHmmss').zip"                                                        
-                write-log -logFile $logFile -module $functionName -message "Preparing to create zip file: $zipFileName" -logLevel "Information"                
+                $zipFileName = "DiagnosticInformation_$(Get-Date -Format 'yyyyMMdd_HHmmss').zip"
+                Write-Log -logFile $logFile -module $functionName -message "Preparing to create zip file: $zipFileName" -logLevel "Information"
                 # Create zip file
                 $zipCreated = New-ZipPackage -FilePaths $zipFiles -DestinationPath $zipFileName
                 if ($null -ne $zipCreated)
                 {
                     Write-Host "Diagnostic information saved to zip file: $zipCreated" -ForegroundColor Green
-                    Write-Log -Message "Diagnostic information saved to zip file: $zipCreated" -Module $functionName -LogLevel "Information" -LogFile $logFile                         
+                    Write-Log -Message "Diagnostic information saved to zip file: $zipCreated" -Module $functionName -LogLevel "Information" -LogFile $logFile
                 }
                 else
                 {
-                    write-log -logFile $logFile -module $functionName -message "Failed to create zip file for diagnostic information" -logLevel "Error"                                   
+                    Write-Log -logFile $logFile -module $functionName -message "Failed to create zip file for diagnostic information" -logLevel "Error"
                     Write-Host "Failed to create zip file for diagnostic information" -ForegroundColor Red
-                    Write-Log -Message "Failed to create zip file for diagnostic information" -Module $functionName -LogLevel "Error" -LogFile $logFile                 
-                    Write-Host "Please manually collect the log file located at: $logFile" -ForegroundColor Yellow                      
+                    Write-Log -Message "Failed to create zip file for diagnostic information" -Module $functionName -LogLevel "Error" -LogFile $logFile
+                    Write-Host "Please manually collect the log file located at: $logFile" -ForegroundColor Yellow
                 }
             }
             else
             {
                 Write-Host "No log file found to include in zip" -ForegroundColor Yellow
-                Write-Log -Message "No log file found to include in zip" -Module $functionName -LogLevel "Warning" -LogFile $logFile                 
-            }                                   
+                Write-Log -Message "No log file found to include in zip" -Module $functionName -LogLevel "Warning" -LogFile $logFile
+            }
         }
         else
         {
             Write-Log -Message "User cancelled diagnostic information collection" -Module $functionName -LogLevel "Information" -LogFile $logFile
-            Write-Host "Diagnostic information collection cancelled by user" -ForegroundColor Yellow                        
+            Write-Host "Diagnostic information collection cancelled by user" -ForegroundColor Yellow
         }
     }
     catch
     {
         Write-Log -Message "Error in Send-DiagnosticInformation: $($_.Exception.Message)" -Module $functionName -LogLevel "Error" -LogFile $logFile
-        Write-Error "Failed to send diagnostic information: $($_.Exception.Message)"                    
-        
+        Write-Error "Failed to send diagnostic information: $($_.Exception.Message)"
+
     }
 }
 
@@ -210,27 +210,27 @@ function Send-EmailWithAttachments()
 .DESCRIPTION
     This function provides enterprise-grade email functionality using either Microsoft Graph API
     or MAPI/Outlook COM automation for secure and reliable email transmission. Features include:
-    
+
     Microsoft Graph Integration (Default):
     - Uses modern authentication with Microsoft Graph
     - Supports organizational email policies and security
     - Handles large attachments efficiently
     - Sends email automatically without user interaction
-    
+
     Outlook COM Integration (Optional):
     - Opens Classic Outlook with pre-filled message
     - Allows user to review and edit before sending
     - Works with standard user permissions
     - Does not require Graph API authentication
     - Requires Classic Outlook (New Outlook does not support COM automation)
-    
+
     Attachment Processing:
     - Supports multiple file attachments
     - Automatic MIME type detection based on file extensions (Graph API)
     - Base64 encoding for secure transmission (Graph API)
     - Direct file attachment (Outlook COM)
     - File size validation and handling
-    
+
     Error Handling:
     - Comprehensive connection and authentication error handling
     - Graceful degradation when Graph modules are unavailable
@@ -283,13 +283,13 @@ function Send-EmailWithAttachments()
     - Appropriate permissions for Mail.Send in Microsoft Graph
     - Valid organizational email configuration
     - AccessToken parameter
-    
+
     Prerequisites for Outlook COM mode:
     - Classic Outlook installed and configured
     - No authentication required
-    
+
     Note: New Outlook does not support COM automation and cannot be used with this feature.
-    
+
     The function automatically handles authentication prompts and permission requests.
     #>
     [CmdletBinding()]
@@ -307,33 +307,33 @@ function Send-EmailWithAttachments()
         [Parameter(Mandatory = $false)]
         [switch]$UseMAPI
     )
-    
+
     $functionName = $MyInvocation.MyCommand.Name
     Write-Log -Message "Starting email send process to $To $(if ($UseMAPI) { '(MAPI mode)' } else { '(Graph API mode)' })" -Module $functionName -LogLevel "Information" -LogFile $logFile
-    
+
     # MAPI Mode: Use Outlook COM automation to open email client
     if ($UseMAPI)
     {
         Write-Log -Message "Using Outlook COM automation to create email" -Module $functionName -LogLevel "Information" -LogFile $logFile
         Write-Verbose "[$functionName] Using Outlook COM automation"
-        
+
         try
         {
             # Attempt to create Outlook COM object (Classic Outlook)
             # Note: New Outlook does not support COM automation
             $outlook = New-Object -ComObject Outlook.Application -ErrorAction Stop
             Write-Log -Message "Successfully created Outlook COM object" -Module $functionName -LogLevel "Debug" -LogFile $logFile
-            
+
             # Create a new mail item
             $mail = $outlook.CreateItem(0)  # 0 = olMailItem
             Write-Log -Message "Created new Outlook mail item" -Module $functionName -LogLevel "Debug" -LogFile $logFile
-            
+
             # Set email properties
             $mail.To = $To
             $mail.Subject = $Subject
             $mail.Body = $Body
             Write-Log -Message "Set email properties: To=$To, Subject=$Subject" -Module $functionName -LogLevel "Debug" -LogFile $logFile
-            
+
             # Add attachments
             $attachmentCount = 0
             foreach ($attachmentPath in $AttachmentPaths)
@@ -360,12 +360,12 @@ function Send-EmailWithAttachments()
                     Write-Verbose "[$functionName] Attachment file not found: $attachmentPath"
                 }
             }
-            
+
             # Display the email for user review and sending
             $mail.Display()
             Write-Log -Message "Email displayed in Outlook with $attachmentCount attachment(s)" -Module $functionName -LogLevel "Information" -LogFile $logFile
             Write-Verbose "[$functionName] Email displayed in Outlook with $attachmentCount attachment(s)"
-            
+
             return $true
         }
         catch
@@ -373,10 +373,10 @@ function Send-EmailWithAttachments()
             $errorMessage = "Failed to create email using Outlook COM automation: $($_.Exception.Message)"
             Write-Error $errorMessage
             Write-Log -Message $errorMessage -Module $functionName -LogLevel "Error" -LogFile $logFile
-            
+
             # Check if Classic Outlook is installed
             $classicOutlookInstalled = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\OUTLOOK.EXE" -ErrorAction SilentlyContinue
-            
+
             # Check if New Outlook is being used
             $newOutlookEnabled = $false
             $newOutlookRegPath = 'HKCU:\Software\Microsoft\Office\16.0\Outlook\Preferences'
@@ -388,7 +388,7 @@ function Send-EmailWithAttachments()
                     $newOutlookEnabled = $true
                 }
             }
-            
+
             if ($newOutlookEnabled)
             {
                 Write-Log -Message "New Outlook is enabled, which does not support COM automation" -Module $functionName -LogLevel "Error" -LogFile $logFile
@@ -406,11 +406,11 @@ function Send-EmailWithAttachments()
                 Write-Log -Message "Outlook COM automation failed: $($_.Exception.Message)" -Module $functionName -LogLevel "Error" -LogFile $logFile
                 Write-Host "Failed to automate Outlook. Please ensure Classic Outlook is properly configured." -ForegroundColor Red
             }
-            
+
             return $false
         }
     }
-    
+
     # Graph API Mode: Continue with existing implementation
     $requiredScope = "Mail.Send"
     if (-not $accessToken)
@@ -419,7 +419,7 @@ function Send-EmailWithAttachments()
         Write-Log -Message "AccessToken is required when not using MAPI mode" -Module $functionName -LogLevel "Error" -LogFile $logFile
         return $false
     }
-    
+
     # Extract user info from access token to ensure we're sending from the correct mailbox
     $tokenClaims = DecodeJwtToken -Token $accessToken -raw
     $grantedScopes = @()
@@ -429,32 +429,32 @@ function Send-EmailWithAttachments()
         Write-Verbose "[$functionName] Cached token has delegated scopes (scp)"
         $grantedScopes = $tokenClaims.scp -split ' ' | Where-Object { $_ -and $_.Trim() }
         Write-Verbose "[$functionName] Cached token has delegated scopes (scp): $($grantedScopes -join ', ')"
-        write-log -logFile $logFile -Module "$functionName" -Message "Cached token has delegated scopes (scp): $($grantedScopes -join ', ')"                                
+        Write-Log -logFile $logFile -Module "$functionName" -Message "Cached token has delegated scopes (scp): $($grantedScopes -join ', ')"
     }
     elseif ($tokenClaims.roles)
     {
         # Application auth - roles is array
         $grantedScopes = $tokenClaims.roles
         Write-Verbose "[$functionName] Cached token has application scopes (roles): $($grantedScopes -join ', ')"
-        write-log -logFile $logFile -Module "$functionName" -Message "Cached token has application scopes (roles): $($grantedScopes -join ', ')"                    
+        Write-Log -logFile $logFile -Module "$functionName" -Message "Cached token has application scopes (roles): $($grantedScopes -join ', ')"
     }
-    else 
+    else
     {
         Write-Error "Could not determine granted scopes from access token"
         Write-Log -Message "Could not determine granted scopes from access token" -Module $functionName -LogLevel "Error" -LogFile $logFile
         return $false
-    }                                                               
-    
+    }
+
     if (-not ($grantedScopes -contains $requiredScope))
     {
         Write-Error "The access token does not have the required scope '$requiredScope' to send email."
         Write-Log -Message "The access token does not have the required scope '$requiredScope' to send email." -Module $functionName -LogLevel "Error" -LogFile $logFile
         return $false
-    }                                                                                   
-    Write-Verbose "[$functionName] Access token has required scope: $requiredScope"                                     
-    write-log -logFile $logFile -Module "$functionName" -Message "Access token has required scope: $requiredScope"                  
+    }
+    Write-Verbose "[$functionName] Access token has required scope: $requiredScope"
+    Write-Log -logFile $logFile -Module "$functionName" -Message "Access token has required scope: $requiredScope"
     $senderUPN = $null
-    
+
     # Try to get UPN from token claims (preferred_username, upn, email, unique_name in order of preference)
     if ($tokenClaims.preferred_username)
     {
@@ -478,19 +478,19 @@ function Send-EmailWithAttachments()
     }
     else
     {
-        write-log -logFile $logFile -module $functionName -message "Could not determine sender UPN from token claims" -logLevel "Warning" 
-        $senderUPN = Read-Host -Prompt "Please enter your email address"                     
+        Write-Log -logFile $logFile -module $functionName -message "Could not determine sender UPN from token claims" -logLevel "Warning"
+        $senderUPN = Read-Host -Prompt "Please enter your email address"
         #ensure we get a valid email address format
-        while (-not ($senderUPN -match '^[^@\s]+@[^@\s]+\.[^@\s]+$'))                                     
+        while (-not ($senderUPN -match '^[^@\s]+@[^@\s]+\.[^@\s]+$'))
         {
-            Write-Host "Incorrect email format. Please enter a valid email address." -ForegroundColor Yellow                                
-            [console]::beep(1000, 300)                       
-            $senderUPN = Read-Host -Prompt "Please enter your email address"                     
+            Write-Host "Incorrect email format. Please enter a valid email address." -ForegroundColor Yellow
+            [console]::beep(1000, 300)
+            $senderUPN = Read-Host -Prompt "Please enter your email address"
         }
-        write-log -logFile $logFile -module $functionName -message "Using user-provided sender UPN: $senderUPN" -logLevel "Debug"                                           
-        Write-Verbose "[$functionName] Using user-provided sender UPN: $senderUPN"                              
+        Write-Log -logFile $logFile -module $functionName -message "Using user-provided sender UPN: $senderUPN" -logLevel "Debug"
+        Write-Verbose "[$functionName] Using user-provided sender UPN: $senderUPN"
     }
-    
+
     # Use me/sendMail since we're using the authenticated user's context
     $emailSendURI = "me/sendMail"
     # Prepare attachments
@@ -505,26 +505,26 @@ function Send-EmailWithAttachments()
             {
                 ".txt"
                 {
-                    "text/plain" 
+                    "text/plain"
                 }
                 ".log"
                 {
-                    "text/plain" 
+                    "text/plain"
                 }
                 ".cer"
                 {
-                    "application/x-x509-ca-cert" 
+                    "application/x-x509-ca-cert"
                 }
                 ".zip"
                 {
-                    "application/zip" 
+                    "application/zip"
                 }
                 default
                 {
-                    "application/octet-stream" 
+                    "application/octet-stream"
                 }
             }
-                
+
             $attachment = @{
                 "@odata.type"  = "#microsoft.graph.fileAttachment"
                 "name"         = $fileName
@@ -539,7 +539,7 @@ function Send-EmailWithAttachments()
             Write-Log -Message "Attachment file not found: $attachmentPath" -Module $functionName -LogLevel "Warning" -LogFile $logFile
         }
     }
-    
+
     #prepare email message object - attachments MUST be inside the message object per Microsoft Graph API spec
     $emailMessage = [ordered]@{
         message         = @{
@@ -557,10 +557,10 @@ function Send-EmailWithAttachments()
             )
             attachments  = $attachments
         }
-        saveToSentItems = $true                                           
-    } | ConvertTo-Json -Depth 5         
+        saveToSentItems = $true
+    } | ConvertTo-Json -Depth 5
     # Send the email
-    try 
+    try
     {
         Write-Log -Message "Calling Graph API to send email" -Module $functionName -LogLevel "Debug" -LogFile $logFile
         $emailResponse = CallGraphApi -AccessToken $accessToken -Method POST -ResourcePath $emailSendURI -Body $emailMessage
@@ -573,7 +573,7 @@ function Send-EmailWithAttachments()
         {
             Write-Log -Message "Unexpected response from email send: $emailResponse" -Module $functionName -LogLevel "Warning" -LogFile $logFile
             return $false
-        }                           
+        }
     }
     catch
     {
@@ -584,16 +584,16 @@ function Send-EmailWithAttachments()
             "Recipient: $To"
             "Attachment Count: $($attachments.Count)"
         )
-        
+
         if ($_.ErrorDetails.Message)
         {
             $errorDetails += "API Error Details: $($_.ErrorDetails.Message)"
         }
-        
+
         $fullErrorMessage = $errorDetails -join ' | '
         Write-Error $fullErrorMessage
         Write-Log -Message $fullErrorMessage -Module $functionName -LogLevel "Error" -LogFile $logFile
-        
+
         # Try to decode Graph API error if available
         if ($_.ErrorDetails.Message)
         {
@@ -611,7 +611,7 @@ function Send-EmailWithAttachments()
                 Write-Verbose "[$functionName] Could not parse Graph API error details"
             }
         }
-        
+
         return $false
     }
 }
@@ -625,18 +625,18 @@ function New-ZipPackage()
 .DESCRIPTION
     This function provides robust ZIP file creation functionality using .NET compression
     libraries. The implementation includes:
-    
+
     Archive Creation:
     - Uses System.IO.Compression.FileSystem for reliable compression
     - Creates directory structure automatically if needed
     - Handles existing file replacement safely
-    
+
     File Processing:
     - Validates source files before inclusion
     - Preserves original filenames in archive
     - Handles file access and permission issues gracefully
     - Provides progress logging for large operations
-    
+
     Error Handling:
     - Comprehensive exception handling for I/O operations
     - Automatic cleanup of partial archives on failure
@@ -666,7 +666,7 @@ function New-ZipPackage()
 .NOTES
     The function uses native .NET compression capabilities, requiring no additional
     tools or modules. ZIP files created are compatible with standard archive utilities.
-    
+
     Large files or many files may take significant time to compress.
     The function automatically disposes of file handles to prevent resource leaks.
 #>
@@ -677,17 +677,17 @@ function New-ZipPackage()
         [Parameter(Mandatory = $true)]
         [string]$DestinationPath
     )
-    
+
     $functionName = $MyInvocation.MyCommand.Name
     Write-Log -Message "Creating zip package at $DestinationPath with files: $($FilePaths -join ', ')" -Module $functionName -LogLevel "Information" -LogFile $logFile
-    Write-Verbose "[$functionName] Creating zip package at $DestinationPath with files: $($FilePaths -join ', ')"                       
+    Write-Verbose "[$functionName] Creating zip package at $DestinationPath with files: $($FilePaths -join ', ')"
     #if the destination file does not have a parent, assume current directory
-    if (-not (Split-Path $DestinationPath -Parent))         
+    if (-not (Split-Path $DestinationPath -Parent))
     {
         $DestinationPath = Join-Path -Path (Get-Location) -ChildPath $DestinationPath
-        Write-Verbose "[$functionName] Adjusted DestinationPath to include current directory: $DestinationPath"                       
-        write-log -logFile $logFile -module $functionName -message "Adjusted DestinationPath to include current directory: $DestinationPath" -logLevel "Debug"                        
-    }                                                       
+        Write-Verbose "[$functionName] Adjusted DestinationPath to include current directory: $DestinationPath"
+        Write-Log -logFile $logFile -module $functionName -message "Adjusted DestinationPath to include current directory: $DestinationPath" -logLevel "Debug"
+    }
     try
     {
         # Ensure destination directory exists
@@ -695,23 +695,23 @@ function New-ZipPackage()
         if (-not (Test-Path $destDir))
         {
             New-Item -Path $destDir -ItemType Directory -Force | Out-Null
-            write-log -logFile $logFile -module $functionName -message "Created directory for zip destination: $destDir" -logLevel "Information"                        
-            Write-Verbose "[$functionName] Created directory for zip destination: $destDir"                             
+            Write-Log -logFile $logFile -module $functionName -message "Created directory for zip destination: $destDir" -logLevel "Information"
+            Write-Verbose "[$functionName] Created directory for zip destination: $destDir"
         }
-        
+
         # Remove existing zip file if it exists
         if (Test-Path $DestinationPath)
         {
             Remove-Item $DestinationPath -Force
-            write-log -logFile $logFile -module $functionName -message "Removed existing zip file at destination: $DestinationPath" -logLevel "Information"                                         
-            Write-Verbose "[$functionName] Removed existing zip file at destination: $DestinationPath"                  
+            Write-Log -logFile $logFile -module $functionName -message "Removed existing zip file at destination: $DestinationPath" -logLevel "Information"
+            Write-Verbose "[$functionName] Removed existing zip file at destination: $DestinationPath"
         }
-        
+
         # Load required assemblies for ZIP operations
         try
         {
-            Write-Verbose "[$functionName] Loading ZIP compression assemblies"                  
-            write-log -logFile $logFile -module $functionName -message "Loading ZIP compression assemblies" -logLevel "Debug"               
+            Write-Verbose "[$functionName] Loading ZIP compression assemblies"
+            Write-Log -logFile $logFile -module $functionName -message "Loading ZIP compression assemblies" -logLevel "Debug"
             Add-Type -AssemblyName System.IO.Compression
             Add-Type -AssemblyName System.IO.Compression.FileSystem
         }
@@ -720,13 +720,13 @@ function New-ZipPackage()
             Write-Log -Message "Failed to load ZIP compression assemblies: $($_.Exception.Message)" -Module $functionName -LogLevel "Error" -LogFile $logFile
             throw "Failed to load required assemblies for ZIP operations: $($_.Exception.Message)"
         }
-        
+
         $zip = [System.IO.Compression.ZipFile]::Open($DestinationPath, [System.IO.Compression.ZipArchiveMode]::Create)
-        write-log -logFile $logFile -module $functionName -message "Opened zip archive for creation: $DestinationPath" -logLevel "Information"                              
-        Write-Verbose "[$functionName] Opened zip archive for creation: $DestinationPath"                       
+        Write-Log -logFile $logFile -module $functionName -message "Opened zip archive for creation: $DestinationPath" -logLevel "Information"
+        Write-Verbose "[$functionName] Opened zip archive for creation: $DestinationPath"
         foreach ($filePath in $FilePaths)
         {
-            Write-Verbose "[$functionName] Adding file to zip: $filePath"       
+            Write-Verbose "[$functionName] Adding file to zip: $filePath"
             if (Test-Path $filePath)
             {
                 # Copy the file to a temporary file in the system temp folder.
@@ -734,10 +734,10 @@ function New-ZipPackage()
                 # which can cause issues when attempting to add it directly to the zip archive.
                 # Copying to a temporary location ensures reliable access for zipping.
                 $tempFilePath = Join-Path -Path $env:TEMP -ChildPath ([System.IO.Path]::GetFileName($filePath))
-                Write-Verbose "[$functionName] Copying file $filePath to temporary location: $tempFilePath"                           
+                Write-Verbose "[$functionName] Copying file $filePath to temporary location: $tempFilePath"
                 Copy-Item -Path $filePath -Destination $tempFilePath -Force
                 $fileName = [System.IO.Path]::GetFileName($tempFilePath)
-                Write-Verbose "[$functionName] Adding temporary file to zip: $tempFilePath as $fileName"            
+                Write-Verbose "[$functionName] Adding temporary file to zip: $tempFilePath as $fileName"
                 $entry = $zip.CreateEntry($fileName)
                 $entryStream = $null
                 $fileStream = $null
@@ -746,51 +746,51 @@ function New-ZipPackage()
                     $entryStream = $entry.Open()
                     $fileStream = [System.IO.File]::OpenRead($tempFilePath)
                     $fileStream.CopyTo($entryStream)
-                    Write-Verbose "[$functionName] Added file to zip: $filePath"                                            
-                    write-log -logFile $logFile -module $functionName -message "Added file to zip: $fileName" -logLevel "Information"                                       
+                    Write-Verbose "[$functionName] Added file to zip: $filePath"
+                    Write-Log -logFile $logFile -module $functionName -message "Added file to zip: $fileName" -logLevel "Information"
                 }
                 finally
                 {
                     if ($fileStream)
                     {
-                        $fileStream.Close() 
-                        Write-Verbose "[$functionName] Closed file stream for: $filePath"                   
-                        write-log -logFile $logFile -module $functionName -message "Closed file stream for: $fileName" -logLevel "Information"                                                                                                  
+                        $fileStream.Close()
+                        Write-Verbose "[$functionName] Closed file stream for: $filePath"
+                        Write-Log -logFile $logFile -module $functionName -message "Closed file stream for: $fileName" -logLevel "Information"
                     }
                     if ($entryStream)
                     {
-                        $entryStream.Close() 
+                        $entryStream.Close()
                     }
                     if (Test-Path $tempFilePath)
                     {
                         Remove-Item -Path $tempFilePath -Force
-                        Write-Verbose "[$functionName] Removed temporary file: $tempFilePath"                   
-                        write-log -logFile $logFile -module $functionName -message "Removed temporary file: $tempFilePath" -logLevel "Information"                                                                                                  
-                    }                                               
+                        Write-Verbose "[$functionName] Removed temporary file: $tempFilePath"
+                        Write-Log -logFile $logFile -module $functionName -message "Removed temporary file: $tempFilePath" -logLevel "Information"
+                    }
                 }
                 Write-Log -Message "Added file to zip: $fileName" -Module $functionName -LogLevel "Information" -LogFile $logFile
-                Write-Verbose "[$functionName] Added file to zip: $filePath"                                                                            
+                Write-Verbose "[$functionName] Added file to zip: $filePath"
             }
             else
             {
                 Write-Log -Message "File not found, skipping: $filePath" -Module $functionName -LogLevel "Warning" -LogFile $logFile
-                Write-Verbose "[$functionName] File not found, skipping: $filePath"                                 
+                Write-Verbose "[$functionName] File not found, skipping: $filePath"
             }
         }
         $zip.Dispose()
         Write-Log -Message "Zip package created successfully: $DestinationPath" -Module $functionName -LogLevel "Information" -LogFile $logFile
-        Write-Verbose "[$functionName] Zip package created successfully: $DestinationPath"                  
+        Write-Verbose "[$functionName] Zip package created successfully: $DestinationPath"
         return $DestinationPath
     }
     catch
     {
         Write-Log -Message "Failed to create zip package: $($_.Exception.Message)" -Module $functionName -LogLevel "Error" -LogFile $logFile
-        Write-Verbose "[$functionName] Failed to create zip package: $($_.Exception.Message)"                                           
+        Write-Verbose "[$functionName] Failed to create zip package: $($_.Exception.Message)"
         if ($zip)
         {
             $zip.Dispose()
             Write-Verbose "[$functionName] Disposed zip archive due to error"
-            write-log -logFile $logFile -module $functionName -message "Disposed zip archive due to error" -logLevel "Information"                                                                                                                                                          
+            Write-Log -logFile $logFile -module $functionName -message "Disposed zip archive due to error" -logLevel "Information"
         }
         return $null
     }

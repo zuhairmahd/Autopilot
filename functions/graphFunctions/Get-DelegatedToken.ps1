@@ -71,8 +71,8 @@ function Get-DelegatedToken()
     #>
     [CmdletBinding()]
     param(
-        [string]$tenantId, 
-        [string]$clientId, 
+        [string]$tenantId,
+        [string]$clientId,
         [string]$clientSecret,
         [string[]]$scopes,
         [string]$domain,
@@ -109,10 +109,10 @@ function Get-DelegatedToken()
         $scopes = "offline_access openid Device.ReadWrite.All DeviceManagementApps.Read.All DeviceManagementConfiguration.ReadWrite.All DeviceManagementManagedDevices.PrivilegedOperations.All DeviceManagementManagedDevices.ReadWrite.All DeviceManagementServiceConfig.ReadWrite.All"
         Write-Host "Using default scopes as none were provided: $scopes" -ForegroundColor Yellow
     }
-    
+
     Write-Verbose "[$functionName] Starting with scopes: '$scopes'"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Starting with scopes: '$scopes'"
-    
+
     # First check if we have a valid refresh token in config
     if ($configRefreshToken)
     {
@@ -144,8 +144,8 @@ function Get-DelegatedToken()
     }
     else
     {
-        Write-Verbose "[$functionName] No existing refresh token found in config."                  
-        write-log -LogFile $LogFile -Module $functionName -Message "No existing refresh token found in config."                                 
+        Write-Verbose "[$functionName] No existing refresh token found in config."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "No existing refresh token found in config."
         if ($ForcedRenewal)
         {
             Write-Host "No existing refresh token found or refresh token was cleared - proceeding with new authentication flow." -ForegroundColor Yellow
@@ -153,8 +153,8 @@ function Get-DelegatedToken()
         }
         else
         {
-            Write-Verbose "[$functionName] Proceeding with new authentication flow."                            
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Proceeding with new authentication flow."                                                   
+            Write-Verbose "[$functionName] Proceeding with new authentication flow."
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Proceeding with new authentication flow."
         }
     }
     # Generate a random state string
@@ -163,7 +163,7 @@ function Get-DelegatedToken()
     $state = [System.Guid]::NewGuid().ToString()
     $scopesFormatted = FormatScopes -scopes $scopes
     $encodedScopes = [uri]::EscapeDataString($scopesFormatted)
-    
+
     $automaticFlowSuccess = $false
     switch ($AuthType)
     {
@@ -183,7 +183,7 @@ function Get-DelegatedToken()
             Write-Log -LogFile $LogFile -Module $functionName -Message "Device code request URL: $deviceCodeRequestUrl"
             Write-Log -LogFile $LogFile -Module $functionName -Message "Original scopes parameter: '$scopes'"
             Write-Log -LogFile $LogFile -Module $functionName -Message "Requesting device code with body: $($deviceCodeRequestBody | ConvertTo-Json -Depth $maxJSONDepth)"
-            try 
+            try
             {
                 $deviceCodeResponse = Invoke-RestMethod -Method POST -Uri $deviceCodeRequestUrl -Body $deviceCodeRequestBody
                 Write-Verbose "[$functionName] Device code response: $($deviceCodeResponse | ConvertTo-Json -Depth $maxJSONDepth)"
@@ -238,7 +238,7 @@ function Get-DelegatedToken()
                 $displayMessage = "If you choose 'Yes', $preferredBrowser will be used for authentication."
                 if ($settings.privateSession)
                 {
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "Using private session for browser."         
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Using private session for browser."
                     $displayMessage += " A private session (incognito) will be used."
                 }
             }
@@ -246,7 +246,7 @@ function Get-DelegatedToken()
             Write-Log -LogFile $LogFile -Module $functionName -Message "Preferred browser for authentication: $preferredBrowser"
             $authUrl = "https://microsoft.com/devicelogin"
             Write-Verbose "[$functionName] Authentication URL: $authUrl"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Authentication URL: $authUrl"   
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Authentication URL: $authUrl"
             Write-Host "Would you like to open a browser to the authentication page?"
             Write-Host "`n$displayMessage"
             $userChoice = Read-Host "Type 'Yes' to open the browser, or 'No' to continue without opening a browser `n (you will need to manually open your browser to $authUrl)"
@@ -303,7 +303,7 @@ function Get-DelegatedToken()
             {
                 Write-Verbose "[$functionName] Polling for access token..."
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Polling for access token..."
-                Start-Sleep -Seconds $intervalSeconds 
+                Start-Sleep -Seconds $intervalSeconds
                 try
                 {
                     $tokenResponse = Invoke-RestMethod -Method POST -Uri $tokenRequestUrl -Body $tokenRequestBody -ErrorAction SilentlyContinue
@@ -334,7 +334,7 @@ function Get-DelegatedToken()
                 {
                     # Check if this is the expected "authorization_pending" error (400 Bad Request)
                     $isAuthPending = $false
-                    
+
                     # Check the HTTP status code first
                     if ($_.Exception.Response -and $_.Exception.Response.StatusCode -eq 400)
                     {
@@ -343,7 +343,7 @@ function Get-DelegatedToken()
                         # Multiple ways to detect authorization_pending:
                         # 1. Check the exception message for common patterns
                         $exceptionMessage = $_.Exception.Message
-                        if ($exceptionMessage -like "*authorization_pending*" -or 
+                        if ($exceptionMessage -like "*authorization_pending*" -or
                             $exceptionMessage -like "*Bad Request*" -or
                             $exceptionMessage -like "*400*")
                         {
@@ -351,7 +351,7 @@ function Get-DelegatedToken()
                             Write-Verbose "[$functionName] Detected authorization_pending from exception message pattern"
                             Write-Log -LogFile $LogFile -Module $functionName -Message "Detected authorization_pending from exception message pattern"
                         }
-                        
+
                         # 2. Try to parse the response body if available
                         if (-not $isAuthPending)
                         {
@@ -363,7 +363,7 @@ function Get-DelegatedToken()
                                     $streamReader = New-Object System.IO.StreamReader($errorResponse)
                                     $errorMessage = $streamReader.ReadToEnd()
                                     $streamReader.Close()
-                                    
+
                                     if ($errorMessage)
                                     {
                                         $errorJson = $errorMessage | ConvertFrom-Json
@@ -384,20 +384,20 @@ function Get-DelegatedToken()
                                 $isAuthPending = $true
                             }
                         }
-                        
+
                         if ($isAuthPending)
                         {
                             Write-Verbose "[$functionName] Authorization still pending (from catch block), continuing to poll..."
-                            Write-Log -LogFile $LogFile -Module $functionName -Message "Authorization still pending (from catch block), continuing to poll..."  
+                            Write-Log -LogFile $LogFile -Module $functionName -Message "Authorization still pending (from catch block), continuing to poll..."
                         }
                     }
-                    
+
                     # Only show warning for unexpected errors, not for authorization_pending
                     if (-not $isAuthPending)
                     {
                         Write-Warning "Polling attempt failed: $($_.Exception.Message)"
                         Write-Verbose "[$functionName] Unexpected error during polling: $($_.Exception | Out-String)"
-                        Write-Log -LogFile $LogFile -Module $functionName -Message "Unexpected error during polling: $($_.Exception.Message)"   
+                        Write-Log -LogFile $LogFile -Module $functionName -Message "Unexpected error during polling: $($_.Exception.Message)"
                     }
                 }
                 Write-Host -NoNewline "."
@@ -480,12 +480,12 @@ function Get-DelegatedToken()
             return $null
         }
     }
-    
+
     # Fall back to manual code input if automatic flow failed
     if (-not $automaticFlowSuccess)
     {
         Write-Log -LogFile $LogFile -Module $functionName -Message "Automatic flow was not successful, falling back to manual code input"
-        Write-Verbose "[$functionName] Automatic flow was not successful, falling back to manual code input"                        
+        Write-Verbose "[$functionName] Automatic flow was not successful, falling back to manual code input"
         # Step 1: Open the authorization URL
         $authUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/authorize?client_id=$clientId&response_type=code&redirect_uri=$encodedRedirectUri&response_mode=query&scope=$encodedScopes&state=$state"
         Write-Verbose "[$functionName] Authorization URL: $authUrl"
@@ -497,7 +497,7 @@ function Get-DelegatedToken()
             Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to launch browser for manual authentication" -LogLevel Error
             return $null
         }
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Browser launched for manual authentication"        
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Browser launched for manual authentication"
         Write-Host "After granting consent, copy the 'code' parameter from the redirected URL and paste it below."
         $code = Read-Host "Enter the authorization code"
         Write-Verbose "[$functionName] Received authorization code input from user"
@@ -515,7 +515,7 @@ function Get-DelegatedToken()
             Write-Log -LogFile $LogFile -Module $functionName -Message "Could not extract code parameter from provided URL" -LogLevel Warning
             Write-Verbose "[$functionName] Input received: $($code.Substring(0, [Math]::Min(30, $code.Length)))..."
         }
-    }           
+    }
     # Regardless of how we got the code, exchange it for a token
     if ($code -and $AuthType -ne 'PublicAuthFlow')
     {
@@ -546,7 +546,7 @@ function Get-DelegatedToken()
             $tokenResponse = Invoke-RestMethod -Method Post -Uri $tokenEndpoint -ContentType "application/x-www-form-urlencoded" -Body $tokenRequestBody -ErrorVariable tokenError
             Write-Verbose "[$functionName] Access token received successfully"
             Write-Log -LogFile $LogFile -Module $functionName -Message "Access token received successfully"
-        }            
+        }
         catch
         {
             Write-Error "Failed to get delegated access token: $_"
@@ -627,7 +627,7 @@ function Get-DelegatedToken()
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Token response property: $($prop) = $($tokenResponse.$prop)"
             }
         }
-        
+
         $cachedToken = Get-TokenFromResponse -tokenResponse $tokenResponse -domain $domain
         Write-Log -LogFile $LogFile -Module $functionName -Message "Retrieved token from response"
         # Cache the access token based on cache type
@@ -660,7 +660,7 @@ function Get-DelegatedToken()
         Write-Log -LogFile $LogFile -Module $functionName -Message "Returning formatted token output"
         return Format-TokenOutput -token $tokenResponse.access_token -secureString $SecureString
     }
-    else 
+    else
     {
         Write-Verbose "[$functionName] Token response is null. Authorization code exchange failed."
         Write-Log -LogFile $LogFile -Module $functionName -Message "Token response is null. Authorization code exchange failed." -LogLevel Error

@@ -20,7 +20,7 @@ Updated the FastStart configuration tests to measure initialization duration usi
 ```powershell
 $duration = (Get-Date) - $startTime
 Write-Host "Initialization completed in $($duration.Minutes) minutes and $($duration.Seconds) seconds."
-write-log -logFile $logFile -module $scriptName -message "Initialization completed in $($duration.Minutes) minutes and $($duration.Seconds) seconds."
+Write-Log -logFile $logFile -module $scriptName -message "Initialization completed in $($duration.Minutes) minutes and $($duration.Seconds) seconds."
 
 # Early exit point for test mode when exitAfter is true (after duration is calculated)
 if ($testMode -and $script:testModeOptions.exitAfter)

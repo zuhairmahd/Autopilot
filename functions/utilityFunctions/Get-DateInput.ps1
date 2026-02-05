@@ -65,7 +65,7 @@ function Get-DateInput()
         Uses regex validation for reliable pattern matching without exceptions.
         Supports relative date calculations (days, months, years).
         Loops until valid date is entered or user presses Enter (blank input).
-        Logs all attempts and results using write-log function.
+        Logs all attempts and results using Write-Log function.
     #>
     [CmdletBinding()]
     param(
@@ -74,13 +74,13 @@ function Get-DateInput()
 
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Starting function execution"
-    write-log -logFile $logFile -module $functionName -message "Function execution started" -LogLevel "Debug"
+    Write-Log -logFile $logFile -module $functionName -message "Function execution started" -LogLevel "Debug"
 
     # Display instructions to user
     Write-Host $message
     Write-Host "Leave blank to include all assigned devices."
     Write-Host "Supported formats: YYYY-MM-DD, 30d (days ago), 3m (months ago), 1y (years ago)"
-    write-log -logFile $logFile -module $functionName -message "Displayed date input prompt to user with format examples" -LogLevel "Debug"
+    Write-Log -logFile $logFile -module $functionName -message "Displayed date input prompt to user with format examples" -LogLevel "Debug"
 
     # Initialize variables
     $lastContactDateTime = $null
@@ -91,13 +91,13 @@ function Get-DateInput()
     $lastContactDateTimeInput = Read-Host "Enter date (YYYY-MM-DD, 30d, 3m, 1y) or leave blank"
     $attemptCount++
     Write-Verbose "[$functionName] User input received (attempt $attemptCount): '$lastContactDateTimeInput'"
-    write-log -logFile $logFile -module $functionName -message "User input received (attempt $attemptCount): '$lastContactDateTimeInput'" -LogLevel "Information"
+    Write-Log -logFile $logFile -module $functionName -message "User input received (attempt $attemptCount): '$lastContactDateTimeInput'" -LogLevel "Information"
 
     # Check if user pressed Enter without input - exit immediately
     if ([string]::IsNullOrWhiteSpace($lastContactDateTimeInput))
     {
         Write-Verbose "[$functionName] User provided blank input, skipping date filter"
-        write-log -logFile $logFile -module $functionName -message "User provided blank input on first attempt, returning null (no date filter)" -LogLevel "Information"
+        Write-Log -logFile $logFile -module $functionName -message "User provided blank input on first attempt, returning null (no date filter)" -LogLevel "Information"
         return $null
     }
 
@@ -105,7 +105,7 @@ function Get-DateInput()
     while (-not [string]::IsNullOrWhiteSpace($lastContactDateTimeInput))
     {
         Write-Verbose "[$functionName] Attempting to parse date input: '$lastContactDateTimeInput'"
-        write-log -logFile $logFile -module $functionName -message "Attempting to parse date: '$lastContactDateTimeInput'" -LogLevel "Debug"
+        Write-Log -logFile $logFile -module $functionName -message "Attempting to parse date: '$lastContactDateTimeInput'" -LogLevel "Debug"
 
         $success = $false
         $parsedDate = $null
@@ -117,15 +117,15 @@ function Get-DateInput()
             $number = [int]$matches[1]
             $unit = if ($matches[2])
             {
-                $matches[2].ToLower() 
+                $matches[2].ToLower()
             }
             else
             {
-                'd' 
+                'd'
             }  # Default to days
 
             Write-Verbose "[$functionName] Detected relative date format: $number $unit"
-            write-log -logFile $logFile -module $functionName -message "Detected relative date format: $number unit(s) of type '$unit'" -LogLevel "Debug"
+            Write-Log -logFile $logFile -module $functionName -message "Detected relative date format: $number unit(s) of type '$unit'" -LogLevel "Debug"
 
             try
             {
@@ -136,19 +136,19 @@ function Get-DateInput()
                     {
                         $parsedDate = $today.AddDays(-$number)
                         Write-Verbose "[$functionName] Calculated date: $number days ago = $($parsedDate.ToString('yyyy-MM-dd'))"
-                        write-log -logFile $logFile -module $functionName -message "Calculated date: $number days ago = $($parsedDate.ToString('yyyy-MM-dd HH:mm:ss'))" -LogLevel "Information"
+                        Write-Log -logFile $logFile -module $functionName -message "Calculated date: $number days ago = $($parsedDate.ToString('yyyy-MM-dd HH:mm:ss'))" -LogLevel "Information"
                     }
                     'm'
                     {
                         $parsedDate = $today.AddMonths(-$number)
                         Write-Verbose "[$functionName] Calculated date: $number months ago = $($parsedDate.ToString('yyyy-MM-dd'))"
-                        write-log -logFile $logFile -module $functionName -message "Calculated date: $number months ago = $($parsedDate.ToString('yyyy-MM-dd HH:mm:ss'))" -LogLevel "Information"
+                        Write-Log -logFile $logFile -module $functionName -message "Calculated date: $number months ago = $($parsedDate.ToString('yyyy-MM-dd HH:mm:ss'))" -LogLevel "Information"
                     }
                     'y'
                     {
                         $parsedDate = $today.AddYears(-$number)
                         Write-Verbose "[$functionName] Calculated date: $number years ago = $($parsedDate.ToString('yyyy-MM-dd'))"
-                        write-log -logFile $logFile -module $functionName -message "Calculated date: $number years ago = $($parsedDate.ToString('yyyy-MM-dd HH:mm:ss'))" -LogLevel "Information"
+                        Write-Log -logFile $logFile -module $functionName -message "Calculated date: $number years ago = $($parsedDate.ToString('yyyy-MM-dd HH:mm:ss'))" -LogLevel "Information"
                     }
                 }
                 $success = $true
@@ -156,7 +156,7 @@ function Get-DateInput()
             catch
             {
                 Write-Verbose "[$functionName] Error calculating relative date: $_"
-                write-log -logFile $logFile -module $functionName -message "Error calculating relative date: $_" -LogLevel "Error"
+                Write-Log -logFile $logFile -module $functionName -message "Error calculating relative date: $_" -LogLevel "Error"
                 $success = $false
             }
         }
@@ -170,7 +170,7 @@ function Get-DateInput()
             $day = [int]$matches[3]
 
             Write-Verbose "[$functionName] Detected absolute date format (YYYY-MM-DD): Year=$year, Month=$month, Day=$day"
-            write-log -logFile $logFile -module $functionName -message "Detected absolute date format (YYYY-MM-DD): Year=$year, Month=$month, Day=$day" -LogLevel "Debug"
+            Write-Log -logFile $logFile -module $functionName -message "Detected absolute date format (YYYY-MM-DD): Year=$year, Month=$month, Day=$day" -LogLevel "Debug"
 
             # Validate date components
             if ($year -ge 1900 -and $year -le 9999 -and $month -ge 1 -and $month -le 12 -and $day -ge 1 -and $day -le 31)
@@ -180,19 +180,19 @@ function Get-DateInput()
                     $parsedDate = Get-Date -Year $year -Month $month -Day $day -Hour 0 -Minute 0 -Second 0
                     $success = $true
                     Write-Verbose "[$functionName] Successfully parsed absolute date: $($parsedDate.ToString('yyyy-MM-dd'))"
-                    write-log -logFile $logFile -module $functionName -message "Successfully parsed absolute date: $($parsedDate.ToString('yyyy-MM-dd HH:mm:ss'))" -LogLevel "Information"
+                    Write-Log -logFile $logFile -module $functionName -message "Successfully parsed absolute date: $($parsedDate.ToString('yyyy-MM-dd HH:mm:ss'))" -LogLevel "Information"
                 }
                 catch
                 {
                     Write-Verbose "[$functionName] Invalid date components: $_"
-                    write-log -logFile $logFile -module $functionName -message "Invalid date components (out of range): $_" -LogLevel "Warning"
+                    Write-Log -logFile $logFile -module $functionName -message "Invalid date components (out of range): $_" -LogLevel "Warning"
                     $success = $false
                 }
             }
             else
             {
                 Write-Verbose "[$functionName] Date components out of valid range"
-                write-log -logFile $logFile -module $functionName -message "Date components out of valid range: Year=$year, Month=$month, Day=$day" -LogLevel "Warning"
+                Write-Log -logFile $logFile -module $functionName -message "Date components out of valid range: Year=$year, Month=$month, Day=$day" -LogLevel "Warning"
                 $success = $false
             }
         }
@@ -204,7 +204,7 @@ function Get-DateInput()
             $year = [int]$matches[3]
 
             Write-Verbose "[$functionName] Detected absolute date format (MM-DD-YYYY): Month=$month, Day=$day, Year=$year"
-            write-log -logFile $logFile -module $functionName -message "Detected absolute date format (MM-DD-YYYY): Month=$month, Day=$day, Year=$year" -LogLevel "Debug"
+            Write-Log -logFile $logFile -module $functionName -message "Detected absolute date format (MM-DD-YYYY): Month=$month, Day=$day, Year=$year" -LogLevel "Debug"
 
             # Validate date components
             if ($year -ge 1900 -and $year -le 9999 -and $month -ge 1 -and $month -le 12 -and $day -ge 1 -and $day -le 31)
@@ -214,52 +214,52 @@ function Get-DateInput()
                     $parsedDate = Get-Date -Year $year -Month $month -Day $day -Hour 0 -Minute 0 -Second 0
                     $success = $true
                     Write-Verbose "[$functionName] Successfully parsed absolute date: $($parsedDate.ToString('yyyy-MM-dd'))"
-                    write-log -logFile $logFile -module $functionName -message "Successfully parsed absolute date: $($parsedDate.ToString('yyyy-MM-dd HH:mm:ss'))" -LogLevel "Information"
+                    Write-Log -logFile $logFile -module $functionName -message "Successfully parsed absolute date: $($parsedDate.ToString('yyyy-MM-dd HH:mm:ss'))" -LogLevel "Information"
                 }
                 catch
                 {
                     Write-Verbose "[$functionName] Invalid date components: $_"
-                    write-log -logFile $logFile -module $functionName -message "Invalid date components (out of range): $_" -LogLevel "Warning"
+                    Write-Log -logFile $logFile -module $functionName -message "Invalid date components (out of range): $_" -LogLevel "Warning"
                     $success = $false
                 }
             }
             else
             {
                 Write-Verbose "[$functionName] Date components out of valid range"
-                write-log -logFile $logFile -module $functionName -message "Date components out of valid range: Month=$month, Day=$day, Year=$year" -LogLevel "Warning"
+                Write-Log -logFile $logFile -module $functionName -message "Date components out of valid range: Month=$month, Day=$day, Year=$year" -LogLevel "Warning"
                 $success = $false
             }
         }
         else
         {
             Write-Verbose "[$functionName] Input does not match any supported format"
-            write-log -logFile $logFile -module $functionName -message "Input does not match any supported format: '$lastContactDateTimeInput'" -LogLevel "Warning"
+            Write-Log -logFile $logFile -module $functionName -message "Input does not match any supported format: '$lastContactDateTimeInput'" -LogLevel "Warning"
             $success = $false
         }
 
         if ($success -and $parsedDate)
         {
             Write-Verbose "[$functionName] Date validation successful"
-            write-log -logFile $logFile -module $functionName -message "Date validation successful for input: '$lastContactDateTimeInput'" -LogLevel "Information"
+            Write-Log -logFile $logFile -module $functionName -message "Date validation successful for input: '$lastContactDateTimeInput'" -LogLevel "Information"
             break
         }
 
         # Invalid date format - provide feedback and retry
         Write-Host "Invalid date format. Examples: 2025-01-15, 30d (30 days ago), 3m (3 months ago), 1y (1 year ago)" -ForegroundColor Red
-        write-log -logFile $logFile -module $functionName -message "Invalid date format entered: '$lastContactDateTimeInput' (attempt $attemptCount)" -LogLevel "Warning"
+        Write-Log -logFile $logFile -module $functionName -message "Invalid date format entered: '$lastContactDateTimeInput' (attempt $attemptCount)" -LogLevel "Warning"
         [console]::beep()
 
         # Prompt for retry
         $lastContactDateTimeInput = Read-Host "Enter date (YYYY-MM-DD, 30d, 3m, 1y) or leave blank"
         $attemptCount++
         Write-Verbose "[$functionName] Retry input received (attempt $attemptCount): '$lastContactDateTimeInput'"
-        write-log -logFile $logFile -module $functionName -message "Retry input received (attempt $attemptCount): '$lastContactDateTimeInput'" -LogLevel "Information"
+        Write-Log -logFile $logFile -module $functionName -message "Retry input received (attempt $attemptCount): '$lastContactDateTimeInput'" -LogLevel "Information"
 
         # Check if user pressed Enter to exit loop
         if ([string]::IsNullOrWhiteSpace($lastContactDateTimeInput))
         {
             Write-Verbose "[$functionName] User provided blank input on retry, exiting validation loop"
-            write-log -logFile $logFile -module $functionName -message "User provided blank input on retry (attempt $attemptCount), exiting loop without date filter" -LogLevel "Information"
+            Write-Log -logFile $logFile -module $functionName -message "User provided blank input on retry (attempt $attemptCount), exiting loop without date filter" -LogLevel "Information"
             break
         }
     }
@@ -269,14 +269,14 @@ function Get-DateInput()
     {
         $lastContactDateTime = $parsedDate
         Write-Verbose "[$functionName] Returning valid date: $($lastContactDateTime.ToString('yyyy-MM-dd'))"
-        write-log -logFile $logFile -module $functionName -message "Valid date accepted: $($lastContactDateTime.ToString('yyyy-MM-dd HH:mm:ss')) (after $attemptCount attempt(s))" -LogLevel "Information"
+        Write-Log -logFile $logFile -module $functionName -message "Valid date accepted: $($lastContactDateTime.ToString('yyyy-MM-dd HH:mm:ss')) (after $attemptCount attempt(s))" -LogLevel "Information"
     }
     else
     {
         Write-Verbose "[$functionName] No valid date provided, returning null"
-        write-log -logFile $logFile -module $functionName -message "No valid date provided, returning null (total attempts: $attemptCount)" -LogLevel "Information"
+        Write-Log -logFile $logFile -module $functionName -message "No valid date provided, returning null (total attempts: $attemptCount)" -LogLevel "Information"
     }
 
-    write-log -logFile $logFile -module $functionName -message "Function execution completed" -LogLevel "Debug"
+    Write-Log -logFile $logFile -module $functionName -message "Function execution completed" -LogLevel "Debug"
     return $lastContactDateTime
 }

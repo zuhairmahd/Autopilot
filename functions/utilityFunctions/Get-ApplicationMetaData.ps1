@@ -59,7 +59,7 @@ function Get-ApplicationMetaData()
         }
         result            = $false
     }
-    
+
     if ($GlobalSettingsFile)
     {
         Write-Verbose "[$functionName] Loading global settings from: $GlobalSettingsFile"
@@ -70,8 +70,8 @@ function Get-ApplicationMetaData()
             if ($null -ne $globalSettings.corporateSettings.corporateDomain -and $globalSettings.corporateSettings.useCorporateSettings)
             {
                 $domain = $globalSettings.corporateSettings.corporateDomain
-                Write-Verbose "[$functionName] Corporate settings enabled. Using corporate domain: $domain"                 
-                write-log -logFile $logFile -module $functionName -Message "Corporate settings enabled. Using corporate domain: $domain"                                            
+                Write-Verbose "[$functionName] Corporate settings enabled. Using corporate domain: $domain"
+                Write-Log -logFile $logFile -module $functionName -Message "Corporate settings enabled. Using corporate domain: $domain"
             }
             Write-Verbose "[$functionName] Successfully loaded global settings."
             Write-Log -logFile $logFile -module $functionName -Message "Successfully loaded global settings."
@@ -87,7 +87,7 @@ function Get-ApplicationMetaData()
         Write-Verbose "[$functionName] No global settings file specified."
         Write-Log -logFile $logFile -module $functionName -Message "No global settings file specified."
     }
-    
+
     if (-not $domain)
     {
         Write-Verbose "[$functionName] No domain specified. Attempting to infer from context."
@@ -133,11 +133,11 @@ function Get-ApplicationMetaData()
             else
             {
                 Write-Verbose "[$functionName] Silent mode enabled. Choosing the first found domain."
-                Write-Log -logFile $logFile -module $functionName -Message "Silent mode enabled. Choosing the first found domain."  
-                $domainSettingsFile = $domainsSettingsFiles | Select-Object -First 1    
+                Write-Log -logFile $logFile -module $functionName -Message "Silent mode enabled. Choosing the first found domain."
+                $domainSettingsFile = $domainsSettingsFiles | Select-Object -First 1
             }
         }
-        else 
+        else
         {
             Write-Verbose "[$functionName] No domain settings files found."
             Write-Log -logFile $logFile -module $functionName -Message "No domain settings files found."
@@ -165,7 +165,7 @@ function Get-ApplicationMetaData()
         Write-Verbose "[$functionName] A domain settings file for domain '$domain' could not be determined."
         Write-Log -logFile $logFile -module $functionName -Message "A domain settings file for domain '$domain' could not be determined."
     }
-    
+
     #Get the version.  Check if the script name exists
     if ($scriptName -and $scriptName.endswith('.ps1'))
     {
@@ -178,7 +178,7 @@ function Get-ApplicationMetaData()
         Write-Verbose "[$functionName] Executable file exists: $scriptName. Getting version."
         Write-Log -logFile $logFile -module $functionName -Message "Script file exists: $scriptName. Getting version."
         $fileVersionInfo = Get-FileVersion -executableFileName $scriptName
-    }    
+    }
     if ($null -eq $fileVersionInfo)
     {
         Write-Verbose "[$functionName] Could not retrieve version information for script: $scriptName.  Let us check lastrun.json"
@@ -210,16 +210,16 @@ function Get-ApplicationMetaData()
                 Write-Verbose "[$functionName] Error reading lastrun.json: $($_.Exception.Message)"
                 Write-Log -logFile $logFile -module $functionName -Message "Error reading lastrun.json: $($_.Exception.Message)" -logLevel 'Error'
             }
-        }                           
+        }
     }
-    
+
     if (-not $globalSettings -and -not $domainSettings -and -not $fileVersionInfo)
     {
         Write-Verbose "[$functionName] No settings files could be loaded. Cannot retrieve application metadata."
         Write-Log -logFile $logFile -module $functionName -Message "No settings files could be loaded. Cannot retrieve application metadata." -logLevel "Error"
         return $appMetaData
     }
-    
+
     $appMetaData = @{
         result            = $true
         corporateSettings = if ($null -ne $globalSettings.corporateSettings -and $globalSettings.corporateSettings.useCorporateSettings)
@@ -229,14 +229,14 @@ function Get-ApplicationMetaData()
         else
         {
             @{}
-        }                       
+        }
         companyName       = if ($domainSettings.companyName)
         {
-            $domainSettings.companyName  
+            $domainSettings.companyName
         }
         elseif ($globalSettings.globalSettings.companyName)
         {
-            $globalSettings.globalSettings.companyName 
+            $globalSettings.globalSettings.companyName
         }
         elseif ($fileVersionInfo.companyName)
         {
@@ -252,11 +252,11 @@ function Get-ApplicationMetaData()
         }
         elseif ($domainSettings.version)
         {
-            [version]$domainSettings.version 
+            [version]$domainSettings.version
         }
         elseif ($globalSettings.version)
         {
-            [version]$globalSettings.version 
+            [version]$globalSettings.version
         }
         else
         {
@@ -264,19 +264,19 @@ function Get-ApplicationMetaData()
         }
         release           = if ($domainSettings.release)
         {
-            $domainSettings.release 
+            $domainSettings.release
         }
         elseif ($globalSettings.globalSettings.release)
         {
-            $globalSettings.globalSettings.release 
+            $globalSettings.globalSettings.release
         }
         else
         {
-            $null 
+            $null
         }
         domain            = if ($domainSettings.domain)
         {
-            $domainSettings.domain 
+            $domainSettings.domain
         }
     }
     #print verbose all the values that are not null.

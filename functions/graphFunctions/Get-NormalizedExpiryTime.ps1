@@ -34,18 +34,18 @@ function Get-NormalizedExpiryTime()
     if (-not $accessTokenObject.AbsoluteExpiryTime)
     {
         Write-Verbose "[$functionName] No AbsoluteExpiryTime found in token object"
-        write-log -logFile $logFile -moduleName $moduleName -logLevel Warning -message "No AbsoluteExpiryTime found in token object"
+        Write-Log -logFile $logFile -moduleName $moduleName -logLevel Warning -message "No AbsoluteExpiryTime found in token object"
         return [datetime]::MinValue
     }
-    
+
     try
     {
         if ($accessTokenObject.AbsoluteExpiryTime -is [string])
         {
             Write-Verbose "[$functionName] Converting string expiry time to datetime"
-            write-log -logFile $logFile -moduleName $moduleName -logLevel Verbose -message "Converting string expiry time to datetime"
+            Write-Log -logFile $logFile -moduleName $moduleName -logLevel Verbose -message "Converting string expiry time to datetime"
             $parsedTime = [datetime]::Parse($accessTokenObject.AbsoluteExpiryTime).ToLocalTime()
-            write-log -logFile $logFile -moduleName $moduleName -logLevel Verbose -message "Parsed expiry time: $parsedTime"
+            Write-Log -logFile $logFile -moduleName $moduleName -logLevel Verbose -message "Parsed expiry time: $parsedTime"
             # Handle timezone differences
             if ($parsedTime -lt $accessTokenObject.AbsoluteExpiryTime)
             {
@@ -68,7 +68,7 @@ function Get-NormalizedExpiryTime()
     catch
     {
         Write-Warning "[$functionName] Failed to parse expiry time: $_"
-        write-log -logFile $logFile -moduleName $moduleName -logLevel Error -message "Failed to parse expiry time: $_"
+        Write-Log -logFile $logFile -moduleName $moduleName -logLevel Error -message "Failed to parse expiry time: $_"
         return [datetime]::MinValue
     }
 }
