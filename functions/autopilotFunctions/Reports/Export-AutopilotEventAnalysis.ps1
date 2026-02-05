@@ -510,7 +510,8 @@ function Export-AutopilotEventAnalysis()
         Write-Host "`nExport complete. $($exportedFiles.Count) file(s) created." -ForegroundColor Cyan
         Write-Log -LogFile $LogFile -Module $functionName -Message "Export completed successfully. Created $($exportedFiles.Count) file(s)" -LogLevel "Information"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Exported files: $($exportedFiles -join ', ')" -LogLevel "Verbose"
-        return $exportedFiles
+        # Use comma operator to prevent PowerShell from unrolling single-element arrays
+        , $exportedFiles
     }
 
     $functionName = $MyInvocation.MyCommand.Name
@@ -560,7 +561,7 @@ function Export-AutopilotEventAnalysis()
                     $exportedFiles = Export-EventAnalysis -AnalysisData $AnalysisData -OutputPath $exportPath -ExportSummary -ExportFailures -ExportUserAnalysis -ExportAllEvents -ExportSuccesses -ExportInProgress
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Export completed successfully" -LogLevel "Information"
                     $result.Success = $true
-                    $result.ExportedFiles = $exportedFiles
+                    $result.ExportedFiles = @($exportedFiles)
                     $result.OutputPath = (Resolve-Path $exportPath).Path
                     $result.FileCount = $exportedFiles.Count
                 }
@@ -614,7 +615,7 @@ function Export-AutopilotEventAnalysis()
                     $exportedFiles = Export-EventAnalysis @exportParams
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Custom export completed successfully" -LogLevel "Information"
                     $result.Success = $true
-                    $result.ExportedFiles = $exportedFiles
+                    $result.ExportedFiles = @($exportedFiles)
                     $result.OutputPath = (Resolve-Path $exportPath).Path
                     $result.FileCount = $exportedFiles.Count
                 }
@@ -625,7 +626,7 @@ function Export-AutopilotEventAnalysis()
                     $exportedFiles = Export-EventAnalysis -AnalysisData $AnalysisData -OutputPath $exportPath -ExportSummary -ExportFailures -ExportUserAnalysis
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Default export completed successfully" -LogLevel "Information"
                     $result.Success = $true
-                    $result.ExportedFiles = $exportedFiles
+                    $result.ExportedFiles = @($exportedFiles)
                     $result.OutputPath = (Resolve-Path $exportPath).Path
                     $result.FileCount = $exportedFiles.Count
                 }

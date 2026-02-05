@@ -112,7 +112,8 @@ function Show-AutopilotEventAnalysis()
         Write-Host "`n1. Earliest Event Date: " -NoNewline
         if ($AnalysisData.EarliestEventDate)
         {
-            Write-Host (FormatDateWithTimeZone -DateTime $AnalysisData.EarliestEventDate) -ForegroundColor Green
+            $formattedDate = FormatDateWithTimeZone -DateTime $AnalysisData.EarliestEventDate
+            Write-Host $formattedDate -ForegroundColor Green
         }
         else
         {
@@ -258,15 +259,15 @@ function Show-AutopilotEventAnalysis()
                 {
                     'inProgress'
                     {
-                        'Cyan' 
+                        'Cyan'
                     }
                     'success'
                     {
-                        'Green' 
+                        'Green'
                     }
                     default
                     {
-                        'Yellow' 
+                        'Yellow'
                     }
                 }
                 Write-Host "$($device.deviceSetupStatus)" -ForegroundColor $deviceColor
@@ -276,15 +277,15 @@ function Show-AutopilotEventAnalysis()
                 {
                     'inProgress'
                     {
-                        'Cyan' 
+                        'Cyan'
                     }
                     'success'
                     {
-                        'Green' 
+                        'Green'
                     }
                     default
                     {
-                        'Yellow' 
+                        'Yellow'
                     }
                 }
                 Write-Host "$($device.accountSetupStatus)" -ForegroundColor $accountColor
@@ -507,7 +508,8 @@ function Show-AutopilotEventAnalysis()
         Write-Host "`nDetailed Failure Summary Table:" -ForegroundColor Yellow
         $AnalysisData.FailedEvents |
             Select-Object -First 5 deviceSerialNumber, managedDeviceName, deploymentState, deviceSetupStatus, accountSetupStatus, enrollmentFailureDetails |
-            Format-Table -AutoSize
+            Format-Table -AutoSize |
+            Out-Host
 
         if ($AnalysisData.FailureCount -gt 5)
         {

@@ -56,7 +56,7 @@ function Get-AutopilotEventAnalysis()
     Write-Log -LogFile $LogFile -Module $functionName -Message $filterMsg -LogLevel "Information"
 
     # Fetch events if not provided
-    if (-not $Events)
+    if (-not $PSBoundParameters.ContainsKey('Events'))
     {
         if (-not $AccessToken)
         {
@@ -76,6 +76,33 @@ function Get-AutopilotEventAnalysis()
     {
         Write-Log -LogFile $LogFile -Module $functionName -Message "Using provided events array with $($Events.Count) events" -LogLevel "Verbose"
     }
+
+    # Filter out events with invalid dates to prevent downstream errors
+    $validEvents = @($Events | Where-Object {
+            $hasValidDate = $false
+            if ($_.eventDateTime)
+            {
+                try
+                {
+                    [void][DateTime]$_.eventDateTime
+                    $hasValidDate = $true
+                }
+                catch
+                {
+                    Write-Verbose "[$functionName] Skipping event with invalid date: $($_.eventDateTime)"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Skipping event with invalid eventDateTime: $($_.eventDateTime)" -LogLevel "Warning"
+                }
+            }
+            return $hasValidDate
+        })
+
+    if ($validEvents.Count -ne $Events.Count)
+    {
+        $invalidCount = $Events.Count - $validEvents.Count
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Filtered out $invalidCount events with invalid dates" -LogLevel "Information"
+    }
+
+    $Events = $validEvents
 
     # Filter events by date range if specified
     $filteredEvents = $Events
