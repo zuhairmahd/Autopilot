@@ -20,8 +20,14 @@ function Get-AutopilotEventAnalysis()
     .PARAMETER EndDate
         Optional end date to filter events.
 
+    .PARAMETER UserPrincipalName
+        Optional user principal name to filter events.
+
     .EXAMPLE
         $analysis = Get-AutopilotEventAnalysis -AccessToken $token -StartDate "2025-01-01"
+
+    .EXAMPLE
+        $analysis = Get-AutopilotEventAnalysis -AccessToken $token -UserPrincipalName "user@contoso.com"
 
     .OUTPUTS
         PSCustomObject with analyzed autopilot event data
@@ -35,12 +41,19 @@ function Get-AutopilotEventAnalysis()
         [Parameter()]
         [DateTime]$StartDate,
         [Parameter()]
-        [DateTime]$EndDate
+        [DateTime]$EndDate,
+        [Parameter()]
+        [string]$UserPrincipalName
     )
 
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Starting autopilot event analysis"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting autopilot event analysis" -LogLevel "Information"
+    $filterMsg = "Starting autopilot event analysis"
+    if ($UserPrincipalName)
+    {
+        $filterMsg += " for user: $UserPrincipalName"
+    }
+    Write-Verbose "[$functionName] $filterMsg"
+    Write-Log -LogFile $LogFile -Module $functionName -Message $filterMsg -LogLevel "Information"
 
     # Fetch events if not provided
     if (-not $Events)
@@ -69,8 +82,14 @@ function Get-AutopilotEventAnalysis()
     if ($StartDate -or $EndDate)
     {
         $dateRangeMsg = "Filtering events"
-        if ($StartDate) { $dateRangeMsg += " from $($StartDate.ToString('yyyy-MM-dd'))" }
-        if ($EndDate) { $dateRangeMsg += " to $($EndDate.ToString('yyyy-MM-dd'))" }
+        if ($StartDate)
+        {
+            $dateRangeMsg += " from $($StartDate.ToString('yyyy-MM-dd'))"
+        }
+        if ($EndDate)
+        {
+            $dateRangeMsg += " to $($EndDate.ToString('yyyy-MM-dd'))"
+        }
         Write-Log -LogFile $LogFile -Module $functionName -Message $dateRangeMsg -LogLevel "Information"
 
         $filteredEvents = $Events | Where-Object {
@@ -97,6 +116,18 @@ function Get-AutopilotEventAnalysis()
         Write-Log -LogFile $LogFile -Module $functionName -Message "No date filtering applied, analyzing all $($Events.Count) events" -LogLevel "Verbose"
     }
 
+    # Filter events by UserPrincipalName if specified
+    if ($UserPrincipalName)
+    {
+        $beforeUserFilter = $filteredEvents.Count
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Filtering events by UserPrincipalName: $UserPrincipalName" -LogLevel "Information"
+        $filteredEvents = $filteredEvents | Where-Object {
+            $_.userPrincipalName -eq $UserPrincipalName
+        }
+        Write-Verbose "[$functionName] Filtered to $($filteredEvents.Count) events from $beforeUserFilter for user $UserPrincipalName"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Filtered to $($filteredEvents.Count) events from $beforeUserFilter for user $UserPrincipalName" -LogLevel "Information"
+    }
+
     # Helper function to convert ISO 8601 duration to TimeSpan
     function ConvertFrom-ISO8601Duration
     {
@@ -120,7 +151,7 @@ function Get-AutopilotEventAnalysis()
 
     # 1. Earliest event date
     $earliestEvent = $filteredEvents |
-        Where-Object { $_.eventDateTime } |
+        Where-Object { $_.eventDateTime -and $null -ne $_.deploymentState } |
         Sort-Object eventDateTime |
         Select-Object -First 1
 
@@ -138,7 +169,7 @@ function Get-AutopilotEventAnalysis()
 
     # 3 & 4. Successful and failed events
     $successfulEvents = @($filteredEvents | Where-Object { $_.deploymentState -eq 'success' })
-    $failedEvents = @($filteredEvents | Where-Object { $_.deploymentState -ne 'success' -and $_.deploymentState -ne $null })
+    $failedEvents = @($filteredEvents | Where-Object { $_.deploymentState -ne 'success' -and $null -ne $_.deploymentState })
 
     # 5. Average duration of successful deployments
     $successDurations = @($successfulEvents | ForEach-Object {
@@ -178,13 +209,55 @@ function Get-AutopilotEventAnalysis()
         $null
     }
 
-    # 7. Failures during device vs. user setup
-    $devicePhaseFailures = @($failedEvents | Where-Object {
-            $_.deviceSetupStatus -and $_.deviceSetupStatus -ne 'success' -and $_.deviceSetupStatus -ne 'notStarted'
+    # 7. Categorize failures into mutually exclusive groups
+    # Device phase only: Device failed, account not started or success
+    $devicePhaseOnlyFailures = @($failedEvents | Where-Object {
+            $deviceFailed = $_.deviceSetupStatus -and
+            $_.deviceSetupStatus -ne 'success' -and
+            $_.deviceSetupStatus -ne 'notStarted'
+            $accountNotFailed = (-not $_.accountSetupStatus) -or
+            $_.accountSetupStatus -eq 'success' -or
+            $_.accountSetupStatus -eq 'notStarted'
+            $deviceFailed -and $accountNotFailed
         })
 
-    $userPhaseFailures = @($failedEvents | Where-Object {
-            $_.accountSetupStatus -and $_.accountSetupStatus -ne 'success' -and $_.accountSetupStatus -ne 'notStarted'
+    # User/Account phase only: Device succeeded, account failed
+    $userPhaseOnlyFailures = @($failedEvents | Where-Object {
+            $deviceSuccess = $_.deviceSetupStatus -eq 'success'
+            $accountFailed = $_.accountSetupStatus -and
+            $_.accountSetupStatus -ne 'success' -and
+            $_.accountSetupStatus -ne 'notStarted'
+            $deviceSuccess -and $accountFailed
+        })
+
+    # Both phases failed: Both device and account show failure
+    $bothPhasesFailures = @($failedEvents | Where-Object {
+            $deviceFailed = $_.deviceSetupStatus -and
+            $_.deviceSetupStatus -ne 'success' -and
+            $_.deviceSetupStatus -ne 'notStarted'
+            $accountFailed = $_.accountSetupStatus -and
+            $_.accountSetupStatus -ne 'success' -and
+            $_.accountSetupStatus -ne 'notStarted'
+            $deviceFailed -and $accountFailed
+        })
+
+    # Unknown/Other: Failures that don't clearly fall into above categories
+    $unknownPhaseFailures = @($failedEvents | Where-Object {
+            $deviceFailed = $_.deviceSetupStatus -and
+            $_.deviceSetupStatus -ne 'success' -and
+            $_.deviceSetupStatus -ne 'notStarted'
+            $accountFailed = $_.accountSetupStatus -and
+            $_.accountSetupStatus -ne 'success' -and
+            $_.accountSetupStatus -ne 'notStarted'
+            $deviceSuccess = $_.deviceSetupStatus -eq 'success'
+            $accountNotFailed = (-not $_.accountSetupStatus) -or
+            $_.accountSetupStatus -eq 'success' -or
+            $_.accountSetupStatus -eq 'notStarted'
+
+            # Not in any of the three categories above
+            -not (($deviceFailed -and $accountNotFailed) -or
+                ($deviceSuccess -and $accountFailed) -or
+                ($deviceFailed -and $accountFailed))
         })
 
     # 8. Users with multiple enrollment failures
@@ -274,30 +347,36 @@ function Get-AutopilotEventAnalysis()
         Sort-Object eventDateTime
 
     Write-Log -LogFile $LogFile -Module $functionName -Message "Analysis complete: $totalEvents total events, $($successfulEvents.Count) successful, $($failedEvents.Count) failed" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Failure breakdown: Device only=$($devicePhaseOnlyFailures.Count), User only=$($userPhaseOnlyFailures.Count), Both=$($bothPhasesFailures.Count), Unknown=$($unknownPhaseFailures.Count)" -LogLevel "Information"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Users with multiple failures: $($usersWithMultipleFailures.Count), Single failure with success: $($singleFailureWithSuccess.Count)" -LogLevel "Verbose"
 
     # Build result object
     $result = [PSCustomObject]@{
-        TotalEvents                = $totalEvents
-        TotalEventsBeforeFilter    = $Events.Count
-        StartDate                  = $StartDate
-        EndDate                    = $EndDate
-        EarliestEventDate          = $earliestDate
-        SuccessfulEvents           = $successfulEvents
-        SuccessCount               = $successfulEvents.Count
-        FailedEvents               = $failedEvents
-        FailureCount               = $failedEvents.Count
-        AverageSuccessDuration     = $avgSuccessDuration
-        AverageFailureDuration     = $avgFailureDuration
-        DevicePhaseFailures        = $devicePhaseFailures
-        DevicePhaseFailureCount    = $devicePhaseFailures.Count
-        UserPhaseFailures          = $userPhaseFailures
-        UserPhaseFailureCount      = $userPhaseFailures.Count
-        UsersWithMultipleFailures  = $usersWithMultipleFailures
-        SingleFailureWithSuccess   = $singleFailureWithSuccess
-        FailedDevicesChronological = $failedDevicesSorted
-        AllFilteredEvents          = $filteredEvents
-        AllEvents                  = $Events
+        TotalEvents                 = $totalEvents
+        TotalEventsBeforeFilter     = $Events.Count
+        StartDate                   = $StartDate
+        EndDate                     = $EndDate
+        UserPrincipalName           = $UserPrincipalName
+        EarliestEventDate           = $earliestDate
+        SuccessfulEvents            = $successfulEvents
+        SuccessCount                = $successfulEvents.Count
+        FailedEvents                = $failedEvents
+        FailureCount                = $failedEvents.Count
+        AverageSuccessDuration      = $avgSuccessDuration
+        AverageFailureDuration      = $avgFailureDuration
+        DevicePhaseOnlyFailures     = $devicePhaseOnlyFailures
+        DevicePhaseOnlyFailureCount = $devicePhaseOnlyFailures.Count
+        UserPhaseOnlyFailures       = $userPhaseOnlyFailures
+        UserPhaseOnlyFailureCount   = $userPhaseOnlyFailures.Count
+        BothPhasesFailures          = $bothPhasesFailures
+        BothPhasesFailureCount      = $bothPhasesFailures.Count
+        UnknownPhaseFailures        = $unknownPhaseFailures
+        UnknownPhaseFailureCount    = $unknownPhaseFailures.Count
+        UsersWithMultipleFailures   = $usersWithMultipleFailures
+        SingleFailureWithSuccess    = $singleFailureWithSuccess
+        FailedDevicesChronological  = $failedDevicesSorted
+        AllFilteredEvents           = $filteredEvents
+        AllEvents                   = $Events
     }
 
     Write-Verbose "[$functionName] Analysis complete"

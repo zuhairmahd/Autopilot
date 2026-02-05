@@ -40,48 +40,52 @@ function Show-AutopilotEventAnalysis()
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [PSCustomObject]$AnalysisData,
         [Parameter()]
-        [switch]$ShowSummary = $true,
+        [switch]$ShowSummary,
         [Parameter()]
-        [switch]$ShowMultipleFailures = $true,
+        [switch]$ShowMultipleFailures,
         [Parameter()]
-        [switch]$ShowSingleFailures = $true,
+        [switch]$ShowSingleFailures,
         [Parameter()]
-        [switch]$ShowChronologicalFailures = $true,
+        [switch]$ShowChronologicalFailures,
         [Parameter()]
         [int]$MaxChronologicalDisplay = 20,
         [Parameter()]
-        [switch]$ShowDetailedFailures = $true
+        [switch]$ShowDetailedFailures
     )
 
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Log -LogFile $LogFile -Module $functionName -Message \"Starting display of autopilot event analysis\" -LogLevel \"Verbose\"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting display of autopilot event analysis" -LogLevel "Verbose"
 
     if ($AnalysisData.TotalEvents -eq 0)
     {
-        Write-Host \"`nNo autopilot events found in the specified date range.\" -ForegroundColor Yellow
-        Write-Log -LogFile $LogFile -Module $functionName -Message \"No events to display (TotalEvents = 0)\" -LogLevel \"Information\"
+        Write-Host "`nNo autopilot events found in the specified date range." -ForegroundColor Yellow
+        Write-Log -LogFile $LogFile -Module $functionName -Message "No events to display (TotalEvents = 0)" -LogLevel "Information"
         return
     }
 
-    Write-Log -LogFile $LogFile -Module $functionName -Message \"Displaying analysis for $($AnalysisData.TotalEvents) events (Success: $($AnalysisData.SuccessCount), Failed: $($AnalysisData.FailureCount))\" -LogLevel \"Information\"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Displaying analysis for $($AnalysisData.TotalEvents) events (Success: $($AnalysisData.SuccessCount), Failed: $($AnalysisData.FailureCount))" -LogLevel "Information"
 
-    Write-Host \"`nAutopilot Events Analysis\" -ForegroundColor Cyan
-    Write-Host (\"=\" * 60) -ForegroundColor Cyan
+    Write-Host "`nAutopilot Enrollment Report" -ForegroundColor Cyan
+    Write-Host ("=" * 60) -ForegroundColor Cyan
 
     # Summary Section
     if ($ShowSummary)
     {
-        Write-Log -LogFile $LogFile -Module $functionName -Message \"Displaying summary section\" -LogLevel \"Verbose\"
-        if ($AnalysisData.StartDate -or $AnalysisData.EndDate)
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Displaying summary section" -LogLevel "Verbose"
+        if ($AnalysisData.StartDate -or $AnalysisData.EndDate -or $AnalysisData.UserPrincipalName)
         {
-            Write-Host "`nDate Range Filter:" -ForegroundColor Cyan
+            Write-Host "`nApplied Filters:" -ForegroundColor Cyan
             if ($AnalysisData.StartDate)
             {
-                Write-Host "  Start: $($AnalysisData.StartDate.ToString('yyyy-MM-dd'))" -ForegroundColor Gray
+                Write-Host "  Start Date: $($AnalysisData.StartDate.ToString('yyyy-MM-dd'))" -ForegroundColor Gray
             }
             if ($AnalysisData.EndDate)
             {
-                Write-Host "  End: $($AnalysisData.EndDate.ToString('yyyy-MM-dd'))" -ForegroundColor Gray
+                Write-Host "  End Date: $($AnalysisData.EndDate.ToString('yyyy-MM-dd'))" -ForegroundColor Gray
+            }
+            if ($AnalysisData.UserPrincipalName)
+            {
+                Write-Host "  User: $($AnalysisData.UserPrincipalName)" -ForegroundColor Gray
             }
             Write-Host "  Filtered: $($AnalysisData.TotalEvents) of $($AnalysisData.TotalEventsBeforeFilter) events" -ForegroundColor Gray
         }
@@ -132,9 +136,9 @@ function Show-AutopilotEventAnalysis()
             Write-Host "N/A (no failed deployments with duration data)" -ForegroundColor Yellow
         }
 
-        Write-Host "`n7. Failure Breakdown:" -ForegroundColor Cyan
-        Write-Host "   - Device Phase Failures: " -NoNewline
-        Write-Host $AnalysisData.DevicePhaseFailureCount -ForegroundColor $(if ($AnalysisData.DevicePhaseFailureCount -gt 0)
+        Write-Host "`n7. Failure Breakdown (Mutually Exclusive):" -ForegroundColor Cyan
+        Write-Host "   - Device Phase Only: " -NoNewline
+        Write-Host $AnalysisData.DevicePhaseOnlyFailureCount -NoNewline -ForegroundColor $(if ($AnalysisData.DevicePhaseOnlyFailureCount -gt 0)
             {
                 "Red"
             }
@@ -142,8 +146,10 @@ function Show-AutopilotEventAnalysis()
             {
                 "Green"
             })
-        Write-Host "   - User Phase Failures: " -NoNewline
-        Write-Host $AnalysisData.UserPhaseFailureCount -ForegroundColor $(if ($AnalysisData.UserPhaseFailureCount -gt 0)
+        Write-Host " (device setup failed, account not started or succeeded)" -ForegroundColor Gray
+
+        Write-Host "   - User/Account Phase Only: " -NoNewline
+        Write-Host $AnalysisData.UserPhaseOnlyFailureCount -NoNewline -ForegroundColor $(if ($AnalysisData.UserPhaseOnlyFailureCount -gt 0)
             {
                 "Red"
             }
@@ -151,12 +157,32 @@ function Show-AutopilotEventAnalysis()
             {
                 "Green"
             })
+        Write-Host " (device setup succeeded, account setup failed)" -ForegroundColor Gray
+
+        Write-Host "   - Both Phases Failed: " -NoNewline
+        Write-Host $AnalysisData.BothPhasesFailureCount -NoNewline -ForegroundColor $(if ($AnalysisData.BothPhasesFailureCount -gt 0)
+            {
+                "Red"
+            }
+            else
+            {
+                "Green"
+            })
+        Write-Host " (both device and account setup failed)" -ForegroundColor Gray
+
+        if ($AnalysisData.UnknownPhaseFailureCount -gt 0)
+        {
+            Write-Host "   - Unknown/Other: " -NoNewline
+            Write-Host $AnalysisData.UnknownPhaseFailureCount -NoNewline -ForegroundColor Yellow
+            Write-Host " (failure stage unclear)" -ForegroundColor Gray
+        }
     }
 
     # Users with multiple failures
     if ($ShowMultipleFailures)
     {
-        Write-Log -LogFile $LogFile -Module $functionName -Message \"Displaying users with multiple failures section ($($AnalysisData.UsersWithMultipleFailures.Count) users)\" -LogLevel \"Verbose\" Write-Host "`n8. Users with Multiple Enrollment Failures:" -ForegroundColor Cyan
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Displaying users with multiple failures section ($($AnalysisData.UsersWithMultipleFailures.Count) users)" -LogLevel "Verbose"
+        Write-Host "`n8. Users with Multiple Enrollment Failures:" -ForegroundColor Cyan
         if ($AnalysisData.UsersWithMultipleFailures.Count -gt 0)
         {
             Write-Host "   Found $($AnalysisData.UsersWithMultipleFailures.Count) user(s) with multiple failures:" -ForegroundColor Yellow
@@ -214,7 +240,8 @@ function Show-AutopilotEventAnalysis()
     # Single failure with success
     if ($ShowSingleFailures)
     {
-        Write-Log -LogFile $LogFile -Module $functionName -Message \"Displaying single failure with success section ($($AnalysisData.SingleFailureWithSuccess.Count) users)\" -LogLevel \"Verbose\" Write-Host "`n8b. Users with Failed Then Successful Enrollments (Single Failure):" -ForegroundColor Cyan
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Displaying single failure with success section ($($AnalysisData.SingleFailureWithSuccess.Count) users)" -LogLevel "Verbose"
+        Write-Host "`n8b. Users with Failed Then Successful Enrollments (Single Failure):" -ForegroundColor Cyan
         if ($AnalysisData.SingleFailureWithSuccess.Count -gt 0)
         {
             Write-Host "   Found $($AnalysisData.SingleFailureWithSuccess.Count) user(s) with 1 failure followed by success:" -ForegroundColor Yellow
@@ -257,7 +284,8 @@ function Show-AutopilotEventAnalysis()
     # Chronological failures
     if ($ShowChronologicalFailures)
     {
-        Write-Log -LogFile $LogFile -Module $functionName -Message \"Displaying chronological failures section ($($AnalysisData.FailedDevicesChronological.Count) devices, max display: $MaxChronologicalDisplay)\" -LogLevel \"Verbose\" Write-Host "`n9. Failed Devices (Chronological Order):" -ForegroundColor Cyan
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Displaying chronological failures section ($($AnalysisData.FailedDevicesChronological.Count) devices, max display: $MaxChronologicalDisplay)" -LogLevel "Verbose"
+        Write-Host "`n9. Failed Devices (Chronological Order):" -ForegroundColor Cyan
         if ($AnalysisData.FailedDevicesChronological.Count -gt 0)
         {
             Write-Host "   Total failed devices: " -NoNewline

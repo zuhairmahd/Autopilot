@@ -9,16 +9,16 @@ function DisplayNumericMenu()
     It handles user input validation, navigation commands (Back, Main Menu, Exit), and provides
     flexible configuration for prompts and behavior. The function supports both immediate selection
     and Enter-required modes.
-    
+
     The choices parameter accepts two formats:
     - String array (legacy format): @("Option 1", "Option 2", "Option 3")
     - Hashtable array (new format): @(@{name="Option 1"; description="Description 1"}, @{name="Option 2"; description="Description 2"})
-    
+
     When hashtables are provided, descriptions are displayed after the name in Gray color.
 
     .PARAMETER choices
     Array of menu choices to display. This parameter is mandatory.
-    Accepts either an array of strings (legacy format) or an array of hashtables with 'name' 
+    Accepts either an array of strings (legacy format) or an array of hashtables with 'name'
     and optional 'description' keys (new format). The function auto-detects the format.
 
     .PARAMETER banner
@@ -51,7 +51,7 @@ function DisplayNumericMenu()
     Navigation options: "B" or "b" for Back, "M" or "m" for Main Menu, "0" for Exit.
     Page navigation: "N" for next page, "P" for previous page.
     Returns NoMenusConfigured value from $returnValues if choices array is empty.
-    When hashtables with descriptions are provided, they are displayed in Gray color after the 
+    When hashtables with descriptions are provided, they are displayed in Gray color after the
     choice name, separated by " - " to distinguish them from the menu item name.
     Compatible with PowerShell 5.1.
     #>
@@ -80,13 +80,13 @@ function DisplayNumericMenu()
         Write-Log -LogFile $LogFile -Module $functionName -Message "No menu items available to display." -LogLevel "Warning"
         return $returnValues.NoMenusConfigured
     }
-    
+
     # Ensure choices is an array (handle single item case)
     if ($choices -isnot [array])
     {
         $choices = @($choices)
     }
-    
+
     # Detect if choices are hashtables (new format) or strings (legacy format)
     $isHashtableFormat = $choices[0] -is [hashtable]
     if ($isHashtableFormat)
@@ -99,7 +99,7 @@ function DisplayNumericMenu()
         Write-Verbose "[$functionName] Detected string format for choices (legacy format)"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Using string format for menu choices" -LogLevel "Debug"
     }
-    
+
     # Helper function to get the name from a choice (handles both formats)
     $getChoiceName = {
         param($choice)
@@ -115,7 +115,7 @@ function DisplayNumericMenu()
         }
         return $choice
     }
-    
+
     # Helper function to get the description from a choice (returns empty for strings)
     $getChoiceDescription = {
         param($choice)
@@ -125,14 +125,14 @@ function DisplayNumericMenu()
         }
         return ""
     }
-    
+
     # Build a normalized list of choice names for validation and return
     $choiceNames = @()
     foreach ($choice in $choices)
     {
         $choiceNames += & $getChoiceName $choice
     }
-    
+
     # Get max items per page from settings if not explicitly provided
     if ($MaxItemsPerPage -le 0)
     {
@@ -147,12 +147,12 @@ function DisplayNumericMenu()
     }
     Write-Verbose "[$functionName] Max items per page: $MaxItemsPerPage"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Using max items per page: $MaxItemsPerPage" -LogLevel "Debug"
-    
+
     # Check if paging is needed
     $needsPaging = $choices.Count -gt $MaxItemsPerPage
     $currentPage = 1
     $totalPages = [Math]::Ceiling($choices.Count / $MaxItemsPerPage)
-    
+
     if ($needsPaging)
     {
         Write-Verbose "[$functionName] Paging enabled: $($choices.Count) items across $totalPages pages"
@@ -165,7 +165,7 @@ function DisplayNumericMenu()
         $startIndex = ($currentPage - 1) * $MaxItemsPerPage
         $endIndex = [Math]::Min($startIndex + $MaxItemsPerPage, $choices.Count) - 1
         $pageChoices = $choices[$startIndex..$endIndex]
-        
+
         # Display page header if paging is active
         if ($needsPaging)
         {
@@ -173,7 +173,7 @@ function DisplayNumericMenu()
             Write-Host "Showing items $($startIndex + 1) - $($endIndex + 1) of $($choices.Count)" -ForegroundColor Gray
             Write-Host ""
         }
-        
+
         # Display the menu options for current page
         Write-Host $banner -ForegroundColor Green
         for ($i = 0; $i -lt $pageChoices.Count; $i++)
@@ -181,13 +181,13 @@ function DisplayNumericMenu()
             $globalIndex = $startIndex + $i + 1
             $choiceName = & $getChoiceName $pageChoices[$i]
             $choiceDesc = & $getChoiceDescription $pageChoices[$i]
-            
+
             Write-Host "$globalIndex. $choiceName" -NoNewline -ForegroundColor White
-            
+
             # Display description if available
             if (-not [string]::IsNullOrWhiteSpace($choiceDesc))
             {
-                Write-Host " - $choiceDesc" -ForegroundColor Gray
+                Write-Host "`n - $choiceDesc" -ForegroundColor Gray
             }
             else
             {
@@ -195,7 +195,7 @@ function DisplayNumericMenu()
             }
         }
         Write-Host "0. Exit" -ForegroundColor White
-        
+
         # Add paging navigation options if needed
         if ($needsPaging)
         {
@@ -211,14 +211,14 @@ function DisplayNumericMenu()
             }
             Write-Host "[1-$totalPages] Jump to page" -ForegroundColor Yellow
         }
-    
+
         # Prepare valid key options (numeric keys) - all items remain valid regardless of page
         $validKeys = @()
         for ($i = 0; $i -le $choices.Count; $i++)
         {
             $validKeys += $i.ToString()
         }
-        
+
         # Add paging navigation keys
         $pagingKeys = @()
         if ($needsPaging)
@@ -240,7 +240,7 @@ function DisplayNumericMenu()
                 }
             }
         }
-    
+
         # Add mnemonic keys based on available choices (easter egg functionality)
         $mnemonicKeys = @()
         if ($choiceNames -contains "Back")
@@ -256,7 +256,7 @@ function DisplayNumericMenu()
         # Always allow q and e for exit
         $mnemonicKeys += @("q", "e")
         Write-Verbose "[$functionName] Added mnemonic keys 'q' and 'e' for Exit"
-        
+
         $allValidKeys = $validKeys + $mnemonicKeys + $pagingKeys
         Write-Verbose "[$functionName] Valid keys: $($allValidKeys -join ', ')"
         Write-Verbose "[$functionName] Mnemonic keys: $($mnemonicKeys -join ', ')"
@@ -265,10 +265,10 @@ function DisplayNumericMenu()
             Write-Verbose "[$functionName] Paging keys: $($pagingKeys -join ', ')"
         }
         Write-Log -LogFile $LogFile -Module $functionName -Message "Valid menu options: $($validKeys -join ', '), Mnemonic keys: $($mnemonicKeys -join ', ')" -LogLevel "Debug"
-        
+
         # Handle paging navigation
         $pageNavigationOccurred = $false
-        
+
         if ($RequireEnter)
         {
             # Original behavior with ReadLine
@@ -316,12 +316,12 @@ function DisplayNumericMenu()
                     $selection = $null
                 }
             } until ($allValidKeys -contains $selection)
-        
+
             # Echo the selection so user can see what was chosen
             Write-Host $selection -ForegroundColor Green
             Write-Log -LogFile $LogFile -Module $functionName -Message "Valid key pressed: '$selection'" -LogLevel "Debug"
         }
-    
+
         # Handle paging navigation first
         if ($needsPaging)
         {
@@ -348,13 +348,13 @@ function DisplayNumericMenu()
                 }
             }
         }
-        
+
         # If page navigation occurred, continue to next iteration
         if ($pageNavigationOccurred)
         {
             continue
         }
-        
+
         # Validate the selection and handle mnemonic keys
         while ($selection -notin $allValidKeys)
         {
@@ -363,11 +363,11 @@ function DisplayNumericMenu()
             {
                 break
             }
-            
+
             Write-Host $errorMessage -ForegroundColor Red
             Write-Log -LogFile $LogFile -Module $functionName -Message "Invalid selection: '$selection'" -LogLevel "Warning"
             [console]::beep(1000, 500)
-            
+
             if ($RequireEnter)
             {
                 # Re-prompt with ReadLine
@@ -388,7 +388,7 @@ function DisplayNumericMenu()
             break
         }
     } while ($needsPaging)  # End of paging loop
-    
+
     # Handle mnemonic keys first
     if ($selection -eq "b" -and $choiceNames -contains "Back")
     {

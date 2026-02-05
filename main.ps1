@@ -2137,6 +2137,61 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Auto
         Write-Verbose "[$scriptName] Device deletion result: $result"
     }
 }
+$autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Autopilot enrollment report" -action {
+    $autopilotReportInput = Get-AutopilotEnrollmentReportInput
+    write-log -logFile $logFile -module $scriptName -Message "User input received: $($autopilotReportInput | Out-String)"
+    $analysisParams = @{
+        accessToken = $accessToken
+    }
+    if ($autopilotReportInput.StartDate)
+    {
+        $analysisParams['StartDate'] = $autopilotReportInput.StartDate
+    }
+    if ($autopilotReportInput.EndDate)
+    {
+        $analysisParams['EndDate'] = $autopilotReportInput.EndDate
+    }
+    if ($autopilotReportInput.UserPrincipalName)
+    {
+        $analysisParams['UserPrincipalName'] = $autopilotReportInput.UserPrincipalName
+    }
+    write-log -logFile $logFile -Module $scriptName -Message "Analysis parameters set: $($analysisParams | Out-String)"
+    $analysis = Get-AutopilotEventAnalysis @analysisParams
+    write-log -logFile $logFile -Module $scriptName -Message "Analysis results obtained: $($analysis | Out-String)"
+    # Display results
+    Show-AutopilotEventAnalysis -AnalysisData $analysis -ShowSummary -ShowMultipleFailures -ShowSingleFailures -ShowChronologicalFailures -ShowDetailedFailures
+
+    # Prompt for export
+    Write-Host "`nWould you like to export the analysis to CSV? (Y/N): " -NoNewline -ForegroundColor Yellow
+    $exportChoice = Read-Host
+    while ($exportChoice -notin @('Y', 'y', 'N', 'n'))
+    {
+        Write-Host "Invalid choice. Please enter 'Y' for Yes or 'N' for No: " -NoNewline -ForegroundColor Yellow
+        [console]::beep(300, 100)
+        $exportChoice = Read-Host
+    }
+    if ($exportChoice -eq 'Y' -or $exportChoice -eq 'y')
+    {
+        write-log -logFile $logFile -Module $scriptName -Message "User chose to export analysis results."
+        $exportResult = Export-AutopilotEventAnalysis -AnalysisData $analysis
+        write-log -logFile $logFile -Module $scriptName -Message "Export result: $($exportResult | Out-String)"
+        if ($exportResult.success)
+        {
+            Write-Host "Analysis exported successfully" -ForegroundColor Green
+            write-log -logFile $logFile -Module $scriptName -Message "Analysis exported successfully to $($exportResult.filePath)"
+        }
+        else
+        {
+            Write-Host "Failed to export analysis: $($exportResult.errorMessage)" -ForegroundColor Red
+            write-log -logFile $logFile -Module $scriptName -Message "Failed to export analysis: $($exportResult.errorMessage)" -logLevel "ERROR"
+        }
+    }
+    else
+    {
+        write-log -logFile $logFile -Module $scriptName -Message "User chose not to export analysis results."
+        Write-Host "Export skipped." -ForegroundColor Yellow
+    }
+}
 #endregion Autopilot menu
 
 #region Environment menu
