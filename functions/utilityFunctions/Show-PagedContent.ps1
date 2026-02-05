@@ -393,6 +393,7 @@ function Show-PagedContent()
 
             if ($userInput.ToLower() -eq 'q')
             {
+                $userQuit = $true
                 break
             }
 
@@ -409,7 +410,14 @@ function Show-PagedContent()
         }
     } while ($true)
 
-    $finalResult = if ($userQuit) { "quit" } else { "completed" }
+    $finalResult = if ($userQuit)
+    {
+        "quit" 
+    }
+    else
+    {
+        "completed" 
+    }
     Write-Log -LogFile $logFile -Module $functionName -Message "Paging finished: $finalResult" -LogLevel "Information"
     Write-Verbose "[$functionName] Paging finished: $finalResult"
 
