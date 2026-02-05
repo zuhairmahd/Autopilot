@@ -73,6 +73,9 @@ function Export-AutopilotEventAnalysis()
     .PARAMETER ExportSuccesses
         Export successful enrollments.
 
+    .PARAMETER ExportInProgress
+        Export devices currently in progress.
+
     .PARAMETER ExportAllEvents
         Export all events with human-readable formatting.
 
@@ -101,6 +104,8 @@ function Export-AutopilotEventAnalysis()
             [Parameter()]
             [switch]$ExportSuccesses,
             [Parameter()]
+            [switch]$ExportInProgress,
+            [Parameter()]
             [switch]$ExportAllEvents,
             [Parameter()]
             [switch]$ExportUserAnalysis
@@ -109,7 +114,7 @@ function Export-AutopilotEventAnalysis()
         $functionName = $MyInvocation.MyCommand.Name
         Write-Verbose "[$functionName] Starting export to: $OutputPath"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Starting autopilot event analysis export to: $OutputPath" -LogLevel "Information"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Export options: Summary=$ExportSummary, Failures=$ExportFailures, Successes=$ExportSuccesses, AllEvents=$ExportAllEvents, UserAnalysis=$ExportUserAnalysis" -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Export options: Summary=$ExportSummary, Failures=$ExportFailures, Successes=$ExportSuccesses, InProgress=$ExportInProgress, AllEvents=$ExportAllEvents, UserAnalysis=$ExportUserAnalysis" -LogLevel "Verbose"
 
         $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
         $exportedFiles = @()
@@ -127,6 +132,18 @@ function Export-AutopilotEventAnalysis()
                 [PSCustomObject]@{
                     Metric = "Successful Events"
                     Value  = $AnalysisData.SuccessCount
+                },
+                [PSCustomObject]@{
+                    Metric = "In-Progress Events"
+                    Value  = $AnalysisData.InProgressCount
+                },
+                [PSCustomObject]@{
+                    Metric = "In-Progress - Device Phase"
+                    Value  = $AnalysisData.DevicePhaseInProgressCount
+                },
+                [PSCustomObject]@{
+                    Metric = "In-Progress - User/Account Phase"
+                    Value  = $AnalysisData.UserPhaseInProgressCount
                 },
                 [PSCustomObject]@{
                     Metric = "Failed Events"
@@ -286,6 +303,50 @@ function Export-AutopilotEventAnalysis()
             $exportedFiles += $successesFile
             Write-Host "Exported successes to: $successesFile" -ForegroundColor Green
             Write-Log -LogFile $LogFile -Module $functionName -Message "Successes exported successfully to: $successesFile" -LogLevel "Information"
+        }
+
+        # Export In-Progress
+        if ($ExportInProgress -and $AnalysisData.InProgressCount -gt 0)
+        {
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Exporting in-progress data ($($AnalysisData.InProgressCount) in progress)" -LogLevel "Verbose"
+            $inProgressFile = Join-Path $OutputPath "$FilePrefix`_InProgress_$timestamp.csv"
+            $AnalysisData.InProgressEvents |
+                Select-Object @{N = "EventDate"; E = { if ($_.eventDateTime)
+                        {
+                            ([DateTime]$_.eventDateTime).ToString("yyyy-MM-dd HH:mm:ss")
+                        }
+                        else
+                        {
+                            "N/A"
+                        } }
+                },
+                deviceSerialNumber,
+                managedDeviceName,
+                userPrincipalName,
+                deploymentState,
+                deviceSetupStatus,
+                accountSetupStatus,
+                @{N = "InProgressPhase"; E = {
+                    if ($_.deviceSetupStatus -eq 'inProgress') {
+                        "Device"
+                    }
+                    elseif ($_.accountSetupStatus -eq 'inProgress') {
+                        "User/Account"
+                    }
+                    else {
+                        "Unknown"
+                    }
+                }},
+                osVersion,
+                enrollmentState,
+                enrollmentType,
+                windowsAutopilotDeploymentProfileDisplayName,
+                @{N = "DeploymentDuration"; E = { $_.deploymentDuration } },
+                @{N = "DeploymentTotalDuration"; E = { $_.deploymentTotalDuration } } |
+                Export-Csv -Path $inProgressFile -NoTypeInformation
+            $exportedFiles += $inProgressFile
+            Write-Host "Exported in-progress devices to: $inProgressFile" -ForegroundColor Cyan
+            Write-Log -LogFile $LogFile -Module $functionName -Message "In-progress devices exported successfully to: $inProgressFile" -LogLevel "Information"
         }
 
         # Export User Analysis
@@ -494,9 +555,9 @@ function Export-AutopilotEventAnalysis()
             {
                 "2"
                 {
-                    Write-Verbose "[$functionName] Exporting all data (summary, failures, successes, user analysis, all events)"
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "Exporting all data (summary, failures, successes, user analysis, all events)" -LogLevel "Information"
-                    $exportedFiles = Export-EventAnalysis -AnalysisData $AnalysisData -OutputPath $exportPath -ExportSummary -ExportFailures -ExportUserAnalysis -ExportAllEvents -ExportSuccesses
+                    Write-Verbose "[$functionName] Exporting all data (summary, failures, successes, in-progress, user analysis, all events)"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Exporting all data (summary, failures, successes, in-progress, user analysis, all events)" -LogLevel "Information"
+                    $exportedFiles = Export-EventAnalysis -AnalysisData $AnalysisData -OutputPath $exportPath -ExportSummary -ExportFailures -ExportUserAnalysis -ExportAllEvents -ExportSuccesses -ExportInProgress
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Export completed successfully" -LogLevel "Information"
                     $result.Success = $true
                     $result.ExportedFiles = $exportedFiles
@@ -513,6 +574,8 @@ function Export-AutopilotEventAnalysis()
                     $expFail = Read-Host
                     Write-Host "Export Successes? (Y/N): " -NoNewline
                     $expSucc = Read-Host
+                    Write-Host "Export In-Progress Devices? (Y/N): " -NoNewline
+                    $expInProg = Read-Host
                     Write-Host "Export All Events? (Y/N): " -NoNewline
                     $expAll = Read-Host
                     Write-Host "Export User Analysis? (Y/N): " -NoNewline
@@ -533,6 +596,10 @@ function Export-AutopilotEventAnalysis()
                     {
                         $exportParams['ExportSuccesses'] = $true
                     }
+                    if ($expInProg -eq 'Y' -or $expInProg -eq 'y')
+                    {
+                        $exportParams['ExportInProgress'] = $true
+                    }
                     if ($expAll -eq 'Y' -or $expAll -eq 'y')
                     {
                         $exportParams['ExportAllEvents'] = $true
@@ -542,8 +609,8 @@ function Export-AutopilotEventAnalysis()
                         $exportParams['ExportUserAnalysis'] = $true
                     }
 
-                    Write-Verbose "[$functionName] Custom selections: Summary=$($expSum), Failures=$($expFail), Successes=$($expSucc), AllEvents=$($expAll), UserAnalysis=$($expUser)"
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "Custom selections: Summary=$($expSum), Failures=$($expFail), Successes=$($expSucc), AllEvents=$($expAll), UserAnalysis=$($expUser)" -LogLevel "Verbose"
+                    Write-Verbose "[$functionName] Custom selections: Summary=$($expSum), Failures=$($expFail), Successes=$($expSucc), InProgress=$($expInProg), AllEvents=$($expAll), UserAnalysis=$($expUser)"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Custom selections: Summary=$($expSum), Failures=$($expFail), Successes=$($expSucc), InProgress=$($expInProg), AllEvents=$($expAll), UserAnalysis=$($expUser)" -LogLevel "Verbose"
                     $exportedFiles = Export-EventAnalysis @exportParams
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Custom export completed successfully" -LogLevel "Information"
                     $result.Success = $true

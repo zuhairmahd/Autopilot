@@ -30,6 +30,10 @@ function Show-AutopilotEventAnalysis()
         Display failed devices in chronological order.
         Uses paging with 10 items per page.
 
+    .PARAMETER ShowInProgress
+        Display devices currently in progress and which phase they are in.
+        Uses paging with 10 items per page.
+
     .PARAMETER MaxChronologicalDisplay
         DEPRECATED: No longer used due to paging implementation.
         Previously limited chronological failures to display (default: 20).
@@ -60,6 +64,8 @@ function Show-AutopilotEventAnalysis()
         [switch]$ShowSingleFailures,
         [Parameter()]
         [switch]$ShowChronologicalFailures,
+        [Parameter()]
+        [switch]$ShowInProgress,
         [Parameter()]
         [int]$MaxChronologicalDisplay = 20,
         [Parameter()]
@@ -119,7 +125,25 @@ function Show-AutopilotEventAnalysis()
         Write-Host "`n3. Successful Events: " -NoNewline
         Write-Host $AnalysisData.SuccessCount -ForegroundColor Green
 
-        Write-Host "`n4. Failed Events: " -NoNewline
+        Write-Host "`n4. In-Progress Events: " -NoNewline
+        Write-Host $AnalysisData.InProgressCount -ForegroundColor $(if ($AnalysisData.InProgressCount -gt 0)
+            {
+                "Cyan"
+            }
+            else
+            {
+                "Green"
+            })
+
+        if ($AnalysisData.InProgressCount -gt 0)
+        {
+            Write-Host "   - Device Phase: " -NoNewline -ForegroundColor Gray
+            Write-Host $AnalysisData.DevicePhaseInProgressCount -ForegroundColor Cyan
+            Write-Host "   - User/Account Phase: " -NoNewline -ForegroundColor Gray
+            Write-Host $AnalysisData.UserPhaseInProgressCount -ForegroundColor Cyan
+        }
+
+        Write-Host "`n5. Failed Events: " -NoNewline
         Write-Host $AnalysisData.FailureCount -ForegroundColor $(if ($AnalysisData.FailureCount -gt 0)
             {
                 "Red"
@@ -129,7 +153,7 @@ function Show-AutopilotEventAnalysis()
                 "Green"
             })
 
-        Write-Host "`n5. Average Duration (Successful): " -NoNewline
+        Write-Host "`n6. Average Duration (Successful): " -NoNewline
         if ($AnalysisData.AverageSuccessDuration)
         {
             Write-Host ("{0:hh\:mm\:ss}" -f $AnalysisData.AverageSuccessDuration) -ForegroundColor Green
@@ -139,7 +163,7 @@ function Show-AutopilotEventAnalysis()
             Write-Host "N/A (no successful deployments with duration data)" -ForegroundColor Yellow
         }
 
-        Write-Host "`n6. Average Duration (Failed): " -NoNewline
+        Write-Host "`n7. Average Duration (Failed): " -NoNewline
         if ($AnalysisData.AverageFailureDuration)
         {
             Write-Host ("{0:hh\:mm\:ss}" -f $AnalysisData.AverageFailureDuration) -ForegroundColor Red
@@ -149,7 +173,7 @@ function Show-AutopilotEventAnalysis()
             Write-Host "N/A (no failed deployments with duration data)" -ForegroundColor Yellow
         }
 
-        Write-Host "`n7. Failure Breakdown (Mutually Exclusive):" -ForegroundColor Cyan
+        Write-Host "`n8. Failure Breakdown (Mutually Exclusive):" -ForegroundColor Cyan
         Write-Host "   - Device Phase Only: " -NoNewline
         Write-Host $AnalysisData.DevicePhaseOnlyFailureCount -NoNewline -ForegroundColor $(if ($AnalysisData.DevicePhaseOnlyFailureCount -gt 0)
             {
@@ -191,11 +215,105 @@ function Show-AutopilotEventAnalysis()
         }
     }
 
+    # In-progress devices
+    if ($ShowInProgress)
+    {
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Displaying in-progress devices section ($($AnalysisData.InProgressCount) devices)" -LogLevel "Verbose"
+        Write-Host "`n9. Devices Currently In Progress:" -ForegroundColor Cyan
+        if ($AnalysisData.InProgressCount -gt 0)
+        {
+            Write-Host "   Total in-progress devices: " -NoNewline
+            Write-Host $AnalysisData.InProgressCount -ForegroundColor Cyan
+            Write-Host ""
+
+            # Use paged display for in-progress devices
+            $displayScript = {
+                param($device)
+                $eventDate = if ($device.eventDateTime)
+                {
+                    FormatDateWithTimeZone -DateTime $device.eventDateTime
+                }
+                else
+                {
+                    "Unknown Date"
+                }
+
+                Write-Host "   Serial Number: " -NoNewline -ForegroundColor Gray
+                Write-Host "$($device.deviceSerialNumber)" -ForegroundColor Cyan
+
+                Write-Host "   Device Name: " -NoNewline -ForegroundColor Gray
+                Write-Host "$($device.managedDeviceName)" -ForegroundColor Cyan
+
+                Write-Host "   User: " -NoNewline -ForegroundColor Gray
+                Write-Host "$($device.userPrincipalName)" -ForegroundColor Cyan
+
+                Write-Host "   Date/Time: " -NoNewline -ForegroundColor Gray
+                Write-Host "$eventDate" -ForegroundColor Cyan
+
+                Write-Host "   Deployment State: " -NoNewline -ForegroundColor Gray
+                Write-Host "$($device.deploymentState)" -ForegroundColor Cyan
+
+                Write-Host "   Device Setup: " -NoNewline -ForegroundColor Gray
+                $deviceColor = switch ($device.deviceSetupStatus)
+                {
+                    'inProgress'
+                    {
+                        'Cyan' 
+                    }
+                    'success'
+                    {
+                        'Green' 
+                    }
+                    default
+                    {
+                        'Yellow' 
+                    }
+                }
+                Write-Host "$($device.deviceSetupStatus)" -ForegroundColor $deviceColor
+
+                Write-Host "   Account Setup: " -NoNewline -ForegroundColor Gray
+                $accountColor = switch ($device.accountSetupStatus)
+                {
+                    'inProgress'
+                    {
+                        'Cyan' 
+                    }
+                    'success'
+                    {
+                        'Green' 
+                    }
+                    default
+                    {
+                        'Yellow' 
+                    }
+                }
+                Write-Host "$($device.accountSetupStatus)" -ForegroundColor $accountColor
+
+                # Indicate which phase is in progress
+                if ($device.deviceSetupStatus -eq 'inProgress')
+                {
+                    Write-Host "   [DEVICE PHASE IN PROGRESS]" -ForegroundColor Cyan
+                }
+                elseif ($device.accountSetupStatus -eq 'inProgress')
+                {
+                    Write-Host "   [USER/ACCOUNT PHASE IN PROGRESS]" -ForegroundColor Cyan
+                }
+                Write-Host ""
+            }
+
+            Show-PagedContent -Content $AnalysisData.InProgressEvents -DisplayScriptBlock $displayScript -PageSize 10 -Title "Devices In Progress" -ShowPageInfo $true
+        }
+        else
+        {
+            Write-Host "   No devices currently in progress." -ForegroundColor Green
+        }
+    }
+
     # Users with multiple failures
     if ($ShowMultipleFailures)
     {
         Write-Log -LogFile $LogFile -Module $functionName -Message "Displaying users with multiple failures section ($($AnalysisData.UsersWithMultipleFailures.Count) users)" -LogLevel "Verbose"
-        Write-Host "`n8. Users with Multiple Enrollment Failures:" -ForegroundColor Cyan
+        Write-Host "`n10. Users with Multiple Enrollment Failures:" -ForegroundColor Cyan
         if ($AnalysisData.UsersWithMultipleFailures.Count -gt 0)
         {
             Write-Host "   Found $($AnalysisData.UsersWithMultipleFailures.Count) user(s) with multiple failures:" -ForegroundColor Yellow
@@ -231,7 +349,7 @@ function Show-AutopilotEventAnalysis()
                 if ($user.EventualSuccess)
                 {
                     $successDate = FormatDateWithTimeZone -DateTime $user.SuccessDevice.eventDateTime
-                    Write-Host "\n   [SUCCESS AFTER FAILURES]" -ForegroundColor Green
+                    Write-Host "`n   [SUCCESS AFTER FAILURES]" -ForegroundColor Green
                     Write-Host "   User had $($user.FailureCount) failed enrollment(s) before successful enrollment" -ForegroundColor Green
                     Write-Host "   Successful Device: " -NoNewline -ForegroundColor Gray
                     Write-Host "$($user.SuccessDevice.managedDeviceName)" -NoNewline -ForegroundColor Green
@@ -242,7 +360,7 @@ function Show-AutopilotEventAnalysis()
                 }
                 else
                 {
-                    Write-Host "\n   [NO SUCCESSFUL ENROLLMENT FOUND]" -ForegroundColor Red
+                    Write-Host "`n   [NO SUCCESSFUL ENROLLMENT FOUND]" -ForegroundColor Red
                     Write-Host "   User has not yet completed a successful enrollment in the analyzed period" -ForegroundColor Yellow
                 }
                 Write-Host ""
@@ -260,7 +378,7 @@ function Show-AutopilotEventAnalysis()
     if ($ShowSingleFailures)
     {
         Write-Log -LogFile $LogFile -Module $functionName -Message "Displaying single failure with success section ($($AnalysisData.SingleFailureWithSuccess.Count) users)" -LogLevel "Verbose"
-        Write-Host "`n8b. Users with Failed Then Successful Enrollments (Single Failure):" -ForegroundColor Cyan
+        Write-Host "`n10b. Users with Failed Then Successful Enrollments (Single Failure):" -ForegroundColor Cyan
         if ($AnalysisData.SingleFailureWithSuccess.Count -gt 0)
         {
             Write-Host "   Found $($AnalysisData.SingleFailureWithSuccess.Count) user(s) with 1 failure followed by success:" -ForegroundColor Yellow
@@ -310,12 +428,12 @@ function Show-AutopilotEventAnalysis()
     if ($ShowChronologicalFailures)
     {
         Write-Log -LogFile $LogFile -Module $functionName -Message "Displaying chronological failures section ($($AnalysisData.FailedDevicesChronological.Count) devices, max display: $MaxChronologicalDisplay)" -LogLevel "Verbose"
-        Write-Host "`n9. Failed Devices (Chronological Order):" -ForegroundColor Cyan
+        Write-Host "`n11. Failed Devices (Chronological Order):" -ForegroundColor Cyan
         if ($AnalysisData.FailedDevicesChronological.Count -gt 0)
         {
             Write-Host "   Total failed devices: " -NoNewline
             Write-Host $AnalysisData.FailedDevicesChronological.Count -ForegroundColor Red
-            Write-Host "\n   Failures from oldest to newest:" -ForegroundColor Yellow
+            Write-Host "`n   Failures from oldest to newest:" -ForegroundColor Yellow
             Write-Host ""
 
             # Use paged display for chronological failures

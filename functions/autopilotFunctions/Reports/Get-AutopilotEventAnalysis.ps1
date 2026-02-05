@@ -167,9 +167,17 @@ function Get-AutopilotEventAnalysis()
     # 2. Total number of events
     $totalEvents = $filteredEvents.Count
 
-    # 3 & 4. Successful and failed events
+    # 3, 4 & 4b. Successful, failed, and in-progress events
     $successfulEvents = @($filteredEvents | Where-Object { $_.deploymentState -eq 'success' })
-    $failedEvents = @($filteredEvents | Where-Object { $_.deploymentState -ne 'success' -and $null -ne $_.deploymentState })
+    $inProgressEvents = @($filteredEvents | Where-Object { $_.deploymentState -eq 'inProgress' })
+    $failedEvents = @($filteredEvents | Where-Object {
+            ($null -ne $_.deploymentState -and $_.deploymentState -notin @('success', 'inProgress', 'notStarted')) -or
+            ($_.deploymentState -eq 'notStarted' -and
+            (
+                ($null -ne $_.deviceSetupStatus -and $_.deviceSetupStatus -notin @('success', 'inProgress', 'notStarted')) -or
+                ($null -ne $_.accountSetupStatus -and $_.accountSetupStatus -notin @('success', 'inProgress', 'notStarted'))
+            ))
+        })
 
     # 5. Average duration of successful deployments
     $successDurations = @($successfulEvents | ForEach-Object {
@@ -209,15 +217,24 @@ function Get-AutopilotEventAnalysis()
         $null
     }
 
+    # 6b. Categorize in-progress devices by phase
+    $devicePhaseInProgress = @($inProgressEvents | Where-Object {
+            $_.deviceSetupStatus -eq 'inProgress'
+        })
+
+    $userPhaseInProgress = @($inProgressEvents | Where-Object {
+            $_.deviceSetupStatus -eq 'success' -and
+            $_.accountSetupStatus -eq 'inProgress'
+        })
+
     # 7. Categorize failures into mutually exclusive groups
     # Device phase only: Device failed, account not started or success
     $devicePhaseOnlyFailures = @($failedEvents | Where-Object {
             $deviceFailed = $_.deviceSetupStatus -and
-            $_.deviceSetupStatus -ne 'success' -and
-            $_.deviceSetupStatus -ne 'notStarted'
+            $_.deviceSetupStatus -notin @('success', 'notStarted', 'inProgress') -and
+            $null -ne $_.deviceSetupStatus
             $accountNotFailed = (-not $_.accountSetupStatus) -or
-            $_.accountSetupStatus -eq 'success' -or
-            $_.accountSetupStatus -eq 'notStarted'
+            $_.accountSetupStatus -in @('success', 'notStarted', 'inProgress')
             $deviceFailed -and $accountNotFailed
         })
 
@@ -225,34 +242,33 @@ function Get-AutopilotEventAnalysis()
     $userPhaseOnlyFailures = @($failedEvents | Where-Object {
             $deviceSuccess = $_.deviceSetupStatus -eq 'success'
             $accountFailed = $_.accountSetupStatus -and
-            $_.accountSetupStatus -ne 'success' -and
-            $_.accountSetupStatus -ne 'notStarted'
+            $_.accountSetupStatus -notin @('success', 'notStarted', 'inProgress') -and
+            $null -ne $_.accountSetupStatus
             $deviceSuccess -and $accountFailed
         })
 
     # Both phases failed: Both device and account show failure
     $bothPhasesFailures = @($failedEvents | Where-Object {
             $deviceFailed = $_.deviceSetupStatus -and
-            $_.deviceSetupStatus -ne 'success' -and
-            $_.deviceSetupStatus -ne 'notStarted'
+            $_.deviceSetupStatus -notin @('success', 'notStarted', 'inProgress') -and
+            $null -ne $_.deviceSetupStatus
             $accountFailed = $_.accountSetupStatus -and
-            $_.accountSetupStatus -ne 'success' -and
-            $_.accountSetupStatus -ne 'notStarted'
+            $_.accountSetupStatus -notin @('success', 'notStarted', 'inProgress') -and
+            $null -ne $_.accountSetupStatus
             $deviceFailed -and $accountFailed
         })
 
     # Unknown/Other: Failures that don't clearly fall into above categories
     $unknownPhaseFailures = @($failedEvents | Where-Object {
             $deviceFailed = $_.deviceSetupStatus -and
-            $_.deviceSetupStatus -ne 'success' -and
-            $_.deviceSetupStatus -ne 'notStarted'
+            $_.deviceSetupStatus -notin @('success', 'notStarted', 'inProgress') -and
+            $null -ne $_.deviceSetupStatus
             $accountFailed = $_.accountSetupStatus -and
-            $_.accountSetupStatus -ne 'success' -and
-            $_.accountSetupStatus -ne 'notStarted'
+            $_.accountSetupStatus -notin @('success', 'notStarted', 'inProgress') -and
+            $null -ne $_.accountSetupStatus
             $deviceSuccess = $_.deviceSetupStatus -eq 'success'
             $accountNotFailed = (-not $_.accountSetupStatus) -or
-            $_.accountSetupStatus -eq 'success' -or
-            $_.accountSetupStatus -eq 'notStarted'
+            $_.accountSetupStatus -in @('success', 'notStarted', 'inProgress')
 
             # Not in any of the three categories above
             -not (($deviceFailed -and $accountNotFailed) -or
@@ -346,7 +362,8 @@ function Get-AutopilotEventAnalysis()
         Where-Object { $_.deviceSerialNumber } |
         Sort-Object eventDateTime
 
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Analysis complete: $totalEvents total events, $($successfulEvents.Count) successful, $($failedEvents.Count) failed" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Analysis complete: $totalEvents total events, $($successfulEvents.Count) successful, $($failedEvents.Count) failed, $($inProgressEvents.Count) in progress" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "In-progress breakdown: Device phase=$($devicePhaseInProgress.Count), User phase=$($userPhaseInProgress.Count)" -LogLevel "Information"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Failure breakdown: Device only=$($devicePhaseOnlyFailures.Count), User only=$($userPhaseOnlyFailures.Count), Both=$($bothPhasesFailures.Count), Unknown=$($unknownPhaseFailures.Count)" -LogLevel "Information"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Users with multiple failures: $($usersWithMultipleFailures.Count), Single failure with success: $($singleFailureWithSuccess.Count)" -LogLevel "Verbose"
 
@@ -360,6 +377,12 @@ function Get-AutopilotEventAnalysis()
         EarliestEventDate           = $earliestDate
         SuccessfulEvents            = $successfulEvents
         SuccessCount                = $successfulEvents.Count
+        InProgressEvents            = $inProgressEvents
+        InProgressCount             = $inProgressEvents.Count
+        DevicePhaseInProgress       = $devicePhaseInProgress
+        DevicePhaseInProgressCount  = $devicePhaseInProgress.Count
+        UserPhaseInProgress         = $userPhaseInProgress
+        UserPhaseInProgressCount    = $userPhaseInProgress.Count
         FailedEvents                = $failedEvents
         FailureCount                = $failedEvents.Count
         AverageSuccessDuration      = $avgSuccessDuration

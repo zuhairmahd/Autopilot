@@ -2190,6 +2190,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Autopilot enrollment re
     {
         Write-Log -logFile $logFile -Module $scriptName -Message "User chose not to export analysis results."
         Write-Host "Export skipped." -ForegroundColor Yellow
+        return $returnValues.backoutText
     }
 }
 #endregion Autopilot menu
