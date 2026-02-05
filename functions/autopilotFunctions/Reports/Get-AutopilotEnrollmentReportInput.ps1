@@ -94,7 +94,7 @@ function Get-AutopilotEnrollmentReportInput()
 
         if ($result -and $IsEndDate)
         {
-            $result = $result.AddDays(1).AddSeconds(-1)
+            $result = $result.AddDays(1).AddTicks(-1)
             Write-Verbose "[$functionName] Adjusted end date to end of day: $($result.ToString('yyyy-MM-dd HH:mm:ss'))"
             Write-Log -logFile $LogFile -Module $functionName -Message "Adjusted end date to end of day: $($result.ToString('yyyy-MM-dd HH:mm:ss'))"
         }
