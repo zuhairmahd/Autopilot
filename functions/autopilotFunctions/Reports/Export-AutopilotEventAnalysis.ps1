@@ -327,16 +327,20 @@ function Export-AutopilotEventAnalysis()
                 deviceSetupStatus,
                 accountSetupStatus,
                 @{N = "InProgressPhase"; E = {
-                    if ($_.deviceSetupStatus -eq 'inProgress') {
-                        "Device"
+                        if ($_.deviceSetupStatus -eq 'inProgress')
+                        {
+                            "Device"
+                        }
+                        elseif ($_.accountSetupStatus -eq 'inProgress')
+                        {
+                            "User/Account"
+                        }
+                        else
+                        {
+                            "Unknown"
+                        }
                     }
-                    elseif ($_.accountSetupStatus -eq 'inProgress') {
-                        "User/Account"
-                    }
-                    else {
-                        "Unknown"
-                    }
-                }},
+                },
                 osVersion,
                 enrollmentState,
                 enrollmentType,
@@ -539,11 +543,19 @@ function Export-AutopilotEventAnalysis()
         $exportOption = Read-Host "Choose export option (1-3)"
         Write-Verbose "[$functionName] User selected export option: $exportOption"
         Write-Log -LogFile $LogFile -Module $functionName -Message "User selected export option: $exportOption" -LogLevel "Information"
-
         $exportPath = Read-Host "Enter output path (leave blank for current directory)"
         if ([string]::IsNullOrWhiteSpace($exportPath))
         {
             $exportPath = "."
+        }
+        else
+        {
+            if (-not (Test-Path -Path $exportPath -PathType Container))
+            {
+                Write-Host "Output path does not exist. Creating directory: $exportPath" -ForegroundColor Yellow
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Output path does not exist. Creating directory: $exportPath" -LogLevel "Warning"
+                New-Item -Path $exportPath -ItemType Directory | Out-Null
+            }
         }
         Write-Verbose "[$functionName] Export path set to: $exportPath"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Export path set to: $exportPath" -LogLevel "Verbose"
