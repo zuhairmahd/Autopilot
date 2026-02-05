@@ -3,37 +3,37 @@ function Show-AutopilotProfilesEditor()
     <#
     .SYNOPSIS
         Interactive editor for domain-level Autopilot profile settings.
-    
+
     .DESCRIPTION
         Provides an interactive interface for users to modify autopilotProfilesToInclude
-        arrays at the domain level. These settings control which Autopilot profiles are 
+        arrays at the domain level. These settings control which Autopilot profiles are
         considered valid for device assignment operations. Uses the existing Update-Setting
         infrastructure to maintain consistency with other settings management.
-    
+
     .PARAMETER SettingsFile
         Path to the settings.psd1 file. Defaults to "settings.psd1".
-    
+
     .PARAMETER DomainName
-        The domain name for which to edit Autopilot profile settings. If not provided, will attempt 
-        to use the currently loaded domain from the session. If no loaded domain is 
+        The domain name for which to edit Autopilot profile settings. If not provided, will attempt
+        to use the currently loaded domain from the session. If no loaded domain is
         available, will prompt user to select from available domains.
-    
+
     .PARAMETER AccessToken
         Microsoft Graph access token for Autopilot profile validation and search.
-    
+
     .PARAMETER Silent
         If specified, uses defaults and minimal output.
-    
+
     .OUTPUTS
         System.Boolean
         Returns $true if settings were successfully updated, $false otherwise.
-    
+
     .EXAMPLE
         Show-AutopilotProfilesEditor -DomainName "contoso.com" -AccessToken $token
-    
+
     .EXAMPLE
         Show-AutopilotProfilesEditor -SettingsFile "settings.psd1" -AccessToken $token
-    
+
     .NOTES
         - Maintains PowerShell 5.1 compatibility
         - Uses existing Update-Setting function for data persistence
@@ -48,30 +48,30 @@ function Show-AutopilotProfilesEditor()
         [string]$AccessToken,
         [switch]$Silent
     )
-    
+
     $functionName = $MyInvocation.MyCommand.Name
     Write-Log -LogFile $logFile -Module $functionName -Message "Starting Autopilot profiles editor for domain: '$DomainName'" -LogLevel "Verbose"
     Write-Verbose "[$functionName] Starting Autopilot profiles editor for domain: '$DomainName'"
-    
+
     try
     {
         # Check if settings file exists for configuration path determination
         Write-Log -LogFile $logFile -Module $functionName -Message "Checking settings file: $SettingsFile" -LogLevel "Verbose"
         Write-Verbose "[$functionName] Checking settings file: $SettingsFile"
-        
+
         if (-not (Test-Path -Path $SettingsFile))
         {
             Write-Log -LogFile $logFile -Module $functionName -Message "Settings file not found: $SettingsFile" -LogLevel "Verbose"
             Write-Warning "[$functionName] Settings file not found: $SettingsFile"
             return $false
         }
-        
+
         # Get domain name if not specified - use consolidated logic
         if ([string]::IsNullOrWhiteSpace($DomainName))
         {
             Write-Log -LogFile $logFile -Module $functionName -Message "No domain specified, attempting to determine current domain" -LogLevel "Verbose"
             Write-Verbose "[$functionName] No domain specified, attempting to determine current domain"
-            
+
             $DomainName = Get-DomainForEditor -DomainName $DomainName -SettingsFile $SettingsFile -Silent:$Silent
             if ([string]::IsNullOrWhiteSpace($DomainName))
             {
@@ -79,12 +79,12 @@ function Show-AutopilotProfilesEditor()
                 return $false
             }
         }
-        
+
         # Validate domain exists and load domain configuration using new architecture
         $configPath = Split-Path $SettingsFile -Parent
         Write-Log -LogFile $logFile -Module $functionName -Message "Loading domain configuration for '$DomainName' from: $configPath" -LogLevel "Verbose"
         Write-Verbose "[$functionName] Loading domain configuration for '$DomainName' from: $configPath"
-        
+
         $domainConfig = Get-DomainConfigurationFromFiles -DomainName $DomainName -ConfigurationPath $configPath
         if ($null -eq $domainConfig)
         {
@@ -92,16 +92,16 @@ function Show-AutopilotProfilesEditor()
             Write-Warning "[$functionName] Domain '$DomainName' configuration not found"
             return $false
         }
-        
+
         Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded domain configuration for '$DomainName'" -LogLevel "Information"
         Write-Verbose "[$functionName] Successfully loaded domain configuration for '$DomainName'"
-        
+
         # Get current Autopilot profile settings - preserve arrays even if empty
         # Force array type to prevent PowerShell from unwrapping single-element arrays
         $currentAutopilotProfiles = @($domainConfig.autopilotProfilesToInclude)
         Write-Log -LogFile $logFile -Module $functionName -Message "Domain '$DomainName' has $($currentAutopilotProfiles.Count) Autopilot profiles" -LogLevel "Information"
         Write-Verbose "[$functionName] Domain '$DomainName' has $($currentAutopilotProfiles.Count) Autopilot profiles"
-        
+
         if (-not $Silent)
         {
             Write-Host "`n══ Autopilot Profiles Editor ══" -ForegroundColor Cyan
@@ -109,7 +109,7 @@ function Show-AutopilotProfilesEditor()
             Write-Host "    $DomainName" -ForegroundColor Yellow
             Write-Host "These settings control which Autopilot profiles are considered valid for device assignment.`n" -ForegroundColor Gray
         }
-        
+
         # Create Autopilot profiles editing menu using the menu system
         if (-not $Silent)
         {
@@ -117,7 +117,7 @@ function Show-AutopilotProfilesEditor()
             $autopilotProfilesEditMenu = NewMenu -MenuName "autopilotProfilesEditMenu"
             # Update the title to include the actual domain name
             $autopilotProfilesEditMenu.Title = $autopilotProfilesEditMenu.Title -replace '\$DomainName', $DomainName
-            
+
             # Set actions for the menu items
             $autopilotProfilesEditMenu = AddMenuItem -Menu $autopilotProfilesEditMenu -Name "Modify Autopilot profiles to include" -Action {
                 Write-Host "Selected: Modify Autopilot profiles to include" -ForegroundColor Green
@@ -127,7 +127,7 @@ function Show-AutopilotProfilesEditor()
                 Write-Host "Selected: View current Autopilot profile settings" -ForegroundColor Cyan
                 return 'view'
             } -ReturnsValue
-            
+
             # Loop: after editing profiles, return to the profile management menu
             while ($true)
             {
@@ -139,7 +139,7 @@ function Show-AutopilotProfilesEditor()
                     Write-Verbose "[$functionName] ShowMenu returned navigation option: '$profileChoice', treating as navigation"
                     break
                 }
-                
+
                 # Process the user's choice
                 if ($profileChoice -eq 'modify')
                 {
@@ -148,23 +148,23 @@ function Show-AutopilotProfilesEditor()
                     Write-Host "Current Autopilot profiles:" -ForegroundColor Cyan
                     Write-Log -LogFile $logFile -Module $functionName -Message "Found $($currentAutopilotProfiles.Count) Autopilot profiles" -LogLevel "Information"
                     Write-Verbose "[$functionName] Current Autopilot profiles count: $($currentAutopilotProfiles.Count)"
-                    
+
                     if ($currentAutopilotProfiles -and $currentAutopilotProfiles.Count -gt 0)
                     {
-                        Show-EditorArrayContents -Array $currentAutopilotProfiles -ArrayName "Autopilot profiles" 
+                        Show-EditorArrayContents -Array $currentAutopilotProfiles -ArrayName "Autopilot profiles"
                     }
                     else
                     {
                         Write-Host "  (no Autopilot profiles specified)" -ForegroundColor Gray
                     }
-                    
+
                     # Get updated profiles
                     $updatedProfiles = Get-AutopilotProfileArrayInput -CurrentProfiles $currentAutopilotProfiles -AccessToken $AccessToken
                     if ($null -ne $updatedProfiles -and (Compare-EditorArrayContents -Array1 $currentAutopilotProfiles -Array2 $updatedProfiles))
                     {
                         Write-Log -LogFile $logFile -Module $functionName -Message "Autopilot profiles changed" -LogLevel "Information"
                         Write-Verbose "[$functionName] Autopilot profiles changed"
-                        
+
                         # Save changes immediately
                         Write-Host "`nSaving changes..." -ForegroundColor Yellow
                         $success = Update-DomainArraySetting -SettingsFile $SettingsFile -DomainName $DomainName -SettingName "autopilotProfilesToInclude" -SettingValue $updatedProfiles
@@ -191,7 +191,7 @@ function Show-AutopilotProfilesEditor()
                     Write-Host "Domain: $DomainName`n" -ForegroundColor Yellow
                     Write-Host "Autopilot Profiles to Include:" -ForegroundColor Green
                     Write-Verbose "[$functionName] Found $($currentAutopilotProfiles.count) Autopilot profiles"
-                    write-log -LogFile $logFile -Module $functionName -Message "Found $($currentAutopilotProfiles.count) Autopilot profiles" -LogLevel "Information"
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Found $($currentAutopilotProfiles.count) Autopilot profiles" -LogLevel "Information"
                     if ($currentAutopilotProfiles -and $currentAutopilotProfiles.Count -gt 0)
                     {
                         # Detect format and display accordingly
@@ -199,26 +199,26 @@ function Show-AutopilotProfilesEditor()
                         if ($null -ne $firstElement)
                         {
                             Write-Verbose "[$functionName] First element type: $($firstElement.GetType().FullName)"
-                            write-log -LogFile $logFile -Module $functionName -Message "First element type: $($firstElement.GetType().FullName)" -LogLevel "Information"
-                        }                       
+                            Write-Log -LogFile $logFile -Module $functionName -Message "First element type: $($firstElement.GetType().FullName)" -LogLevel "Information"
+                        }
                         if ($firstElement -is [string])
                         {
                             # Old string format
                             Write-Verbose "[$functionName] Detected string array format for Autopilot profiles"
-                            write-log -LogFile $logFile -Module $functionName -Message "Detected string array format for Autopilot profiles" -LogLevel "Information"
+                            Write-Log -LogFile $logFile -Module $functionName -Message "Detected string array format for Autopilot profiles" -LogLevel "Information"
                             foreach ($autopilotProfile in $currentAutopilotProfiles)
                             {
                                 Write-Host "  - $autopilotProfile" -ForegroundColor White
                             }
                             Write-Host "  Total: $($currentAutopilotProfiles.Count) profile(s) [Legacy Format]" -ForegroundColor Yellow
                         }
-                        elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and 
-                            (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name')) -or 
+                        elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and
+                            (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name')) -or
                             ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name'))))
                         {
                             # New hashtable format
                             Write-Verbose "[$functionName] Detected hashtable format for Autopilot profiles"
-                            write-log -LogFile $logFile -Module $functionName -Message "Detected hashtable format for Autopilot profiles" -LogLevel "Information"           
+                            Write-Log -LogFile $logFile -Module $functionName -Message "Detected hashtable format for Autopilot profiles" -LogLevel "Information"
                             foreach ($autopilotProfile in $currentAutopilotProfiles)
                             {
                                 Write-Host " - Name: $($autopilotProfile.name)" -ForegroundColor White
@@ -237,9 +237,9 @@ function Show-AutopilotProfilesEditor()
                         {
                             # Fallback for unknown format
                             Write-Verbose "[$functionName] Unknown format for Autopilot profiles, displaying raw values"
-                            write-log -LogFile $logFile -Module $functionName -Message "Unknown format for Autopilot profiles, displaying raw values" -LogLevel "Warning"
+                            Write-Log -LogFile $logFile -Module $functionName -Message "Unknown format for Autopilot profiles, displaying raw values" -LogLevel "Warning"
                             foreach ($autopilotProfile in $currentAutopilotProfiles)
-                            {   
+                            {
                                 Write-Host " - $autopilotProfile" -ForegroundColor White
                             }
                             Write-Host " Total: $($currentAutopilotProfiles.Count) profile(s)" -ForegroundColor Gray
@@ -248,9 +248,9 @@ function Show-AutopilotProfilesEditor()
                     else
                     {
                         Write-Host " (no Autopilot profiles specified)" -ForegroundColor Gray
-                        write-log -LogFile $logFile -Module $functionName -Message "No Autopilot profiles specified" -LogLevel "Warning"
+                        Write-Log -LogFile $logFile -Module $functionName -Message "No Autopilot profiles specified" -LogLevel "Warning"
                     }
-                    
+
                     Write-Host "`nPress any key to continue..." -ForegroundColor Yellow
                     [void][System.Console]::ReadKey($true)
                 }
@@ -261,7 +261,7 @@ function Show-AutopilotProfilesEditor()
                 return $profileChoice
             }
         }
-        
+
         # Since settings are now saved immediately after each edit operation,
         # we no longer need to defer saving until the end
         Write-Log -LogFile $logFile -Module $functionName -Message "Autopilot profiles editor completed" -LogLevel "Information"
@@ -291,11 +291,11 @@ function Get-AutopilotProfileArrayInput()
         [array]$CurrentProfiles,
         [string]$AccessToken  # Added for profile ID resolution
     )
-    
+
     $functionName = $MyInvocation.MyCommand.Name
     Write-Log -LogFile $logFile -Module $functionName -Message "Getting Autopilot profile array input" -LogLevel "Verbose"
     Write-Verbose "[$functionName] Getting Autopilot profile array input"
-    
+
     # Detect current format and display appropriately
     $currentFormat = "Empty"
     if ($CurrentProfiles -and $CurrentProfiles.Count -gt 0)
@@ -305,8 +305,8 @@ function Get-AutopilotProfileArrayInput()
         {
             $currentFormat = "StringArray"
         }
-        elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and 
-            (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name') -and $firstElement.ContainsKey('id')) -or 
+        elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and
+            (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name') -and $firstElement.ContainsKey('id')) -or
             ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name') -and ($firstElement.PSObject.Properties.Name -contains 'id'))))
         {
             $currentFormat = "HashTableArray"
@@ -316,12 +316,12 @@ function Get-AutopilotProfileArrayInput()
             $currentFormat = "Unknown"
         }
     }
-    
+
     Write-Log -LogFile $logFile -Module $functionName -Message "Current Autopilot profiles format: $currentFormat" -LogLevel "Verbose"
-    
+
     # Get user decision for replace/add/keep
     $decision = Get-EditorReplaceOrAddChoice -CurrentArray $CurrentProfiles -ItemType 'profile'
-    
+
     if ($decision.ShouldProceed)
     {
         # Display operation mode banner
@@ -337,7 +337,7 @@ function Get-AutopilotProfileArrayInput()
             Write-Host " MODE: ADD - New profiles will be added" -ForegroundColor Green
             Write-Host "=======================================" -ForegroundColor Green
         }
-    
+
         if ($CurrentProfiles -and $CurrentProfiles.Count -gt 0)
         {
             Write-Host "`nCurrent profiles:" -ForegroundColor Cyan
@@ -370,7 +370,7 @@ function Get-AutopilotProfileArrayInput()
         Write-Host " * Profile names will be searched and resolved interactively" -ForegroundColor Gray
         Write-Host " * Press Enter on empty line to finish" -ForegroundColor Gray
         Write-Host " * Leave first line empty to cancel" -ForegroundColor Gray
-    
+
         $newProfilesHashTable = @()
         $firstInput = $true
         do
@@ -379,7 +379,7 @@ function Get-AutopilotProfileArrayInput()
             {
                 $choice = Read-Host "Profile name"
                 $firstInput = $false
-            
+
                 # If first input is empty, return current profiles
                 if ([string]::IsNullOrWhiteSpace($choice))
                 {
@@ -387,16 +387,16 @@ function Get-AutopilotProfileArrayInput()
                     Write-Verbose "[$functionName] User cancelled input, keeping current Autopilot profiles"
                     return $CurrentProfiles
                 }
-            
+
                 # Process the first profile name
                 # For replace mode, check against building list; for add mode, check against current + building list
                 $checkList = if ($decision.ShouldReplaceExisting)
                 {
-                    $newProfilesHashTable 
+                    $newProfilesHashTable
                 }
                 else
                 {
-                    $CurrentProfiles + $newProfilesHashTable 
+                    $CurrentProfiles + $newProfilesHashTable
                 }
                 $resolvedProfile = Resolve-SingleAutopilotProfileInteractive -ProfileName $choice.Trim() -AccessToken $AccessToken -ExistingItems $checkList
                 if ($resolvedProfile)
@@ -417,16 +417,16 @@ function Get-AutopilotProfileArrayInput()
                 {
                     break
                 }
-            
+
                 # Process each additional profile name
                 # For replace mode, check against building list; for add mode, check against current + building list
                 $checkList = if ($decision.ShouldReplaceExisting)
                 {
-                    $newProfilesHashTable 
+                    $newProfilesHashTable
                 }
                 else
                 {
-                    $CurrentProfiles + $newProfilesHashTable 
+                    $CurrentProfiles + $newProfilesHashTable
                 }
                 $resolvedProfile = Resolve-SingleAutopilotProfileInteractive -ProfileName $choice.Trim() -AccessToken $AccessToken -ExistingItems $checkList
                 if ($resolvedProfile)
@@ -441,7 +441,7 @@ function Get-AutopilotProfileArrayInput()
                 }
             }
         } while ($true)
-        
+
         # Show summary of what will be saved
         Write-Host ""
         if ($decision.ShouldReplaceExisting)
@@ -462,9 +462,9 @@ function Get-AutopilotProfileArrayInput()
             Write-Host "Total profiles: $($CurrentProfiles.Count + $newProfilesHashTable.Count)" -ForegroundColor Cyan
         }
         Write-Host ""
-        
+
         # Determine final result based on user choice and format compatibility
-    
+
         if ($decision.ShouldReplaceExisting -or -not $CurrentProfiles -or $CurrentProfiles.Count -eq 0)
         {
             # Replace existing profiles
@@ -474,7 +474,7 @@ function Get-AutopilotProfileArrayInput()
         {
             # Add to existing profiles - need to handle format conversion
             $combinedProfiles = @()
-        
+
             # Add existing profiles in hashtable format
             if ($currentFormat -eq "HashTableArray")
             {
@@ -492,7 +492,7 @@ function Get-AutopilotProfileArrayInput()
                     }
                 }
             }
-        
+
             # Add new profiles
             $combinedProfiles += $newProfilesHashTable
             $result = $combinedProfiles
@@ -508,7 +508,7 @@ function Get-AutopilotProfileArrayInput()
         Write-Verbose "[$functionName] User chose to keep current Autopilot profiles unchanged"
         $result = $CurrentProfiles
     }
-    
+
     Write-Log -LogFile $logFile -Module $functionName -Message "Returning Autopilot profile array with $($result.Count) profiles in hashtable format" -LogLevel "Information"
     Write-Verbose "[$functionName] Returning Autopilot profile array with $($result.Count) profiles in hashtable format"
     return $result
@@ -521,7 +521,7 @@ function Resolve-SingleAutopilotProfileInteractive()
         Resolves a single Autopilot profile name to profile object using interactive search.
         Uses GetAutopilotProfile function for better search capabilities.
         Checks for duplicates against existing items.
-    
+
     .PARAMETER Silent
         If specified and a single exact match is found, returns the profile without prompting.
         Interactive prompts still occur for multiple matches or no matches.
@@ -533,8 +533,8 @@ function Resolve-SingleAutopilotProfileInteractive()
         [array]$ExistingItems = @(),
         [switch]$Silent
     )
-    
-    $FunctionName = $MyInvocation.MyCommand.Name    
+
+    $FunctionName = $MyInvocation.MyCommand.Name
     Write-Log -LogFile $logFile -Module $FunctionName -Message "Resolving Autopilot profile: '$ProfileName'" -LogLevel "Verbose"
     if (-not $AccessToken)
     {
@@ -544,7 +544,7 @@ function Resolve-SingleAutopilotProfileInteractive()
             id   = $null
         }
     }
-    
+
     try
     {
         # First try exact match
@@ -556,16 +556,16 @@ function Resolve-SingleAutopilotProfileInteractive()
         {
             Write-Verbose "[$FunctionName] Searching for Autopilot profile: '$ProfileName' (Silent mode)"
         }
-        
+
         $result, $wasSubstringSearch = GetAutopilotProfile -AccessToken $AccessToken -ProfileName $ProfileName
-        
+
         if ($result -and $result.value -and $result.value.Count -gt 0)
         {
             if ($result.value.Count -eq 1)
             {
                 # Single exact match found
                 $autopilotProfile = $result.value[0]
-                
+
                 # Check for duplicate
                 if (Test-ItemExists -ItemName $autopilotProfile.displayName -ItemId $autopilotProfile.id -ExistingList $ExistingItems)
                 {
@@ -576,7 +576,7 @@ function Resolve-SingleAutopilotProfileInteractive()
                     Write-Log -LogFile $logFile -Module $FunctionName -Message "Duplicate profile detected: '$($autopilotProfile.displayName)'" -LogLevel "Warning"
                     return $null
                 }
-                
+
                 # In Silent mode with exact match, automatically accept without prompting
                 if ($Silent)
                 {
@@ -587,7 +587,7 @@ function Resolve-SingleAutopilotProfileInteractive()
                 {
                     Write-Host " Found profile: '$($autopilotProfile.displayName)' (ID: $($autopilotProfile.id))" -ForegroundColor Green
                 }
-                
+
                 return @{
                     name = $autopilotProfile.displayName
                     id   = $autopilotProfile.id
@@ -603,7 +603,7 @@ function Resolve-SingleAutopilotProfileInteractive()
                     Write-Host " $($i + 1). $($autopilotProfile.displayName) (ID: $($autopilotProfile.id))" -ForegroundColor White
                 }
                 Write-Host " 0. Skip this profile" -ForegroundColor Gray
-                
+
                 do
                 {
                     $choice = Read-Host " Select profile (0 - $($result.value.Count))"
@@ -618,7 +618,7 @@ function Resolve-SingleAutopilotProfileInteractive()
                         $selectedProfile = $result.value[[int]$choice - 1]
                         Write-Host " Selected: '$($selectedProfile.displayName)'" -ForegroundColor Green
                         Write-Log -LogFile $logFile -Module $FunctionName -Message "User selected Autopilot profile: '$($selectedProfile.displayName)' (ID: $($selectedProfile.id))" -LogLevel "Verbose"
-                        
+
                         # Check for duplicate
                         if (Test-ItemExists -ItemName $selectedProfile.displayName -ItemId $selectedProfile.id -ExistingList $ExistingItems)
                         {
@@ -626,7 +626,7 @@ function Resolve-SingleAutopilotProfileInteractive()
                             Write-Log -LogFile $logFile -Module $FunctionName -Message "Duplicate profile detected: '$($selectedProfile.displayName)'" -LogLevel "Warning"
                             return $null
                         }
-                        
+
                         return @{
                             name = $selectedProfile.displayName
                             id   = $selectedProfile.id
@@ -641,7 +641,7 @@ function Resolve-SingleAutopilotProfileInteractive()
             # No exact match, try similarity search
             Write-Host " No exact match found. Searching for similar Autopilot profiles..." -ForegroundColor Yellow
             $similarResult, $wasSubstringSearch = GetAutopilotProfile -AccessToken $AccessToken -ProfileName $ProfileName -FindSimilar
-            
+
             if ($similarResult -and $similarResult.value -and $similarResult.value.Count -gt 0)
             {
                 Write-Host " Similar Autopilot profiles found:" -ForegroundColor Yellow
@@ -652,7 +652,7 @@ function Resolve-SingleAutopilotProfileInteractive()
                 }
                 Write-Host " 0. Enter different profile name" -ForegroundColor Gray
                 Write-Host " 00. Skip this profile" -ForegroundColor Gray
-                
+
                 do
                 {
                     $choice = Read-Host " Select profile, try different name, or skip (0 / 00 / 1 - $($similarResult.value.Count))"
@@ -682,7 +682,7 @@ function Resolve-SingleAutopilotProfileInteractive()
                         $selectedProfile = $similarResult.value[[int]$choice - 1]
                         Write-Host " Selected: '$($selectedProfile.displayName)'" -ForegroundColor Green
                         Write-Log -LogFile $logFile -Module $FunctionName -Message "User selected similar Autopilot profile: '$($selectedProfile.displayName)' (ID: $($selectedProfile.id))" -LogLevel "Verbose"
-                        
+
                         # Check for duplicate
                         if (Test-ItemExists -ItemName $selectedProfile.displayName -ItemId $selectedProfile.id -ExistingList $ExistingItems)
                         {
@@ -690,7 +690,7 @@ function Resolve-SingleAutopilotProfileInteractive()
                             Write-Log -LogFile $logFile -Module $FunctionName -Message "Duplicate profile detected: '$($selectedProfile.displayName)'" -LogLevel "Warning"
                             return $null
                         }
-                        
+
                         return @{
                             name = $selectedProfile.displayName
                             id   = $selectedProfile.id
@@ -708,7 +708,7 @@ function Resolve-SingleAutopilotProfileInteractive()
                 Write-Host " 2. View all Autopilot profiles" -ForegroundColor White
                 Write-Host " 3. Save profile name without ID (will resolve later)" -ForegroundColor White
                 Write-Host " 4. Skip this profile" -ForegroundColor White
-                
+
                 do
                 {
                     $choice = Read-Host " Select option (1 - 4)"
@@ -734,9 +734,9 @@ function Resolve-SingleAutopilotProfileInteractive()
                             Write-Host ""
                             Write-Host " Retrieving all Autopilot profiles..." -ForegroundColor Cyan
                             Write-Log -LogFile $logFile -Module $FunctionName -Message "User chose to view all Autopilot profiles" -LogLevel "Verbose"
-                            
+
                             $allProfilesResult, $wasSubstringSearch = GetAutopilotProfile -AccessToken $AccessToken -GetAll
-                            
+
                             if ($allProfilesResult -and $allProfilesResult.value -and $allProfilesResult.value.Count -gt 0)
                             {
                                 Write-Host " All Autopilot profiles ($($allProfilesResult.value.Count) total):" -ForegroundColor Yellow
@@ -746,7 +746,7 @@ function Resolve-SingleAutopilotProfileInteractive()
                                     Write-Host " $($i + 1). $($autopilotProfile.displayName) (ID: $($autopilotProfile.id))" -ForegroundColor White
                                 }
                                 Write-Host " 0. Go back to options" -ForegroundColor Gray
-                                
+
                                 do
                                 {
                                     $profileChoice = Read-Host " Select profile (0 - $($allProfilesResult.value.Count))"
@@ -760,7 +760,7 @@ function Resolve-SingleAutopilotProfileInteractive()
                                         $selectedProfile = $allProfilesResult.value[[int]$profileChoice - 1]
                                         Write-Host " Selected: '$($selectedProfile.displayName)'" -ForegroundColor Green
                                         Write-Log -LogFile $logFile -Module $FunctionName -Message "User selected Autopilot profile from all profiles list: '$($selectedProfile.displayName)' (ID: $($selectedProfile.id))" -LogLevel "Verbose"
-                                        
+
                                         # Check for duplicate
                                         if (Test-ItemExists -ItemName $selectedProfile.displayName -ItemId $selectedProfile.id -ExistingList $ExistingItems)
                                         {
@@ -768,7 +768,7 @@ function Resolve-SingleAutopilotProfileInteractive()
                                             Write-Log -LogFile $logFile -Module $FunctionName -Message "Duplicate profile detected: '$($selectedProfile.displayName)'" -LogLevel "Warning"
                                             return $null
                                         }
-                                        
+
                                         return @{
                                             name = $selectedProfile.displayName
                                             id   = $selectedProfile.id
@@ -814,7 +814,7 @@ function Resolve-SingleAutopilotProfileInteractive()
     {
         Write-Warning "[$FunctionName] Error resolving Autopilot profile '[REDACTED]': $($_.Exception.Message)"
         Write-Log -LogFile $logFile -Module $FunctionName -Message "Error resolving Autopilot profile '[REDACTED]': $($_.Exception.Message)" -LogLevel "Warning"
-        
+
         Write-Host " Error occurred while searching for Autopilot profile. Save without ID? (y/n)" -ForegroundColor Red
         $choice = Read-Host
         if ($choice -eq 'y' -or $choice -eq 'Y')

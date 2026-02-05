@@ -49,7 +49,7 @@ function ShowDeviceReport()
     # Use with hashtable (original DisplayReport functionality)
     #Show-DeviceReport -report $myHashtable -PrefixList @('Custom', 'Prefix')
     # Direct export without prompting
-    #Show-DeviceReport -enrollmentState $state -Export -ExportFormat "CSV"   
+    #Show-DeviceReport -enrollmentState $state -Export -ExportFormat "CSV"
     #endregion usage info
     $functionName = $MyInvocation.MyCommand.Name
     #region write verbose log of received parameters
@@ -72,11 +72,11 @@ function ShowDeviceReport()
     #endregion write verbose log of received parameters
     #region Build report data
     $output = [ordered]@{}
-    
+
     if ($PSCmdlet.ParameterSetName -eq 'EnrollmentState')
     {
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Building report from enrollment state" -LogLevel "Information"
-        
+
         # Get latest autopilot event
         if ($enrollmentState.autopilot.events -and $enrollmentState.autopilot.events.Count -gt 0)
         {
@@ -88,7 +88,7 @@ function ShowDeviceReport()
             $latestAutopilotEvent = $null
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "No autopilot events found" -LogLevel "Verbose"
         }
-        
+
         $output = [ordered] @{
             InputIdentifier               = $SerialNumber
             IntuneDeviceName              = $enrollmentState.managedDevice.device.deviceName
@@ -97,19 +97,19 @@ function ShowDeviceReport()
             IntuneManagedDeviceId         = $enrollmentState.managedDevice.device.Id
             IntuneEnrollmentDate          = if ($enrollmentState.managedDevice.device.enrolledDateTime)
             {
-                $enrollmentState.managedDevice.device.enrolledDateTime | FormatDateWithTimeZone 
+                $enrollmentState.managedDevice.device.enrolledDateTime | FormatDateWithTimeZone
             }
             else
             {
-                $null 
+                $null
             }
             IntuneLastSync                = if ($enrollmentState.managedDevice.device.lastSyncDateTime)
             {
-                $enrollmentState.managedDevice.device.lastSyncDateTime | FormatDateWithTimeZone 
+                $enrollmentState.managedDevice.device.lastSyncDateTime | FormatDateWithTimeZone
             }
             else
             {
-                $null 
+                $null
             }
             IntuneEnrollmentProfile       = $enrollmentState.managedDevice.device.enrollmentProfileName
             IntunePrimaryUPN              = $enrollmentState.managedDevice.device.userPrincipalName
@@ -118,28 +118,28 @@ function ShowDeviceReport()
             IntuneReportedUserDisplayName = $enrollmentState.managedDevice.device.userDisplayName
             IntuneLastLogon               = if ($enrollmentState.managedDevice.users.lastLogOnDateTime)
             {
-                $enrollmentState.managedDevice.users.lastLogOnDateTime | FormatDateWithTimeZone 
+                $enrollmentState.managedDevice.users.lastLogOnDateTime | FormatDateWithTimeZone
             }
             else
             {
-                $null 
+                $null
             }
             IntuneActionResults           = $enrollmentState.managedDevice.device.deviceActionResults
             IntuneCertExpiration          = if ($enrollmentState.managedDevice.device.managementCertificateExpirationDate)
             {
-                $enrollmentState.managedDevice.device.managementCertificateExpirationDate | FormatDateWithTimeZone 
+                $enrollmentState.managedDevice.device.managementCertificateExpirationDate | FormatDateWithTimeZone
             }
             else
             {
-                $null 
+                $null
             }
             IntuneComplianceExpiry        = if ($enrollmentState.managedDevice.device.complianceGracePeriodExpirationDateTime)
             {
-                $enrollmentState.managedDevice.device.complianceGracePeriodExpirationDateTime | FormatDateWithTimeZone 
+                $enrollmentState.managedDevice.device.complianceGracePeriodExpirationDateTime | FormatDateWithTimeZone
             }
             else
             {
-                $null 
+                $null
             }
             IntuneAutopilotEnrolled       = $enrollmentState.managedDevice.device.autopilotEnrolled
             IntuneRegistrationState       = $enrollmentState.managedDevice.device.deviceRegistrationState
@@ -154,35 +154,35 @@ function ShowDeviceReport()
             AutopilotProfileAssigned      = $enrollmentState.autopilot.device.deploymentProfileAssignmentStatus
             AutopilotProfileAssignedDate  = if ($enrollmentState.autopilot.device.deploymentProfileAssignedDateTime)
             {
-                $enrollmentState.autopilot.device.deploymentProfileAssignedDateTime | FormatDateWithTimeZone 
+                $enrollmentState.autopilot.device.deploymentProfileAssignedDateTime | FormatDateWithTimeZone
             }
             else
             {
-                $null 
+                $null
             }
             AutopilotProfileName          = $enrollmentState.autopilot.device.deploymentProfile.displayName
             AutopilotAssignedUser         = $enrollmentState.autopilot.device.userPrincipalName
             AutopilotLastContacted        = if ($enrollmentState.autopilot.device.lastContactedDateTime)
             {
-                $enrollmentState.autopilot.device.lastContactedDateTime | FormatDateWithTimeZone 
+                $enrollmentState.autopilot.device.lastContactedDateTime | FormatDateWithTimeZone
             }
             else
             {
-                $null 
+                $null
             }
             AutopilotLatestEventTime      = if ($latestAutopilotEvent -and $latestAutopilotEvent.eventDateTime)
             {
-                $latestAutopilotEvent.eventDateTime | FormatDateWithTimeZone 
+                $latestAutopilotEvent.eventDateTime | FormatDateWithTimeZone
             }
             else
             {
-                $null 
+                $null
             }
             AutopilotLatestProfile        = $latestAutopilotEvent.windowsAutopilotDeploymentProfileDisplayName
             AutopilotLatestStatus         = $latestAutopilotEvent.deploymentState
             AutopilotLatestError          = $latestAutopilotEvent.enrollmentFailureDetails
         }
-        
+
         # Set device name for export if not provided
         if (-not $DeviceName)
         {
@@ -195,19 +195,19 @@ function ShowDeviceReport()
         $output = $report
     }
     #endregion Build report data
-    
+
     #region Format property names and display report
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Formatting output for display" -LogLevel "Information"
     $formattedOutput = [System.Collections.Specialized.OrderedDictionary]::new()
-    
+
     foreach ($key in $output.Keys)
     {
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing property: $key" -LogLevel "Verbose"
-        
+
         # Format the property name to be more readable
         $readableKey = $key
         $matchedPrefix = $null
-        
+
         # Check for prefix matches
         foreach ($prefix in $PrefixList)
         {
@@ -218,7 +218,7 @@ function ShowDeviceReport()
                 break
             }
         }
-        
+
         if ($matchedPrefix)
         {
             $prefix = $matches[1]
@@ -232,7 +232,7 @@ function ShowDeviceReport()
             # Insert spaces before capital letters
             $readableKey = [regex]::Replace($key, '(?<=[a-z])(?=[A-Z])', ' ')
         }
-        
+
         # Format the value based on type
         $formattedValue = $output[$key]
         if ($output[$key] -is [DateTime])
@@ -244,16 +244,16 @@ function ShowDeviceReport()
         {
             $formattedValue = "N/A"
         }
-        
+
         $formattedOutput[$readableKey] = $formattedValue
     }
-    
+
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Formatted $($formattedOutput.Keys.Count) properties for display" -LogLevel "Information"
-    
+
     # Use the generic paging function to display the report
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Invoking Show-PagedContent for device report with $($formattedOutput.Count) properties" -LogLevel "Verbose"
     Write-Verbose "[$functionName] Invoking Show-PagedContent for device report with $($formattedOutput.Count) properties"
-    
+
     # Convert ordered dictionary to array of key-value pairs for paging
     $reportItems = @()
     foreach ($key in $formattedOutput.Keys)
@@ -263,7 +263,7 @@ function ShowDeviceReport()
             Value    = $formattedOutput[$key]
         }
     }
-    
+
     # Build title string to avoid nested quote issues
     $reportTitle = "Device Report"
     if ($DeviceName)
@@ -275,10 +275,10 @@ function ShowDeviceReport()
         $reportTitle += " - $SerialNumber"
     }
     #endregion Format property names and display report
-    
+
     #region Handle menu decision
     $displayAction = {
-        write-log -logFile $LogFile -Module "$functionName" -Message "User selected to display report on screen" -LogLevel "Information"
+        Write-Log -logFile $LogFile -Module "$functionName" -Message "User selected to display report on screen" -LogLevel "Information"
         $pagingResult = Show-PagedContent `
             -Content $reportItems `
             -PageSize 15 `
@@ -295,8 +295,8 @@ function ShowDeviceReport()
         {
             Write-Host "Returning to Device Health Menu due to an error: $pagingResult" -ForegroundColor Yellow
         }
-        return $pagingResult                
-    } 
+        return $pagingResult
+    }
     $HTMLAction = {
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "User selected HTML export" -LogLevel "Information"
         $exportResult = Export-DeviceReport -formattedOutput $formattedOutput -ExportFormat "HTML"
@@ -308,21 +308,21 @@ function ShowDeviceReport()
         {
             Write-Host $exportResult.message -ForegroundColor Red
         }
-        return $exportResult 
-    } 
+        return $exportResult
+    }
     $CSVAction = {
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "User selected CSV export" -LogLevel "Information"
         $exportResult = Export-DeviceReport -formattedOutput $formattedOutput -ExportFormat "CSV"
         if ($exportResult.success)
         {
-            Write-Host $exportResult.message -ForegroundColor Green                 
+            Write-Host $exportResult.message -ForegroundColor Green
         }
         else
         {
             Write-Host $exportResult.message -ForegroundColor Red
         }
-        return $exportResult 
-    } 
+        return $exportResult
+    }
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Prompting user for export decision" -LogLevel "Information"
     # Create report menu from configuration
     $reportExportMenu = NewMenu -MenuName "reportExportMenu"
@@ -334,18 +334,18 @@ function ShowDeviceReport()
     $reportExportMenu = AddMenuItem -Menu $reportExportMenu -Name "Display on Screen" -Action $displayAction -ReturnsValue
     $reportExportMenu = AddMenuItem -Menu $reportExportMenu -Name "Export to HTML" -Action $HTMLAction -ReturnsValue
     $reportExportMenu = AddMenuItem -Menu $reportExportMenu -Name "Export to CSV" -Action $CSVAction -ReturnsValue
-    
+
     # Loop to keep showing the menu until user chooses to navigate away
     # Similar approach to ShowGroupAssignments function
     while ($true)
     {
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "=== LOOP ITERATION START ===" -LogLevel "Debug"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "About to call ShowMenu with CalledBy 'Custom_DeviceHealthSubmenu' and StackOperation 'Push'" -LogLevel "Debug"
-        
+
         # Use custom CalledBy context with explicit Push to enable auto-pop after action
         # This ensures the menu stays on the stack during loop but pops after each action completes
         $selection = ShowMenu -Menu $reportExportMenu -CalledBy 'Custom_DeviceHealthSubmenu' -StackOperation 'Push'
-        
+
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "ShowMenu returned. Selection value: '$selection', Type: $(if ($null -eq $selection) { 'null' } else { $selection.GetType().Name })" -LogLevel "Debug"
 
         # Validate that we got a proper selection, not a navigation option
@@ -354,14 +354,14 @@ function ShowDeviceReport()
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "ShowMenu returned navigation option: '$selection', treating as navigation" -LogLevel "Information"
             return $selection
         }
-        
+
         # If selection is null, user may have navigated away
         if ($null -eq $selection)
         {
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "ShowMenu returned null, user may have navigated away" -LogLevel "Information"
             return $null
         }
-        
+
         # If action completed successfully, continue loop to show menu again
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action completed, returning to Device Health Menu" -LogLevel "Information"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "=== LOOP ITERATION END - continuing ===" -LogLevel "Debug"

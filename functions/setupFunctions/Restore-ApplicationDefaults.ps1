@@ -24,7 +24,7 @@ function Restore-ApplicationDefaults()
         [string]$ScriptPath,
         [switch]$Silent
     )
-    
+
     $functionName = $MyInvocation.MyCommand.Name
     $returnObject = @{
         Success            = $false
@@ -32,7 +32,7 @@ function Restore-ApplicationDefaults()
         ProcessedFiles     = @()
         FileCount          = 0
         RemovedFiles       = @()
-        RemovedFileCount   = 0        
+        RemovedFileCount   = 0
         MissingFiles       = @()
         MissingFileCount   = 0
         UndeletedFiles     = @()
@@ -40,16 +40,16 @@ function Restore-ApplicationDefaults()
         UserCancelled      = $false
         ErrorMessages      = @()
     }
-        
-    
+
+
     # Manual validation for FilesToDelete since ValidateNotNullOrEmpty doesn't work well with arrays
     if ($null -eq $FilesToDelete -or $FilesToDelete.Count -eq 0)
     {
         Write-Verbose "[$functionName] No files specified for deletion."
-        Write-Log -LogFile $logFile -Module $functionName -Message "No files specified for deletion." -LogLevel "Error"         
-        return $returnObject            
+        Write-Log -LogFile $logFile -Module $functionName -Message "No files specified for deletion." -LogLevel "Error"
+        return $returnObject
     }
-    
+
     # Build complete list of files to process
     $allFilesToDelete = @($FilesToDelete)
     # Add domain-specific file if it exists
@@ -65,13 +65,13 @@ function Restore-ApplicationDefaults()
         Write-Verbose "[$functionName] Domain file not found: $domainFileName"
         Write-Log -LogFile $logFile -Module $functionName -Message "Domain file not found: $domainFileName" -LogLevel "Verbose"
     }
-    
+
     $returnObject.ProcessedFiles = $allFilesToDelete
     $returnObject.FileCount = $allFilesToDelete.Count
-    
+
     Write-Verbose "[$functionName] Processing $($allFilesToDelete.Count) files for deletion."
     Write-Log -LogFile $logFile -Module $functionName -Message "Processing $($allFilesToDelete.Count) files for deletion."
-    
+
     # Validation check
     if ($allFilesToDelete.Count -eq 0)
     {
@@ -82,7 +82,7 @@ function Restore-ApplicationDefaults()
         $returnObject.ErrorMessages += $errorMessage
         return $returnObject
     }
-    
+
     # User confirmation
     Write-Host "This will restore the application settings to their default values by removing the specified configuration files."
     Write-Host "Files to be deleted:" -ForegroundColor Yellow
@@ -92,37 +92,37 @@ function Restore-ApplicationDefaults()
         Write-Host "  - $fileName" -ForegroundColor Gray
     }
     Write-Host "`nThis operation cannot be undone. Do you want to continue? (Y/N)" -ForegroundColor Yellow
-    if (-not $Silent) 
-    { 
-        $confirmation = Read-Host -Prompt "Enter Y to continue or N to cancel" 
-        Write-Verbose "[$functionName] User confirmation received: $confirmation" 
-        Write-Log -LogFile $logFile -Module $functionName -Message "User confirmation received: $confirmation" 
-        while ($confirmation -notin @("Y", "y", "N", "n")) 
-        { 
-            Write-Host "Invalid input. Please enter Y to continue or N to cancel." -ForegroundColor Red 
-            $confirmation = Read-Host -Prompt "Enter Y to continue or N to cancel" 
-            Write-Log -LogFile $logFile -Module $functionName -Message "User provided invalid input. Prompting again." 
-            [console]::beep(1000, 300) 
-        } 
-    } 
-    else 
-    { 
-        $confirmation = 'Y' 
-        Write-Verbose "[$functionName] Silent mode enabled. Automatically proceeding with operation." 
-        Write-Log -LogFile $logFile -Module $functionName -Message "Silent mode enabled. Automatically proceeding with operation." 
-    }               
-    if ($confirmation -in @("N", "n")) 
-    { 
-        $cancelMessage = "Operation cancelled by user." 
-        Write-Host $cancelMessage -ForegroundColor Yellow 
-        Write-Log -LogFile $logFile -Module $functionName -Message $cancelMessage 
-        $returnObject.Message = $cancelMessage 
-        $returnObject.UserCancelled = $true 
-        return $returnObject 
+    if (-not $Silent)
+    {
+        $confirmation = Read-Host -Prompt "Enter Y to continue or N to cancel"
+        Write-Verbose "[$functionName] User confirmation received: $confirmation"
+        Write-Log -LogFile $logFile -Module $functionName -Message "User confirmation received: $confirmation"
+        while ($confirmation -notin @("Y", "y", "N", "n"))
+        {
+            Write-Host "Invalid input. Please enter Y to continue or N to cancel." -ForegroundColor Red
+            $confirmation = Read-Host -Prompt "Enter Y to continue or N to cancel"
+            Write-Log -LogFile $logFile -Module $functionName -Message "User provided invalid input. Prompting again."
+            [console]::beep(1000, 300)
+        }
+    }
+    else
+    {
+        $confirmation = 'Y'
+        Write-Verbose "[$functionName] Silent mode enabled. Automatically proceeding with operation."
+        Write-Log -LogFile $logFile -Module $functionName -Message "Silent mode enabled. Automatically proceeding with operation."
+    }
+    if ($confirmation -in @("N", "n"))
+    {
+        $cancelMessage = "Operation cancelled by user."
+        Write-Host $cancelMessage -ForegroundColor Yellow
+        Write-Log -LogFile $logFile -Module $functionName -Message $cancelMessage
+        $returnObject.Message = $cancelMessage
+        $returnObject.UserCancelled = $true
+        return $returnObject
     }
     # Process file deletions
-    Write-Verbose "[$functionName] Beginning file deletion process."            
-    
+    Write-Verbose "[$functionName] Beginning file deletion process."
+
     foreach ($file in $allFilesToDelete)
     {
         try
@@ -135,8 +135,8 @@ function Restore-ApplicationDefaults()
                 $returnObject.RemovedFiles += $file
                 $returnObject.RemovedFileCount++
                 $fileName = Split-Path -Leaf $file
-                Write-Verbose "[$functionName] Deleted: $fileName"                  
-                write-log -LogFile $logFile -Module $functionName -Message "Deleted: $fileName" -LogLevel "Verbose"                         
+                Write-Verbose "[$functionName] Deleted: $fileName"
+                Write-Log -LogFile $logFile -Module $functionName -Message "Deleted: $fileName" -LogLevel "Verbose"
             }
             else
             {
@@ -145,9 +145,9 @@ function Restore-ApplicationDefaults()
                 $returnObject.MissingFiles += $file
                 $returnObject.MissingFileCount++
                 $fileName = Split-Path -Leaf $file
-                Write-Verbose "[$functionName] Not found: $fileName"                  
-                Write-Log -LogFile $logFile -Module $functionName -Message "Not found: $fileName" -LogLevel "Warning"                           
-            }                                                       
+                Write-Verbose "[$functionName] Not found: $fileName"
+                Write-Log -LogFile $logFile -Module $functionName -Message "Not found: $fileName" -LogLevel "Warning"
+            }
         }
         catch
         {
@@ -159,15 +159,15 @@ function Restore-ApplicationDefaults()
             $returnObject.ErrorMessages += $errorMsg
             $fileName = Split-Path -Leaf $file
             Write-Verbose "[$functionName] Failed: $fileName - $($_.Exception.Message)"
-            Write-Log -LogFile $logFile -Module $functionName -Message "Failed: $fileName - $($_.Exception.Message)" -LogLevel "Error"       
+            Write-Log -LogFile $logFile -Module $functionName -Message "Failed: $fileName - $($_.Exception.Message)" -LogLevel "Error"
         }
     }
-    
+
     # Determine overall success and build comprehensive message
     $totalProcessed = $returnObject.RemovedFileCount + $returnObject.MissingFileCount + $returnObject.UndeletedFileCount
-    Write-Verbose "[$functionName] File deletion process completed. Processed: $totalProcessed, Deleted: $($returnObject.RemovedFileCount), Missing: $($returnObject.MissingFileCount), Failed: $($returnObject.UndeletedFileCount)"                                    
+    Write-Verbose "[$functionName] File deletion process completed. Processed: $totalProcessed, Deleted: $($returnObject.RemovedFileCount), Missing: $($returnObject.MissingFileCount), Failed: $($returnObject.UndeletedFileCount)"
     Write-Log -LogFile $logFile -Module $functionName -Message "File deletion process completed. Processed: $totalProcessed, Deleted: $($returnObject.RemovedFileCount), Missing: $($returnObject.MissingFileCount), Failed: $($returnObject.UndeletedFileCount)" -LogLevel "Verbose"
-    
+
     if ($returnObject.UndeletedFileCount -eq 0)
     {
         # No failures occurred
@@ -206,14 +206,14 @@ function Restore-ApplicationDefaults()
         $returnObject.Message += " $($returnObject.MissingFileCount) file(s) were already missing."
     }
     Write-Verbose "[$functionName] Operation completed. Success: $($returnObject.Success), Deleted: $($returnObject.RemovedFileCount), Missing: $($returnObject.MissingFileCount), Failed: $($returnObject.UndeletedFileCount)"
-    Write-Log -LogFile $logFile -Module $functionName -Message "Operation completed. Success: $($returnObject.Success), Deleted: $($returnObject.RemovedFileCount), Missing: $($returnObject.MissingFileCount), Failed: $($returnObject.UndeletedFileCount)"    
+    Write-Log -LogFile $logFile -Module $functionName -Message "Operation completed. Success: $($returnObject.Success), Deleted: $($returnObject.RemovedFileCount), Missing: $($returnObject.MissingFileCount), Failed: $($returnObject.UndeletedFileCount)"
     return $returnObject
 }
 
 
 function Show-RestoreApplicationDefaultsResults()
 {
-    [CmdletBinding()]                                    
+    [CmdletBinding()]
     param(
         [string[]]$FilesToDelete,
         [string]$Domain,
@@ -221,21 +221,21 @@ function Show-RestoreApplicationDefaultsResults()
         [switch]$Silent
     )
 
-    $functionName = $MyInvocation.MyCommand.Name                        
-    
+    $functionName = $MyInvocation.MyCommand.Name
+
     $restoreResult = Restore-ApplicationDefaults -FilesToDelete $FilesToDelete -Domain $Domain -ScriptPath $ScriptPath -Silent:$Silent
-    Write-Verbose "[$functionName] Restore operation result: $($restoreResult | Out-String)"                    
-    Write-Log -LogFile $logFile -Module $functionName -Message "Restore operation result: $($restoreResult | Out-String)" -LogLevel "Verbose"                                                   
+    Write-Verbose "[$functionName] Restore operation result: $($restoreResult | Out-String)"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Restore operation result: $($restoreResult | Out-String)" -LogLevel "Verbose"
     if ($restoreResult.UserCancelled)
     {
         Write-Host "`nRestore operation cancelled by user." -ForegroundColor Yellow
-        Write-Log -LogFile $logFile -Module $functionName -Message "Restore operation cancelled by user." -LogLevel "Warning"                                                   
+        Write-Log -LogFile $logFile -Module $functionName -Message "Restore operation cancelled by user." -LogLevel "Warning"
         return $returnValues.backoutText
     }
     elseif ($restoreResult.Success)
     {
         Write-Host "`n$($restoreResult.Message)" -ForegroundColor Green
-        Write-Log -LogFile $logFile -Module $functionName -Message "$($restoreResult.Message)" -LogLevel "Information"                                                                              
+        Write-Log -LogFile $logFile -Module $functionName -Message "$($restoreResult.Message)" -LogLevel "Information"
         if ($restoreResult.RemovedFileCount -gt 0)
         {
             Write-Host "Files successfully removed:" -ForegroundColor Green
@@ -243,7 +243,7 @@ function Show-RestoreApplicationDefaultsResults()
             {
                 $fileName = Split-Path -Leaf $file
                 Write-Host "   $fileName" -ForegroundColor Gray
-                Write-Log -LogFile $logFile -Module $functionName -Message "File successfully removed: $fileName" -LogLevel "Information"                                           
+                Write-Log -LogFile $logFile -Module $functionName -Message "File successfully removed: $fileName" -LogLevel "Information"
             }
         }
         Write-Host "\nThe application will now exit. Please restart to use default settings." -ForegroundColor Cyan
@@ -261,27 +261,27 @@ function Show-RestoreApplicationDefaultsResults()
         {
             # Partial success - some files could not be deleted
             Write-Host "`n$($restoreResult.Message)" -ForegroundColor Yellow
-            Write-Log -LogFile $logFile -Module $functionName -Message "$($restoreResult.Message)" -LogLevel "Warning"                                                   
+            Write-Log -LogFile $logFile -Module $functionName -Message "$($restoreResult.Message)" -LogLevel "Warning"
             if ($restoreResult.RemovedFiles.Count -gt 0)
             {
                 Write-Host "`nFiles successfully removed:" -ForegroundColor Green
-                Write-Log -LogFile $logFile -Module $functionName -Message "Files successfully removed:" -LogLevel "Information"                                                                                                                                    
+                Write-Log -LogFile $logFile -Module $functionName -Message "Files successfully removed:" -LogLevel "Information"
                 foreach ($file in $restoreResult.RemovedFiles)
                 {
                     $fileName = Split-Path -Leaf $file
                     Write-Host "   $fileName" -ForegroundColor Gray
-                    Write-Log -LogFile $logFile -Module $functionName -Message "File successfully removed: $fileName" -LogLevel "Information"                               
+                    Write-Log -LogFile $logFile -Module $functionName -Message "File successfully removed: $fileName" -LogLevel "Information"
                 }
             }
             if ($restoreResult.UndeletedFiles.Count -gt 0)
             {
                 Write-Host "`nFiles that could not be deleted:" -ForegroundColor Red
-                Write-Log -LogFile $logFile -Module $functionName -Message "Files that could not be deleted:" -LogLevel "Error"                                         
+                Write-Log -LogFile $logFile -Module $functionName -Message "Files that could not be deleted:" -LogLevel "Error"
                 foreach ($file in $restoreResult.UndeletedFiles)
                 {
                     $fileName = Split-Path -Leaf $file
                     Write-Host "   $fileName" -ForegroundColor Gray
-                    Write-Log -LogFile $logFile -Module $functionName -Message "File could not be deleted: $fileName" -LogLevel "Error"                                         
+                    Write-Log -LogFile $logFile -Module $functionName -Message "File could not be deleted: $fileName" -LogLevel "Error"
                 }
                 Write-Host "`nYou may need to delete these files manually or run as administrator." -ForegroundColor Yellow
             }
@@ -298,42 +298,42 @@ function Show-RestoreApplicationDefaultsResults()
         {
             # Complete failure
             Write-Host "`n$($restoreResult.Message)" -ForegroundColor Red
-            Write-Log -LogFile $logFile -Module $functionName -Message "$($restoreResult.Message)" -LogLevel "Error"                                                                
+            Write-Log -LogFile $logFile -Module $functionName -Message "$($restoreResult.Message)" -LogLevel "Error"
             if ($restoreResult.UndeletedFiles.Count -gt 0)
             {
                 Write-Host "`nFiles that could not be deleted:" -ForegroundColor Red
-                Write-Log -LogFile $logFile -Module $functionName -Message "Files that could not be deleted:" -LogLevel "Error"                                                                         
+                Write-Log -LogFile $logFile -Module $functionName -Message "Files that could not be deleted:" -LogLevel "Error"
                 foreach ($file in $restoreResult.UndeletedFiles)
                 {
                     $fileName = Split-Path -Leaf $file
                     Write-Host "   $fileName" -ForegroundColor Gray
-                    Write-Log -LogFile $logFile -Module $functionName -Message "File could not be deleted: $fileName" -LogLevel "Error"                                                                     
+                    Write-Log -LogFile $logFile -Module $functionName -Message "File could not be deleted: $fileName" -LogLevel "Error"
                 }
             }
             if ($restoreResult.MissingFiles.Count -gt 0)
             {
                 Write-Host "`nFiles that were already missing:" -ForegroundColor Yellow
-                Write-Log -LogFile $logFile -Module $functionName -Message "Files that were already missing:" -LogLevel "Warning"                                                               
+                Write-Log -LogFile $logFile -Module $functionName -Message "Files that were already missing:" -LogLevel "Warning"
                 foreach ($file in $restoreResult.MissingFiles)
                 {
                     $fileName = Split-Path -Leaf $file
                     Write-Host "  ! $fileName" -ForegroundColor Gray
-                    Write-Log -LogFile $logFile -Module $functionName -Message "File was already missing: $fileName" -LogLevel "Warning"                                                               
+                    Write-Log -LogFile $logFile -Module $functionName -Message "File was already missing: $fileName" -LogLevel "Warning"
                 }
             }
             if ($restoreResult.ErrorMessages.Count -gt 0)
             {
                 Write-Host "`nDetailed error information:" -ForegroundColor Red
-                Write-Log -LogFile $logFile -Module $functionName -Message "Detailed error information:" -LogLevel "Error"                              
+                Write-Log -LogFile $logFile -Module $functionName -Message "Detailed error information:" -LogLevel "Error"
                 foreach ($errorMsg in $restoreResult.ErrorMessages)
                 {
                     Write-Host "  $errorMsg" -ForegroundColor Gray
-                    Write-Log -LogFile $logFile -Module $functionName -Message $errorMsg -LogLevel "Error"          
+                    Write-Log -LogFile $logFile -Module $functionName -Message $errorMsg -LogLevel "Error"
                 }
             }
             Write-Host "`nNo files were removed. Please check file permissions or run as administrator." -ForegroundColor Red
-            Write-Log -LogFile $logFile -Module $functionName -Message "No files were removed. Please check file permissions or run as administrator." -LogLevel "Error"                                  
-            Write-Host "`nThe application will now exit." -ForegroundColor Cyan     
+            Write-Log -LogFile $logFile -Module $functionName -Message "No files were removed. Please check file permissions or run as administrator." -LogLevel "Error"
+            Write-Host "`nThe application will now exit." -ForegroundColor Cyan
             return $returnValues.backoutText
         }
     }
