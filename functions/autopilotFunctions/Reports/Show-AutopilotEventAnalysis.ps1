@@ -214,6 +214,11 @@ function Show-AutopilotEventAnalysis()
             Write-Host $AnalysisData.UnknownPhaseFailureCount -NoNewline -ForegroundColor Yellow
             Write-Host " (failure stage unclear)" -ForegroundColor Gray
         }
+
+        # Pause after summary to allow user to review before showing detailed sections
+        Write-Host ""
+        Write-Host ("=" * 60) -ForegroundColor Cyan
+        $null = Read-Host -Prompt "Press Enter to continue to detailed results..."
     }
 
     # In-progress devices
@@ -302,7 +307,7 @@ function Show-AutopilotEventAnalysis()
                 Write-Host ""
             }
 
-            Show-PagedContent -Content $AnalysisData.InProgressEvents -DisplayScriptBlock $displayScript -PageSize 10 -Title "Devices In Progress" -ShowPageInfo $true
+            Show-PagedContent -Content $AnalysisData.InProgressEvents -DisplayScriptBlock $displayScript -PageSize 2 -Title "Devices In Progress" -ShowPageInfo $true
         }
         else
         {
@@ -367,7 +372,7 @@ function Show-AutopilotEventAnalysis()
                 Write-Host ""
             }
 
-            Show-PagedContent -Content $AnalysisData.UsersWithMultipleFailures -DisplayScriptBlock $displayScript -PageSize 5 -Title "Users with Multiple Enrollment Failures" -ShowPageInfo $true
+            Show-PagedContent -Content $AnalysisData.UsersWithMultipleFailures -DisplayScriptBlock $displayScript -PageSize 3 -Title "Users with Multiple Enrollment Failures" -ShowPageInfo $true
         }
         else
         {
@@ -417,7 +422,7 @@ function Show-AutopilotEventAnalysis()
                 Write-Host ""
             }
 
-            Show-PagedContent -Content $AnalysisData.SingleFailureWithSuccess -DisplayScriptBlock $displayScript -PageSize 5 -Title "Users with Single Failure Then Success" -ShowPageInfo $true
+            Show-PagedContent -Content $AnalysisData.SingleFailureWithSuccess -DisplayScriptBlock $displayScript -PageSize 3 -Title "Users with Single Failure Then Success" -ShowPageInfo $true
         }
         else
         {
@@ -492,7 +497,7 @@ function Show-AutopilotEventAnalysis()
                 Write-Host ""
             }
 
-            Show-PagedContent -Content $AnalysisData.FailedDevicesChronological -DisplayScriptBlock $displayScript -PageSize 10 -Title "Failed Devices (Chronological)" -ShowPageInfo $true
+            Show-PagedContent -Content $AnalysisData.FailedDevicesChronological -DisplayScriptBlock $displayScript -PageSize 3 -Title "Failed Devices (Chronological)" -ShowPageInfo $true
         }
         else
         {
