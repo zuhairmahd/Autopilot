@@ -77,7 +77,7 @@ function GetGraphAccessToken()
         [string[]]$Scope,
         [parameter(parameterSetName = 'delegated')]
         [ValidateSet('PublicAuthFlow', 'Interactive', 'Private')]
-        [string]$AuthType = 'Private', 
+        [string]$AuthType = 'Private',
         [parameter(parameterSetName = 'delegated')]
         [switch]$ForceNewToken,
         [parameter(parameterSetName = 'delegated')]
@@ -87,7 +87,7 @@ function GetGraphAccessToken()
         [string]$APIVersion = 'Beta'
     )
     $functionName = $MyInvocation.MyCommand.Name
-        
+
     #region Process config files
     Write-Log -LogFile $LogFile -Module $functionName -Message "Starting Graph access token retrieval" -LogLevel "Verbose"
     # Read and process configuration file
@@ -100,7 +100,7 @@ function GetGraphAccessToken()
 
     Write-Log -LogFile $LogFile -Module $functionName -Message "Accessing config values from in-memory encrypted config" -LogLevel "Debug"
     $configRefreshToken = $null
-    
+
     # Extract the refresh token if it exists using the new encryption system
     try
     {
@@ -125,12 +125,12 @@ function GetGraphAccessToken()
     {
         Write-Host "Force new refresh token requested. Invalidating existing refresh token." -ForegroundColor Yellow
         Write-Verbose "[$functionName] ForceNewRefreshToken requested. Clearing existing refresh token from memory."
-        
+
         # Clear the configRefreshToken variable so a new one will be obtained
         $configRefreshToken = $null
         Write-Verbose "[$functionName] Cleared configRefreshToken variable. New refresh token will be obtained and saved to config."
-    }    
-    
+    }
+
     #get the tenant Id
     try
     {
@@ -150,7 +150,7 @@ function GetGraphAccessToken()
         Write-Error "Tenant ID not found in config file."
         return $null
     }
-    
+
     #get the domain
     try
     {
@@ -170,7 +170,7 @@ function GetGraphAccessToken()
         Write-Error "Domain not found in config file."
         return $null
     }
-    
+
     #get the client id
     try
     {
@@ -190,7 +190,7 @@ function GetGraphAccessToken()
         Write-Error "Client ID not found in config file."
         return $null
     }
-    
+
     #get the client secret
     try
     {
@@ -227,7 +227,7 @@ function GetGraphAccessToken()
             Write-Verbose "[$functionName] Public Auth Flow does not require Client Secret."
         }
     }
-    
+
     # Check for certificate thumbprint (try both "certificateThumbprint" and "thumbprint" for compatibility)
     try
     {
@@ -236,7 +236,7 @@ function GetGraphAccessToken()
         {
             $certificateThumbprint = Get-DecryptedConfigValue -PropertyPath "thumbprint"
         }
-        
+
         if ($certificateThumbprint)
         {
             Write-Verbose "[$functionName] Certificate thumbprint found in config: $certificateThumbprint"
@@ -297,11 +297,11 @@ function GetGraphAccessToken()
         Write-Verbose "[$functionName] Using default scope: $Scope"
     }
     #endregion Process config files
-    
+
     #region Log parameters
     Write-Verbose "[$functionName] Received parameters:"
     Write-Verbose "[$functionName] Configuration File: $configFile"
-    Write-Verbose "[$functionName] Renewal Lead Time: $renewalLeadTime" 
+    Write-Verbose "[$functionName] Renewal Lead Time: $renewalLeadTime"
     Write-Verbose "[$functionName] Secure String: $SecureString"
     Write-Verbose "[$functionName] Force New Token: $ForceNewToken"
     Write-Verbose "[$functionName] Force New Refresh Token: $ForceNewRefreshToken"
@@ -333,43 +333,43 @@ function GetGraphAccessToken()
     if (-not $ForceNewToken)
     {
         Write-Verbose "[$functionName] Attempting to retrieve token from cache."
-        write-log -logFile $logFile -Module $functionName -Message "Attempting to retrieve token from cache."
+        Write-Log -logFile $logFile -Module $functionName -Message "Attempting to retrieve token from cache."
         $accessToken = Get-TokenFromCache -cacheType $CacheType -domain $domain -renewalLeadTime $renewalLeadTime `
             -clientId $clientId -clientSecret $clientSecret -tenantId $tenantId -scopes $Scope `
             -delegated $delegated -cacheFolder $cacheFolder -cacheTokenFile $cacheTokenFile `
             -secureString $SecureString -configFilePath $configFile -configRefreshToken $configRefreshToken
         if ($accessToken)
         {
-            Write-Verbose "[$functionName] Successfully retrieved valid token from cache."                                                  
-            write-log -logFile $logFile -Module $functionName -Message "Successfully retrieved valid token from cache."
+            Write-Verbose "[$functionName] Successfully retrieved valid token from cache."
+            Write-Log -logFile $logFile -Module $functionName -Message "Successfully retrieved valid token from cache."
             return $accessToken
         }
     }
     else
     {
         Write-Host "Force new token requested. Ignoring cache."
-        write-log -logFile $logFile -Module $functionName -Message "Force new token requested. Ignoring cache."                 
+        Write-Log -logFile $logFile -Module $functionName -Message "Force new token requested. Ignoring cache."
     }
     #endregion Try to get token from cache if not forcing new token
-        
+
     #region Authentication flow
     if ($delegated)
     {
-        Write-Verbose "[$functionName] delegated authentication flow selected." 
+        Write-Verbose "[$functionName] delegated authentication flow selected."
         Write-Log -LogFile $LogFile -Module $functionName -Message "Using delegated authentication flow"
         $params = @{
-            tenantId           = $tenantId 
-            clientId           = $clientId 
+            tenantId           = $tenantId
+            clientId           = $clientId
             scopes             = $Scope
-            domain             = $domain 
+            domain             = $domain
             cacheType          = $CacheType
             AuthType           = $AuthType
             cacheTokenFile     = $cacheTokenFile
-            cacheFolder        = $cacheFolder 
+            cacheFolder        = $cacheFolder
             configFilePath     = $configFile
             configRefreshToken = $configRefreshToken
         }
-        
+
         # Debug the scopes parameter being passed
         Write-Verbose "[$functionName] Scope parameter value: '$Scope'"
         Write-Verbose "[$functionName] Scope parameter type: $($Scope.GetType().Name)"
@@ -382,12 +382,12 @@ function GetGraphAccessToken()
             PublicAuthFlow
             {
                 Write-Verbose "[$functionName] Using public authentication flow for delegated token."
-                write-log -logFile $logFile -Module $functionName -Message "Using public authentication flow for delegated token." 
+                Write-Log -logFile $logFile -Module $functionName -Message "Using public authentication flow for delegated token."
             }
             Interactive
             {
                 Write-Verbose "[$functionName] Using interactive authentication flow for delegated token."
-                write-log -logFile $logFile -Module $functionName -Message "Using interactive authentication flow for delegated token."         
+                Write-Log -logFile $logFile -Module $functionName -Message "Using interactive authentication flow for delegated token."
                 $params += @{
                     clientSecret = $clientSecret
                 }
@@ -395,16 +395,16 @@ function GetGraphAccessToken()
             Private
             {
                 Write-Verbose "[$functionName] Using private authentication flow for delegated token."
-                write-log -logFile $logFile -Module $functionName -Message "Using private authentication flow for delegated token."     
+                Write-Log -logFile $logFile -Module $functionName -Message "Using private authentication flow for delegated token."
                 $params += @{
                     clientSecret = $clientSecret
                 }
-            }        
+            }
         }
         if ($NoSaveRefreshToken)
         {
             Write-Verbose "[$functionName] No save refresh token option selected. Not saving refresh token."
-            write-log -logFile $logFile -Module $functionName -Message "No save refresh token option selected. Not saving refresh token."   
+            Write-Log -logFile $logFile -Module $functionName -Message "No save refresh token option selected. Not saving refresh token."
             $params += @{
                 NoSaveRefreshToken = $NoSaveRefreshToken
             }
@@ -412,7 +412,7 @@ function GetGraphAccessToken()
         if ($ForceNewRefreshToken)
         {
             Write-Verbose "[$functionName] Force new refresh token requested. This will force a new authentication flow."
-            write-log -logFile $logFile -Module $functionName -Message "Force new refresh token requested. This will force a new authentication flow."          
+            Write-Log -logFile $logFile -Module $functionName -Message "Force new refresh token requested. This will force a new authentication flow."
             # Add a marker to indicate this was a forced refresh token renewal
             $params += @{
                 ForcedRenewal = $true
@@ -425,11 +425,11 @@ function GetGraphAccessToken()
         # Non-delegated (client credentials) authentication
         Write-Verbose "[$functionName] Using non-delegated (client credentials) authentication flow."
         Write-Log -LogFile $LogFile -Module $functionName -Message "Using non-delegated (client credentials) authentication flow" -LogLevel "Verbose"
-        
+
         if ($tenantId -and $clientId -and ($clientSecret -or $certificateThumbprint))
         {
             Write-Verbose "[$functionName] Preparing parameters for client credentials token retrieval."
-            write-log -logFile $logFile -Module $functionName -Message "Preparing parameters for client credentials token retrieval."
+            Write-Log -logFile $logFile -Module $functionName -Message "Preparing parameters for client credentials token retrieval."
             $params = @{
                 tenantId       = $tenantId
                 clientId       = $clientId
@@ -438,34 +438,34 @@ function GetGraphAccessToken()
                 cacheTokenFile = $cacheTokenFile
                 cacheFolder    = $cacheFolder
             }
-            
+
             if ($clientSecret)
             {
                 Write-Verbose "[$functionName] Using client secret for authentication."
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Using client secret for authentication" -LogLevel "Verbose"
                 $params['clientSecret'] = $clientSecret
             }
-            
+
             if ($certificateThumbprint)
             {
                 Write-Verbose "[$functionName] Using certificate thumbprint for authentication: $certificateThumbprint"
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Using certificate thumbprint for authentication: $certificateThumbprint" -LogLevel "Verbose"
                 $params['certificateThumbprint'] = $certificateThumbprint
             }
-            
+
             if ($clientSecret -and $certificateThumbprint)
             {
                 Write-Verbose "[$functionName] Both client secret and certificate available - will try certificate first with fallback to secret."
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Both client secret and certificate available - will try certificate first with fallback to secret" -LogLevel "Warning"
             }
-            
+
             if ($SecureString)
             {
-                Write-Verbose "[$functionName] Secure string option selected. Returning token as SecureString."         
-                write-log -logFile $logFile -Module $functionName -Message "Secure string option selected. Returning token as SecureString."   
+                Write-Verbose "[$functionName] Secure string option selected. Returning token as SecureString."
+                Write-Log -logFile $logFile -Module $functionName -Message "Secure string option selected. Returning token as SecureString."
                 $params['secureString'] = $true
             }
-            
+
             return Get-ClientCredentialsToken @params
         }
         else

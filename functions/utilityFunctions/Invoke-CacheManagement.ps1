@@ -131,13 +131,13 @@ function Invoke-CacheManagement()
             if (-not $CacheType)
             {
                 Write-Warning "[$functionName] CacheType parameter required for Get action"
-                write-log -logFile $LogFile -Module $functionName -Message "CacheType parameter missing for Get action" -LogLevel "Warning"
+                Write-Log -logFile $LogFile -Module $functionName -Message "CacheType parameter missing for Get action" -LogLevel "Warning"
                 return $null
             }
             if (-not $Key)
             {
                 Write-Warning "[$functionName] Key parameter required for Get action"
-                write-log -logFile $LogFile -Module $functionName -Message "Key parameter missing for Get action" -LogLevel "Warning"
+                Write-Log -logFile $LogFile -Module $functionName -Message "Key parameter missing for Get action" -LogLevel "Warning"
                 return $null
             }
 
@@ -145,12 +145,12 @@ function Invoke-CacheManagement()
             if ($CacheType -notin @('Configuration', 'DirectoryObjects', 'Devices'))
             {
                 Write-Warning "[$functionName] Invalid CacheType for unified cache: $CacheType. Use Configuration, DirectoryObjects, or Devices."
-                write-log -logFile $LogFile -Module $functionName -Message "Invalid CacheType for Get action: $CacheType" -LogLevel "Warning"
+                Write-Log -logFile $LogFile -Module $functionName -Message "Invalid CacheType for Get action: $CacheType" -LogLevel "Warning"
                 return $null
             }
 
             Write-Verbose "[$functionName] Getting cached data: Type=$CacheType, Key=$Key"
-            write-log -logFile $LogFile -Module $functionName -Message "Getting cached data: Type=$CacheType, Key=$Key" -LogLevel "Debug"
+            Write-Log -logFile $LogFile -Module $functionName -Message "Getting cached data: Type=$CacheType, Key=$Key" -LogLevel "Debug"
             $result = Get-CachedData -CacheType $CacheType -Key $Key
 
             if ($null -ne $result)
@@ -158,7 +158,7 @@ function Invoke-CacheManagement()
                 if ($global:CacheStats)
                 {
                     $global:CacheStats.Operations.Hits++
-                    write-log -logFile $LogFile -Module $functionName -Message "Incremented cache hit count" -LogLevel "Debug"
+                    Write-Log -logFile $LogFile -Module $functionName -Message "Incremented cache hit count" -LogLevel "Debug"
                 }
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Cache hit for $CacheType`: $Key" -LogLevel "Debug"
             }
@@ -167,7 +167,7 @@ function Invoke-CacheManagement()
                 if ($global:CacheStats)
                 {
                     $global:CacheStats.Operations.Misses++
-                    write-log -logFile $LogFile -Module $functionName -Message "Incremented cache miss count" -LogLevel "Debug"
+                    Write-Log -logFile $LogFile -Module $functionName -Message "Incremented cache miss count" -LogLevel "Debug"
                 }
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Cache miss for $CacheType`: $Key" -LogLevel "Debug"
             }
@@ -179,19 +179,19 @@ function Invoke-CacheManagement()
             if (-not $CacheType)
             {
                 Write-Warning "[$functionName] CacheType parameter required for Set action"
-                write-log -logFile $LogFile -Module $functionName -Message "CacheType parameter missing for Set action" -LogLevel "Warning"
+                Write-Log -logFile $LogFile -Module $functionName -Message "CacheType parameter missing for Set action" -LogLevel "Warning"
                 return $null
             }
             if (-not $Key)
             {
                 Write-Warning "[$functionName] Key parameter required for Set action"
-                write-log -logFile $LogFile -Module $functionName -Message "Key parameter missing for Set action" -LogLevel "Warning"
+                Write-Log -logFile $LogFile -Module $functionName -Message "Key parameter missing for Set action" -LogLevel "Warning"
                 return $null
             }
             if ($null -eq $Data)
             {
                 Write-Warning "[$functionName] Data parameter required for Set action"
-                write-log -logFile $LogFile -Module $functionName -Message "Data parameter missing for Set action" -LogLevel "Warning"
+                Write-Log -logFile $LogFile -Module $functionName -Message "Data parameter missing for Set action" -LogLevel "Warning"
                 return $null
             }
 
@@ -199,13 +199,13 @@ function Invoke-CacheManagement()
             if ($CacheType -notin @('Configuration', 'DirectoryObjects', 'Devices'))
             {
                 Write-Warning "[$functionName] Invalid CacheType for unified cache: $CacheType. Use Configuration, DirectoryObjects, or Devices."
-                write-log -logFile $LogFile -Module $functionName -Message "Invalid CacheType for Set action: $CacheType" -LogLevel "Warning"
+                Write-Log -logFile $LogFile -Module $functionName -Message "Invalid CacheType for Set action: $CacheType" -LogLevel "Warning"
                 return $null
             }
 
             Write-Verbose "[$functionName] Setting cached data: Type=$CacheType, Key=$Key"
             $success = Set-CachedData -CacheType $CacheType -Key $Key -Data $Data -Metadata $Metadata
-            write-log -logFile $LogFile -Module $functionName -Message "Setting cached data: Type=$CacheType, Key=$Key, success =$success"
+            Write-Log -logFile $LogFile -Module $functionName -Message "Setting cached data: Type=$CacheType, Key=$Key, success =$success"
             if ($success)
             {
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully cached data for $CacheType`: $Key" -LogLevel "Debug"
@@ -285,13 +285,13 @@ function Invoke-CacheManagement()
             if (-not $CacheType)
             {
                 Write-Warning "[$functionName] CacheType parameter required for ClearSpecific action"
-                write-log -logFile $LogFile -Module $functionName -Message "CacheType parameter missing for ClearSpecific action" -LogLevel "Warning"
+                Write-Log -logFile $LogFile -Module $functionName -Message "CacheType parameter missing for ClearSpecific action" -LogLevel "Warning"
                 return $null
             }
 
             Write-Verbose "[$functionName] Clearing specific cache: $CacheType"
             $cleared = $false
-            write-log -logFile $LogFile -Module $functionName -Message "Clearing specific cache: $CacheType" -LogLevel "Debug"
+            Write-Log -logFile $LogFile -Module $functionName -Message "Clearing specific cache: $CacheType" -LogLevel "Debug"
             # Check if this is a unified cache type
             if ($CacheType -in @('Configuration', 'DirectoryObjects', 'Devices'))
             {
@@ -313,7 +313,7 @@ function Invoke-CacheManagement()
                             $script:menuConfigCache.Clear()
                             $script:menuFileTimestamp.Clear()
                             $cleared = $true
-                            write-log -logFile $LogFile -Module $functionName -Message "Cleared menu configuration cache" -LogLevel "Information"
+                            Write-Log -logFile $LogFile -Module $functionName -Message "Cleared menu configuration cache" -LogLevel "Information"
                         }
                     }
                     'Strings'
@@ -323,7 +323,7 @@ function Invoke-CacheManagement()
                             $script:stringsCache.Clear()
                             $script:stringsFileTimestamp.Clear()
                             $cleared = $true
-                            write-log -logFile $LogFile -Module $functionName -Message "Cleared strings cache" -LogLevel "Information"
+                            Write-Log -logFile $LogFile -Module $functionName -Message "Cleared strings cache" -LogLevel "Information"
                         }
                     }
                     'Defaults'
@@ -332,7 +332,7 @@ function Invoke-CacheManagement()
                         {
                             $script:defaultsCache.Clear()
                             $cleared = $true
-                            write-log -logFile $LogFile -Module $functionName -Message "Cleared application defaults cache" -LogLevel "Information"
+                            Write-Log -logFile $LogFile -Module $functionName -Message "Cleared application defaults cache" -LogLevel "Information"
                         }
                     }
                 }
@@ -346,20 +346,20 @@ function Invoke-CacheManagement()
 
             if ($cleared)
             {
-                write-log -logFile $LogFile -Module $functionName -Message "Successfully cleared $CacheType cache" -LogLevel "Debug"
+                Write-Log -logFile $LogFile -Module $functionName -Message "Successfully cleared $CacheType cache" -LogLevel "Debug"
                 return @{ Action = 'ClearSpecific'; Status = 'Success'; CacheType = $CacheType; Cleared = $true; Timestamp = Get-Date }
             }
             else
             {
                 Write-Verbose "[$functionName] No cache found to clear for type: $CacheType"
-                write-log -logFile $LogFile -Module $functionName -Message "No cache found to clear for type: $CacheType" -LogLevel "Warning"
+                Write-Log -logFile $LogFile -Module $functionName -Message "No cache found to clear for type: $CacheType" -LogLevel "Warning"
                 return @{ Action = 'ClearSpecific'; Status = 'NotFound'; CacheType = $CacheType; Cleared = $false; Timestamp = Get-Date }
             }
         }
         'GetStatistics'
         {
             Write-Verbose "[$functionName] Gathering cache statistics"
-            write-log -logFile $LogFile -Module $functionName -Message "Gathering cache statistics" -LogLevel "Debug"
+            Write-Log -logFile $LogFile -Module $functionName -Message "Gathering cache statistics" -LogLevel "Debug"
             $stats = @{
                 Action          = 'GetStatistics'
                 Timestamp       = Get-Date
@@ -425,7 +425,7 @@ function Invoke-CacheManagement()
             # Add unified cache statistics with EntryCount properties (API contract for tests)
             if ($global:UnifiedCache)
             {
-                write-log -logFile $LogFile -Module $functionName -Message "Gathering unified cache statistics"
+                Write-Log -logFile $LogFile -Module $functionName -Message "Gathering unified cache statistics"
                 $stats.Caches.UnifiedConfiguration = @{
                     Enabled = $true
                     Size    = if ($global:UnifiedCache.Configuration)
@@ -495,7 +495,7 @@ function Invoke-CacheManagement()
             else
             {
                 # Initialize empty UnifiedCache stats if cache doesn't exist yet
-                write-log -logFile $LogFile -Module $functionName -Message "UnifiedCache not found. Initializing empty UnifiedCache statistics." -LogLevel "Debug"
+                Write-Log -logFile $LogFile -Module $functionName -Message "UnifiedCache not found. Initializing empty UnifiedCache statistics." -LogLevel "Debug"
                 $stats.UnifiedCache.Configuration = @{ EntryCount = 0 }
                 $stats.UnifiedCache.DirectoryObjects = @{ EntryCount = 0 }
                 $stats.UnifiedCache.Devices = @{ EntryCount = 0 }
@@ -528,13 +528,13 @@ function Invoke-CacheManagement()
                         })
                 }
             }
-            write-log -logFile $LogFile -Module $functionName -Message "Cache statistics: $($stats | Out-String)"
+            Write-Log -logFile $LogFile -Module $functionName -Message "Cache statistics: $($stats | Out-String)"
             return $stats
         }
         'ListCaches'
         {
             Write-Verbose "[$functionName] Listing available caches"
-            write-log -logFile $logFile -Module $functionName -Message "Listing available caches"
+            Write-Log -logFile $logFile -Module $functionName -Message "Listing available caches"
             $cacheList = @(
                 @{ Name = 'Menu'; Description = 'Menu configuration cache (menu.psd1)'; Variable = '$script:menuConfigCache'; Value = $script:menuConfigCache }
                 @{ Name = 'Strings'; Description = 'String resources cache (strings.psd1)'; Variable = '$script:stringsCache'; Value = $script:stringsCache }
@@ -607,7 +607,7 @@ function Invoke-CacheManagement()
         'Monitor'
         {
             Write-Verbose "[$functionName] Displaying cache monitoring information"
-            write-log -logFile $logFile -Module $functionName -Message "Displaying cache monitoring information"
+            Write-Log -logFile $logFile -Module $functionName -Message "Displaying cache monitoring information"
             $stats = Invoke-CacheManagement -Action GetStatistics
 
             Write-Host "=== Cache Performance Monitor ===" -ForegroundColor Cyan
@@ -774,7 +774,7 @@ function Invoke-CacheManagement()
                 {
                     $global:CacheStats.Operations.Hits++
                     $global:CacheStats.CacheTypes.Menu.Hits++
-                    write-log -logFile $LogFile -Module $functionName -Message "Cache hit for menu configuration key: $cacheKey"
+                    Write-Log -logFile $LogFile -Module $functionName -Message "Cache hit for menu configuration key: $cacheKey"
                 }
             }
 
@@ -828,7 +828,7 @@ function Invoke-CacheManagement()
                 if ($global:CacheStats)
                 {
                     $global:CacheStats.CacheTypes.Menu.Size = $script:menuConfigCache.Count
-                    write-log -logFile $logFile -Module $functionName -Message "Updated menu cache size to $($script:menuConfigCache.Count)"
+                    Write-Log -logFile $logFile -Module $functionName -Message "Updated menu cache size to $($script:menuConfigCache.Count)"
                 }
 
                 return @{

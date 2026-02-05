@@ -137,7 +137,7 @@ function ProcessSerialNumber()
                 $DeviceAssessmentState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness'
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device assessment state: $DeviceAssessmentState" -LogLevel "Information"
                 Write-Verbose "[$functionName] Device Assessment State: $($DeviceAssessmentState | Out-String)"
-                write-log -logfile $LogFile -Module "$functionName" -Message "Device assessment state details: $($DeviceAssessmentState | ConvertTo-Json -Depth $maxJSONDepth)" -LogLevel "Debug"
+                Write-Log -logfile $LogFile -Module "$functionName" -Message "Device assessment state details: $($DeviceAssessmentState | ConvertTo-Json -Depth $maxJSONDepth)" -LogLevel "Debug"
             }
             Write-Host "Deployment profile assignment status: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)"
             if ($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus -in @('assignedInSync', 'assignedUnkownSyncState'))

@@ -65,19 +65,19 @@ function Export-AutopilotEventAnalysis()
         Prefix for output file names (default: "AutopilotEvents").
 
     .PARAMETER ExportSummary
-        Export summary statistics to CSV (default: true).
+        Export summary statistics to CSV.
 
     .PARAMETER ExportFailures
-        Export detailed failure information (default: true).
+        Export detailed failure information.
 
     .PARAMETER ExportSuccesses
-        Export successful enrollments (default: false).
+        Export successful enrollments.
 
     .PARAMETER ExportAllEvents
-        Export all events with human-readable formatting (default: false).
+        Export all events with human-readable formatting.
 
     .PARAMETER ExportUserAnalysis
-        Export user-based failure analysis (default: true).
+        Export user-based failure analysis.
 
     .EXAMPLE
         $analysis = Get-AutopilotEventAnalysis -AccessToken $token
@@ -488,15 +488,14 @@ function Export-AutopilotEventAnalysis()
 
         # Store the path in result object
         $result.OutputPath = $exportPath
-
-        switch ($exportOption)
+        try
         {
-            "2"
+            switch ($exportOption)
             {
-                Write-Verbose "[$functionName] Exporting all data (summary, failures, successes, user analysis, all events)"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Exporting all data (summary, failures, successes, user analysis, all events)" -LogLevel "Information"
-                try
+                "2"
                 {
+                    Write-Verbose "[$functionName] Exporting all data (summary, failures, successes, user analysis, all events)"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Exporting all data (summary, failures, successes, user analysis, all events)" -LogLevel "Information"
                     $exportedFiles = Export-EventAnalysis -AnalysisData $AnalysisData -OutputPath $exportPath -ExportSummary -ExportFailures -ExportUserAnalysis -ExportAllEvents -ExportSuccesses
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Export completed successfully" -LogLevel "Information"
                     $result.Success = $true
@@ -504,59 +503,47 @@ function Export-AutopilotEventAnalysis()
                     $result.OutputPath = (Resolve-Path $exportPath).Path
                     $result.FileCount = $exportedFiles.Count
                 }
-                catch
+                "3"
                 {
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "Export failed: $_" -LogLevel "Error"
-                    $result.Error = $_.Exception.Message
-                    throw
-                }
-            }
-            "3"
-            {
-                Write-Verbose "[$functionName] Custom export selection mode"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Custom export selection mode" -LogLevel "Information"
+                    Write-Verbose "[$functionName] Custom export selection mode"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Custom export selection mode" -LogLevel "Information"
+                    Write-Host "`nExport Summary? (Y/N): " -NoNewline
+                    $expSum = Read-Host
+                    Write-Host "Export Failures? (Y/N): " -NoNewline
+                    $expFail = Read-Host
+                    Write-Host "Export Successes? (Y/N): " -NoNewline
+                    $expSucc = Read-Host
+                    Write-Host "Export All Events? (Y/N): " -NoNewline
+                    $expAll = Read-Host
+                    Write-Host "Export User Analysis? (Y/N): " -NoNewline
+                    $expUser = Read-Host
+                    $exportParams = @{
+                        AnalysisData = $AnalysisData
+                        OutputPath   = $exportPath
+                    }
+                    if ($expSum -eq 'Y' -or $expSum -eq 'y')
+                    {
+                        $exportParams['ExportSummary'] = $true
+                    }
+                    if ($expFail -eq 'Y' -or $expFail -eq 'y')
+                    {
+                        $exportParams['ExportFailures'] = $true
+                    }
+                    if ($expSucc -eq 'Y' -or $expSucc -eq 'y')
+                    {
+                        $exportParams['ExportSuccesses'] = $true
+                    }
+                    if ($expAll -eq 'Y' -or $expAll -eq 'y')
+                    {
+                        $exportParams['ExportAllEvents'] = $true
+                    }
+                    if ($expUser -eq 'Y' -or $expUser -eq 'y')
+                    {
+                        $exportParams['ExportUserAnalysis'] = $true
+                    }
 
-                Write-Host "`nExport Summary? (Y/N): " -NoNewline
-                $expSum = Read-Host
-                Write-Host "Export Failures? (Y/N): " -NoNewline
-                $expFail = Read-Host
-                Write-Host "Export Successes? (Y/N): " -NoNewline
-                $expSucc = Read-Host
-                Write-Host "Export All Events? (Y/N): " -NoNewline
-                $expAll = Read-Host
-                Write-Host "Export User Analysis? (Y/N): " -NoNewline
-                $expUser = Read-Host
-
-                $exportParams = @{
-                    AnalysisData = $AnalysisData
-                    OutputPath   = $exportPath
-                }
-                if ($expSum -eq 'Y' -or $expSum -eq 'y')
-                {
-                    $exportParams['ExportSummary'] = $true
-                }
-                if ($expFail -eq 'Y' -or $expFail -eq 'y')
-                {
-                    $exportParams['ExportFailures'] = $true
-                }
-                if ($expSucc -eq 'Y' -or $expSucc -eq 'y')
-                {
-                    $exportParams['ExportSuccesses'] = $true
-                }
-                if ($expAll -eq 'Y' -or $expAll -eq 'y')
-                {
-                    $exportParams['ExportAllEvents'] = $true
-                }
-                if ($expUser -eq 'Y' -or $expUser -eq 'y')
-                {
-                    $exportParams['ExportUserAnalysis'] = $true
-                }
-
-                Write-Verbose "[$functionName] Custom selections: Summary=$($expSum), Failures=$($expFail), Successes=$($expSucc), AllEvents=$($expAll), UserAnalysis=$($expUser)"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Custom selections: Summary=$($expSum), Failures=$($expFail), Successes=$($expSucc), AllEvents=$($expAll), UserAnalysis=$($expUser)" -LogLevel "Verbose"
-
-                try
-                {
+                    Write-Verbose "[$functionName] Custom selections: Summary=$($expSum), Failures=$($expFail), Successes=$($expSucc), AllEvents=$($expAll), UserAnalysis=$($expUser)"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Custom selections: Summary=$($expSum), Failures=$($expFail), Successes=$($expSucc), AllEvents=$($expAll), UserAnalysis=$($expUser)" -LogLevel "Verbose"
                     $exportedFiles = Export-EventAnalysis @exportParams
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Custom export completed successfully" -LogLevel "Information"
                     $result.Success = $true
@@ -564,19 +551,10 @@ function Export-AutopilotEventAnalysis()
                     $result.OutputPath = (Resolve-Path $exportPath).Path
                     $result.FileCount = $exportedFiles.Count
                 }
-                catch
+                default
                 {
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "Custom export failed: $_" -LogLevel "Error"
-                    $result.Error = $_.Exception.Message
-                    throw
-                }
-            }
-            default
-            {
-                Write-Verbose "[$functionName] Default export (summary, failures, user analysis)"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Default export (summary, failures, user analysis)" -LogLevel "Information"
-                try
-                {
+                    Write-Verbose "[$functionName] Default export (summary, failures, user analysis)"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Default export (summary, failures, user analysis)" -LogLevel "Information"
                     $exportedFiles = Export-EventAnalysis -AnalysisData $AnalysisData -OutputPath $exportPath -ExportSummary -ExportFailures -ExportUserAnalysis
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Default export completed successfully" -LogLevel "Information"
                     $result.Success = $true
@@ -584,13 +562,13 @@ function Export-AutopilotEventAnalysis()
                     $result.OutputPath = (Resolve-Path $exportPath).Path
                     $result.FileCount = $exportedFiles.Count
                 }
-                catch
-                {
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "Default export failed: $_" -LogLevel "Error"
-                    $result.Error = $_.Exception.Message
-                    throw
-                }
             }
+        }
+        catch
+        {
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Export failed: $_" -LogLevel "Error"
+            $result.Error = $_.Exception.Message
+            throw
         }
     }
     catch

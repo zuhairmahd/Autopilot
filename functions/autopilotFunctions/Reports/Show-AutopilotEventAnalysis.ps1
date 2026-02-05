@@ -6,27 +6,36 @@ function Show-AutopilotEventAnalysis()
 
     .DESCRIPTION
         Formats and displays the analyzed autopilot event data with customizable sections.
+        Uses paging for large result sets and timezone-aware date formatting.
+
+        Dependencies:
+        - Show-PagedContent: For paged display of multi-item sections
+        - FormatDateWithTimeZone: For timezone-aware date/time formatting
 
     .PARAMETER AnalysisData
         The analysis data object returned from Get-AutopilotEventAnalysis.
 
     .PARAMETER ShowSummary
-        Display summary statistics (default: true).
+        Display summary statistics.
 
     .PARAMETER ShowMultipleFailures
-        Display users with multiple failures (default: true).
+        Display users with multiple failures.
+        Uses paging with 5 items per page.
 
     .PARAMETER ShowSingleFailures
-        Display users with single failure then success (default: true).
+        Display users with single failure then success.
+        Uses paging with 5 items per page.
 
     .PARAMETER ShowChronologicalFailures
-        Display failed devices in chronological order (default: true).
+        Display failed devices in chronological order.
+        Uses paging with 10 items per page.
 
     .PARAMETER MaxChronologicalDisplay
-        Maximum number of chronological failures to display (default: 20).
+        DEPRECATED: No longer used due to paging implementation.
+        Previously limited chronological failures to display (default: 20).
 
     .PARAMETER ShowDetailedFailures
-        Show detailed failure table at the end (default: true).
+        Show detailed failure table at the end.
 
     .EXAMPLE
         $analysis = Get-AutopilotEventAnalysis -AccessToken $token
@@ -34,6 +43,10 @@ function Show-AutopilotEventAnalysis()
 
     .EXAMPLE
         $analysis | Show-AutopilotEventAnalysis -ShowChronologicalFailures:$false
+
+    .NOTES
+        All dates are displayed in local timezone with timezone abbreviation.
+        Large result sets use interactive paging (n/p/q for navigation).
     #>
     [CmdletBinding()]
     param(
@@ -77,11 +90,11 @@ function Show-AutopilotEventAnalysis()
             Write-Host "`nApplied Filters:" -ForegroundColor Cyan
             if ($AnalysisData.StartDate)
             {
-                Write-Host "  Start Date: $($AnalysisData.StartDate.ToString('yyyy-MM-dd'))" -ForegroundColor Gray
+                Write-Host "  Start Date: $(FormatDateWithTimeZone -DateTime $AnalysisData.StartDate)" -ForegroundColor Gray
             }
             if ($AnalysisData.EndDate)
             {
-                Write-Host "  End Date: $($AnalysisData.EndDate.ToString('yyyy-MM-dd'))" -ForegroundColor Gray
+                Write-Host "  End Date: $(FormatDateWithTimeZone -DateTime $AnalysisData.EndDate)" -ForegroundColor Gray
             }
             if ($AnalysisData.UserPrincipalName)
             {
@@ -93,7 +106,7 @@ function Show-AutopilotEventAnalysis()
         Write-Host "`n1. Earliest Event Date: " -NoNewline
         if ($AnalysisData.EarliestEventDate)
         {
-            Write-Host $AnalysisData.EarliestEventDate.ToString("yyyy-MM-dd HH:mm:ss") -ForegroundColor Green
+            Write-Host (FormatDateWithTimeZone -DateTime $AnalysisData.EarliestEventDate) -ForegroundColor Green
         }
         else
         {
@@ -186,9 +199,12 @@ function Show-AutopilotEventAnalysis()
         if ($AnalysisData.UsersWithMultipleFailures.Count -gt 0)
         {
             Write-Host "   Found $($AnalysisData.UsersWithMultipleFailures.Count) user(s) with multiple failures:" -ForegroundColor Yellow
-            foreach ($user in $AnalysisData.UsersWithMultipleFailures)
-            {
-                Write-Host "`n   User: " -NoNewline -ForegroundColor White
+            Write-Host ""
+
+            # Use paged display for multiple failure users
+            $displayScript = {
+                param($user)
+                Write-Host "   User: " -NoNewline -ForegroundColor White
                 Write-Host $user.UserPrincipalName -ForegroundColor Red
                 Write-Host "   Failure Count: " -NoNewline -ForegroundColor White
                 Write-Host $user.FailureCount -ForegroundColor Red
@@ -198,7 +214,7 @@ function Show-AutopilotEventAnalysis()
                 {
                     $eventDate = if ($device.eventDateTime)
                     {
-                        ([DateTime]$device.eventDateTime).ToString("yyyy-MM-dd HH:mm:ss")
+                        FormatDateWithTimeZone -DateTime $device.eventDateTime
                     }
                     else
                     {
@@ -214,8 +230,8 @@ function Show-AutopilotEventAnalysis()
 
                 if ($user.EventualSuccess)
                 {
-                    $successDate = ([DateTime]$user.SuccessDevice.eventDateTime).ToString("yyyy-MM-dd HH:mm:ss")
-                    Write-Host "`n   [SUCCESS AFTER FAILURES]" -ForegroundColor Green
+                    $successDate = FormatDateWithTimeZone -DateTime $user.SuccessDevice.eventDateTime
+                    Write-Host "\n   [SUCCESS AFTER FAILURES]" -ForegroundColor Green
                     Write-Host "   User had $($user.FailureCount) failed enrollment(s) before successful enrollment" -ForegroundColor Green
                     Write-Host "   Successful Device: " -NoNewline -ForegroundColor Gray
                     Write-Host "$($user.SuccessDevice.managedDeviceName)" -NoNewline -ForegroundColor Green
@@ -226,10 +242,13 @@ function Show-AutopilotEventAnalysis()
                 }
                 else
                 {
-                    Write-Host "`n   [NO SUCCESSFUL ENROLLMENT FOUND]" -ForegroundColor Red
+                    Write-Host "\n   [NO SUCCESSFUL ENROLLMENT FOUND]" -ForegroundColor Red
                     Write-Host "   User has not yet completed a successful enrollment in the analyzed period" -ForegroundColor Yellow
                 }
+                Write-Host ""
             }
+
+            Show-PagedContent -Content $AnalysisData.UsersWithMultipleFailures -DisplayScriptBlock $displayScript -PageSize 5 -Title "Users with Multiple Enrollment Failures" -ShowPageInfo $true
         }
         else
         {
@@ -245,11 +264,14 @@ function Show-AutopilotEventAnalysis()
         if ($AnalysisData.SingleFailureWithSuccess.Count -gt 0)
         {
             Write-Host "   Found $($AnalysisData.SingleFailureWithSuccess.Count) user(s) with 1 failure followed by success:" -ForegroundColor Yellow
-            foreach ($user in $AnalysisData.SingleFailureWithSuccess)
-            {
+            Write-Host ""
+
+            # Use paged display for single failure users
+            $displayScript = {
+                param($user)
                 $failDate = if ($user.FailureDate)
                 {
-                    ([DateTime]$user.FailureDate).ToString("yyyy-MM-dd HH:mm:ss")
+                    FormatDateWithTimeZone -DateTime $user.FailureDate
                 }
                 else
                 {
@@ -257,14 +279,14 @@ function Show-AutopilotEventAnalysis()
                 }
                 $succDate = if ($user.SuccessDate)
                 {
-                    ([DateTime]$user.SuccessDate).ToString("yyyy-MM-dd HH:mm:ss")
+                    FormatDateWithTimeZone -DateTime $user.SuccessDate
                 }
                 else
                 {
                     "Unknown"
                 }
 
-                Write-Host "`n   User: " -NoNewline -ForegroundColor White
+                Write-Host "   User: " -NoNewline -ForegroundColor White
                 Write-Host $user.UserPrincipalName -ForegroundColor Yellow
                 Write-Host "   Had 1 failed enrollment before successful enrollment" -ForegroundColor Green
                 Write-Host "   Failed Device: " -NoNewline -ForegroundColor Gray
@@ -273,7 +295,10 @@ function Show-AutopilotEventAnalysis()
                 Write-Host "   Success Device: " -NoNewline -ForegroundColor Gray
                 Write-Host "$($user.SuccessDevice.deviceSerialNumber)" -NoNewline -ForegroundColor Green
                 Write-Host " on $succDate" -ForegroundColor Gray
+                Write-Host ""
             }
+
+            Show-PagedContent -Content $AnalysisData.SingleFailureWithSuccess -DisplayScriptBlock $displayScript -PageSize 5 -Title "Users with Single Failure Then Success" -ShowPageInfo $true
         }
         else
         {
@@ -290,37 +315,37 @@ function Show-AutopilotEventAnalysis()
         {
             Write-Host "   Total failed devices: " -NoNewline
             Write-Host $AnalysisData.FailedDevicesChronological.Count -ForegroundColor Red
-            Write-Host "`n   Failures from oldest to newest:" -ForegroundColor Yellow
+            Write-Host "\n   Failures from oldest to newest:" -ForegroundColor Yellow
+            Write-Host ""
 
-            $counter = 1
-            foreach ($failure in $AnalysisData.FailedDevicesChronological)
-            {
+            # Use paged display for chronological failures
+            $displayScript = {
+                param($failure)
                 $eventDate = if ($failure.eventDateTime)
                 {
-                    ([DateTime]$failure.eventDateTime).ToString("yyyy-MM-dd HH:mm:ss")
+                    FormatDateWithTimeZone -DateTime $failure.eventDateTime
                 }
                 else
                 {
                     "Unknown Date"
                 }
 
-                Write-Host "`n   [$counter] " -NoNewline -ForegroundColor White
-                Write-Host "Serial Number: " -NoNewline -ForegroundColor Gray
+                Write-Host "   Serial Number: " -NoNewline -ForegroundColor Gray
                 Write-Host "$($failure.deviceSerialNumber)" -ForegroundColor Yellow
 
-                Write-Host "       Device Name: " -NoNewline -ForegroundColor Gray
+                Write-Host "   Device Name: " -NoNewline -ForegroundColor Gray
                 Write-Host "$($failure.managedDeviceName)" -ForegroundColor Yellow
 
-                Write-Host "       User: " -NoNewline -ForegroundColor Gray
+                Write-Host "   User: " -NoNewline -ForegroundColor Gray
                 Write-Host "$($failure.userPrincipalName)" -ForegroundColor Yellow
 
-                Write-Host "       Date/Time: " -NoNewline -ForegroundColor Gray
+                Write-Host "   Date/Time: " -NoNewline -ForegroundColor Gray
                 Write-Host "$eventDate" -ForegroundColor Yellow
 
-                Write-Host "       Deployment State: " -NoNewline -ForegroundColor Gray
+                Write-Host "   Deployment State: " -NoNewline -ForegroundColor Gray
                 Write-Host "$($failure.deploymentState)" -ForegroundColor Red
 
-                Write-Host "       Device Setup: " -NoNewline -ForegroundColor Gray
+                Write-Host "   Device Setup: " -NoNewline -ForegroundColor Gray
                 Write-Host "$($failure.deviceSetupStatus)" -ForegroundColor $(if ($failure.deviceSetupStatus -eq 'success')
                     {
                         "Green"
@@ -330,7 +355,7 @@ function Show-AutopilotEventAnalysis()
                         "Red"
                     })
 
-                Write-Host "       Account Setup: " -NoNewline -ForegroundColor Gray
+                Write-Host "   Account Setup: " -NoNewline -ForegroundColor Gray
                 Write-Host "$($failure.accountSetupStatus)" -ForegroundColor $(if ($failure.accountSetupStatus -eq 'success')
                     {
                         "Green"
@@ -342,19 +367,13 @@ function Show-AutopilotEventAnalysis()
 
                 if (-not [string]::IsNullOrWhiteSpace($failure.enrollmentFailureDetails))
                 {
-                    Write-Host "       Failure Details: " -NoNewline -ForegroundColor Gray
+                    Write-Host "   Failure Details: " -NoNewline -ForegroundColor Gray
                     Write-Host "$($failure.enrollmentFailureDetails)" -ForegroundColor Red
                 }
-
-                $counter++
-
-                if ($counter -gt $MaxChronologicalDisplay -and $AnalysisData.FailedDevicesChronological.Count -gt $MaxChronologicalDisplay)
-                {
-                    Write-Host "`n   ... and $($AnalysisData.FailedDevicesChronological.Count - $MaxChronologicalDisplay) more failures." -ForegroundColor Yellow
-                    Write-Host "   Use Export-AutopilotEventAnalysis for full details." -ForegroundColor Yellow
-                    break
-                }
+                Write-Host ""
             }
+
+            Show-PagedContent -Content $AnalysisData.FailedDevicesChronological -DisplayScriptBlock $displayScript -PageSize 10 -Title "Failed Devices (Chronological)" -ShowPageInfo $true
         }
         else
         {

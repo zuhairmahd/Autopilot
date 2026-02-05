@@ -82,7 +82,7 @@ function Get-Updates()
     Write-Verbose "[$functionName] Temp Update File: $tempUpdateFile"
     Write-Verbose "[$functionName] Executable Update URL: $executableUpdateURL"
     Write-Verbose "[$functionName] No confirmation: $noConfirmation"
-    #now write-log the above
+    #now Write-Log the above
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Executable File Name: $executableFileName" -LogLevel "Information"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "updateURL: $updateURL" -LogLevel "Information"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "metaDataURL: $metaDataURL" -LogLevel "Information"
@@ -165,7 +165,7 @@ function Get-Updates()
         Write-Host "Release date: $($fileMetaData.date | FormatDateWithTimeZone)" -ForegroundColor Cyan
         if (-not ([string]::IsNullOrWhiteSpace($fileMetaData.releaseNotes)))
         {
-            write-log -LogFile $LogFile -Module "$functionName" -Message "Release notes available: $($fileMetaData.releaseNotes)" -LogLevel "Information"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Release notes available: $($fileMetaData.releaseNotes)" -LogLevel "Information"
             Write-Host "Release notes: $($fileMetaData.releaseNotes)" -ForegroundColor Cyan
         }
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Current version: $localVersion, New version: $remoteVersion" -LogLevel "Information"
@@ -269,7 +269,7 @@ function Get-Updates()
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Renamed $executableFileName to $executableFileName.old" -LogLevel "Information"
                 Write-Verbose "[$functionName] Copying the update file from $tempUpdateFile to $executableFileName"
                 Copy-Item -Path $tempUpdateFile -Destination $executableFileName -Force
-                write-log -LogFile $LogFile -Module "$functionName" -Message "Updating $($filesToUpdate.count) additional files..." -LogLevel "Information"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Updating $($filesToUpdate.count) additional files..." -LogLevel "Information"
                 if ($filesToUpdate.count -gt 0)
                 {
                     Write-Host "Updating $($filesToUpdate.count) additional files..."

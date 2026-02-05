@@ -54,30 +54,26 @@ function Get-AutopilotEnrollmentReportInput()
             {
                 $result = Get-Date -Hour 0 -Minute 0 -Second 0
                 Write-Verbose "[$functionName] Interpreted '$InputString' as today: $($result.ToString('yyyy-MM-dd'))"
-                write-log -logFile $LogFile -Module $functionName -Message "Interpreted '$InputString' as today: $($result.ToString('yyyy-MM-dd'))"
+                Write-Log -logFile $LogFile -Module $functionName -Message "Interpreted '$InputString' as today: $($result.ToString('yyyy-MM-dd'))"
             }
             '^yesterday$'
             {
                 $result = (Get-Date).AddDays(-1).Date
                 Write-Verbose "[$functionName] Interpreted '$InputString' as yesterday: $($result.ToString('yyyy-MM-dd'))"
-                write-log -logFile $LogFile -Module $functionName -Message "Interpreted '$InputString' as yesterday: $($result.ToString('yyyy-MM-dd'))"
+                Write-Log -logFile $LogFile -Module $functionName -Message "Interpreted '$InputString' as yesterday: $($result.ToString('yyyy-MM-dd'))"
             }
             '^(wtd|week|weektodate|week-to-date)$'
             {
                 $daysToMonday = ([int]$today.DayOfWeek + 6) % 7
-                if ($daysToMonday -eq 0)
-                {
-                    $daysToMonday = 7
-                }
                 $result = $today.AddDays(-$daysToMonday).Date
                 Write-Verbose "[$functionName] Interpreted '$InputString' as week-to-date: $($result.ToString('yyyy-MM-dd'))"
-                write-log -logFile $LogFile -Module $functionName -Message "Interpreted '$InputString' as week-to-date: $($result.ToString('yyyy-MM-dd'))"
+                Write-Log -logFile $LogFile -Module $functionName -Message "Interpreted '$InputString' as week-to-date: $($result.ToString('yyyy-MM-dd'))"
             }
             '^(mtd|month|monthtodate|month-to-date)$'
             {
                 $result = Get-Date -Day 1 -Hour 0 -Minute 0 -Second 0
                 Write-Verbose "[$functionName] Interpreted '$InputString' as month-to-date: $($result.ToString('yyyy-MM-dd'))"
-                write-log -logFile $LogFile -Module $functionName -Message "Interpreted '$InputString' as month-to-date: $($result.ToString('yyyy-MM-dd'))"
+                Write-Log -logFile $LogFile -Module $functionName -Message "Interpreted '$InputString' as month-to-date: $($result.ToString('yyyy-MM-dd'))"
             }
             default
             {
@@ -85,11 +81,11 @@ function Get-AutopilotEnrollmentReportInput()
                 {
                     $result = [DateTime]::Parse($InputString)
                     Write-Verbose "[$functionName] Parsed date input: $($result.ToString('yyyy-MM-dd'))"
-                    write-log -logFile $LogFile -Module $functionName -Message "Parsed date input: $($result.ToString('yyyy-MM-dd'))"
+                    Write-Log -logFile $LogFile -Module $functionName -Message "Parsed date input: $($result.ToString('yyyy-MM-dd'))"
                 }
                 catch
                 {
-                    write-log -logFile $LogFile -Module $functionName -Message "Failed to parse date input: $InputString" -LogLevel "ERROR"
+                    Write-Log -logFile $LogFile -Module $functionName -Message "Failed to parse date input: $InputString" -LogLevel "ERROR"
                     Write-Verbose "[$functionName] Failed to parse date input: $InputString"
                     return $null
                 }
@@ -100,9 +96,9 @@ function Get-AutopilotEnrollmentReportInput()
         {
             $result = $result.AddDays(1).AddSeconds(-1)
             Write-Verbose "[$functionName] Adjusted end date to end of day: $($result.ToString('yyyy-MM-dd HH:mm:ss'))"
-            write-log -logFile $LogFile -Module $functionName -Message "Adjusted end date to end of day: $($result.ToString('yyyy-MM-dd HH:mm:ss'))"
+            Write-Log -logFile $LogFile -Module $functionName -Message "Adjusted end date to end of day: $($result.ToString('yyyy-MM-dd HH:mm:ss'))"
         }
-        write-log -logFile $LogFile -Module $functionName -Message "Returning date filter: $($result.ToString('yyyy-MM-dd HH:mm:ss'))" -LogLevel "Verbose"
+        Write-Log -logFile $LogFile -Module $functionName -Message "Returning date filter: $($result.ToString('yyyy-MM-dd HH:mm:ss'))" -LogLevel "Verbose"
         return $result
     }
 
