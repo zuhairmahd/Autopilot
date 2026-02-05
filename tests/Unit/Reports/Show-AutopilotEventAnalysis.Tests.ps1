@@ -152,6 +152,13 @@ Describe "Show-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
                 return "N/A"
             }
         }
+
+        # Mock Read-Host to prevent test hangs on prompt
+        Mock Read-Host {
+            param($Prompt)
+            # Return empty string to simulate user pressing Enter
+            return ""
+        }
     }
 
     AfterAll {
@@ -256,6 +263,16 @@ Describe "Show-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
 
             Should -Invoke Write-Host -ParameterFilter {
                 $Object -like "*Failure Breakdown*"
+            } -Exactly 1
+        }
+
+        It "Should prompt to continue after summary" {
+            Mock Write-Host { }
+
+            Show-AutopilotEventAnalysis -AnalysisData $script:MockAnalysisData -ShowSummary
+
+            Should -Invoke Read-Host -ParameterFilter {
+                $Prompt -like "*Press Enter to continue*"
             } -Exactly 1
         }
     }

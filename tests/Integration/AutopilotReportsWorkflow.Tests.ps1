@@ -30,8 +30,12 @@ Describe "Autopilot Event Analysis Workflow" -Tags 'Integration', 'Reports' {
         Initialize-GraphMockEnvironment -ClearCache
 
         # Mock Write-Log if not already available
-        if (-not (Get-Command Write-Log -ErrorAction SilentlyContinue)) {
-            function global:Write-Log { param($LogFile, $Module, $Message, $LogLevel) }
+        if (-not (Get-Command Write-Log -ErrorAction SilentlyContinue))
+        {
+            function global:Write-Log
+            {
+                param($LogFile, $Module, $Message, $LogLevel) 
+            }
         }
 
         # Set global variables
@@ -41,185 +45,185 @@ Describe "Autopilot Event Analysis Workflow" -Tags 'Integration', 'Reports' {
         $script:SampleAutopilotEvents = @(
             # Successful enrollments
             @{
-                id = "event-001"
-                eventDateTime = "2025-02-01T10:00:00Z"
-                deviceSerialNumber = "SN-SUCCESS-001"
-                managedDeviceName = "LAPTOP-SUCCESS-001"
-                userPrincipalName = "success.user@contoso.com"
-                deploymentState = "success"
-                deviceSetupStatus = "success"
-                accountSetupStatus = "success"
-                deploymentTotalDuration = "PT2H30M"
-                deploymentDuration = "PT2H"
-                deviceSetupDuration = "PT1H30M"
-                accountSetupDuration = "PT30M"
-                osVersion = "10.0.19045"
-                enrollmentState = "enrolled"
-                enrollmentType = "userDrivenAADJoin"
+                id                                           = "event-001"
+                eventDateTime                                = "2025-02-01T10:00:00Z"
+                deviceSerialNumber                           = "SN-SUCCESS-001"
+                managedDeviceName                            = "LAPTOP-SUCCESS-001"
+                userPrincipalName                            = "success.user@contoso.com"
+                deploymentState                              = "success"
+                deviceSetupStatus                            = "success"
+                accountSetupStatus                           = "success"
+                deploymentTotalDuration                      = "PT2H30M"
+                deploymentDuration                           = "PT2H"
+                deviceSetupDuration                          = "PT1H30M"
+                accountSetupDuration                         = "PT30M"
+                osVersion                                    = "10.0.19045"
+                enrollmentState                              = "enrolled"
+                enrollmentType                               = "userDrivenAADJoin"
                 windowsAutopilotDeploymentProfileDisplayName = "Standard Profile"
-                deviceId = "device-001"
-                userId = "user-001"
-                deviceRegisteredDateTime = "2025-02-01T08:00:00Z"
-                enrollmentStartDateTime = "2025-02-01T09:00:00Z"
-                deploymentStartDateTime = "2025-02-01T09:30:00Z"
-                deploymentEndDateTime = "2025-02-01T12:00:00Z"
+                deviceId                                     = "device-001"
+                userId                                       = "user-001"
+                deviceRegisteredDateTime                     = "2025-02-01T08:00:00Z"
+                enrollmentStartDateTime                      = "2025-02-01T09:00:00Z"
+                deploymentStartDateTime                      = "2025-02-01T09:30:00Z"
+                deploymentEndDateTime                        = "2025-02-01T12:00:00Z"
             },
             @{
-                id = "event-002"
-                eventDateTime = "2025-02-02T11:00:00Z"
-                deviceSerialNumber = "SN-SUCCESS-002"
-                managedDeviceName = "LAPTOP-SUCCESS-002"
-                userPrincipalName = "another.user@contoso.com"
-                deploymentState = "success"
-                deviceSetupStatus = "success"
-                accountSetupStatus = "success"
-                deploymentTotalDuration = "PT1H45M"
-                osVersion = "10.0.19045"
-                enrollmentState = "enrolled"
-                enrollmentType = "userDrivenAADJoin"
+                id                                           = "event-002"
+                eventDateTime                                = "2025-02-02T11:00:00Z"
+                deviceSerialNumber                           = "SN-SUCCESS-002"
+                managedDeviceName                            = "LAPTOP-SUCCESS-002"
+                userPrincipalName                            = "another.user@contoso.com"
+                deploymentState                              = "success"
+                deviceSetupStatus                            = "success"
+                accountSetupStatus                           = "success"
+                deploymentTotalDuration                      = "PT1H45M"
+                osVersion                                    = "10.0.19045"
+                enrollmentState                              = "enrolled"
+                enrollmentType                               = "userDrivenAADJoin"
                 windowsAutopilotDeploymentProfileDisplayName = "Standard Profile"
             },
             # Multiple failures then success (same user)
             @{
-                id = "event-003"
-                eventDateTime = "2025-02-03T12:00:00Z"
-                deviceSerialNumber = "SN-FAIL-001"
-                managedDeviceName = "LAPTOP-RETRY-001"
-                userPrincipalName = "retry.user@contoso.com"
-                deploymentState = "failure"
-                deviceSetupStatus = "failure"
-                accountSetupStatus = "notStarted"
-                deploymentTotalDuration = "PT45M"
-                osVersion = "10.0.19045"
-                enrollmentState = "enrolled"
-                enrollmentType = "userDrivenAADJoin"
+                id                                           = "event-003"
+                eventDateTime                                = "2025-02-03T12:00:00Z"
+                deviceSerialNumber                           = "SN-FAIL-001"
+                managedDeviceName                            = "LAPTOP-RETRY-001"
+                userPrincipalName                            = "retry.user@contoso.com"
+                deploymentState                              = "failure"
+                deviceSetupStatus                            = "failure"
+                accountSetupStatus                           = "notStarted"
+                deploymentTotalDuration                      = "PT45M"
+                osVersion                                    = "10.0.19045"
+                enrollmentState                              = "enrolled"
+                enrollmentType                               = "userDrivenAADJoin"
                 windowsAutopilotDeploymentProfileDisplayName = "Standard Profile"
-                enrollmentFailureDetails = "Device setup failed - network timeout"
+                enrollmentFailureDetails                     = "Device setup failed - network timeout"
             },
             @{
-                id = "event-004"
-                eventDateTime = "2025-02-04T13:00:00Z"
-                deviceSerialNumber = "SN-FAIL-002"
-                managedDeviceName = "LAPTOP-RETRY-002"
-                userPrincipalName = "retry.user@contoso.com"
-                deploymentState = "failure"
-                deviceSetupStatus = "failure"
-                accountSetupStatus = "notStarted"
-                deploymentTotalDuration = "PT30M"
-                osVersion = "10.0.19045"
-                enrollmentState = "enrolled"
-                enrollmentType = "userDrivenAADJoin"
+                id                                           = "event-004"
+                eventDateTime                                = "2025-02-04T13:00:00Z"
+                deviceSerialNumber                           = "SN-FAIL-002"
+                managedDeviceName                            = "LAPTOP-RETRY-002"
+                userPrincipalName                            = "retry.user@contoso.com"
+                deploymentState                              = "failure"
+                deviceSetupStatus                            = "failure"
+                accountSetupStatus                           = "notStarted"
+                deploymentTotalDuration                      = "PT30M"
+                osVersion                                    = "10.0.19045"
+                enrollmentState                              = "enrolled"
+                enrollmentType                               = "userDrivenAADJoin"
                 windowsAutopilotDeploymentProfileDisplayName = "Standard Profile"
-                enrollmentFailureDetails = "Device setup failed - DNS resolution"
+                enrollmentFailureDetails                     = "Device setup failed - DNS resolution"
             },
             @{
-                id = "event-005"
-                eventDateTime = "2025-02-05T14:00:00Z"
-                deviceSerialNumber = "SN-SUCCESS-003"
-                managedDeviceName = "LAPTOP-SUCCESS-003"
-                userPrincipalName = "retry.user@contoso.com"
-                deploymentState = "success"
-                deviceSetupStatus = "success"
-                accountSetupStatus = "success"
-                deploymentTotalDuration = "PT2H"
-                osVersion = "10.0.19045"
-                enrollmentState = "enrolled"
-                enrollmentType = "userDrivenAADJoin"
+                id                                           = "event-005"
+                eventDateTime                                = "2025-02-05T14:00:00Z"
+                deviceSerialNumber                           = "SN-SUCCESS-003"
+                managedDeviceName                            = "LAPTOP-SUCCESS-003"
+                userPrincipalName                            = "retry.user@contoso.com"
+                deploymentState                              = "success"
+                deviceSetupStatus                            = "success"
+                accountSetupStatus                           = "success"
+                deploymentTotalDuration                      = "PT2H"
+                osVersion                                    = "10.0.19045"
+                enrollmentState                              = "enrolled"
+                enrollmentType                               = "userDrivenAADJoin"
                 windowsAutopilotDeploymentProfileDisplayName = "Standard Profile"
             },
             # Single failure then success (different user)
             @{
-                id = "event-006"
-                eventDateTime = "2025-02-06T15:00:00Z"
-                deviceSerialNumber = "SN-FAIL-003"
-                managedDeviceName = "LAPTOP-SINGLEFAIL-001"
-                userPrincipalName = "singlefail.user@contoso.com"
-                deploymentState = "failure"
-                deviceSetupStatus = "failure"
-                accountSetupStatus = "notStarted"
-                deploymentTotalDuration = "PT25M"
-                osVersion = "10.0.19045"
-                enrollmentState = "enrolled"
-                enrollmentType = "userDrivenAADJoin"
+                id                                           = "event-006"
+                eventDateTime                                = "2025-02-06T15:00:00Z"
+                deviceSerialNumber                           = "SN-FAIL-003"
+                managedDeviceName                            = "LAPTOP-SINGLEFAIL-001"
+                userPrincipalName                            = "singlefail.user@contoso.com"
+                deploymentState                              = "failure"
+                deviceSetupStatus                            = "failure"
+                accountSetupStatus                           = "notStarted"
+                deploymentTotalDuration                      = "PT25M"
+                osVersion                                    = "10.0.19045"
+                enrollmentState                              = "enrolled"
+                enrollmentType                               = "userDrivenAADJoin"
                 windowsAutopilotDeploymentProfileDisplayName = "Standard Profile"
-                enrollmentFailureDetails = "Device setup failed - TPM issue"
+                enrollmentFailureDetails                     = "Device setup failed - TPM issue"
             },
             @{
-                id = "event-007"
-                eventDateTime = "2025-02-07T16:00:00Z"
-                deviceSerialNumber = "SN-SUCCESS-004"
-                managedDeviceName = "LAPTOP-SUCCESS-004"
-                userPrincipalName = "singlefail.user@contoso.com"
-                deploymentState = "success"
-                deviceSetupStatus = "success"
-                accountSetupStatus = "success"
-                deploymentTotalDuration = "PT2H15M"
-                osVersion = "10.0.19045"
-                enrollmentState = "enrolled"
-                enrollmentType = "userDrivenAADJoin"
+                id                                           = "event-007"
+                eventDateTime                                = "2025-02-07T16:00:00Z"
+                deviceSerialNumber                           = "SN-SUCCESS-004"
+                managedDeviceName                            = "LAPTOP-SUCCESS-004"
+                userPrincipalName                            = "singlefail.user@contoso.com"
+                deploymentState                              = "success"
+                deviceSetupStatus                            = "success"
+                accountSetupStatus                           = "success"
+                deploymentTotalDuration                      = "PT2H15M"
+                osVersion                                    = "10.0.19045"
+                enrollmentState                              = "enrolled"
+                enrollmentType                               = "userDrivenAADJoin"
                 windowsAutopilotDeploymentProfileDisplayName = "Standard Profile"
             },
             # In-progress devices
             @{
-                id = "event-008"
-                eventDateTime = "2025-02-08T17:00:00Z"
-                deviceSerialNumber = "SN-INPROG-001"
-                managedDeviceName = "LAPTOP-INPROG-001"
-                userPrincipalName = "inprogress.user@contoso.com"
-                deploymentState = "inProgress"
-                deviceSetupStatus = "inProgress"
-                accountSetupStatus = "notStarted"
-                osVersion = "10.0.19045"
-                enrollmentState = "enrolling"
-                enrollmentType = "userDrivenAADJoin"
+                id                                           = "event-008"
+                eventDateTime                                = "2025-02-08T17:00:00Z"
+                deviceSerialNumber                           = "SN-INPROG-001"
+                managedDeviceName                            = "LAPTOP-INPROG-001"
+                userPrincipalName                            = "inprogress.user@contoso.com"
+                deploymentState                              = "inProgress"
+                deviceSetupStatus                            = "inProgress"
+                accountSetupStatus                           = "notStarted"
+                osVersion                                    = "10.0.19045"
+                enrollmentState                              = "enrolling"
+                enrollmentType                               = "userDrivenAADJoin"
                 windowsAutopilotDeploymentProfileDisplayName = "Standard Profile"
             },
             @{
-                id = "event-009"
-                eventDateTime = "2025-02-09T18:00:00Z"
-                deviceSerialNumber = "SN-INPROG-002"
-                managedDeviceName = "LAPTOP-INPROG-002"
-                userPrincipalName = "inprogress2.user@contoso.com"
-                deploymentState = "inProgress"
-                deviceSetupStatus = "success"
-                accountSetupStatus = "inProgress"
-                osVersion = "10.0.19045"
-                enrollmentState = "enrolling"
-                enrollmentType = "userDrivenAADJoin"
+                id                                           = "event-009"
+                eventDateTime                                = "2025-02-09T18:00:00Z"
+                deviceSerialNumber                           = "SN-INPROG-002"
+                managedDeviceName                            = "LAPTOP-INPROG-002"
+                userPrincipalName                            = "inprogress2.user@contoso.com"
+                deploymentState                              = "inProgress"
+                deviceSetupStatus                            = "success"
+                accountSetupStatus                           = "inProgress"
+                osVersion                                    = "10.0.19045"
+                enrollmentState                              = "enrolling"
+                enrollmentType                               = "userDrivenAADJoin"
                 windowsAutopilotDeploymentProfileDisplayName = "Standard Profile"
             },
             # Different failure types
             @{
-                id = "event-010"
-                eventDateTime = "2025-02-10T19:00:00Z"
-                deviceSerialNumber = "SN-FAIL-ACCOUNT"
-                managedDeviceName = "LAPTOP-ACCOUNTFAIL"
-                userPrincipalName = "accountfail.user@contoso.com"
-                deploymentState = "failure"
-                deviceSetupStatus = "success"
-                accountSetupStatus = "failure"
-                deploymentTotalDuration = "PT1H20M"
-                osVersion = "10.0.19045"
-                enrollmentState = "enrolled"
-                enrollmentType = "userDrivenAADJoin"
+                id                                           = "event-010"
+                eventDateTime                                = "2025-02-10T19:00:00Z"
+                deviceSerialNumber                           = "SN-FAIL-ACCOUNT"
+                managedDeviceName                            = "LAPTOP-ACCOUNTFAIL"
+                userPrincipalName                            = "accountfail.user@contoso.com"
+                deploymentState                              = "failure"
+                deviceSetupStatus                            = "success"
+                accountSetupStatus                           = "failure"
+                deploymentTotalDuration                      = "PT1H20M"
+                osVersion                                    = "10.0.19045"
+                enrollmentState                              = "enrolled"
+                enrollmentType                               = "userDrivenAADJoin"
                 windowsAutopilotDeploymentProfileDisplayName = "Standard Profile"
-                enrollmentFailureDetails = "Account setup failed - Azure AD sync issue"
+                enrollmentFailureDetails                     = "Account setup failed - Azure AD sync issue"
             },
             @{
-                id = "event-011"
-                eventDateTime = "2025-02-11T20:00:00Z"
-                deviceSerialNumber = "SN-FAIL-BOTH"
-                managedDeviceName = "LAPTOP-BOTHFAIL"
-                userPrincipalName = "bothfail.user@contoso.com"
-                deploymentState = "failure"
-                deviceSetupStatus = "failure"
-                accountSetupStatus = "failure"
-                deploymentTotalDuration = "PT50M"
-                osVersion = "10.0.19045"
-                enrollmentState = "enrolled"
-                enrollmentType = "userDrivenAADJoin"
+                id                                           = "event-011"
+                eventDateTime                                = "2025-02-11T20:00:00Z"
+                deviceSerialNumber                           = "SN-FAIL-BOTH"
+                managedDeviceName                            = "LAPTOP-BOTHFAIL"
+                userPrincipalName                            = "bothfail.user@contoso.com"
+                deploymentState                              = "failure"
+                deviceSetupStatus                            = "failure"
+                accountSetupStatus                           = "failure"
+                deploymentTotalDuration                      = "PT50M"
+                osVersion                                    = "10.0.19045"
+                enrollmentState                              = "enrolled"
+                enrollmentType                               = "userDrivenAADJoin"
                 windowsAutopilotDeploymentProfileDisplayName = "Standard Profile"
-                enrollmentFailureDetails = "Both device and account setup failed"
+                enrollmentFailureDetails                     = "Both device and account setup failed"
             }
         )
 
@@ -231,7 +235,8 @@ Describe "Autopilot Event Analysis Workflow" -Tags 'Integration', 'Reports' {
         # Mock FormatDateWithTimeZone
         Mock FormatDateWithTimeZone {
             param($DateTime)
-            if ($DateTime) {
+            if ($DateTime)
+            {
                 return $DateTime.ToString("yyyy-MM-dd HH:mm:ss zzz")
             }
             return "N/A"
@@ -240,9 +245,17 @@ Describe "Autopilot Event Analysis Workflow" -Tags 'Integration', 'Reports' {
         # Mock Show-PagedContent to avoid interactive prompts
         Mock Show-PagedContent {
             param($Items, $PageSize, $DisplayScript, $SectionTitle)
-            foreach ($item in $Items) {
+            foreach ($item in $Items)
+            {
                 & $DisplayScript $item
             }
+        }
+
+        # Mock Read-Host to prevent test hangs on prompt
+        Mock Read-Host {
+            param($Prompt)
+            # Return empty string to simulate user pressing Enter
+            return ""
         }
     }
 
@@ -308,8 +321,14 @@ Describe "Autopilot Event Analysis Workflow" -Tags 'Integration', 'Reports' {
             Mock Write-Host { }
             Mock Read-Host {
                 param($Prompt)
-                if ($Prompt -like "*export option*") { return "1" }
-                if ($Prompt -like "*output path*") { return $script:TestContext.TestFolder }
+                if ($Prompt -like "*export option*")
+                {
+                    return "1" 
+                }
+                if ($Prompt -like "*output path*")
+                {
+                    return $script:TestContext.TestFolder 
+                }
                 return ""
             }
 
@@ -373,8 +392,14 @@ Describe "Autopilot Event Analysis Workflow" -Tags 'Integration', 'Reports' {
             Mock Write-Host { }
             Mock Read-Host {
                 param($Prompt)
-                if ($Prompt -like "*export option*") { return "2" }
-                if ($Prompt -like "*output path*") { return $script:TestContext.TestFolder }
+                if ($Prompt -like "*export option*")
+                {
+                    return "2" 
+                }
+                if ($Prompt -like "*output path*")
+                {
+                    return $script:TestContext.TestFolder 
+                }
                 return ""
             }
 
@@ -390,9 +415,18 @@ Describe "Autopilot Event Analysis Workflow" -Tags 'Integration', 'Reports' {
         It "Should gather input and apply filters" {
             Mock Read-Host {
                 param($Prompt)
-                if ($Prompt -like "*Start Date*") { return "2025-02-05" }
-                if ($Prompt -like "*End Date*") { return "" }
-                if ($Prompt -like "*User Principal Name*") { return "" }
+                if ($Prompt -like "*Start Date*")
+                {
+                    return "2025-02-05" 
+                }
+                if ($Prompt -like "*End Date*")
+                {
+                    return "" 
+                }
+                if ($Prompt -like "*User Principal Name*")
+                {
+                    return "" 
+                }
                 return ""
             }
             Mock Write-Host { }
@@ -408,12 +442,27 @@ Describe "Autopilot Event Analysis Workflow" -Tags 'Integration', 'Reports' {
             Mock Read-Host {
                 param($Prompt)
                 # Input gathering
-                if ($Prompt -like "*Start Date*") { return "2025-02-01" }
-                if ($Prompt -like "*End Date*") { return "2025-02-11" }
-                if ($Prompt -like "*User Principal Name*") { return "" }
+                if ($Prompt -like "*Start Date*")
+                {
+                    return "2025-02-01" 
+                }
+                if ($Prompt -like "*End Date*")
+                {
+                    return "2025-02-11" 
+                }
+                if ($Prompt -like "*User Principal Name*")
+                {
+                    return "" 
+                }
                 # Export prompts
-                if ($Prompt -like "*export option*") { return "1" }
-                if ($Prompt -like "*output path*") { return $script:TestContext.TestFolder }
+                if ($Prompt -like "*export option*")
+                {
+                    return "1" 
+                }
+                if ($Prompt -like "*output path*")
+                {
+                    return $script:TestContext.TestFolder 
+                }
                 return ""
             }
             Mock Write-Host { }
@@ -457,8 +506,14 @@ Describe "Autopilot Event Analysis Workflow" -Tags 'Integration', 'Reports' {
             Mock Write-Host { }
             Mock Read-Host {
                 param($Prompt)
-                if ($Prompt -like "*export option*") { return "1" }
-                if ($Prompt -like "*output path*") { return $script:TestContext.TestFolder }
+                if ($Prompt -like "*export option*")
+                {
+                    return "1" 
+                }
+                if ($Prompt -like "*output path*")
+                {
+                    return $script:TestContext.TestFolder 
+                }
                 return ""
             }
 
@@ -474,8 +529,14 @@ Describe "Autopilot Event Analysis Workflow" -Tags 'Integration', 'Reports' {
             Mock Write-Host { }
             Mock Read-Host {
                 param($Prompt)
-                if ($Prompt -like "*export option*") { return "2" }
-                if ($Prompt -like "*output path*") { return $script:TestContext.TestFolder }
+                if ($Prompt -like "*export option*")
+                {
+                    return "2" 
+                }
+                if ($Prompt -like "*output path*")
+                {
+                    return $script:TestContext.TestFolder 
+                }
                 return ""
             }
 
@@ -540,17 +601,42 @@ Describe "Autopilot Event Analysis Workflow" -Tags 'Integration', 'Reports' {
             # Create large dataset
             $largeEventSet = 1..120 | ForEach-Object {
                 @{
-                    id = "event-$_"
-                    eventDateTime = (Get-Date).AddDays(-$_).ToString("yyyy-MM-ddTHH:mm:ssZ")
+                    id                 = "event-$_"
+                    eventDateTime      = (Get-Date).AddDays(-$_).ToString("yyyy-MM-ddTHH:mm:ssZ")
                     deviceSerialNumber = "SN-$_"
-                    managedDeviceName = "Device-$_"
-                    userPrincipalName = "user$_@contoso.com"
-                    deploymentState = if ($_ % 3 -eq 0) { "failure" } elseif ($_ % 7 -eq 0) { "inProgress" } else { "success" }
-                    deviceSetupStatus = if ($_ % 3 -eq 0) { "failure" } else { "success" }
-                    accountSetupStatus = if ($_ % 3 -eq 0) { "notStarted" } else { "success" }
-                    osVersion = "10.0.19045"
-                    enrollmentState = "enrolled"
-                    enrollmentType = "userDrivenAADJoin"
+                    managedDeviceName  = "Device-$_"
+                    userPrincipalName  = "user$_@contoso.com"
+                    deploymentState    = if ($_ % 3 -eq 0)
+                    {
+                        "failure" 
+                    }
+                    elseif ($_ % 7 -eq 0)
+                    {
+                        "inProgress" 
+                    }
+                    else
+                    {
+                        "success" 
+                    }
+                    deviceSetupStatus  = if ($_ % 3 -eq 0)
+                    {
+                        "failure" 
+                    }
+                    else
+                    {
+                        "success" 
+                    }
+                    accountSetupStatus = if ($_ % 3 -eq 0)
+                    {
+                        "notStarted" 
+                    }
+                    else
+                    {
+                        "success" 
+                    }
+                    osVersion          = "10.0.19045"
+                    enrollmentState    = "enrolled"
+                    enrollmentType     = "userDrivenAADJoin"
                 }
             }
 
