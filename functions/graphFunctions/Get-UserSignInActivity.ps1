@@ -90,7 +90,8 @@ function Get-UserSignInActivity
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Searching sign-ins from $startDate" -LogLevel "Verbose"
 
     # Build the filter for the signIns endpoint
-    $filter = "userPrincipalName eq '$userPrincipalName' and createdDateTime ge $startDate"
+    $escapedUserPrincipalName = $userPrincipalName -replace "'", "''"
+    $filter = "userPrincipalName eq '$escapedUserPrincipalName' and createdDateTime ge $startDate"
     $extraParams = "top=$maxResults&orderby=createdDateTime desc"
 
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Calling Graph API for sign-in logs with filter: $filter" -LogLevel "Information"
