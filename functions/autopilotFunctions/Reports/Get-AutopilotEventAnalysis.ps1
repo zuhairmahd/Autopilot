@@ -7,6 +7,7 @@ function Get-AutopilotEventAnalysis()
     .DESCRIPTION
         Retrieves autopilot events from Graph API and performs comprehensive analysis
         including success/failure counts, durations, user patterns, and device information.
+        Optionally enriches events with user sign-in activity data.
 
     .PARAMETER Events
         Array of autopilot events to analyze. If not provided, will fetch from Graph API.
@@ -23,11 +24,18 @@ function Get-AutopilotEventAnalysis()
     .PARAMETER UserPrincipalName
         Optional user principal name to filter events.
 
+    .PARAMETER IncludeSignInData
+        When specified, enriches failed events with user sign-in activity data including
+        location, status, failure reasons, and conditional access information.
+
     .EXAMPLE
         $analysis = Get-AutopilotEventAnalysis -AccessToken $token -StartDate "2025-01-01"
 
     .EXAMPLE
         $analysis = Get-AutopilotEventAnalysis -AccessToken $token -UserPrincipalName "user@contoso.com"
+
+    .EXAMPLE
+        $analysis = Get-AutopilotEventAnalysis -AccessToken $token -IncludeSignInData
 
     .OUTPUTS
         PSCustomObject with analyzed autopilot event data
@@ -43,7 +51,9 @@ function Get-AutopilotEventAnalysis()
         [Parameter()]
         [DateTime]$EndDate,
         [Parameter()]
-        [string]$UserPrincipalName
+        [string]$UserPrincipalName,
+        [Parameter()]
+        [switch]$IncludeSignInData
     )
 
     $functionName = $MyInvocation.MyCommand.Name
@@ -388,6 +398,64 @@ function Get-AutopilotEventAnalysis()
     $failedDevicesSorted = $failedEvents |
         Where-Object { $_.deviceSerialNumber } |
         Sort-Object eventDateTime
+
+    # 10. Enrich events with sign-in activity data if requested
+    if ($IncludeSignInData)
+    {
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Enriching events with sign-in activity data" -LogLevel "Information"
+
+        # Get unique users from failed events
+        $uniqueUsers = @($failedEvents |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_.userPrincipalName) } |
+            Select-Object -ExpandProperty userPrincipalName -Unique)
+
+        if ($uniqueUsers.Count -gt 0)
+        {
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Fetching sign-in data for $($uniqueUsers.Count) unique users" -LogLevel "Verbose"
+
+            # Cache sign-in data by user to avoid redundant API calls
+            $signInCache = @{}
+
+            foreach ($user in $uniqueUsers)
+            {
+                try
+                {
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Fetching sign-in data for user: $user" -LogLevel "Verbose"
+                    $signInEnrichment = Get-SignInActivity -UserPrincipalName $user -AccessToken $AccessToken -EnrichmentOnly
+                    $signInCache[$user] = $signInEnrichment
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Cached sign-in data for user: $user" -LogLevel "Verbose"
+                }
+                catch
+                {
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to fetch sign-in data for user $user : $($_.Exception.Message)" -LogLevel "Warning"
+                    $signInCache[$user] = @{ SignInLatestStatus = "Error retrieving sign-in data" }
+                }
+            }
+
+            # Enrich failed events with cached sign-in data
+            foreach ($event in $failedEvents)
+            {
+                if (-not [string]::IsNullOrWhiteSpace($event.userPrincipalName) -and $signInCache.ContainsKey($event.userPrincipalName))
+                {
+                    $signInData = $signInCache[$event.userPrincipalName]
+
+                    # Add sign-in properties to the event object
+                    foreach ($key in $signInData.Keys)
+                    {
+                        Add-Member -InputObject $event -MemberType NoteProperty -Name $key -Value $signInData[$key] -Force
+                    }
+
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Enriched event for device $($event.deviceSerialNumber) with sign-in data" -LogLevel "Verbose"
+                }
+            }
+
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Sign-in enrichment complete. Enriched $($failedEvents.Count) failed events" -LogLevel "Information"
+        }
+        else
+        {
+            Write-Log -LogFile $LogFile -Module $functionName -Message "No users found in failed events for sign-in enrichment" -LogLevel "Information"
+        }
+    }
 
     Write-Log -LogFile $LogFile -Module $functionName -Message "Analysis complete: $totalEvents total events, $($successfulEvents.Count) successful, $($failedEvents.Count) failed, $($inProgressEvents.Count) in progress" -LogLevel "Information"
     Write-Log -LogFile $LogFile -Module $functionName -Message "In-progress breakdown: Device phase=$($devicePhaseInProgress.Count), User phase=$($userPhaseInProgress.Count)" -LogLevel "Information"

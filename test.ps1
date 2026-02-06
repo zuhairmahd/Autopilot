@@ -1068,51 +1068,8 @@ $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $sc
 # "unmanaged" = $unmanagedDevices
 # }
 
-
-$autopilotReportInput = Get-AutopilotEnrollmentReportInput
-$analysisParams = @{
-    accessToken = $accessToken
-}
-
-if ($autopilotReportInput.StartDate)
-{
-    $analysisParams['StartDate'] = $autopilotReportInput.StartDate
-}
-if ($autopilotReportInput.EndDate)
-{
-    $analysisParams['EndDate'] = $autopilotReportInput.EndDate
-}
-if ($autopilotReportInput.UserPrincipalName
-)
-{
-    $analysisParams['UserPrincipalName'] = $autopilotReportInput.UserPrincipalName
-}
-$analysis = Get-AutopilotEventAnalysis @analysisParams
-# Display results
-Show-AutopilotEventAnalysis -AnalysisData $analysis
-
-# Prompt for export
-Write-Host "`nWould you like to export the analysis to CSV? (Y/N): " -NoNewline -ForegroundColor Yellow
-$exportChoice = Read-Host
-while ($exportChoice -notin @('Y', 'y', 'N', 'n'))
-{
-    Write-Host "Invalid choice. Please enter 'Y' for Yes or 'N' for No: " -NoNewline -ForegroundColor Yellow
-    [console]::beep(300, 100)
-    $exportChoice = Read-Host
-}
-if ($exportChoice -eq 'Y' -or $exportChoice -eq 'y')
-{
-
-    $exportResult = Export-AutopilotEventAnalysis -AnalysisData $analysis
-    if ($exportResult.success)
-    {
-        Write-Host "Analysis exported successfully" -ForegroundColor Green
-    }
-    else
-    {
-        Write-Host "Failed to export analysis: $($exportResult.errorMessage)" -ForegroundColor Red
-    }
-}
+$signInUPN = "zuhair@arabictutor.com"
+$global:activity = Get-SignInActivity -UserPrincipalName $signInUPN -accessToken $accessToken
 
 
 exit 0

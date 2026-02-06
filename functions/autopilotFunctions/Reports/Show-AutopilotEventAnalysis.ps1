@@ -350,6 +350,33 @@ function Show-AutopilotEventAnalysis()
                     Write-Host "$($device.managedDeviceName)" -NoNewline -ForegroundColor Yellow
                     Write-Host " | Date: " -NoNewline -ForegroundColor Gray
                     Write-Host "$eventDate" -ForegroundColor Yellow
+
+                    # Show sign-in status if available
+                    if ($device.PSObject.Properties.Name -contains 'SignInLatestStatus')
+                    {
+                        Write-Host "        Sign-In: " -NoNewline -ForegroundColor Gray
+                        $statusColor = if ($device.SignInLatestStatus -eq 'Success')
+                        {
+                            'Green'
+                        }
+                        elseif ($device.SignInLatestStatus -eq 'Failed')
+                        {
+                            'Red'
+                        }
+                        else
+                        {
+                            'Yellow'
+                        }
+                        Write-Host "$($device.SignInLatestStatus)" -NoNewline -ForegroundColor $statusColor
+                        if ($device.SignInLatestLocation -and $device.SignInLatestLocation -ne 'N/A')
+                        {
+                            Write-Host " from $($device.SignInLatestLocation)" -ForegroundColor Cyan
+                        }
+                        else
+                        {
+                            Write-Host ""
+                        }
+                    }
                 }
 
                 if ($user.EventualSuccess)
@@ -488,6 +515,79 @@ function Show-AutopilotEventAnalysis()
                     {
                         "Red"
                     })
+
+                # Display sign-in data if available (enriched by Get-AutopilotEventAnalysis with -IncludeSignInData)
+                if ($failure.PSObject.Properties.Name -contains 'SignInLatestStatus')
+                {
+                    Write-Host ""
+                    Write-Host "   [Sign-In Activity]" -ForegroundColor Cyan
+
+                    Write-Host "   Latest Status: " -NoNewline -ForegroundColor Gray
+                    $statusColor = if ($failure.SignInLatestStatus -eq 'Success')
+                    {
+                        'Green'
+                    }
+                    elseif ($failure.SignInLatestStatus -eq 'Failed')
+                    {
+                        'Red'
+                    }
+                    else
+                    {
+                        'Yellow'
+                    }
+                    Write-Host "$($failure.SignInLatestStatus)" -ForegroundColor $statusColor
+
+                    if ($failure.SignInLatestDateTime -and $failure.SignInLatestDateTime -ne 'N/A')
+                    {
+                        Write-Host "   Sign-In Time: " -NoNewline -ForegroundColor Gray
+                        Write-Host "$($failure.SignInLatestDateTime)" -ForegroundColor Cyan
+                    }
+
+                    if ($failure.SignInLatestIPAddress -and $failure.SignInLatestIPAddress -ne 'N/A')
+                    {
+                        Write-Host "   IP Address: " -NoNewline -ForegroundColor Gray
+                        Write-Host "$($failure.SignInLatestIPAddress)" -ForegroundColor Cyan
+                    }
+
+                    if ($failure.SignInLatestLocation -and $failure.SignInLatestLocation -ne 'N/A')
+                    {
+                        Write-Host "   Location: " -NoNewline -ForegroundColor Gray
+                        Write-Host "$($failure.SignInLatestLocation)" -ForegroundColor Cyan
+                    }
+
+                    if ($failure.SignInLatestFailureReason -and $failure.SignInLatestFailureReason -ne 'N/A')
+                    {
+                        Write-Host "   Failure Reason: " -NoNewline -ForegroundColor Gray
+                        Write-Host "$($failure.SignInLatestFailureReason)" -ForegroundColor Red
+                    }
+
+                    if ($failure.SignInRecentPattern -and $failure.SignInRecentPattern -ne 'N/A')
+                    {
+                        Write-Host "   Recent Pattern: " -NoNewline -ForegroundColor Gray
+                        Write-Host "$($failure.SignInRecentPattern)" -ForegroundColor Cyan
+                    }
+
+                    if ($failure.SignInConditionalAccessStatus -and $failure.SignInConditionalAccessStatus -ne 'N/A')
+                    {
+                        Write-Host "   CA Status: " -NoNewline -ForegroundColor Gray
+                        $caColor = switch ($failure.SignInConditionalAccessStatus)
+                        {
+                            'success'
+                            {
+                                'Green'
+                            }
+                            'failure'
+                            {
+                                'Red'
+                            }
+                            default
+                            {
+                                'Yellow'
+                            }
+                        }
+                        Write-Host "$($failure.SignInConditionalAccessStatus)" -ForegroundColor $caColor
+                    }
+                }
 
                 if (-not [string]::IsNullOrWhiteSpace($failure.enrollmentFailureDetails))
                 {
