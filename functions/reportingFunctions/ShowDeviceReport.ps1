@@ -222,9 +222,9 @@ function ShowDeviceReport()
 
                     # Build sign-in analysis pattern summary
                     $totalSignIns = $signInData.SignIns.Count
-                    $successCount = ($signInData.SignIns | Where-Object { $_.SignInSucceeded -eq $true }).Count
-                    $failureCount = ($signInData.SignIns | Where-Object { $_.SignInSucceeded -eq $false }).Count
-                    $caBlockCount = ($signInData.SignIns | Where-Object { $_.CABlockedByPolicy -eq $true }).Count
+                    $successCount = @($signInData.SignIns | Where-Object { $_.SignInSucceeded -eq $true }).Count
+                    $failureCount = @($signInData.SignIns | Where-Object { $_.SignInSucceeded -eq $false }).Count
+                    $caBlockCount = @($signInData.SignIns | Where-Object { $_.CABlockedByPolicy -eq $true }).Count
                     $analysisSummary = "$successCount of $totalSignIns succeeded"
                     if ($failureCount -gt 0)
                     {
