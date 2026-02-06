@@ -84,6 +84,22 @@
             Scope     = 'DeviceManagementScripts.ReadWrite.All'
             Endpoints = @('deviceManagement/deviceHealthScripts')
             Reason    = 'Required to create, update, and delete Intune device management scripts.'
+        },
+        @{
+            Scope     = 'AuditLog.Read.All'
+            Endpoints = @(
+                'auditLogs/signIns',
+                'auditLogs/signIns/id'
+            )
+            Reason    = 'Required to read sign-in activity logs for user authentication analysis in device reports.'
+        },
+        @{
+            Scope     = 'Directory.Read.All'
+            Endpoints = @(
+                'auditLogs/signIns',
+                'auditLogs/signIns/id'
+            )
+            Reason    = 'Required alongside AuditLog.Read.All to access sign-in logs and conditional access policy details.'
         }
     )
     auth              = @{
@@ -98,7 +114,11 @@
             'Mail.Send',
             'DeviceManagementManagedDevices.PrivilegedOperations.All',
             'DeviceManagementManagedDevices.ReadWrite.All',
-            'DeviceManagementServiceConfig.ReadWrite.All'
+            'DeviceManagementServiceConfig.ReadWrite.All',
+            'AuditLog.Read.All',
+            'DeviceManagementManagedDevices.PrivilegedOperations.All',
+            'BitlockerKey.Read.All',
+            'Directory.Read.All'
         )
         renewalLeadTime     = 5
         forceNewToken       = $false

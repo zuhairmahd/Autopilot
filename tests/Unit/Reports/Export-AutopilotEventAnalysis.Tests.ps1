@@ -54,6 +54,13 @@ Describe "Export-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
             UserPhaseOnlyFailureCount   = 1
             BothPhasesFailureCount      = 1
             UnknownPhaseFailureCount    = 0
+            SignInMatchStats            = @{
+                TotalEvents      = 10
+                MatchedEvents    = 8
+                HighConfidence   = 5
+                MediumConfidence = 2
+                LowConfidence    = 1
+            }
             SuccessfulEvents            = @(
                 @{
                     eventDateTime = "2025-02-01T10:00:00Z"
@@ -69,6 +76,14 @@ Describe "Export-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
                     windowsAutopilotDeploymentProfileDisplayName = "Profile1"
                     deploymentDuration = "PT2H"
                     deploymentTotalDuration = "PT2H30M"
+                    SignIn_MatchFound = $true
+                    SignIn_ConfidenceScore = 90
+                    SignIn_MatchedOn = "UserId, DeviceId, Time_Within1Hour"
+                    SignIn_Location_City = "Seattle"
+                    SignIn_Location_State = "Washington"
+                    SignIn_Location_Country = "US"
+                    SignIn_IPAddress = "192.168.1.1"
+                    SignIn_Status = "Success"
                 }
             )
             InProgressEvents            = @(
@@ -86,6 +101,14 @@ Describe "Export-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
                     windowsAutopilotDeploymentProfileDisplayName = "Profile1"
                     deploymentDuration = "PT1H"
                     deploymentTotalDuration = "PT1H"
+                    SignIn_MatchFound = $true
+                    SignIn_ConfidenceScore = 85
+                    SignIn_MatchedOn = "UserId, DeviceId, Time_Within1Hour"
+                    SignIn_Location_City = "Portland"
+                    SignIn_Location_State = "Oregon"
+                    SignIn_Location_Country = "US"
+                    SignIn_IPAddress = "10.0.1.1"
+                    SignIn_Status = "Success"
                 }
             )
             FailedEvents                = @(
@@ -104,6 +127,16 @@ Describe "Export-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
                     deploymentDuration = "PT30M"
                     deploymentTotalDuration = "PT45M"
                     enrollmentFailureDetails = "Device setup failed"
+                    SignIn_MatchFound = $true
+                    SignIn_ConfidenceScore = 70
+                    SignIn_MatchedOn = "UserId, Time_Within2Hours"
+                    SignIn_Location_City = "San Francisco"
+                    SignIn_Location_State = "California"
+                    SignIn_Location_Country = "US"
+                    SignIn_IPAddress = "172.16.0.1"
+                    SignIn_Status = "Failure"
+                    SignIn_FailureReason = "Device registration failed"
+                    SignIn_ErrorCode = 50034
                 }
             )
             UsersWithMultipleFailures   = @(
@@ -151,6 +184,20 @@ Describe "Export-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
                     deploymentEndDateTime = "2025-02-01T12:00:00Z"
                     deviceSetupDuration = "PT1H30M"
                     accountSetupDuration = "PT30M"
+                    SignIn_MatchFound = $true
+                    SignIn_ConfidenceScore = 95
+                    SignIn_MatchedOn = "UserId, DeviceId, Time_Within1Hour, IntuneApp"
+                    SignIn_Location_City = "Seattle"
+                    SignIn_Location_State = "Washington"
+                    SignIn_Location_Country = "US"
+                    SignIn_IPAddress = "192.168.1.1"
+                    SignIn_Status = "Success"
+                    SignIn_FailureReason = $null
+                    SignIn_ErrorCode = $null
+                    SignIn_AppDisplayName = "Microsoft Intune Enrollment"
+                    SignIn_DeviceDisplayName = "Device1"
+                    SignIn_IsCompliant = $true
+                    SignIn_IsManaged = $true
                 }
             )
         }
@@ -644,6 +691,70 @@ Describe "Export-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
             $result2 = Export-AutopilotEventAnalysis -AnalysisData $script:MockAnalysisData
 
             $result1.ExportedFiles[0] | Should -Not -Be $result2.ExportedFiles[0]
+        }
+    }
+
+    Context "Sign-in enrichment data" {
+
+        It "Should include sign-in enrichment columns when exporting all events" {
+            Mock Read-Host {
+                param($Prompt)
+                if ($Prompt -like "*export option*") { return "2" }
+                if ($Prompt -like "*output path*") { return $script:TestOutputPath }
+                return ""
+            }
+            Mock Write-Host { }
+
+            $result = Export-AutopilotEventAnalysis -AnalysisData $script:MockAnalysisData
+            $allEventsFile = $result.ExportedFiles | Where-Object { $_ -like "*AllEvents*" }
+
+            if ($allEventsFile) {
+                $csvData = Import-Csv $allEventsFile
+                $headers = $csvData[0].PSObject.Properties.Name
+                $headers | Should -Contain "SignIn_MatchFound"
+                $headers | Should -Contain "SignIn_ConfidenceScore"
+                $headers | Should -Contain "SignIn_Location_City"
+                $headers | Should -Contain "SignIn_Location_State"
+                $headers | Should -Contain "SignIn_Location_Country"
+                $headers | Should -Contain "SignIn_IPAddress"
+                $headers | Should -Contain "SignIn_Status"
+            }
+        }
+
+        It "Should export sign-in match confidence scores" {
+            Mock Read-Host {
+                param($Prompt)
+                if ($Prompt -like "*export option*") { return "2" }
+                if ($Prompt -like "*output path*") { return $script:TestOutputPath }
+                return ""
+            }
+            Mock Write-Host { }
+
+            $result = Export-AutopilotEventAnalysis -AnalysisData $script:MockAnalysisData
+            $allEventsFile = $result.ExportedFiles | Where-Object { $_ -like "*AllEvents*" }
+
+            if ($allEventsFile) {
+                $csvData = Import-Csv $allEventsFile
+                $csvData[0].SignIn_ConfidenceScore | Should -Not -BeNullOrEmpty
+            }
+        }
+
+        It "Should export sign-in location data" {
+            Mock Read-Host {
+                param($Prompt)
+                if ($Prompt -like "*export option*") { return "2" }
+                if ($Prompt -like "*output path*") { return $script:TestOutputPath }
+                return ""
+            }
+            Mock Write-Host { }
+
+            $result = Export-AutopilotEventAnalysis -AnalysisData $script:MockAnalysisData
+            $allEventsFile = $result.ExportedFiles | Where-Object { $_ -like "*AllEvents*" }
+
+            if ($allEventsFile) {
+                $csvData = Import-Csv $allEventsFile
+                $csvData[0].SignIn_Location_City | Should -Not -BeNullOrEmpty
+            }
         }
     }
 }
