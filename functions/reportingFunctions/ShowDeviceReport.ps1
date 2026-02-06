@@ -38,7 +38,7 @@ function ShowDeviceReport()
         [Parameter(Mandatory = $true, ParameterSetName = 'HashTable')]
         [hashtable]$report,
         [Parameter(Mandatory = $false)]
-        [string[]]$PrefixList = @('Intune', 'Autopilot'),
+        [string[]]$PrefixList = @('Intune', 'Autopilot', 'SignIn'),
         [string]$DeviceName,
         [Parameter(Mandatory = $false)]
         [string]$SerialNumber
@@ -181,6 +181,112 @@ function ShowDeviceReport()
             AutopilotLatestProfile        = $latestAutopilotEvent.windowsAutopilotDeploymentProfileDisplayName
             AutopilotLatestStatus         = $latestAutopilotEvent.deploymentState
             AutopilotLatestError          = $latestAutopilotEvent.enrollmentFailureDetails
+        }
+
+        # Enrich report with user sign-in activity if a user is associated with the device
+        $signInUPN = $enrollmentState.managedDevice.device.userPrincipalName
+        if (-not $signInUPN)
+        {
+            $signInUPN = $enrollmentState.autopilot.device.userPrincipalName
+        }
+        if ($signInUPN -and $accessToken)
+        {
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Fetching sign-in activity for user: $signInUPN" -LogLevel "Information"
+            try
+            {
+                $signInData = Get-UserSignInActivity -accessToken $accessToken -userPrincipalName $signInUPN -maxResults 5 -daysBack 30
+                if ($signInData.Success -and $signInData.LatestSignIn)
+                {
+                    $latest = $signInData.LatestSignIn
+
+                    # Build location string from available parts
+                    $locationParts = @()
+                    if ($latest.LocationCity) { $locationParts += $latest.LocationCity }
+                    if ($latest.LocationState) { $locationParts += $latest.LocationState }
+                    if ($latest.LocationCountryOrRegion) { $locationParts += $latest.LocationCountryOrRegion }
+                    $locationStr = if ($locationParts.Count -gt 0) { $locationParts -join ", " } else { "N/A" }
+
+                    # Build conditional access summary
+                    $caStatus = if ($latest.ConditionalAccessStatus) { $latest.ConditionalAccessStatus } else { "N/A" }
+                    $caPolicySummary = "None"
+                    if ($latest.CAPoliciesApplied -and $latest.CAPoliciesApplied.Count -gt 0)
+                    {
+                        $policyNames = @()
+                        foreach ($policy in $latest.CAPoliciesApplied)
+                        {
+                            $policyEntry = "$($policy.PolicyName) ($($policy.Result))"
+                            $policyNames += $policyEntry
+                        }
+                        $caPolicySummary = $policyNames -join "; "
+                    }
+
+                    # Build sign-in analysis pattern summary
+                    $totalSignIns = $signInData.SignIns.Count
+                    $successCount = ($signInData.SignIns | Where-Object { $_.SignInSucceeded -eq $true }).Count
+                    $failureCount = ($signInData.SignIns | Where-Object { $_.SignInSucceeded -eq $false }).Count
+                    $caBlockCount = ($signInData.SignIns | Where-Object { $_.CABlockedByPolicy -eq $true }).Count
+                    $analysisSummary = "$successCount of $totalSignIns succeeded"
+                    if ($failureCount -gt 0)
+                    {
+                        $analysisSummary += ", $failureCount failed"
+                    }
+                    if ($caBlockCount -gt 0)
+                    {
+                        $analysisSummary += ", $caBlockCount blocked by CA"
+                    }
+
+                    # Collect unique failure reasons from all failed sign-ins
+                    $failureReasons = @()
+                    foreach ($signIn in $signInData.SignIns)
+                    {
+                        if ($signIn.SignInSucceeded -eq $false -and $signIn.FailureReason)
+                        {
+                            if ($failureReasons -notcontains $signIn.FailureReason)
+                            {
+                                $failureReasons += $signIn.FailureReason
+                            }
+                        }
+                    }
+                    $failureReasonSummary = if ($failureReasons.Count -gt 0) { $failureReasons -join "; " } else { "N/A" }
+
+                    $output['SignInLatestDateTime'] = if ($latest.CreatedDateTime) { $latest.CreatedDateTime | FormatDateWithTimeZone } else { "N/A" }
+                    $output['SignInLatestStatus'] = if ($latest.SignInSucceeded) { "Success" } else { "Failed" }
+                    $output['SignInLatestIPAddress'] = if ($latest.IPAddress) { $latest.IPAddress } else { "N/A" }
+                    $output['SignInLatestLocation'] = $locationStr
+                    $output['SignInLatestAppUsed'] = if ($latest.AppDisplayName) { $latest.AppDisplayName } else { "N/A" }
+                    $output['SignInLatestFailureReason'] = if (-not $latest.SignInSucceeded -and $latest.FailureReason) { $latest.FailureReason } else { "N/A" }
+                    $output['SignInConditionalAccessStatus'] = $caStatus
+                    $output['SignInConditionalAccessPolicies'] = $caPolicySummary
+                    $output['SignInRecentPattern'] = $analysisSummary
+                    $output['SignInRecentFailureReasons'] = $failureReasonSummary
+
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Sign-in data enrichment complete. Pattern: $analysisSummary" -LogLevel "Information"
+                }
+                else
+                {
+                    $output['SignInLatestStatus'] = "No sign-in data available"
+                    $output['SignInRecentPattern'] = $signInData.Message
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "No sign-in data available: $($signInData.Message)" -LogLevel "Information"
+                }
+            }
+            catch
+            {
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to retrieve sign-in data: $($_.Exception.Message)" -LogLevel "Warning"
+                $output['SignInLatestStatus'] = "Error retrieving sign-in data"
+            }
+        }
+        else
+        {
+            if (-not $signInUPN)
+            {
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "No user principal name available for sign-in activity lookup" -LogLevel "Information"
+                $output['SignInLatestStatus'] = "No user associated with device"
+            }
+            elseif (-not $accessToken)
+            {
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "No access token available for sign-in activity lookup" -LogLevel "Information"
+                $output['SignInLatestStatus'] = "No access token available"
+            }
         }
 
         # Set device name for export if not provided
