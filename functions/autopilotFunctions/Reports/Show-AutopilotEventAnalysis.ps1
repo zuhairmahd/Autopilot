@@ -221,6 +221,32 @@ function Show-AutopilotEventAnalysis()
             Write-Host " (failure stage unclear)" -ForegroundColor Gray
         }
 
+        # Display sign-in match statistics if available
+        if ($AnalysisData.SignInMatchStats -and $AnalysisData.SignInMatchStats.TotalEvents -gt 0)
+        {
+            Write-Host "`n9. Sign-In Match Statistics:" -ForegroundColor Cyan
+            Write-Host "   Total Events: " -NoNewline
+            Write-Host "$($AnalysisData.SignInMatchStats.TotalEvents)" -ForegroundColor White
+            Write-Host "   Matched Events: " -NoNewline
+            Write-Host "$($AnalysisData.SignInMatchStats.MatchedEvents)" -ForegroundColor Green
+
+            if ($AnalysisData.SignInMatchStats.HighConfidence -and $AnalysisData.SignInMatchStats.HighConfidence -gt 0)
+            {
+                Write-Host "   High Confidence: " -NoNewline
+                Write-Host "$($AnalysisData.SignInMatchStats.HighConfidence)" -ForegroundColor Green
+            }
+            if ($AnalysisData.SignInMatchStats.MediumConfidence -and $AnalysisData.SignInMatchStats.MediumConfidence -gt 0)
+            {
+                Write-Host "   Medium Confidence: " -NoNewline
+                Write-Host "$($AnalysisData.SignInMatchStats.MediumConfidence)" -ForegroundColor Yellow
+            }
+            if ($AnalysisData.SignInMatchStats.LowConfidence -and $AnalysisData.SignInMatchStats.LowConfidence -gt 0)
+            {
+                Write-Host "   Low Confidence: " -NoNewline
+                Write-Host "$($AnalysisData.SignInMatchStats.LowConfidence)" -ForegroundColor Red
+            }
+        }
+
         # Pause after summary to allow user to review before showing detailed sections
         Write-Host ""
         Write-Host ("=" * 60) -ForegroundColor Cyan

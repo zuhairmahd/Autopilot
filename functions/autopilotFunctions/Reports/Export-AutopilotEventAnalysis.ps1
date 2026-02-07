@@ -526,13 +526,16 @@ function Export-AutopilotEventAnalysis()
                 deviceSetupDuration,
                 accountSetupDuration,
                 enrollmentFailureDetails,
-                @{N = "SignIn_Location"; E = { "$($_.SignIn_Location_City), $($_.SignIn_Location_State), $($_.SignIn_Location_Country)" -replace '^, |, $' } },
+                SignIn_MatchFound,
+                @{N = "SignIn_ConfidenceScore"; E = { $_.SignIn_ConfidenceScore } },
+                @{N = "SignIn_MatchedOn"; E = { $_.SignIn_MatchedOn } },
+                SignIn_Location_City,
+                SignIn_Location_State,
+                SignIn_Location_Country,
                 SignIn_IPAddress,
                 SignIn_Status,
                 SignIn_FailureReason,
-                SignIn_ErrorCode,
-                @{N = "SignIn_ConfidenceScore"; E = { $_.SignIn_ConfidenceScore } },
-                @{N = "SignIn_MatchedOn"; E = { $_.SignIn_MatchedOn } } |
+                SignIn_ErrorCode |
                 Export-Csv -Path $allEventsFile -NoTypeInformation
             $exportedFiles += $allEventsFile
             Write-Host "Exported all events to: $allEventsFile" -ForegroundColor Green
