@@ -142,18 +142,19 @@ function Get-AutopilotEnrollmentReportInput()
     # End Date Input
     Write-Host "`nEnd Date Filter:" -ForegroundColor Cyan
     Write-Host "  Options:" -ForegroundColor Gray
-    Write-Host "    - Press Enter for default (no filter - all events)" -ForegroundColor Gray
+    Write-Host "    - Press Enter for default (today's date)" -ForegroundColor Gray
     Write-Host "    - Type: today, yesterday, wtd (week-to-date), mtd (month-to-date)" -ForegroundColor Gray
     Write-Host "    - Or enter date: yyyy-MM-dd or MM/dd/yyyy" -ForegroundColor Gray
-    $endDateInput = Read-Host "`nEnd Date [default: all events]"
+    $endDateInput = Read-Host "`nEnd Date [default: Today's date]"
 
     $endDate = $null
     if ([string]::IsNullOrWhiteSpace($endDateInput))
     {
         Write-Verbose "[$functionName] Using default end date: no filter (all events)"
         Write-Log -LogFile $LogFile -Module $functionName -Message "User selected default end date (no filter)" -LogLevel "Verbose"
-        Write-Host "Using default: No end date filter (all events)" -ForegroundColor Yellow
-        $endDate = $null
+        Write-Host "Using default: Today's date" -ForegroundColor Yellow
+        #if we have a null string, then endDate will be today's date at 11:59:59 PM
+        $endDate = ConvertTo-DateFilter -InputString "today" -IsEndDate $true
     }
     else
     {

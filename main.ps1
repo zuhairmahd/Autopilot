@@ -2159,7 +2159,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Autopilot enrollment re
     $analysis = Get-AutopilotEventAnalysis @analysisParams
     Write-Log -logFile $logFile -Module $scriptName -Message "Analysis results obtained: $($analysis | Out-String)"
     # Display results
-    Show-AutopilotEventAnalysis -AnalysisData $analysis -ShowSummary -ShowMultipleFailures -ShowSingleFailures -ShowChronologicalFailures -ShowDetailedFailures
+    Show-AutopilotEventAnalysis -AnalysisData $analysis -ShowSummary -ShowInProgress -ShowLocationAnalysis -ShowMultipleFailures -ShowSingleFailures -ShowChronologicalFailures -ShowDetailedFailures
 
     # Prompt for export
     Write-Host "`nWould you like to export the analysis to CSV? (Y/N): " -NoNewline -ForegroundColor Yellow

@@ -69,6 +69,8 @@ function CallGraphAPI()
         [string]$accessToken,
         [Parameter(Mandatory = $true)]
         [object]$ResourcePath,  # Can be string or string array for batch processing
+        [Parameter()]
+        [ValidateSet('v1.0', 'beta')]
         [string]$APIVersion = 'beta',
         [string]$method = 'get',
         [string]$Filter = $null,
@@ -228,7 +230,14 @@ function CallGraphAPI()
                         # Include failed responses so downstream code can handle them properly
                         $allResults += $response
                         $failureCount++
-                        $errorMsg = if ($response.body.error) { $response.body.error.message } else { "Unknown error" }
+                        $errorMsg = if ($response.body.error)
+                        {
+                            $response.body.error.message 
+                        }
+                        else
+                        {
+                            "Unknown error" 
+                        }
                         Write-Log -LogFile $logFile -Module $functionName -Message "Batch request $($response.id) failed (status: $($response.status)): $errorMsg" -LogLevel "Warning"
                     }
                 }
@@ -265,7 +274,14 @@ function CallGraphAPI()
         return @{
             value          = $allResults
             batchProcessed = $true
-            batchMethod    = if ($useBatchProcessor) { "GraphCore" } else { "NativeBatch" }
+            batchMethod    = if ($useBatchProcessor)
+            {
+                "GraphCore" 
+            }
+            else
+            {
+                "NativeBatch" 
+            }
             successCount   = $successCount
             failureCount   = $failureCount
             totalCount     = $ResourcePath.Count
