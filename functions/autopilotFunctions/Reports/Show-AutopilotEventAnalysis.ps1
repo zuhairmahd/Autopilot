@@ -34,6 +34,10 @@ function Show-AutopilotEventAnalysis()
         Display devices currently in progress and which phase they are in.
         Uses paging with 10 items per page.
 
+    .PARAMETER ShowLocationAnalysis
+        Display location-based analysis from sign-in data showing success/failure rates by location.
+        Uses paging with 10 items per page.
+
     .PARAMETER MaxChronologicalDisplay
         DEPRECATED: No longer used due to paging implementation.
         Previously limited chronological failures to display (default: 20).
@@ -66,6 +70,8 @@ function Show-AutopilotEventAnalysis()
         [switch]$ShowChronologicalFailures,
         [Parameter()]
         [switch]$ShowInProgress,
+        [Parameter()]
+        [switch]$ShowLocationAnalysis,
         [Parameter()]
         [int]$MaxChronologicalDisplay = 20,
         [Parameter()]
@@ -215,6 +221,32 @@ function Show-AutopilotEventAnalysis()
             Write-Host " (failure stage unclear)" -ForegroundColor Gray
         }
 
+        # Display sign-in match statistics if available
+        if ($AnalysisData.SignInMatchStats -and $AnalysisData.SignInMatchStats.TotalEvents -gt 0)
+        {
+            Write-Host "`n9. Sign-In Match Statistics:" -ForegroundColor Cyan
+            Write-Host "   Total Events: " -NoNewline
+            Write-Host "$($AnalysisData.SignInMatchStats.TotalEvents)" -ForegroundColor White
+            Write-Host "   Matched Events: " -NoNewline
+            Write-Host "$($AnalysisData.SignInMatchStats.MatchedEvents)" -ForegroundColor Green
+
+            if ($AnalysisData.SignInMatchStats.HighConfidence -and $AnalysisData.SignInMatchStats.HighConfidence -gt 0)
+            {
+                Write-Host "   High Confidence: " -NoNewline
+                Write-Host "$($AnalysisData.SignInMatchStats.HighConfidence)" -ForegroundColor Green
+            }
+            if ($AnalysisData.SignInMatchStats.MediumConfidence -and $AnalysisData.SignInMatchStats.MediumConfidence -gt 0)
+            {
+                Write-Host "   Medium Confidence: " -NoNewline
+                Write-Host "$($AnalysisData.SignInMatchStats.MediumConfidence)" -ForegroundColor Yellow
+            }
+            if ($AnalysisData.SignInMatchStats.LowConfidence -and $AnalysisData.SignInMatchStats.LowConfidence -gt 0)
+            {
+                Write-Host "   Low Confidence: " -NoNewline
+                Write-Host "$($AnalysisData.SignInMatchStats.LowConfidence)" -ForegroundColor Red
+            }
+        }
+
         # Pause after summary to allow user to review before showing detailed sections
         Write-Host ""
         Write-Host ("=" * 60) -ForegroundColor Cyan
@@ -295,6 +327,19 @@ function Show-AutopilotEventAnalysis()
                 }
                 Write-Host "$($device.accountSetupStatus)" -ForegroundColor $accountColor
 
+                # Display location and IP if available from sign-in matching
+                if ($device.SignIn_Location_City -or $device.SignIn_Location_State -or $device.SignIn_Location_Country)
+                {
+                    $location = @($device.SignIn_Location_City, $device.SignIn_Location_State, $device.SignIn_Location_Country) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_.Trim() }
+                    Write-Host "   Location: " -NoNewline -ForegroundColor Gray
+                    Write-Host ($location -join ", ") -ForegroundColor Cyan
+                }
+                if ($device.SignIn_IPAddress)
+                {
+                    Write-Host "   IP Address: " -NoNewline -ForegroundColor Gray
+                    Write-Host "$($device.SignIn_IPAddress)" -ForegroundColor Cyan
+                }
+
                 # Indicate which phase is in progress
                 if ($device.deviceSetupStatus -eq 'inProgress')
                 {
@@ -312,6 +357,167 @@ function Show-AutopilotEventAnalysis()
         else
         {
             Write-Host "   No devices currently in progress." -ForegroundColor Green
+        }
+    }
+
+    # Location-based analysis
+    if ($ShowLocationAnalysis)
+    {
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Displaying location analysis section ($($AnalysisData.LocationAnalysis.Count) locations)" -LogLevel "Verbose"
+        Write-Host "`n9b. Sign-In Enrollment Analysis by Location:" -ForegroundColor Cyan
+        if ($AnalysisData.LocationAnalysis -and $AnalysisData.LocationAnalysis.Count -gt 0)
+        {
+            Write-Host "   Found enrollment activity in $($AnalysisData.LocationAnalysis.Count) location(s):" -ForegroundColor Yellow
+            Write-Host ""
+
+            # Use paged display for location analysis
+            $displayScript = {
+                param($location)
+
+                # Format location display
+                $locationDisplay = if ([string]::IsNullOrWhiteSpace($location.Location))
+                {
+                    "Unknown Location"
+                }
+                else
+                {
+                    $location.Location
+                }
+
+                Write-Host "   Location: " -NoNewline -ForegroundColor White
+                Write-Host $locationDisplay -ForegroundColor Cyan
+
+                Write-Host "   Total Events: " -NoNewline -ForegroundColor Gray
+                Write-Host $location.TotalEvents -ForegroundColor White
+
+                # Show breakdown by outcome
+                if ($location.SuccessfulEvents -gt 0)
+                {
+                    Write-Host "      Successful: " -NoNewline -ForegroundColor Gray
+                    Write-Host "$($location.SuccessfulEvents)" -NoNewline -ForegroundColor Green
+                    Write-Host " ($($location.SuccessRate)%)" -ForegroundColor Green
+                }
+
+                if ($location.FailedEvents -gt 0)
+                {
+                    Write-Host "      Failed: " -NoNewline -ForegroundColor Gray
+                    Write-Host "$($location.FailedEvents)" -NoNewline -ForegroundColor Red
+                    Write-Host " ($($location.FailureRate)%)" -ForegroundColor Red
+                }
+
+                if ($location.InProgressEvents -gt 0)
+                {
+                    Write-Host "      In Progress: " -NoNewline -ForegroundColor Gray
+                    Write-Host $location.InProgressEvents -ForegroundColor Cyan
+                }
+
+                # Show unique users and devices
+                Write-Host "   Unique Users: " -NoNewline -ForegroundColor Gray
+                Write-Host $location.UniqueUsers -ForegroundColor Yellow
+                Write-Host "   Unique Devices: " -NoNewline -ForegroundColor Gray
+                Write-Host $location.UniqueDevices -ForegroundColor Yellow
+
+                # Show detailed location info if available
+                if (-not [string]::IsNullOrWhiteSpace($location.City) -or
+                    -not [string]::IsNullOrWhiteSpace($location.State) -or
+                    -not [string]::IsNullOrWhiteSpace($location.Country))
+                {
+                    Write-Host "   Details: " -NoNewline -ForegroundColor Gray
+                    $detailParts = @()
+                    if (-not [string]::IsNullOrWhiteSpace($location.City))
+                    {
+                        $detailParts += $location.City
+                    }
+                    if (-not [string]::IsNullOrWhiteSpace($location.State))
+                    {
+                        $detailParts += $location.State
+                    }
+                    if (-not [string]::IsNullOrWhiteSpace($location.Country))
+                    {
+                        $detailParts += $location.Country
+                    }
+                    Write-Host ($detailParts -join ", ") -ForegroundColor Cyan
+                }
+
+                # Show users and their devices for this location
+                if ($location.Events -and $location.Events.Count -gt 0)
+                {
+                    Write-Host "`n   Users and Devices:" -ForegroundColor Cyan
+
+                    # Group events by user
+                    $eventsByUser = $location.Events | Group-Object -Property userPrincipalName
+
+                    foreach ($userGroup in $eventsByUser)
+                    {
+                        $userName = if ([string]::IsNullOrWhiteSpace($userGroup.Name))
+                        {
+                            "Unknown User"
+                        }
+                        else
+                        {
+                            $userGroup.Name
+                        }
+
+                        Write-Host "      User: " -NoNewline -ForegroundColor Gray
+                        Write-Host $userName -ForegroundColor White
+
+                        # Show each device for this user
+                        foreach ($evt in $userGroup.Group)
+                        {
+                            $deviceName = if ([string]::IsNullOrWhiteSpace($evt.managedDeviceName))
+                            {
+                                "Unknown"
+                            }
+                            else
+                            {
+                                $evt.managedDeviceName
+                            }
+
+                            $serialNumber = if ([string]::IsNullOrWhiteSpace($evt.deviceSerialNumber))
+                            {
+                                "Unknown"
+                            }
+                            else
+                            {
+                                $evt.deviceSerialNumber
+                            }
+
+                            # Color code by deployment state
+                            $statusColor = switch ($evt.deploymentState)
+                            {
+                                'success'
+                                {
+                                    "Green"
+                                }
+                                'inProgress'
+                                {
+                                    "Cyan"
+                                }
+                                default
+                                {
+                                    "Red"
+                                }
+                            }
+
+                            Write-Host "         - Device: " -NoNewline -ForegroundColor Gray
+                            Write-Host $deviceName -NoNewline -ForegroundColor White
+                            Write-Host " | Serial: " -NoNewline -ForegroundColor Gray
+                            Write-Host $serialNumber -NoNewline -ForegroundColor White
+                            Write-Host " | Status: " -NoNewline -ForegroundColor Gray
+                            Write-Host $evt.deploymentState -ForegroundColor $statusColor
+                        }
+                    }
+                }
+
+                Write-Host ""
+            }
+
+            Show-PagedContent -Content $AnalysisData.LocationAnalysis -DisplayScriptBlock $displayScript -PageSize 5 -Title "Enrollment Activity by Location" -ShowPageInfo $true
+        }
+        else
+        {
+            Write-Host "   No location data available from sign-in logs." -ForegroundColor Yellow
+            Write-Host "   Location information comes from matched sign-in events." -ForegroundColor Gray
         }
     }
 
@@ -350,6 +556,19 @@ function Show-AutopilotEventAnalysis()
                     Write-Host "$($device.managedDeviceName)" -NoNewline -ForegroundColor Yellow
                     Write-Host " | Date: " -NoNewline -ForegroundColor Gray
                     Write-Host "$eventDate" -ForegroundColor Yellow
+
+                    # Display location and IP if available
+                    if ($device.SignIn_Location_City -or $device.SignIn_Location_State -or $device.SignIn_Location_Country)
+                    {
+                        $location = @($device.SignIn_Location_City, $device.SignIn_Location_State, $device.SignIn_Location_Country) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_.Trim() }
+                        Write-Host "        Location: " -NoNewline -ForegroundColor Gray
+                        Write-Host ($location -join ", ") -ForegroundColor Yellow
+                    }
+                    if ($device.SignIn_IPAddress)
+                    {
+                        Write-Host "        IP: " -NoNewline -ForegroundColor Gray
+                        Write-Host "$($device.SignIn_IPAddress)" -ForegroundColor Yellow
+                    }
                 }
 
                 if ($user.EventualSuccess)
@@ -416,9 +635,36 @@ function Show-AutopilotEventAnalysis()
                 Write-Host "   Failed Device: " -NoNewline -ForegroundColor Gray
                 Write-Host "$($user.FailureDevice.deviceSerialNumber)" -NoNewline -ForegroundColor Red
                 Write-Host " on $failDate" -ForegroundColor Gray
+
+                # Display location and IP for failed device if available
+                if ($user.FailureDevice.SignIn_Location_City -or $user.FailureDevice.SignIn_Location_State -or $user.FailureDevice.SignIn_Location_Country)
+                {
+                    $location = @($user.FailureDevice.SignIn_Location_City, $user.FailureDevice.SignIn_Location_State, $user.FailureDevice.SignIn_Location_Country) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_.Trim() }
+                    Write-Host "      Location: " -NoNewline -ForegroundColor Gray
+                    Write-Host ($location -join ", ") -ForegroundColor Yellow
+                }
+                if ($user.FailureDevice.SignIn_IPAddress)
+                {
+                    Write-Host "      IP: " -NoNewline -ForegroundColor Gray
+                    Write-Host "$($user.FailureDevice.SignIn_IPAddress)" -ForegroundColor Yellow
+                }
+
                 Write-Host "   Success Device: " -NoNewline -ForegroundColor Gray
                 Write-Host "$($user.SuccessDevice.deviceSerialNumber)" -NoNewline -ForegroundColor Green
                 Write-Host " on $succDate" -ForegroundColor Gray
+
+                # Display location and IP for success device if available
+                if ($user.SuccessDevice.SignIn_Location_City -or $user.SuccessDevice.SignIn_Location_State -or $user.SuccessDevice.SignIn_Location_Country)
+                {
+                    $location = @($user.SuccessDevice.SignIn_Location_City, $user.SuccessDevice.SignIn_Location_State, $user.SuccessDevice.SignIn_Location_Country) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_.Trim() }
+                    Write-Host "      Location: " -NoNewline -ForegroundColor Gray
+                    Write-Host ($location -join ", ") -ForegroundColor Yellow
+                }
+                if ($user.SuccessDevice.SignIn_IPAddress)
+                {
+                    Write-Host "      IP: " -NoNewline -ForegroundColor Gray
+                    Write-Host "$($user.SuccessDevice.SignIn_IPAddress)" -ForegroundColor Yellow
+                }
                 Write-Host ""
             }
 
@@ -488,6 +734,19 @@ function Show-AutopilotEventAnalysis()
                     {
                         "Red"
                     })
+
+                # Display location and IP if available
+                if ($failure.SignIn_Location_City -or $failure.SignIn_Location_State -or $failure.SignIn_Location_Country)
+                {
+                    $location = @($failure.SignIn_Location_City, $failure.SignIn_Location_State, $failure.SignIn_Location_Country) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_.Trim() }
+                    Write-Host "   Location: " -NoNewline -ForegroundColor Gray
+                    Write-Host ($location -join ", ") -ForegroundColor Yellow
+                }
+                if ($failure.SignIn_IPAddress)
+                {
+                    Write-Host "   IP Address: " -NoNewline -ForegroundColor Gray
+                    Write-Host "$($failure.SignIn_IPAddress)" -ForegroundColor Yellow
+                }
 
                 if (-not [string]::IsNullOrWhiteSpace($failure.enrollmentFailureDetails))
                 {

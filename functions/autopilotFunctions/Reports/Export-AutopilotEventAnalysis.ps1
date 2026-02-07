@@ -82,6 +82,9 @@ function Export-AutopilotEventAnalysis()
     .PARAMETER ExportUserAnalysis
         Export user-based failure analysis.
 
+    .PARAMETER ExportLocationAnalysis
+        Export location-based analysis from sign-in data.
+
     .EXAMPLE
         $analysis = Get-AutopilotEventAnalysis -AccessToken $token
         Export-AutopilotEventAnalysis -AnalysisData $analysis -OutputPath "C:\Reports"
@@ -108,13 +111,15 @@ function Export-AutopilotEventAnalysis()
             [Parameter()]
             [switch]$ExportAllEvents,
             [Parameter()]
-            [switch]$ExportUserAnalysis
+            [switch]$ExportUserAnalysis,
+            [Parameter()]
+            [switch]$ExportLocationAnalysis
         )
 
         $functionName = $MyInvocation.MyCommand.Name
         Write-Verbose "[$functionName] Starting export to: $OutputPath"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Starting autopilot event analysis export to: $OutputPath" -LogLevel "Information"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Export options: Summary=$ExportSummary, Failures=$ExportFailures, Successes=$ExportSuccesses, InProgress=$ExportInProgress, AllEvents=$ExportAllEvents, UserAnalysis=$ExportUserAnalysis" -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Export options: Summary=$ExportSummary, Failures=$ExportFailures, Successes=$ExportSuccesses, InProgress=$ExportInProgress, AllEvents=$ExportAllEvents, UserAnalysis=$ExportUserAnalysis, LocationAnalysis=$ExportLocationAnalysis" -LogLevel "Verbose"
 
         $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
         $exportedFiles = @()
@@ -265,7 +270,13 @@ function Export-AutopilotEventAnalysis()
                 windowsAutopilotDeploymentProfileDisplayName,
                 @{N = "DeploymentDuration"; E = { $_.deploymentDuration } },
                 @{N = "DeploymentTotalDuration"; E = { $_.deploymentTotalDuration } },
-                enrollmentFailureDetails |
+                enrollmentFailureDetails,
+                @{N = "SignIn_Location"; E = { "$($_.SignIn_Location_City), $($_.SignIn_Location_State), $($_.SignIn_Location_Country)" -replace '^, |, $' } },
+                SignIn_IPAddress,
+                SignIn_Status,
+                SignIn_FailureReason,
+                @{N = "SignIn_ConfidenceScore"; E = { $_.SignIn_ConfidenceScore } },
+                @{N = "SignIn_MatchedOn"; E = { $_.SignIn_MatchedOn } } |
                 Export-Csv -Path $failuresFile -NoTypeInformation
             $exportedFiles += $failuresFile
             Write-Host "Exported failures to: $failuresFile" -ForegroundColor Green
@@ -298,7 +309,12 @@ function Export-AutopilotEventAnalysis()
                 enrollmentType,
                 windowsAutopilotDeploymentProfileDisplayName,
                 @{N = "DeploymentDuration"; E = { $_.deploymentDuration } },
-                @{N = "DeploymentTotalDuration"; E = { $_.deploymentTotalDuration } } |
+                @{N = "DeploymentTotalDuration"; E = { $_.deploymentTotalDuration } },
+                @{N = "SignIn_Location"; E = { "$($_.SignIn_Location_City), $($_.SignIn_Location_State), $($_.SignIn_Location_Country)" -replace '^, |, $' } },
+                SignIn_IPAddress,
+                SignIn_Status,
+                @{N = "SignIn_ConfidenceScore"; E = { $_.SignIn_ConfidenceScore } },
+                @{N = "SignIn_MatchedOn"; E = { $_.SignIn_MatchedOn } } |
                 Export-Csv -Path $successesFile -NoTypeInformation
             $exportedFiles += $successesFile
             Write-Host "Exported successes to: $successesFile" -ForegroundColor Green
@@ -327,22 +343,31 @@ function Export-AutopilotEventAnalysis()
                 deviceSetupStatus,
                 accountSetupStatus,
                 @{N = "InProgressPhase"; E = {
-                    if ($_.deviceSetupStatus -eq 'inProgress') {
-                        "Device"
+                        if ($_.deviceSetupStatus -eq 'inProgress')
+                        {
+                            "Device"
+                        }
+                        elseif ($_.accountSetupStatus -eq 'inProgress')
+                        {
+                            "User/Account"
+                        }
+                        else
+                        {
+                            "Unknown"
+                        }
                     }
-                    elseif ($_.accountSetupStatus -eq 'inProgress') {
-                        "User/Account"
-                    }
-                    else {
-                        "Unknown"
-                    }
-                }},
+                },
                 osVersion,
                 enrollmentState,
                 enrollmentType,
                 windowsAutopilotDeploymentProfileDisplayName,
                 @{N = "DeploymentDuration"; E = { $_.deploymentDuration } },
-                @{N = "DeploymentTotalDuration"; E = { $_.deploymentTotalDuration } } |
+                @{N = "DeploymentTotalDuration"; E = { $_.deploymentTotalDuration } },
+                @{N = "SignIn_Location"; E = { "$($_.SignIn_Location_City), $($_.SignIn_Location_State), $($_.SignIn_Location_Country)" -replace '^, |, $' } },
+                SignIn_IPAddress,
+                SignIn_Status,
+                @{N = "SignIn_ConfidenceScore"; E = { $_.SignIn_ConfidenceScore } },
+                @{N = "SignIn_MatchedOn"; E = { $_.SignIn_MatchedOn } } |
                 Export-Csv -Path $inProgressFile -NoTypeInformation
             $exportedFiles += $inProgressFile
             Write-Host "Exported in-progress devices to: $inProgressFile" -ForegroundColor Cyan
@@ -500,11 +525,61 @@ function Export-AutopilotEventAnalysis()
                 deploymentTotalDuration,
                 deviceSetupDuration,
                 accountSetupDuration,
-                enrollmentFailureDetails |
+                enrollmentFailureDetails,
+                SignIn_MatchFound,
+                @{N = "SignIn_ConfidenceScore"; E = { $_.SignIn_ConfidenceScore } },
+                @{N = "SignIn_MatchedOn"; E = { $_.SignIn_MatchedOn } },
+                SignIn_Location_City,
+                SignIn_Location_State,
+                SignIn_Location_Country,
+                SignIn_IPAddress,
+                SignIn_Status,
+                SignIn_FailureReason,
+                SignIn_ErrorCode |
                 Export-Csv -Path $allEventsFile -NoTypeInformation
             $exportedFiles += $allEventsFile
             Write-Host "Exported all events to: $allEventsFile" -ForegroundColor Green
             Write-Log -LogFile $LogFile -Module $functionName -Message "All events exported to: $allEventsFile" -LogLevel "Information"
+        }
+
+        # Export Location Analysis
+        if ($ExportLocationAnalysis -and $AnalysisData.LocationAnalysisCount -gt 0)
+        {
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Exporting location analysis ($($AnalysisData.LocationAnalysisCount) locations)" -LogLevel "Verbose"
+            $locationFile = Join-Path $OutputPath "$FilePrefix`_LocationAnalysis_$timestamp.csv"
+            $AnalysisData.LocationAnalysis |
+                Select-Object Location,
+                TotalEvents,
+                SuccessfulEvents,
+                FailedEvents,
+                InProgressEvents,
+                @{N = "SuccessRate"; E = { if ($_.TotalEvents -gt 0)
+                        {
+                            "{0:P2}" -f $_.SuccessRate
+                        }
+                        else
+                        {
+                            "N/A"
+                        } }
+                },
+                @{N = "FailureRate"; E = { if ($_.TotalEvents -gt 0)
+                        {
+                            "{0:P2}" -f $_.FailureRate
+                        }
+                        else
+                        {
+                            "N/A"
+                        } }
+                },
+                Country,
+                State,
+                City,
+                @{N = "UniqueUsers"; E = { $_.UniqueUsers } },
+                @{N = "UniqueDevices"; E = { $_.UniqueDevices } } |
+                Export-Csv -Path $locationFile -NoTypeInformation
+            $exportedFiles += $locationFile
+            Write-Host "Exported location analysis to: $locationFile" -ForegroundColor Green
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Location analysis exported to: $locationFile" -LogLevel "Information"
         }
 
         Write-Host "`nExport complete. $($exportedFiles.Count) file(s) created." -ForegroundColor Cyan
@@ -539,11 +614,19 @@ function Export-AutopilotEventAnalysis()
         $exportOption = Read-Host "Choose export option (1-3)"
         Write-Verbose "[$functionName] User selected export option: $exportOption"
         Write-Log -LogFile $LogFile -Module $functionName -Message "User selected export option: $exportOption" -LogLevel "Information"
-
         $exportPath = Read-Host "Enter output path (leave blank for current directory)"
         if ([string]::IsNullOrWhiteSpace($exportPath))
         {
             $exportPath = "."
+        }
+        else
+        {
+            if (-not (Test-Path -Path $exportPath -PathType Container))
+            {
+                Write-Host "Output path does not exist. Creating directory: $exportPath" -ForegroundColor Yellow
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Output path does not exist. Creating directory: $exportPath" -LogLevel "Warning"
+                New-Item -Path $exportPath -ItemType Directory | Out-Null
+            }
         }
         Write-Verbose "[$functionName] Export path set to: $exportPath"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Export path set to: $exportPath" -LogLevel "Verbose"
@@ -556,9 +639,9 @@ function Export-AutopilotEventAnalysis()
             {
                 "2"
                 {
-                    Write-Verbose "[$functionName] Exporting all data (summary, failures, successes, in-progress, user analysis, all events)"
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "Exporting all data (summary, failures, successes, in-progress, user analysis, all events)" -LogLevel "Information"
-                    $exportedFiles = Export-EventAnalysis -AnalysisData $AnalysisData -OutputPath $exportPath -ExportSummary -ExportFailures -ExportUserAnalysis -ExportAllEvents -ExportSuccesses -ExportInProgress
+                    Write-Verbose "[$functionName] Exporting all data (summary, failures, successes, in-progress, user analysis, location analysis, all events)"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Exporting all data (summary, failures, successes, in-progress, user analysis, location analysis, all events)" -LogLevel "Information"
+                    $exportedFiles = Export-EventAnalysis -AnalysisData $AnalysisData -OutputPath $exportPath -ExportSummary -ExportFailures -ExportUserAnalysis -ExportLocationAnalysis -ExportAllEvents -ExportSuccesses -ExportInProgress
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Export completed successfully" -LogLevel "Information"
                     $result.Success = $true
                     $result.ExportedFiles = @($exportedFiles)
@@ -581,6 +664,8 @@ function Export-AutopilotEventAnalysis()
                     $expAll = Read-Host
                     Write-Host "Export User Analysis? (Y/N): " -NoNewline
                     $expUser = Read-Host
+                    Write-Host "Export Location Analysis? (Y/N): " -NoNewline
+                    $expLocation = Read-Host
                     $exportParams = @{
                         AnalysisData = $AnalysisData
                         OutputPath   = $exportPath
@@ -609,9 +694,13 @@ function Export-AutopilotEventAnalysis()
                     {
                         $exportParams['ExportUserAnalysis'] = $true
                     }
+                    if ($expLocation -eq 'Y' -or $expLocation -eq 'y')
+                    {
+                        $exportParams['ExportLocationAnalysis'] = $true
+                    }
 
-                    Write-Verbose "[$functionName] Custom selections: Summary=$($expSum), Failures=$($expFail), Successes=$($expSucc), InProgress=$($expInProg), AllEvents=$($expAll), UserAnalysis=$($expUser)"
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "Custom selections: Summary=$($expSum), Failures=$($expFail), Successes=$($expSucc), InProgress=$($expInProg), AllEvents=$($expAll), UserAnalysis=$($expUser)" -LogLevel "Verbose"
+                    Write-Verbose "[$functionName] Custom selections: Summary=$($expSum), Failures=$($expFail), Successes=$($expSucc), InProgress=$($expInProg), AllEvents=$($expAll), UserAnalysis=$($expUser), LocationAnalysis=$($expLocation)"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Custom selections: Summary=$($expSum), Failures=$($expFail), Successes=$($expSucc), InProgress=$($expInProg), AllEvents=$($expAll), UserAnalysis=$($expUser), LocationAnalysis=$($expLocation)" -LogLevel "Verbose"
                     $exportedFiles = Export-EventAnalysis @exportParams
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Custom export completed successfully" -LogLevel "Information"
                     $result.Success = $true
