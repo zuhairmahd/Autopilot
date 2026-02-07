@@ -61,15 +61,14 @@ function Get-AutopilotEventAnalysis()
     Write-Verbose "[$functionName] $filterMsg"
     Write-Log -LogFile $LogFile -Module $functionName -Message $filterMsg -LogLevel "Information"
 
-    if (-not $AccessToken)
-    {
-        Write-Log -LogFile $LogFile -Module $functionName -Message "AccessToken is required when Events are not provided" -LogLevel "Error"
-        throw "AccessToken is required when Events are not provided"
-    }
-
     # Fetch events if not provided
     if (-not $PSBoundParameters.ContainsKey('Events'))
     {
+        if (-not $AccessToken)
+        {
+            Write-Log -LogFile $LogFile -Module $functionName -Message "AccessToken is required when Events are not provided" -LogLevel "Error"
+            throw "AccessToken is required when Events are not provided"
+        }
         Write-Verbose "[$functionName] Fetching autopilot events from Graph API"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Fetching autopilot events from Graph API" -LogLevel "Information"
         $Events = (CallGraphAPI -ResourcePath $autopilotEventsURI -accessToken $AccessToken -consistencyLevel -extraParameters $autopilotExtraparameters ).value
@@ -84,6 +83,10 @@ function Get-AutopilotEventAnalysis()
 
     # Enrich autopilot events with Azure AD Device ID from managed devices
     # This enables accurate correlation with sign-in logs which use Azure AD Device ID
+    # Only enrich when AccessToken is available (skip when Events are provided directly without token)
+    $deviceIdToAzureADDeviceIdCache = @{}
+    if ($AccessToken)
+    {
     Write-Log -LogFile $LogFile -Module $functionName -Message "Enriching autopilot events with Azure AD Device IDs" -LogLevel "Information"
     Write-Verbose "[$functionName] Fetching Azure AD Device IDs for $($Events.Count) autopilot events"
 
@@ -165,6 +168,7 @@ function Get-AutopilotEventAnalysis()
         Write-Verbose "[$functionName] Enriched $devicesEnrichedCount events with Azure AD Device IDs"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Enriched $devicesEnrichedCount events with Azure AD Device IDs" -LogLevel "Information"
     }
+    } # end if ($AccessToken) for device enrichment
 
     # Filter out events with invalid dates to prevent downstream errors
     $validEvents = @($Events | Where-Object {
@@ -260,8 +264,11 @@ function Get-AutopilotEventAnalysis()
     # Filter events by UserPrincipalName if specified
     if ($UserPrincipalName)
     {
-        $userObject = CallGraphAPI -ResourcePath "$userURI/$UserPrincipalName" -accessToken $accessToken
-        write-log -logFile $LogFile -Module $functionName -Message "Retrieved user object for $UserPrincipalName with id $($userObject.id)" -LogLevel "Information"
+        if ($AccessToken)
+        {
+            $userObject = CallGraphAPI -ResourcePath "$userURI/$UserPrincipalName" -accessToken $accessToken
+            write-log -logFile $LogFile -Module $functionName -Message "Retrieved user object for $UserPrincipalName with id $($userObject.id)" -LogLevel "Information"
+        }
         $beforeUserFilter = $filteredEvents.Count
         Write-Log -LogFile $LogFile -Module $functionName -Message "Filtering events by UserPrincipalName: $UserPrincipalName" -LogLevel "Information"
         $filteredEvents = $filteredEvents | Where-Object {
@@ -292,7 +299,12 @@ function Get-AutopilotEventAnalysis()
         }
     }
 
-    # Enrich events with user IDs where missing
+    # Enrich events with user IDs where missing (only when AccessToken is available)
+    $upnToUserIdCache = @{}
+    $signInCache = @{}
+    $totalSignInsRetrieved = 0
+    if ($AccessToken)
+    {
     Write-Log -LogFile $LogFile -Module $functionName -Message "Enriching $($filteredEvents.Count) events with user IDs" -LogLevel "Information"
 
     # Extract unique UPNs from filtered events that need user ID resolution
@@ -438,10 +450,6 @@ function Get-AutopilotEventAnalysis()
     $uniqueUserIds = @($filteredEvents | Where-Object { $_.userId } | Select-Object -ExpandProperty userId -Unique)
     Write-Verbose "[$functionName] Found $($uniqueUserIds.Count) unique user IDs in autopilot events"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Found $($uniqueUserIds.Count) unique user IDs to fetch sign-in data for" -LogLevel "Information"
-
-    # Create sign-in lookup cache by userId
-    $signInCache = @{}
-    $totalSignInsRetrieved = 0
 
     if ($uniqueUserIds.Count -gt 0)
     {
@@ -591,6 +599,7 @@ function Get-AutopilotEventAnalysis()
         Write-Log -LogFile $LogFile -Module $functionName -Message "No user IDs to fetch sign-in data for" -LogLevel "Verbose"
         Write-Verbose "[$functionName] No user IDs to fetch sign-in data for"
     }
+    } # end if ($AccessToken) for user enrichment and sign-in data
 
     # Helper function to match sign-in activity to autopilot event
     function Get-SignInMatch()
