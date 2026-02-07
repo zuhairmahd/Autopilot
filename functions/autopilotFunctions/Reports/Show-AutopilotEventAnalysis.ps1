@@ -398,10 +398,89 @@ function Show-AutopilotEventAnalysis()
                 {
                     Write-Host "   Details: " -NoNewline -ForegroundColor Gray
                     $detailParts = @()
-                    if (-not [string]::IsNullOrWhiteSpace($location.City)) { $detailParts += $location.City }
-                    if (-not [string]::IsNullOrWhiteSpace($location.State)) { $detailParts += $location.State }
-                    if (-not [string]::IsNullOrWhiteSpace($location.Country)) { $detailParts += $location.Country }
+                    if (-not [string]::IsNullOrWhiteSpace($location.City))
+                    {
+                        $detailParts += $location.City
+                    }
+                    if (-not [string]::IsNullOrWhiteSpace($location.State))
+                    {
+                        $detailParts += $location.State
+                    }
+                    if (-not [string]::IsNullOrWhiteSpace($location.Country))
+                    {
+                        $detailParts += $location.Country
+                    }
                     Write-Host ($detailParts -join ", ") -ForegroundColor Cyan
+                }
+
+                # Show users and their devices for this location
+                if ($location.Events -and $location.Events.Count -gt 0)
+                {
+                    Write-Host "`n   Users and Devices:" -ForegroundColor Cyan
+
+                    # Group events by user
+                    $eventsByUser = $location.Events | Group-Object -Property userPrincipalName
+
+                    foreach ($userGroup in $eventsByUser)
+                    {
+                        $userName = if ([string]::IsNullOrWhiteSpace($userGroup.Name))
+                        {
+                            "Unknown User"
+                        }
+                        else
+                        {
+                            $userGroup.Name
+                        }
+
+                        Write-Host "      User: " -NoNewline -ForegroundColor Gray
+                        Write-Host $userName -ForegroundColor White
+
+                        # Show each device for this user
+                        foreach ($evt in $userGroup.Group)
+                        {
+                            $deviceName = if ([string]::IsNullOrWhiteSpace($evt.managedDeviceName))
+                            {
+                                "Unknown"
+                            }
+                            else
+                            {
+                                $evt.managedDeviceName
+                            }
+
+                            $serialNumber = if ([string]::IsNullOrWhiteSpace($evt.deviceSerialNumber))
+                            {
+                                "Unknown"
+                            }
+                            else
+                            {
+                                $evt.deviceSerialNumber
+                            }
+
+                            # Color code by deployment state
+                            $statusColor = switch ($evt.deploymentState)
+                            {
+                                'success'
+                                {
+                                    "Green"
+                                }
+                                'inProgress'
+                                {
+                                    "Cyan"
+                                }
+                                default
+                                {
+                                    "Red"
+                                }
+                            }
+
+                            Write-Host "         - Device: " -NoNewline -ForegroundColor Gray
+                            Write-Host $deviceName -NoNewline -ForegroundColor White
+                            Write-Host " | Serial: " -NoNewline -ForegroundColor Gray
+                            Write-Host $serialNumber -NoNewline -ForegroundColor White
+                            Write-Host " | Status: " -NoNewline -ForegroundColor Gray
+                            Write-Host $evt.deploymentState -ForegroundColor $statusColor
+                        }
+                    }
                 }
 
                 Write-Host ""

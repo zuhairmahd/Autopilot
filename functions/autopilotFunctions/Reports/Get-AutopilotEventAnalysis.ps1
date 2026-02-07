@@ -202,12 +202,34 @@ function Get-AutopilotEventAnalysis()
             $dateRangeMsg += " from $($StartDate.ToString('yyyy-MM-dd'))"
             $signInLogsStartDate = $StartDate.ToString("yyyy-MM-ddTHH:mm:ssZ")
         }
+        else
+        {
+            # If no start date provided, use 30 days before end date or 30 days ago
+            $defaultStart = if ($EndDate)
+            {
+                $EndDate.AddDays(-30) 
+            }
+            else
+            {
+                (Get-Date).AddDays(-30) 
+            }
+            $signInLogsStartDate = $defaultStart.ToString("yyyy-MM-ddTHH:mm:ssZ")
+            Write-Log -LogFile $LogFile -Module $functionName -Message "No StartDate provided, using default start date for sign-in logs: $($defaultStart.ToString('yyyy-MM-dd'))" -LogLevel "Verbose"
+        }
         if ($EndDate)
         {
             $dateRangeMsg += " to $($EndDate.ToString('yyyy-MM-dd'))"
             $signInLogsEndDate = $EndDate.ToString("yyyy-MM-ddTHH:mm:ssZ")
         }
+        else
+        {
+            # If no end date provided, use current date
+            $defaultEnd = Get-Date
+            $signInLogsEndDate = $defaultEnd.ToString("yyyy-MM-ddTHH:mm:ssZ")
+            Write-Log -LogFile $LogFile -Module $functionName -Message "No EndDate provided, using default end date for sign-in logs: $($defaultEnd.ToString('yyyy-MM-dd'))" -LogLevel "Verbose"
+        }
         Write-Log -LogFile $LogFile -Module $functionName -Message $dateRangeMsg -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Sign-in log date range: $signInLogsStartDate to $signInLogsEndDate" -LogLevel "Verbose"
 
         $filteredEvents = $Events | Where-Object {
             $eventDate = $null
@@ -232,6 +254,7 @@ function Get-AutopilotEventAnalysis()
         Write-Log -LogFile $LogFile -Module $functionName -Message "No date filtering applied, analyzing all $($Events.Count) events" -LogLevel "Verbose"
         $signInLogsStartDate = (Get-Date).AddDays(-30).ToString("yyyy-MM-ddTHH:mm:ssZ")
         $signInLogsEndDate = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssZ")
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Sign-in log date range (default): $signInLogsStartDate to $signInLogsEndDate" -LogLevel "Verbose"
     }
 
     # Filter events by UserPrincipalName if specified
@@ -1181,35 +1204,64 @@ function Get-AutopilotEventAnalysis()
     }
 
     # Convert to sorted array of location statistics
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Converting location statistics to sorted array with unique user/device counts" -LogLevel "Verbose"
     $locationAnalysis = @($locationStats.GetEnumerator() | ForEach-Object {
-            [PSCustomObject]@{
-                Location        = $_.Key
-                Country         = $_.Value.Country
-                State           = $_.Value.State
-                City            = $_.Value.City
-                TotalEvents     = $_.Value.TotalEvents
-                SuccessCount    = $_.Value.SuccessCount
-                FailureCount    = $_.Value.FailureCount
-                InProgressCount = $_.Value.InProgressCount
-                SuccessRate     = if ($_.Value.TotalEvents -gt 0)
-                {
-                    [Math]::Round(($_.Value.SuccessCount / $_.Value.TotalEvents) * 100, 2)
-                }
-                else
-                {
-                    0
-                }
-                FailureRate     = if ($_.Value.TotalEvents -gt 0)
-                {
-                    [Math]::Round(($_.Value.FailureCount / $_.Value.TotalEvents) * 100, 2)
-                }
-                else
-                {
-                    0
-                }
-                Events          = $_.Value.Events
-            }
-        } | Sort-Object -Property TotalEvents -Descending)
+            # Calculate unique users and devices for this location
+            $locationEvents = $_.Value.Events
+            $uniqueUsers = @($locationEvents | Where-Object { $_.userId -or $_.userPrincipalName } |
+                    ForEach-Object { if ($_.userId)
+                        {
+                            $_.userId
+                        }
+                        else
+                        {
+                            $_.userPrincipalName
+                        } } |
+                    Select-Object -Unique).Count
+                $uniqueDevices = @($locationEvents | Where-Object { $_.managedDeviceName -or $_.deviceId } |
+                        ForEach-Object { if ($_.deviceId)
+                            {
+                                $_.deviceId
+                            }
+                            else
+                            {
+                                $_.managedDeviceName
+                            } } |
+                        Select-Object -Unique).Count
+
+                    [PSCustomObject]@{
+                        Location         = $_.Key
+                        Country          = $_.Value.Country
+                        State            = $_.Value.State
+                        City             = $_.Value.City
+                        TotalEvents      = $_.Value.TotalEvents
+                        SuccessCount     = $_.Value.SuccessCount
+                        FailureCount     = $_.Value.FailureCount
+                        InProgressCount  = $_.Value.InProgressCount
+                        SuccessfulEvents = $_.Value.SuccessCount
+                        FailedEvents     = $_.Value.FailureCount
+                        InProgressEvents = $_.Value.InProgressCount
+                        UniqueUsers      = $uniqueUsers
+                        UniqueDevices    = $uniqueDevices
+                        SuccessRate      = if ($_.Value.TotalEvents -gt 0)
+                        {
+                            [Math]::Round(($_.Value.SuccessCount / $_.Value.TotalEvents) * 100, 2)
+                        }
+                        else
+                        {
+                            0
+                        }
+                        FailureRate      = if ($_.Value.TotalEvents -gt 0)
+                        {
+                            [Math]::Round(($_.Value.FailureCount / $_.Value.TotalEvents) * 100, 2)
+                        }
+                        else
+                        {
+                            0
+                        }
+                        Events           = $_.Value.Events
+                    }
+                } | Sort-Object -Property TotalEvents -Descending)
 
     Write-Verbose "[$functionName] Location analysis complete: $($locationAnalysis.Count) unique locations"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Location analysis complete: $($locationAnalysis.Count) unique locations identified" -LogLevel "Information"
@@ -1221,7 +1273,7 @@ function Get-AutopilotEventAnalysis()
         Write-Log -LogFile $LogFile -Module $functionName -Message "Top locations by event count:" -LogLevel "Verbose"
         foreach ($loc in $topLocations)
         {
-            Write-Log -LogFile $LogFile -Module $functionName -Message "  $($loc.Location): $($loc.TotalEvents) events (Success: $($loc.SuccessCount), Failure: $($loc.FailureCount), Success Rate: $($loc.SuccessRate)%)" -LogLevel "Verbose"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "  $($loc.Location): $($loc.TotalEvents) events, $($loc.UniqueUsers) users, $($loc.UniqueDevices) devices (Success: $($loc.SuccessCount), Failure: $($loc.FailureCount), Success Rate: $($loc.SuccessRate)%)" -LogLevel "Verbose"
         }
     }
 
@@ -1270,6 +1322,7 @@ function Get-AutopilotEventAnalysis()
 
     Write-Verbose "[$functionName] Analysis complete"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Autopilot event analysis completed successfully" -LogLevel "Information"
+    $global:r = $result
     return $result
 }
 
