@@ -576,12 +576,17 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
         It "Should return only events matching the UPN" {
             $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -UserPrincipalName "user1@contoso.com"
 
-            # Should filter to only events for this user
-            $result.TotalEvents | Should -BeLessOrEqual $script:SampleEvents.Count
-            # Verify filtering occurred (if user has events)
-            if ($result.TotalEvents -gt 0)
-            {
-                $result.UserPrincipalName | Should -Be "user1@contoso.com"
+            # Verify UPN filter was applied
+            $result.UserPrincipalName | Should -Be "user1@contoso.com"
+            # Should have filtered events (not zero)
+            $result.TotalEvents | Should -BeGreaterThan 0
+            # TotalEvents should be calculated from filtered events, which are <= all events
+            @($result.AllFilteredEvents).Count | Should -BeLessOrEqual @($result.AllEvents).Count
+            # TotalEvents should match actual filtered array count
+            $result.TotalEvents | Should -Be @($result.AllFilteredEvents).Count
+            # Verify only events for this user are included
+            $result.AllFilteredEvents | ForEach-Object {
+                $_.userPrincipalName | Should -Be "user1@contoso.com"
             }
         }
 
@@ -844,7 +849,8 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
                 }
             }
 
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
+            # Optimization metrics are only logged during sign-in correlation
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -ApplyLocationAnalysis
 
             # Should log optimization metrics
             $optimizationLogs = $script:logMessages | Where-Object { $_ -match 'Optimization' -or $_ -match 'reduction' }
@@ -855,7 +861,8 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
     Context "User ID enrichment" {
 
         It "Should enrich events with missing user IDs" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
+            # User ID enrichment only happens with ApplyLocationAnalysis
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -ApplyLocationAnalysis
 
             # Check that events without userId now have one
             $enrichedEvent = $result.AllFilteredEvents | Where-Object { $_.userPrincipalName -eq "user2@contoso.com" }
@@ -866,7 +873,8 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
         It "Should fetch user IDs only for filtered events" {
             # Filter to specific date range
             $startDate = [DateTime]"2025-02-05T00:00:00Z"
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -StartDate $startDate
+            # User ID enrichment only happens with ApplyLocationAnalysis
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -StartDate $startDate -ApplyLocationAnalysis
 
             # Should only have enriched events from the filtered date range
             $result.AllFilteredEvents.Count | Should -BeLessOrEqual $script:SampleEvents.Count
@@ -885,7 +893,8 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
         }
 
         It "Should preserve existing user IDs" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
+            # User ID enrichment only happens with ApplyLocationAnalysis
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -ApplyLocationAnalysis
 
             # Check an event that already had userId
             $eventWithId = $result.AllFilteredEvents | Where-Object { $_.userPrincipalName -eq "user1@contoso.com" }
@@ -914,7 +923,8 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
         }
 
         It "Should use enriched user IDs for sign-in matching" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
+            # Sign-in matching only happens with ApplyLocationAnalysis
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -ApplyLocationAnalysis
 
             # Verify sign-in matching was performed
             $result.SignInMatchStats | Should -Not -BeNullOrEmpty
@@ -1226,6 +1236,297 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
             $result | Should -Not -BeNullOrEmpty
             $result.TotalEvents | Should -Be 1
         }
+    }
+
+    Context "ApplyLocationAnalysis Switch" {
+
+        It "Should skip sign-in correlation when ApplyLocationAnalysis is not present" {
+            $script:capturedCalls = @()
+
+            Mock CallGraphAPI {
+                param($ResourcePath)
+                # Use comma operator to preserve arrays as single elements
+                $script:capturedCalls += , $ResourcePath
+
+                # Handle autopilot events endpoint
+                if ($ResourcePath -eq 'deviceManagement/autopilotEvents')
+                {
+                    # Return a sample event with device ID for enrichment
+                    return @{ value = @(
+                            @{
+                                eventDateTime      = "2025-02-01T10:00:00Z"
+                                deviceSerialNumber = "ABC123"
+                                managedDeviceName  = "Device1"
+                                deviceId           = "device-1"
+                                userPrincipalName  = "user1@contoso.com"
+                                userId             = "00000000-0000-0000-0001-000000000001"
+                                deploymentState    = "success"
+                                deviceSetupStatus  = "success"
+                                accountSetupStatus = "success"
+                                id                 = "event-1"
+                            }
+                        )
+                    }
+                }
+                # Handle batch device lookups (array of paths)
+                if ($ResourcePath -is [array] -and $ResourcePath.Count -gt 0 -and $ResourcePath[0] -match '^deviceManagement/managedDevices/')
+                {
+                    return @($ResourcePath | ForEach-Object {
+                            $deviceId = $_.Split('/')[2].Split('?')[0]
+                            @{
+                                id              = $deviceId
+                                azureADDeviceId = "aad-$deviceId"
+                                deviceName      = "Test Device"
+                            }
+                        })
+                }
+                # Managed device lookups (single device)
+                if ($ResourcePath -match '^deviceManagement/managedDevices/')
+                {
+                    $deviceId = $ResourcePath.Split('/')[2].Split('?')[0]
+                    return @{
+                        id              = $deviceId
+                        azureADDeviceId = "aad-$deviceId"
+                        deviceName      = "Test Device"
+                    }
+                }
+                return @{ value = @() }
+            }
+
+            # Call without ApplyLocationAnalysis switch
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
+
+            # Debug output
+            Write-Verbose ("Result properties: " + ($result.PSObject.Properties.Name -join ', '))
+            Write-Verbose ("LocationAnalysis type: " + ($result.LocationAnalysis -eq $null ? "null" : $result.LocationAnalysis.GetType().Name))
+
+            # Verify result
+            $result | Should -Not -BeNullOrEmpty
+            $result.TotalEvents | Should -Be 1
+
+            # Verify no sign-in logs were fetched (no calls to auditLogs/signIns)
+            $signInCalls = $script:capturedCalls | Where-Object { $_ -match 'auditLogs/signIns' }
+            $signInCalls | Should -BeNullOrEmpty
+
+            # Verify no batch requests for sign-ins were made (batch requests are arrays with sign-in paths)
+            $batchSignInCalls = $script:capturedCalls | Where-Object { $_ -is [array] -and $_ -match 'auditLogs/signIns' }
+            $batchSignInCalls | Should -BeNullOrEmpty
+
+            # Verify SignInMatchStats is initialized with zeros
+            $result.SignInMatchStats | Should -Not -BeNullOrEmpty
+            $result.SignInMatchStats.TotalEvents | Should -Be 1
+            $result.SignInMatchStats.MatchedEvents | Should -Be 0
+
+            # Verify LocationAnalysis is empty
+            $result.LocationAnalysisCount | Should -Be 0
+            # LocationAnalysis should be an array (empty when switch not used)
+            $result.LocationAnalysis -is [array] | Should -Be $true
+        }
+
+        It "Should perform sign-in correlation when ApplyLocationAnalysis is present" {
+            $script:capturedCalls = @()
+
+            Mock CallGraphAPI {
+                param($ResourcePath, $AccessToken, $ExtraParameters)
+                # Use comma operator to preserve arrays as single elements
+                $script:capturedCalls += , $ResourcePath
+
+                # Handle autopilot events endpoint
+                if ($ResourcePath -eq 'deviceManagement/autopilotEvents')
+                {
+                    return @{ value = @($script:SampleEvents[0]) }
+                }
+
+                # Handle batch device lookups (array of paths)
+                if ($ResourcePath -is [array] -and $ResourcePath.Count -gt 0 -and $ResourcePath[0] -match '^deviceManagement/managedDevices/')
+                {
+                    return @($ResourcePath | ForEach-Object {
+                            $deviceId = $_.Split('/')[2].Split('?')[0]
+                            @{
+                                id              = $deviceId
+                                azureADDeviceId = "aad-$deviceId"
+                            }
+                        })
+                }
+
+                # Handle managed device lookups (single device)
+                if ($ResourcePath -match '^deviceManagement/managedDevices/')
+                {
+                    $deviceId = $ResourcePath.Split('/')[2].Split('?')[0]
+                    return @{
+                        id              = $deviceId
+                        azureADDeviceId = "aad-$deviceId"
+                    }
+                }
+
+                # Handle batch requests for user lookups and sign-ins
+                if ($ResourcePath -is [array] -and $ResourcePath.Count -gt 0)
+                {
+                    $batchResponses = @()
+                    foreach ($path in $ResourcePath)
+                    {
+                        if ($path -match '^users/(.+@.+)$')
+                        {
+                            $upn = $Matches[1]
+                            $batchResponses += @{
+                                id      = 1
+                                status  = 200
+                                headers = @{}
+                                body    = @{
+                                    id                = $script:UserIdMapping[$upn]
+                                    userPrincipalName = $upn
+                                }
+                            }
+                        }
+                        elseif ($path -match 'auditLogs/signIns')
+                        {
+                            # Return sign-in with location
+                            $batchResponses += @{
+                                id      = 1
+                                status  = 200
+                                headers = @{}
+                                body    = @{
+                                    value = @(
+                                        @{
+                                            createdDateTime = "2025-02-01T10:05:00Z"
+                                            userId          = "00000000-0000-0000-0001-000000000001"
+                                            appId           = "d4ebce55-015a-49b5-a083-c84d1797ae8c"
+                                            location        = @{
+                                                city    = "Seattle"
+                                                state   = "Washington"
+                                                country = "US"
+                                            }
+                                            ipAddress       = "1.2.3.4"
+                                            deviceDetail    = @{
+                                                deviceId    = "aad-device1"
+                                                displayName = "Device1"
+                                            }
+                                            status          = @{
+                                                errorCode         = 0
+                                                failureReason     = $null
+                                                additionalDetails = $null
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    # Return batch response format
+                    return @{
+                        value        = $batchResponses
+                        successCount = $batchResponses.Count
+                        failureCount = 0
+                    }
+                }
+
+                return @{ value = @() }
+            }
+
+            # Call WITH ApplyLocationAnalysis switch
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -ApplyLocationAnalysis
+
+            # Verify result
+            $result | Should -Not -BeNullOrEmpty
+            $result.TotalEvents | Should -Be 1
+
+            # Verify batch requests were made (sign-in logs are fetched via batch)
+            $batchCalls = $script:capturedCalls | Where-Object { $_ -is [array] }
+            $batchCalls | Should -Not -BeNullOrEmpty
+
+            # Verify SignInMatchStats has match data
+            $result.SignInMatchStats | Should -Not -BeNullOrEmpty
+            $result.SignInMatchStats.TotalEvents | Should -Be 1
+            $result.SignInMatchStats.MatchedEvents | Should -BeGreaterThan 0
+
+            # Verify LocationAnalysis is an array and has location data
+            # Force array check without pipeline to handle single-element arrays
+            @($result.LocationAnalysis) -is [array] | Should -Be $true
+            $result.LocationAnalysis.Count | Should -BeGreaterThan 0
+            $result.LocationAnalysisCount | Should -BeGreaterThan 0
+        }
+
+        It "Should enrich events with sign-in data when ApplyLocationAnalysis is used" {
+            Mock CallGraphAPI {
+                param($ResourcePath, $AccessToken, $ExtraParameters)
+
+                if ($ResourcePath -eq 'deviceManagement/autopilotEvents')
+                {
+                    return @{ value = @($script:SampleEvents[0]) }
+                }
+
+                if ($ResourcePath -match '^deviceManagement/managedDevices/')
+                {
+                    $deviceId = $ResourcePath.Split('/')[2].Split('?')[0]
+                    return @{
+                        id              = $deviceId
+                        azureADDeviceId = "aad-$deviceId"
+                    }
+                }
+
+                if ($ResourcePath -is [array])
+                {
+                    $batchResponses = @()
+                    foreach ($path in $ResourcePath)
+                    {
+                        if ($path -match 'auditLogs/signIns')
+                        {
+                            $batchResponses += @{
+                                id     = 1
+                                status = 200
+                                body   = @{
+                                    value = @(
+                                        @{
+                                            createdDateTime = "2025-02-01T10:05:00Z"
+                                            userId          = "00000000-0000-0000-0001-000000000001"
+                                            location        = @{
+                                                city    = "Seattle"
+                                                state   = "Washington"
+                                                country = "US"
+                                            }
+                                            ipAddress       = "1.2.3.4"
+                                            deviceDetail    = @{
+                                                deviceId    = "aad-device1"
+                                                displayName = "Device1"
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    return @{
+                        value        = $batchResponses
+                        successCount = $batchResponses.Count
+                        failureCount = 0
+                    }
+                }
+
+                return @{ value = @() }
+            }
+
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -ApplyLocationAnalysis
+
+            # Verify enriched event has sign-in properties
+            $enrichedEvent = $result.AllFilteredEvents[0]
+            $enrichedEvent | Should -Not -BeNullOrEmpty
+
+            # Check that sign-in properties were added (even if null, they should exist)
+            $enrichedEvent.PSObject.Properties.Name | Should -Contain 'SignIn_MatchFound'
+            $enrichedEvent.PSObject.Properties.Name | Should -Contain 'SignIn_Location_City'
+            $enrichedEvent.PSObject.Properties.Name | Should -Contain 'SignIn_Location_State'
+            $enrichedEvent.PSObject.Properties.Name | Should -Contain 'SignIn_Location_Country'
+            $enrichedEvent.PSObject.Properties.Name | Should -Contain 'SignIn_IPAddress'
+
+            # If a match was found, location data should be populated
+            if ($enrichedEvent.SignIn_MatchFound -eq $true)
+            {
+                $enrichedEvent.SignIn_Location_City | Should -Not -BeNullOrEmpty
+            }
+        }
+    }
+
+    Context "Error Handling" {
 
         It "Should log errors appropriately" {
             $errorLogs = @()

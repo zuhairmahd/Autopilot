@@ -757,4 +757,131 @@ Describe "Export-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
             }
         }
     }
+
+    Context "Smart data-aware export" {
+
+        BeforeEach {
+            # Ensure test output directory exists and is clean for each test
+            if (Test-Path $script:TestOutputPath) {
+                Remove-Item -Path "$script:TestOutputPath\*" -Force -ErrorAction SilentlyContinue
+            }
+            else {
+                New-Item -Path $script:TestOutputPath -ItemType Directory -Force | Out-Null
+            }
+        }
+
+        It "Should analyze available data and display summary" {
+            Mock Read-Host {
+                param($Prompt)
+                if ($Prompt -like "*export option*") { return "1" }
+                if ($Prompt -like "*output path*") { return $script:TestOutputPath }
+                return ""
+            }
+
+            $capturedOutput = @()
+            Mock Write-Host {
+                param($Object)
+                $script:capturedOutput += $Object
+            }
+
+            $result = Export-AutopilotEventAnalysis -AnalysisData $script:MockAnalysisData
+
+            # Should display available data summary
+            $availableDataOutput = $script:capturedOutput -join ' '
+            $availableDataOutput | Should -Match "Available Data"
+            $result.Success | Should -Be $true
+        }
+
+        It "Should skip location export when LocationAnalysisCount is 0" {
+            # Create analysis data without location analysis
+            $analysisWithoutLocation = [PSCustomObject]@{
+                TotalEvents              = 5
+                SuccessCount             = 3
+                FailureCount             = 2
+                InProgressCount          = 0
+                LocationAnalysisCount    = 0
+                LocationAnalysis         = @()
+                UsersWithMultipleFailures = @(
+                    [PSCustomObject]@{
+                        UserPrincipalName = "user1@contoso.com"
+                        FailureCount      = 1
+                        EventualSuccess   = $true
+                    }
+                )
+                SingleFailureWithSuccess = @()
+                AllFilteredEvents        = @(
+                    @{ eventDateTime = "2025-02-01T10:00:00Z"; deploymentState = "success" }
+                )
+                SuccessfulEvents         = @(@{ eventDateTime = "2025-02-01T10:00:00Z" })
+                FailedEvents             = @(@{ eventDateTime = "2025-02-02T10:00:00Z" })
+                InProgressEvents         = @()
+                AllEvents                = @()
+                AverageSuccessDuration   = New-TimeSpan -Hours 2
+                AverageFailureDuration   = New-TimeSpan -Hours 1
+                DevicePhaseOnlyFailureCount = 1
+                UserPhaseOnlyFailureCount = 1
+                BothPhasesFailureCount    = 0
+                UnknownPhaseFailureCount  = 0
+                DevicePhaseInProgressCount = 0
+                UserPhaseInProgressCount  = 0
+            }
+
+            Mock Read-Host {
+                param($Prompt)
+                if ($Prompt -like "*export option*") { return "2" }
+                if ($Prompt -like "*output path*") { return $script:TestOutputPath }
+                return ""
+            }
+            Mock Write-Host { }
+
+            $result = Export-AutopilotEventAnalysis -AnalysisData $analysisWithoutLocation
+
+            # Should not have location analysis file
+            $locationFile = $result.ExportedFiles | Where-Object { $_ -like "*LocationAnalysis*" }
+            $locationFile | Should -BeNullOrEmpty
+            $result.Success | Should -Be $true
+        }
+
+        It "Should handle analysis with no failures gracefully" {
+            $analysisNoFailures = [PSCustomObject]@{
+                TotalEvents              = 10
+                SuccessCount             = 10
+                FailureCount             = 0
+                InProgressCount          = 0
+                LocationAnalysisCount    = 0
+                LocationAnalysis         = @()
+                UsersWithMultipleFailures = @()
+                SingleFailureWithSuccess = @()
+                AllFilteredEvents        = @()
+                SuccessfulEvents         = @()
+                FailedEvents             = @()
+                InProgressEvents         = @()
+                AllEvents                = @()
+                AverageSuccessDuration   = New-TimeSpan -Hours 2
+                DevicePhaseOnlyFailureCount = 0
+                UserPhaseOnlyFailureCount = 0
+                BothPhasesFailureCount    = 0
+                UnknownPhaseFailureCount  = 0
+                DevicePhaseInProgressCount = 0
+                UserPhaseInProgressCount  = 0
+            }
+
+            Mock Read-Host {
+                param($Prompt)
+                if ($Prompt -like "*export option*") { return "1" }
+                if ($Prompt -like "*output path*") { return $script:TestOutputPath }
+                return ""
+            }
+            Mock Write-Host { }
+
+            { Export-AutopilotEventAnalysis -AnalysisData $analysisNoFailures } | Should -Not -Throw
+
+            $result = Export-AutopilotEventAnalysis -AnalysisData $analysisNoFailures
+            $result.Success | Should -Be $true
+
+            # Should not have failures file since no failures
+            $failuresFile = $result.ExportedFiles | Where-Object { $_ -like "*Failures*" }
+            $failuresFile | Should -BeNullOrEmpty
+        }
+    }
 }
