@@ -2166,8 +2166,22 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Autopilot enrollment re
 
     if ($analysis.TotalEventsBeforeFilter -gt 0 -and $analysis.TotalEvents -gt 0)
     {
-        # Display results
-        Show-AutopilotEventAnalysis -AnalysisData $analysis -ShowSummary -ShowInProgress -ShowLocationAnalysis -ShowMultipleFailures -ShowSingleFailures -ShowChronologicalFailures -ShowDetailedFailures
+        # Display results - only pass ShowLocationAnalysis if location analysis was performed
+        $displayParams = @{
+            AnalysisData              = $analysis
+            ShowSummary               = $true
+            ShowInProgress            = $true
+            ShowMultipleFailures      = $true
+            ShowSingleFailures        = $true
+            ShowChronologicalFailures = $true
+            ShowDetailedFailures      = $true
+        }
+        # Only show location analysis if it was actually performed (ApplyLocationAnalysis was used)
+        if ($analysis.LocationAnalysisCount -gt 0)
+        {
+            $displayParams['ShowLocationAnalysis'] = $true
+        }
+        Show-AutopilotEventAnalysis @displayParams
         # Prompt for export
         Write-Host "`nWould you like to export the analysis to CSV? (Y/N): " -NoNewline -ForegroundColor Yellow
         $exportChoice = Read-Host
