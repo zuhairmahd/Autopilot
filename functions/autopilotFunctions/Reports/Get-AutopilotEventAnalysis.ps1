@@ -23,6 +23,9 @@ function Get-AutopilotEventAnalysis()
     .PARAMETER UserPrincipalName
         Optional user principal name to filter events.
 
+    .PARAMETER ApplyLocationAnalysis
+        ##todo: Switch to enable additional analysis based on location data.
+
     .EXAMPLE
         $analysis = Get-AutopilotEventAnalysis -AccessToken $token -StartDate "2025-01-01"
 
@@ -43,7 +46,8 @@ function Get-AutopilotEventAnalysis()
         [Parameter()]
         [DateTime]$EndDate,
         [Parameter()]
-        [string]$UserPrincipalName
+        [string]$UserPrincipalName,
+        [switch]$ApplyLocationAnalysis
     )
 
     $functionName = $MyInvocation.MyCommand.Name
