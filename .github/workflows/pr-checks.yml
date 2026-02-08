@@ -123,7 +123,7 @@ jobs:
           comment_mode: off
 
   test-integration:
-    name: Integration Tests
+    name: Integration Tests With Coverage
     runs-on: windows-latest
     timeout-minutes: 30
     steps:

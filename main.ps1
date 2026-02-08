@@ -2155,6 +2155,11 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Autopilot enrollment re
     {
         $analysisParams['UserPrincipalName'] = $autopilotReportInput.UserPrincipalName
     }
+    if ($autopilotReportInput.UseLocationFilter)
+    {
+        $analysisParams['ShowLocationAnalysis'] = $true
+    }
+
     Write-Log -logFile $logFile -Module $scriptName -Message "Analysis parameters set: $($analysisParams | Out-String)"
     $analysis = Get-AutopilotEventAnalysis @analysisParams
     Write-Log -logFile $logFile -Module $scriptName -Message "Analysis results obtained: $($analysis | Out-String)"
@@ -2957,6 +2962,11 @@ if ($filesCleaned.AllRemoved)
 {
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
 }
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
+# Finish logging
+Write-Log -LogFile $LogFile -FinishLogging
+#endregion Cleanup
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
 # Finish logging
