@@ -111,7 +111,7 @@ function Get-AutopilotEnrollmentReportInput()
     # Start Date Input
     Write-Host "`nStart Date Filter:" -ForegroundColor Cyan
     Write-Host "  Options:" -ForegroundColor Gray
-    Write-Host "    - Press Enter for default $(Get-Date.AddDays(-30).ToString('yyyy-MM-dd'))" -ForegroundColor Gray
+    Write-Host "    - Press Enter for default $((Get-Date).AddDays(-30).ToString('yyyy-MM-dd'))" -ForegroundColor Gray
     Write-Host "    - Type: today, yesterday, wtd (week-to-date), mtd (month-to-date)" -ForegroundColor Gray
     Write-Host "    - Or enter date: yyyy-MM-dd or MM/dd/yyyy" -ForegroundColor Gray
     $startDateInput = Read-Host "`nStart Date [default: $((Get-Date).AddDays(-30).ToString('yyyy-MM-dd'))]"
@@ -197,12 +197,12 @@ function Get-AutopilotEnrollmentReportInput()
     Write-Host "`nLocation data:" -ForegroundColor Cyan
     Write-Host "`nWould you like to use a location filter for the report?" -ForegroundColor Gray
     Write-Host "Please note this may take a long time with a large dataset." -ForegroundColor Yellow
-    $useLocationFilter = Read-Host "Use location filter? (Y/N)"
-    while ($useLocationFilter -notin @("Y", "N", "y", "n"))
+    $useLocationFilter = Read-Host "Use location filter? (Y/N) [default: N]"
+    while ($useLocationFilter -notin @("Y", "N", "y", "n", ""))
     {
         Write-Host "Invalid input. Please enter Y or N." -ForegroundColor Red
-        [console]::Beep(1000, 500)
-        $useLocationFilter = Read-Host "Use location filter? (Y/N)"
+        try { [console]::Beep(1000, 500) } catch { <# Beep not supported on this platform #> }
+        $useLocationFilter = Read-Host "Use location filter? (Y/N) [default: N]"
     }
 
     if ($useLocationFilter -in @("Y", "y"))
@@ -237,10 +237,6 @@ function Get-AutopilotEnrollmentReportInput()
     if ($useLocationFilter)
     {
         $result['UseLocationFilter'] = $true
-    }
-    else
-    {
-        $result['UseLocationFilter'] = $false
     }
     Write-Verbose "[$functionName] Collected input parameters: $($result.Keys -join ', ')"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Collected input parameters: $($result.Keys -join ', ')" -LogLevel "Verbose"

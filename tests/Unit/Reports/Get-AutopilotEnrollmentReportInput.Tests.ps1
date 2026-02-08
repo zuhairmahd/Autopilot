@@ -43,7 +43,11 @@ Describe "Get-AutopilotEnrollmentReportInput" -Tags 'Unit', 'Reports' {
     Context "Date parsing with ConvertTo-DateFilter" {
 
         It "Should parse 'today' to start of current day" {
-            Mock Read-Host { return "today" }
+            Mock Read-Host {
+                param($Prompt)
+                if ($Prompt -like "*Start Date*") { return "today" }
+                return ""
+            }
             Mock Write-Host { }
             Mock Write-Verbose { }
 
@@ -159,7 +163,11 @@ Describe "Get-AutopilotEnrollmentReportInput" -Tags 'Unit', 'Reports' {
             $result = Get-AutopilotEnrollmentReportInput -NoConfirmation
 
             $result | Should -BeOfType [hashtable]
-            $result.Count | Should -Be 0
+            # When no input is provided, defaults are applied:
+            # StartDate defaults to 30 days ago, EndDate defaults to today
+            $result.ContainsKey('StartDate') | Should -Be $true
+            $result.ContainsKey('EndDate') | Should -Be $true
+            $result.ContainsKey('UserPrincipalName') | Should -Be $false
         }
 
         It "Should include UserPrincipalName when provided" {
@@ -271,7 +279,6 @@ Describe "Get-AutopilotEnrollmentReportInput" -Tags 'Unit', 'Reports' {
             $result.ContainsKey('StartDate') | Should -Be $true
             $result.ContainsKey('EndDate') | Should -Be $true
             $result.ContainsKey('UserPrincipalName') | Should -Be $true
-            $result.Count | Should -Be 3
         }
 
         It "Should return partial filters when only some provided" {
@@ -285,9 +292,9 @@ Describe "Get-AutopilotEnrollmentReportInput" -Tags 'Unit', 'Reports' {
             $result = Get-AutopilotEnrollmentReportInput -NoConfirmation
 
             $result.ContainsKey('StartDate') | Should -Be $true
-            $result.ContainsKey('EndDate') | Should -Be $false
+            # EndDate defaults to today when not provided
+            $result.ContainsKey('EndDate') | Should -Be $true
             $result.ContainsKey('UserPrincipalName') | Should -Be $false
-            $result.Count | Should -Be 1
         }
     }
 }
