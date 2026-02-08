@@ -342,9 +342,9 @@ function Get-AutopilotEventAnalysis()
                 for ($i = 0; $i -lt $batchResponse.value.Count; $i++)
                 {
                     $result = $batchResponse.value[$i]
-                    $originalUpn = if ($i -lt $uniqueUPNs.Count)
+                    $originalUpn = if ($result.body -and $result.body.userPrincipalName)
                     {
-                        $uniqueUPNs[$i]
+                        $result.body.userPrincipalName
                     }
                     else
                     {
