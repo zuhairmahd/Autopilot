@@ -8,10 +8,10 @@ function Export-AutopilotEventAnalysis()
         Provides an interactive interface for exporting autopilot event analysis data to CSV files.
         The function intelligently analyzes the incoming AnalysisData object to determine what data
         is available and only offers to export data that actually exists.
-        
+
         For example, if the analysis was performed without the -ApplyLocationAnalysis switch,
         location data won't be available and the function won't offer to export it.
-        
+
         Returns a structured object with success status and exported file information.
 
     .PARAMETER AnalysisData
@@ -53,10 +53,10 @@ function Export-AutopilotEventAnalysis()
         1. Default - Summary + failures + user analysis (only if data exists)
         2. Everything Available - All data that exists in the analysis object
         3. Custom - User selects which available data sets to export
-        
+
         The function displays a summary of available data before prompting for export options,
         helping users understand what data is available for export.
-        
+
         Data Availability Logic:
         - Summary: Always available
         - Failures: Only if FailureCount > 0
@@ -634,7 +634,7 @@ function Export-AutopilotEventAnalysis()
         # Analyze available data in AnalysisData object
         Write-Verbose "[$functionName] Analyzing available data in AnalysisData object"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Analyzing available data in AnalysisData object" -LogLevel "Verbose"
-        
+
         $dataAvailability = @{
             HasSummary          = $true  # Always available
             HasFailures         = $AnalysisData.FailureCount -gt 0
@@ -644,7 +644,7 @@ function Export-AutopilotEventAnalysis()
             HasLocationAnalysis = $AnalysisData.LocationAnalysisCount -gt 0
             HasAllEvents        = @($AnalysisData.AllFilteredEvents).Count -gt 0
         }
-        
+
         Write-Verbose "[$functionName] Data availability: Failures=$($dataAvailability.HasFailures), Successes=$($dataAvailability.HasSuccesses), InProgress=$($dataAvailability.HasInProgress), UserAnalysis=$($dataAvailability.HasUserAnalysis), LocationAnalysis=$($dataAvailability.HasLocationAnalysis), AllEvents=$($dataAvailability.HasAllEvents)"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Data availability: Failures=$($dataAvailability.HasFailures), Successes=$($dataAvailability.HasSuccesses), InProgress=$($dataAvailability.HasInProgress), UserAnalysis=$($dataAvailability.HasUserAnalysis), LocationAnalysis=$($dataAvailability.HasLocationAnalysis), AllEvents=$($dataAvailability.HasAllEvents)" -LogLevel "Information"
 
@@ -686,7 +686,7 @@ function Export-AutopilotEventAnalysis()
         $exportOption = Read-Host "Choose export option (1-3)"
         Write-Verbose "[$functionName] User selected export option: $exportOption"
         Write-Log -LogFile $LogFile -Module $functionName -Message "User selected export option: $exportOption" -LogLevel "Information"
-        
+
         $exportPath = Read-Host "Enter output path (leave blank for current directory)"
         if ([string]::IsNullOrWhiteSpace($exportPath))
         {
@@ -706,7 +706,7 @@ function Export-AutopilotEventAnalysis()
 
         # Store the path in result object
         $result.OutputPath = $exportPath
-        
+
         try
         {
             switch ($exportOption)
@@ -716,13 +716,13 @@ function Export-AutopilotEventAnalysis()
                     # Export everything that's available
                     Write-Verbose "[$functionName] Exporting all available data"
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Exporting all available data" -LogLevel "Information"
-                    
+
                     $exportParams = @{
                         AnalysisData = $AnalysisData
                         OutputPath   = $exportPath
                         ExportSummary = $true
                     }
-                    
+
                     # Add switches only for available data
                     if ($dataAvailability.HasFailures)
                     {
@@ -748,7 +748,7 @@ function Export-AutopilotEventAnalysis()
                     {
                         $exportParams['ExportAllEvents'] = $true
                     }
-                    
+
                     $exportedFiles = Export-EventAnalysis @exportParams
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Export completed successfully" -LogLevel "Information"
                     $result.Success = $true
@@ -761,14 +761,14 @@ function Export-AutopilotEventAnalysis()
                     # Custom selection - only prompt for available data
                     Write-Verbose "[$functionName] Custom export selection mode"
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Custom export selection mode" -LogLevel "Information"
-                    
+
                     $exportParams = @{
                         AnalysisData = $AnalysisData
                         OutputPath   = $exportPath
                     }
-                    
+
                     Write-Host "`nSelect data to export:" -ForegroundColor Cyan
-                    
+
                     # Always ask about summary
                     Write-Host "Export Summary? (Y/N): " -NoNewline
                     $expSum = Read-Host
@@ -776,7 +776,7 @@ function Export-AutopilotEventAnalysis()
                     {
                         $exportParams['ExportSummary'] = $true
                     }
-                    
+
                     # Only ask about failures if they exist
                     if ($dataAvailability.HasFailures)
                     {
@@ -787,7 +787,7 @@ function Export-AutopilotEventAnalysis()
                             $exportParams['ExportFailures'] = $true
                         }
                     }
-                    
+
                     # Only ask about successes if they exist
                     if ($dataAvailability.HasSuccesses)
                     {
@@ -798,7 +798,7 @@ function Export-AutopilotEventAnalysis()
                             $exportParams['ExportSuccesses'] = $true
                         }
                     }
-                    
+
                     # Only ask about in-progress if they exist
                     if ($dataAvailability.HasInProgress)
                     {
@@ -809,7 +809,7 @@ function Export-AutopilotEventAnalysis()
                             $exportParams['ExportInProgress'] = $true
                         }
                     }
-                    
+
                     # Only ask about user analysis if it exists
                     if ($dataAvailability.HasUserAnalysis)
                     {
@@ -820,7 +820,7 @@ function Export-AutopilotEventAnalysis()
                             $exportParams['ExportUserAnalysis'] = $true
                         }
                     }
-                    
+
                     # Only ask about location analysis if it exists
                     if ($dataAvailability.HasLocationAnalysis)
                     {
@@ -831,7 +831,7 @@ function Export-AutopilotEventAnalysis()
                             $exportParams['ExportLocationAnalysis'] = $true
                         }
                     }
-                    
+
                     # Only ask about all events if they exist
                     if ($dataAvailability.HasAllEvents)
                     {
@@ -845,7 +845,7 @@ function Export-AutopilotEventAnalysis()
 
                     Write-Verbose "[$functionName] Custom selections: $($exportParams.Keys -join ', ')"
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Custom selections: $($exportParams.Keys -join ', ')" -LogLevel "Verbose"
-                    
+
                     $exportedFiles = Export-EventAnalysis @exportParams
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Custom export completed successfully" -LogLevel "Information"
                     $result.Success = $true
@@ -858,25 +858,25 @@ function Export-AutopilotEventAnalysis()
                     # Default export - summary + failures + user analysis (if available)
                     Write-Verbose "[$functionName] Default export mode"
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Default export mode" -LogLevel "Information"
-                    
+
                     $exportParams = @{
                         AnalysisData  = $AnalysisData
                         OutputPath    = $exportPath
                         ExportSummary = $true
                     }
-                    
+
                     # Add failures if available
                     if ($dataAvailability.HasFailures)
                     {
                         $exportParams['ExportFailures'] = $true
                     }
-                    
+
                     # Add user analysis if available
                     if ($dataAvailability.HasUserAnalysis)
                     {
                         $exportParams['ExportUserAnalysis'] = $true
                     }
-                    
+
                     $exportedFiles = Export-EventAnalysis @exportParams
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Default export completed successfully" -LogLevel "Information"
                     $result.Success = $true

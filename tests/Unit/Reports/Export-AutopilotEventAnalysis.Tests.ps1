@@ -777,7 +777,7 @@ Describe "Export-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
                 if ($Prompt -like "*output path*") { return $script:TestOutputPath }
                 return ""
             }
-            
+
             $capturedOutput = @()
             Mock Write-Host {
                 param($Object)
@@ -875,10 +875,10 @@ Describe "Export-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
             Mock Write-Host { }
 
             { Export-AutopilotEventAnalysis -AnalysisData $analysisNoFailures } | Should -Not -Throw
-            
+
             $result = Export-AutopilotEventAnalysis -AnalysisData $analysisNoFailures
             $result.Success | Should -Be $true
-            
+
             # Should not have failures file since no failures
             $failuresFile = $result.ExportedFiles | Where-Object { $_ -like "*Failures*" }
             $failuresFile | Should -BeNullOrEmpty
