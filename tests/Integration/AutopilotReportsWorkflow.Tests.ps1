@@ -34,7 +34,7 @@ Describe "Autopilot Event Analysis Workflow" -Tags 'Integration', 'Reports' {
         {
             function global:Write-Log
             {
-                param($LogFile, $Module, $Message, $LogLevel) 
+                param($LogFile, $Module, $Message, $LogLevel)
             }
         }
 
@@ -229,7 +229,163 @@ Describe "Autopilot Event Analysis Workflow" -Tags 'Integration', 'Reports' {
 
         # Mock CallGraphAPI to return sample events
         Mock CallGraphAPI {
-            return @{ value = $script:SampleAutopilotEvents }
+            param($ResourcePath, $AccessToken, $ExtraParameters)
+
+            # Handle autopilot events endpoint
+            if ($ResourcePath -eq 'deviceManagement/autopilotEvents') {
+                return @{ value = $script:SampleAutopilotEvents }
+            }
+
+            # Handle batch requests (array of resource paths)
+            if ($ResourcePath -is [array] -and $ResourcePath.Count -gt 1) {
+                $batchResponses = @()
+                $successCount = 0
+                $failureCount = 0
+                $batchId = 1
+
+                foreach ($path in $ResourcePath) {
+                    # Handle user lookups by UPN
+                    if ($path -match '^users/([^/]+)$') {
+                        $upn = $Matches[1]
+                        $userId = "user-" + ($upn -split '@')[0] -replace '\.',''
+
+                        $batchResponses += @{
+                            id = $batchId
+                            status = 200
+                            headers = @{}
+                            body = @{
+                                id = $userId
+                                userPrincipalName = $upn
+                                displayName = "Test User - $upn"
+                            }
+                        }
+                        $successCount++
+                        $batchId++
+                    }
+                    # Handle sign-in logs with per-user date ranges
+                    elseif ($path -match 'auditLogs/signIns') {
+                        $userId = $null
+                        $requestedStartDate = $null
+                        $requestedEndDate = $null
+
+                        if ($path -match 'userId eq ''([^'']+)''') {
+                            $userId = $Matches[1]
+                        }
+                        if ($path -match 'createdDateTime ge ([^ &]+)') {
+                            $requestedStartDate = $Matches[1]
+                        }
+                        if ($path -match 'createdDateTime le ([^ &]+)') {
+                            $requestedEndDate = $Matches[1]
+                        }
+
+                        # Return mock sign-in data within the requested date range
+                        $signIns = @()
+                        if ($userId) {
+                            $signIns += @{
+                                userId = $userId
+                                createdDateTime = (Get-Date).ToString('yyyy-MM-ddTHH:mm:ssZ')
+                                location = @{
+                                    city = 'Seattle'
+                                    state = 'Washington'
+                                    countryOrRegion = 'US'
+                                }
+                                ipAddress = '10.0.0.100'
+                                deviceDetail = @{
+                                    deviceId = 'mock-device-id'
+                                    displayName = 'Mock Device'
+                                    isCompliant = $true
+                                    isManaged = $true
+                                }
+                                status = @{
+                                    errorCode = 0
+                                }
+                                appDisplayName = 'Microsoft Intune'
+                                appId = 'd4ebce55-015a-49b5-a083-c84d1797ae8c'
+                            }
+                        }
+
+                        $batchResponses += @{
+                            id = $batchId
+                            status = 200
+                            headers = @{}
+                            body = @{
+                                value = $signIns
+                            }
+                        }
+                        $successCount++
+                        $batchId++
+                    }
+                    # Handle managed device lookups for Azure AD Device ID
+                    elseif ($path -match 'deviceManagement/managedDevices/([^?]+)') {
+                        $deviceId = $Matches[1]
+                        $batchResponses += @{
+                            id = $batchId
+                            status = 200
+                            headers = @{}
+                            body = @{
+                                id = $deviceId
+                                azureADDeviceId = "aad-$deviceId"
+                                deviceName = "MockDevice-$deviceId"
+                            }
+                        }
+                        $successCount++
+                        $batchId++
+                    }
+                }
+
+                # Return in standard Graph API batch response format
+                return @{
+                    value = $batchResponses
+                    successCount = $successCount
+                    failureCount = $failureCount
+                    batchProcessed = $true
+                    batchMethod = 'NativeBatch'
+                    totalCount = $batchResponses.Count
+                }
+            }
+
+            # Handle single user lookups
+            if ($ResourcePath -match '^users/([^/]+)$') {
+                $upn = $Matches[1]
+                $userId = "user-" + ($upn -split '@')[0] -replace '\.',''
+
+                return @{
+                    id = $userId
+                    userPrincipalName = $upn
+                    displayName = "Test User - $upn"
+                }
+            }
+
+            # Handle sign-in logs (fallback for non-batch)
+            if ($ResourcePath -eq 'auditLogs/signIns') {
+                return @{
+                    value = @(
+                        @{
+                            userId = 'test-user-id'
+                            createdDateTime = (Get-Date).ToString('yyyy-MM-ddTHH:mm:ssZ')
+                            location = @{
+                                city = 'Seattle'
+                                state = 'Washington'
+                                countryOrRegion = 'US'
+                            }
+                            ipAddress = '10.0.0.1'
+                            deviceDetail = @{
+                                deviceId = 'test-device-id'
+                                displayName = 'Test Device'
+                                isCompliant = $true
+                                isManaged = $true
+                            }
+                            status = @{
+                                errorCode = 0
+                            }
+                            appDisplayName = 'Microsoft Intune'
+                        }
+                    )
+                }
+            }
+
+            # Default: return empty
+            return @{ value = @() }
         }
 
         # Mock FormatDateWithTimeZone
@@ -323,11 +479,11 @@ Describe "Autopilot Event Analysis Workflow" -Tags 'Integration', 'Reports' {
                 param($Prompt)
                 if ($Prompt -like "*export option*")
                 {
-                    return "1" 
+                    return "1"
                 }
                 if ($Prompt -like "*output path*")
                 {
-                    return $script:TestContext.TestFolder 
+                    return $script:TestContext.TestFolder
                 }
                 return ""
             }
@@ -394,11 +550,11 @@ Describe "Autopilot Event Analysis Workflow" -Tags 'Integration', 'Reports' {
                 param($Prompt)
                 if ($Prompt -like "*export option*")
                 {
-                    return "2" 
+                    return "2"
                 }
                 if ($Prompt -like "*output path*")
                 {
-                    return $script:TestContext.TestFolder 
+                    return $script:TestContext.TestFolder
                 }
                 return ""
             }
@@ -417,15 +573,15 @@ Describe "Autopilot Event Analysis Workflow" -Tags 'Integration', 'Reports' {
                 param($Prompt)
                 if ($Prompt -like "*Start Date*")
                 {
-                    return "2025-02-05" 
+                    return "2025-02-05"
                 }
                 if ($Prompt -like "*End Date*")
                 {
-                    return "" 
+                    return ""
                 }
                 if ($Prompt -like "*User Principal Name*")
                 {
-                    return "" 
+                    return ""
                 }
                 return ""
             }
@@ -444,24 +600,24 @@ Describe "Autopilot Event Analysis Workflow" -Tags 'Integration', 'Reports' {
                 # Input gathering
                 if ($Prompt -like "*Start Date*")
                 {
-                    return "2025-02-01" 
+                    return "2025-02-01"
                 }
                 if ($Prompt -like "*End Date*")
                 {
-                    return "2025-02-11" 
+                    return "2025-02-11"
                 }
                 if ($Prompt -like "*User Principal Name*")
                 {
-                    return "" 
+                    return ""
                 }
                 # Export prompts
                 if ($Prompt -like "*export option*")
                 {
-                    return "1" 
+                    return "1"
                 }
                 if ($Prompt -like "*output path*")
                 {
-                    return $script:TestContext.TestFolder 
+                    return $script:TestContext.TestFolder
                 }
                 return ""
             }
@@ -487,17 +643,61 @@ Describe "Autopilot Event Analysis Workflow" -Tags 'Integration', 'Reports' {
     Context "Workflow with provided events" {
 
         It "Should analyze provided events without API call" {
-            Mock CallGraphAPI { throw "Should not call API" }
+            # Mock CallGraphAPI to return sample events for autopilotEvents request
+            Mock CallGraphAPI {
+                param($ResourcePath, $accessToken, $extraParameters, $consistencyLevel)
 
-            $analysis = Get-AutopilotEventAnalysis -Events $script:SampleAutopilotEvents
+                if ($ResourcePath -eq "deviceManagement/autopilotEvents")
+                {
+                    return @{ value = $script:SampleAutopilotEvents }
+                }
+                elseif ($ResourcePath -like "deviceManagement/managedDevices/*")
+                {
+                    return @{ azureADDeviceId = "aad-device-123" }
+                }
+                elseif ($ResourcePath -eq "users")
+                {
+                    return @{ value = @() }
+                }
+                elseif ($ResourcePath -eq "auditLogs/signIns")
+                {
+                    return @{ value = @() }
+                }
+
+                return @{ value = @() }
+            }
+
+            $analysis = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             $analysis.TotalEvents | Should -Be 11
         }
 
         It "Should complete workflow with pipeline" {
             Mock Write-Host { }
+            Mock CallGraphAPI {
+                param($ResourcePath, $accessToken, $extraParameters, $consistencyLevel)
 
-            $analysis = $script:SampleAutopilotEvents | Get-AutopilotEventAnalysis
+                if ($ResourcePath -eq "deviceManagement/autopilotEvents")
+                {
+                    return @{ value = $script:SampleAutopilotEvents }
+                }
+                elseif ($ResourcePath -like "deviceManagement/managedDevices/*")
+                {
+                    return @{ azureADDeviceId = "aad-device-123" }
+                }
+                elseif ($ResourcePath -eq "users")
+                {
+                    return @{ value = @() }
+                }
+                elseif ($ResourcePath -eq "auditLogs/signIns")
+                {
+                    return @{ value = @() }
+                }
+
+                return @{ value = @() }
+            }
+
+            $analysis = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             { $analysis | Show-AutopilotEventAnalysis -ShowSummary } | Should -Not -Throw
         }
@@ -508,16 +708,38 @@ Describe "Autopilot Event Analysis Workflow" -Tags 'Integration', 'Reports' {
                 param($Prompt)
                 if ($Prompt -like "*export option*")
                 {
-                    return "1" 
+                    return "1"
                 }
                 if ($Prompt -like "*output path*")
                 {
-                    return $script:TestContext.TestFolder 
+                    return $script:TestContext.TestFolder
                 }
                 return ""
             }
+            Mock CallGraphAPI {
+                param($ResourcePath, $accessToken, $extraParameters, $consistencyLevel)
 
-            $exportResult = $script:SampleAutopilotEvents | Get-AutopilotEventAnalysis | Export-AutopilotEventAnalysis
+                if ($ResourcePath -eq "deviceManagement/autopilotEvents")
+                {
+                    return @{ value = $script:SampleAutopilotEvents }
+                }
+                elseif ($ResourcePath -like "deviceManagement/managedDevices/*")
+                {
+                    return @{ azureADDeviceId = "aad-device-123" }
+                }
+                elseif ($ResourcePath -eq "users")
+                {
+                    return @{ value = @() }
+                }
+                elseif ($ResourcePath -eq "auditLogs/signIns")
+                {
+                    return @{ value = @() }
+                }
+
+                return @{ value = @() }
+            }
+
+            $exportResult = Get-AutopilotEventAnalysis -AccessToken "test-token" | Export-AutopilotEventAnalysis
 
             $exportResult.Success | Should -Be $true
         }
@@ -531,11 +753,11 @@ Describe "Autopilot Event Analysis Workflow" -Tags 'Integration', 'Reports' {
                 param($Prompt)
                 if ($Prompt -like "*export option*")
                 {
-                    return "2" 
+                    return "2"
                 }
                 if ($Prompt -like "*output path*")
                 {
-                    return $script:TestContext.TestFolder 
+                    return $script:TestContext.TestFolder
                 }
                 return ""
             }
@@ -586,12 +808,21 @@ Describe "Autopilot Event Analysis Workflow" -Tags 'Integration', 'Reports' {
         }
 
         It "Should handle malformed event data" {
-            $badEvents = @(
-                @{ eventDateTime = "invalid-date"; deploymentState = "success" },
-                @{ deviceSerialNumber = "SN001" }  # Missing required fields
-            )
+            Mock CallGraphAPI {
+                param($ResourcePath, $accessToken, $extraParameters, $consistencyLevel)
 
-            { Get-AutopilotEventAnalysis -Events $badEvents } | Should -Not -Throw
+                # Return malformed events
+                if ($ResourcePath -eq "deviceManagement/autopilotEvents")
+                {
+                    return @{ value = @(
+                        @{ eventDateTime = "invalid-date"; deploymentState = "success" },
+                        @{ deviceSerialNumber = "SN001" }  # Missing required fields
+                    ) }
+                }
+                return @{ value = @() }
+            }
+
+            { Get-AutopilotEventAnalysis -AccessToken "test-token" } | Should -Not -Throw
         }
     }
 
@@ -608,31 +839,31 @@ Describe "Autopilot Event Analysis Workflow" -Tags 'Integration', 'Reports' {
                     userPrincipalName  = "user$_@contoso.com"
                     deploymentState    = if ($_ % 3 -eq 0)
                     {
-                        "failure" 
+                        "failure"
                     }
                     elseif ($_ % 7 -eq 0)
                     {
-                        "inProgress" 
+                        "inProgress"
                     }
                     else
                     {
-                        "success" 
+                        "success"
                     }
                     deviceSetupStatus  = if ($_ % 3 -eq 0)
                     {
-                        "failure" 
+                        "failure"
                     }
                     else
                     {
-                        "success" 
+                        "success"
                     }
                     accountSetupStatus = if ($_ % 3 -eq 0)
                     {
-                        "notStarted" 
+                        "notStarted"
                     }
                     else
                     {
-                        "success" 
+                        "success"
                     }
                     osVersion          = "10.0.19045"
                     enrollmentState    = "enrolled"
@@ -640,10 +871,188 @@ Describe "Autopilot Event Analysis Workflow" -Tags 'Integration', 'Reports' {
                 }
             }
 
-            $analysis = Get-AutopilotEventAnalysis -Events $largeEventSet
+            Mock CallGraphAPI {
+                param($ResourcePath, $accessToken, $extraParameters, $consistencyLevel)
+
+                if ($ResourcePath -eq "deviceManagement/autopilotEvents")
+                {
+                    return @{ value = $largeEventSet }
+                }
+                elseif ($ResourcePath -like "deviceManagement/managedDevices/*")
+                {
+                    return @{ azureADDeviceId = "aad-device-123" }
+                }
+                return @{ value = @() }
+            }
+
+            $analysis = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             $analysis.TotalEvents | Should -Be 120
             $analysis.SuccessCount + $analysis.FailureCount + $analysis.InProgressCount | Should -Be 120
+        }
+    }
+
+    Context "Per-user date range optimization" {
+
+        It "Should use per-user date ranges when fetching sign-in logs" {
+            # Track sign-in requests to verify per-user date ranges
+            $script:SignInRequests = @()
+
+            Mock CallGraphAPI {
+                param($ResourcePath, $AccessToken, $ExtraParameters)
+
+                # Capture sign-in log batch requests
+                if ($ResourcePath -is [array]) {
+                    foreach ($path in $ResourcePath) {
+                        if ($path -match 'auditLogs/signIns.*userId eq ''([^'']+)''.*createdDateTime ge ([^ &]+).*createdDateTime le ([^ &]+)') {
+                            $script:SignInRequests += @{
+                                UserId = $Matches[1]
+                                StartDate = $Matches[2]
+                                EndDate = $Matches[3]
+                                Path = $path
+                            }
+                        }
+                    }
+
+                    return @{
+                        value = @()
+                        successCount = $ResourcePath.Count
+                        failureCount = 0
+                    }
+                }
+
+                if ($ResourcePath -eq 'deviceManagement/autopilotEvents') {
+                    return @{ value = $script:SampleAutopilotEvents }
+                }
+
+                return @{ value = @() }
+            }
+
+            $analysis = Get-AutopilotEventAnalysis -AccessToken "test-token"
+
+            # Should have captured sign-in requests
+            $script:SignInRequests.Count | Should -BeGreaterThan 0
+
+            # Each request should have specific date ranges
+            foreach ($request in $script:SignInRequests) {
+                $request.StartDate | Should -Not -BeNullOrEmpty
+                $request.EndDate | Should -Not -BeNullOrEmpty
+
+                # Parse dates to verify they're valid
+                { [DateTime]::Parse($request.StartDate) } | Should -Not -Throw
+                { [DateTime]::Parse($request.EndDate) } | Should -Not -Throw
+            }
+        }
+
+        It "Should calculate different date ranges for users with events on different dates" {
+            # Create events with specific date patterns
+            $testEvents = @(
+                # User A: Events only on Feb 1-2
+                @{
+                    id = "test-001"
+                    eventDateTime = "2025-02-01T10:00:00Z"
+                    userPrincipalName = "userA@contoso.com"
+                    userId = "userA-id"
+                    deploymentState = "success"
+                    deviceSetupStatus = "success"
+                    accountSetupStatus = "success"
+                },
+                @{
+                    id = "test-002"
+                    eventDateTime = "2025-02-02T10:00:00Z"
+                    userPrincipalName = "userA@contoso.com"
+                    userId = "userA-id"
+                    deploymentState = "success"
+                    deviceSetupStatus = "success"
+                    accountSetupStatus = "success"
+                },
+                # User B: Events only on Feb 10-11
+                @{
+                    id = "test-003"
+                    eventDateTime = "2025-02-10T10:00:00Z"
+                    userPrincipalName = "userB@contoso.com"
+                    userId = "userB-id"
+                    deploymentState = "success"
+                    deviceSetupStatus = "success"
+                    accountSetupStatus = "success"
+                },
+                @{
+                    id = "test-004"
+                    eventDateTime = "2025-02-11T10:00:00Z"
+                    userPrincipalName = "userB@contoso.com"
+                    userId = "userB-id"
+                    deploymentState = "success"
+                    deviceSetupStatus = "success"
+                    accountSetupStatus = "success"
+                }
+            )
+
+            $script:UserDateRanges = @{}
+
+            Mock CallGraphAPI {
+                param($ResourcePath, $AccessToken, $ExtraParameters)
+
+                if ($ResourcePath -is [array]) {
+                    foreach ($path in $ResourcePath) {
+                        if ($path -match 'auditLogs/signIns.*userId eq ''([^'']+)''.*createdDateTime ge ([^ &T]+).*createdDateTime le ([^ &T]+)') {
+                            $userId = $Matches[1]
+                            $startDate = [DateTime]::Parse($Matches[2])
+                            $endDate = [DateTime]::Parse($Matches[3])
+                            $daySpan = ($endDate - $startDate).Days
+
+                            $script:UserDateRanges[$userId] = @{
+                                StartDate = $startDate
+                                EndDate = $endDate
+                                DaySpan = $daySpan
+                            }
+                        }
+                    }
+
+                    return @{
+                        value = @()
+                        successCount = $ResourcePath.Count
+                        failureCount = 0
+                    }
+                }
+
+                if ($ResourcePath -eq 'deviceManagement/autopilotEvents') {
+                    return @{ value = $testEvents }
+                }
+
+                return @{ value = @() }
+            }
+
+            $analysis = Get-AutopilotEventAnalysis -AccessToken "test-token"
+
+            # Should have captured date ranges for both users
+            $script:UserDateRanges.Keys.Count | Should -BeGreaterOrEqual 2
+
+            # Each user should have a narrow date range (events + buffer)
+            foreach ($userId in $script:UserDateRanges.Keys) {
+                $dateRange = $script:UserDateRanges[$userId]
+                # With 1-day buffer on each side, 2 days of events should become ~4 days
+                $dateRange.DaySpan | Should -BeLessOrEqual 5
+            }
+        }
+
+        It "Should log optimization metrics showing reduction in data requested" {
+            $optimizationLogs = @()
+
+            Mock Write-Log {
+                param($LogFile, $Module, $Message, $LogLevel)
+                if ($Message -match 'Optimization:|user-days|reduction|%') {
+                    $script:optimizationLogs += $Message
+                }
+            }
+
+            $analysis = Get-AutopilotEventAnalysis -AccessToken "test-token"
+
+            # Should log optimization metrics
+            $script:optimizationLogs.Count | Should -BeGreaterThan 0
+
+            # Should mention reduction percentage
+            $reductionLog = $script:optimizationLogs | Where-Object { $_ -match '\d+%' }
+            $reductionLog | Should -Not -BeNullOrEmpty
         }
     }
 }

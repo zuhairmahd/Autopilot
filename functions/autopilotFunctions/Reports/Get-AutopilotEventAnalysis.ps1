@@ -9,7 +9,7 @@ function Get-AutopilotEventAnalysis()
         including success/failure counts, durations, user patterns, and device information.
 
     .PARAMETER AccessToken
-        Access token for Graph API calls (required if Events not provided).
+        Access token for Graph API calls (required).
 
     .PARAMETER StartDate
         Optional start date to filter events.
@@ -34,7 +34,7 @@ function Get-AutopilotEventAnalysis()
     #>
     [CmdletBinding()]
     param(
-        [Parameter()]
+        [Parameter(Mandatory = $true)]
         [string]$AccessToken,
         [Parameter()]
         [DateTime]$StartDate,
@@ -53,10 +53,13 @@ function Get-AutopilotEventAnalysis()
     $autopilotExtraparameters = "top=999&count=true"
     $signInActivityURI = "auditLogs/signIns"
 
-    if (-not $AccessToken)
+    # Validate AccessToken parameter
+    if ([string]::IsNullOrWhiteSpace($AccessToken))
     {
-        Write-Log -LogFile $LogFile -Module $functionName -Message "AccessToken is required" -LogLevel "Error"
-        throw "AccessToken is required"
+        $errorMsg = "AccessToken parameter is required and cannot be null or empty"
+        Write-Log -LogFile $LogFile -Module $functionName -Message $errorMsg -LogLevel "Error"
+        Write-Error $errorMsg
+        return $null
     }
 
     if ($UserPrincipalName)
@@ -338,81 +341,158 @@ function Get-AutopilotEventAnalysis()
     }
     #endregion Helper functions
 
-    # Fetch events
-    Write-Verbose "[$functionName] Fetching autopilot events from Graph API"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Fetching autopilot events from Graph API" -LogLevel "Information"
-    $Events = (CallGraphAPI -ResourcePath $autopilotEventsURI -accessToken $AccessToken -consistencyLevel -extraParameters $autopilotExtraparameters ).value
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Retrieved $($Events.Count) events from Graph API" -LogLevel "Information"
-
-    # Enrich autopilot events with Azure AD Device ID from managed devices
-    # This enables accurate correlation with sign-in logs which use Azure AD Device ID
-    $deviceIdToAzureADDeviceIdCache = @{}
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Enriching autopilot events with Azure AD Device IDs" -LogLevel "Information"
-    Write-Verbose "[$functionName] Fetching Azure AD Device IDs for $($Events.Count) autopilot events"
-
-    # Extract unique device IDs (Intune Managed Device IDs) from autopilot events
-    $uniqueDeviceIds = @($Events | Where-Object { $_.deviceId } | Select-Object -ExpandProperty deviceId -Unique)
-    Write-Verbose "[$functionName] Found $($uniqueDeviceIds.Count) unique device IDs requiring Azure AD Device ID lookup"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Found $($uniqueDeviceIds.Count) unique device IDs for Azure AD Device ID resolution" -LogLevel "Information"
-
-    # Create deviceId to azureADDeviceId lookup cache
-    $deviceIdToAzureADDeviceIdCache = @{}
-    if ($uniqueDeviceIds.Count -gt 0)
+    # Main processing logic wrapped in comprehensive try-catch for error handling
+    try
     {
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Fetching Azure AD Device IDs using batch processing for $($uniqueDeviceIds.Count) devices" -LogLevel "Information"
-        Write-Verbose "[$functionName] Using batch processing to fetch $($uniqueDeviceIds.Count) Azure AD Device IDs"
-
-        # Build resource paths for batch request
-        $deviceResourcePaths = @($uniqueDeviceIds | ForEach-Object { "deviceManagement/managedDevices/$_?`$select=id,azureADDeviceId,deviceName" })
+        # Fetch autopilot events from Graph API
+        Write-Verbose "[$functionName] Fetching autopilot events from Graph API"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Fetching autopilot events from Graph API" -LogLevel "Information"
 
         try
         {
-            # CallGraphAPI supports batch processing when ResourcePath is an array
-            $batchResponse = CallGraphAPI -ResourcePath $deviceResourcePaths -accessToken $accessToken
+            $apiResponse = CallGraphAPI -ResourcePath $autopilotEventsURI -accessToken $AccessToken -consistencyLevel -extraParameters $autopilotExtraparameters
+            $Events = $apiResponse.value
 
-            if ($batchResponse -and $batchResponse.Count -gt 0)
+            if ($null -eq $Events)
             {
-                foreach ($response in $batchResponse)
-                {
-                    if ($response.id -and $response.azureADDeviceId)
-                    {
-                        $deviceIdToAzureADDeviceIdCache[$response.id] = $response.azureADDeviceId
-                        Write-Verbose "[$functionName] Cached Azure AD Device ID for device: $($response.deviceName) - Intune ID: $($response.id) -> Azure AD ID: $($response.azureADDeviceId)"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "No events returned from Graph API (null response)" -LogLevel "Warning"
+                $Events = @()
+            }
+            elseif ($Events -isnot [Array])
+            {
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Converting single event to array" -LogLevel "Verbose"
+                $Events = @($Events)
+            }
+
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Retrieved $($Events.Count) events from Graph API" -LogLevel "Information"
+
+            if ($Events.Count -eq 0)
+            {
+                Write-Log -LogFile $LogFile -Module $functionName -Message "No autopilot events found. Returning empty analysis." -LogLevel "Warning"
+                Write-Warning "[$functionName] No autopilot events found"
+
+                # Return empty result structure
+                return [PSCustomObject]@{
+                    TotalEvents                 = 0
+                    TotalEventsBeforeFilter     = 0
+                    StartDate                   = $StartDate
+                    EndDate                     = $EndDate
+                    UserPrincipalName           = $UserPrincipalName
+                    EarliestEventDate           = $null
+                    SuccessfulEvents            = @()
+                    SuccessCount                = 0
+                    InProgressEvents            = @()
+                    InProgressCount             = 0
+                    DevicePhaseInProgress       = @()
+                    DevicePhaseInProgressCount  = 0
+                    UserPhaseInProgress         = @()
+                    UserPhaseInProgressCount    = 0
+                    FailedEvents                = @()
+                    FailureCount                = 0
+                    AverageSuccessDuration      = $null
+                    AverageFailureDuration      = $null
+                    DevicePhaseOnlyFailures     = @()
+                    DevicePhaseOnlyFailureCount = 0
+                    UserPhaseOnlyFailures       = @()
+                    UserPhaseOnlyFailureCount   = 0
+                    BothPhasesFailures          = @()
+                    BothPhasesFailureCount      = 0
+                    UnknownPhaseFailures        = @()
+                    UnknownPhaseFailureCount    = 0
+                    UsersWithMultipleFailures   = @()
+                    SingleFailureWithSuccess    = @()
+                    FailedDevicesChronological  = @()
+                    AllFilteredEvents           = @()
+                    AllEvents                   = @()
+                    SignInMatchStats            = @{
+                        TotalEvents      = 0
+                        MatchedEvents    = 0
+                        HighConfidence   = 0
+                        MediumConfidence = 0
+                        LowConfidence    = 0
                     }
-                    elseif ($response.id)
-                    {
-                        Write-Verbose "[$functionName] No Azure AD Device ID found for device: $($response.id)"
-                        Write-Log -LogFile $LogFile -Module $functionName -Message "Device $($response.id) has no Azure AD Device ID (may not be Azure AD joined)" -LogLevel "Verbose"
-                    }
+                    LocationAnalysis            = @()
+                    LocationAnalysisCount       = 0
                 }
             }
         }
         catch
         {
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Batch request for Azure AD Device IDs failed: $_" -LogLevel "Warning"
-            Write-Verbose "[$functionName] Batch request failed, attempting individual lookups"
-
-            # Fallback to individual requests
-            foreach ($deviceId in $uniqueDeviceIds)
-            {
-                try
-                {
-                    $deviceResponse = CallGraphAPI -ResourcePath "deviceManagement/managedDevices/$deviceId" -accessToken $accessToken -extraParameters "select=id,azureADDeviceId,deviceName"
-                    if ($deviceResponse.azureADDeviceId)
-                    {
-                        $deviceIdToAzureADDeviceIdCache[$deviceId] = $deviceResponse.azureADDeviceId
-                        Write-Verbose "[$functionName] Retrieved Azure AD Device ID for device: $deviceId -> $($deviceResponse.azureADDeviceId)"
-                    }
-                }
-                catch
-                {
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to retrieve Azure AD Device ID for device ${deviceId}: $_" -LogLevel "Verbose"
-                }
-            }
+            $errorMsg = "Failed to fetch autopilot events from Graph API: $($_.Exception.Message)"
+            Write-Log -LogFile $LogFile -Module $functionName -Message $errorMsg -LogLevel "Error"
+            Write-Error $errorMsg
+            return $null
         }
 
-        Write-Verbose "[$functionName] Resolved $($deviceIdToAzureADDeviceIdCache.Keys.Count) Azure AD Device IDs from $($uniqueDeviceIds.Count) devices"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Azure AD Device ID resolution complete: $($deviceIdToAzureADDeviceIdCache.Keys.Count) devices resolved" -LogLevel "Information"
+        # Enrich autopilot events with Azure AD Device ID from managed devices
+        # This enables accurate correlation with sign-in logs which use Azure AD Device ID
+        $deviceIdToAzureADDeviceIdCache = @{}
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Enriching autopilot events with Azure AD Device IDs" -LogLevel "Information"
+        Write-Verbose "[$functionName] Fetching Azure AD Device IDs for $($Events.Count) autopilot events"
+
+        # Extract unique device IDs (Intune Managed Device IDs) from autopilot events
+        $uniqueDeviceIds = @($Events | Where-Object { $_.deviceId } | Select-Object -ExpandProperty deviceId -Unique)
+        Write-Verbose "[$functionName] Found $($uniqueDeviceIds.Count) unique device IDs requiring Azure AD Device ID lookup"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Found $($uniqueDeviceIds.Count) unique device IDs for Azure AD Device ID resolution" -LogLevel "Information"
+
+        # Create deviceId to azureADDeviceId lookup cache
+        if ($uniqueDeviceIds.Count -gt 0)
+        {
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Fetching Azure AD Device IDs using batch processing for $($uniqueDeviceIds.Count) devices" -LogLevel "Information"
+            Write-Verbose "[$functionName] Using batch processing to fetch $($uniqueDeviceIds.Count) Azure AD Device IDs"
+
+            # Build resource paths for batch request
+            $deviceResourcePaths = @($uniqueDeviceIds | ForEach-Object { "deviceManagement/managedDevices/$_?`$select=id,azureADDeviceId,deviceName" })
+
+            try
+            {
+                # CallGraphAPI supports batch processing when ResourcePath is an array
+                $batchResponse = CallGraphAPI -ResourcePath $deviceResourcePaths -accessToken $accessToken
+
+                if ($batchResponse -and $batchResponse.Count -gt 0)
+                {
+                    foreach ($response in $batchResponse)
+                    {
+                        if ($response.id -and $response.azureADDeviceId)
+                        {
+                            $deviceIdToAzureADDeviceIdCache[$response.id] = $response.azureADDeviceId
+                            Write-Verbose "[$functionName] Cached Azure AD Device ID for device: $($response.deviceName) - Intune ID: $($response.id) -> Azure AD ID: $($response.azureADDeviceId)"
+                        }
+                        elseif ($response.id)
+                        {
+                            Write-Verbose "[$functionName] No Azure AD Device ID found for device: $($response.id)"
+                            Write-Log -LogFile $LogFile -Module $functionName -Message "Device $($response.id) has no Azure AD Device ID (may not be Azure AD joined)" -LogLevel "Verbose"
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Batch request for Azure AD Device IDs failed: $_" -LogLevel "Warning"
+                Write-Verbose "[$functionName] Batch request failed, attempting individual lookups"
+
+                # Fallback to individual requests
+                foreach ($deviceId in $uniqueDeviceIds)
+                {
+                    try
+                    {
+                        $deviceResponse = CallGraphAPI -ResourcePath "deviceManagement/managedDevices/$deviceId" -accessToken $accessToken -extraParameters "select=id,azureADDeviceId,deviceName"
+                        if ($deviceResponse.azureADDeviceId)
+                        {
+                            $deviceIdToAzureADDeviceIdCache[$deviceId] = $deviceResponse.azureADDeviceId
+                            Write-Verbose "[$functionName] Retrieved Azure AD Device ID for device: $deviceId -> $($deviceResponse.azureADDeviceId)"
+                        }
+                    }
+                    catch
+                    {
+                        Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to retrieve Azure AD Device ID for device ${deviceId}: $_" -LogLevel "Verbose"
+                    }
+                }
+            }
+
+            Write-Verbose "[$functionName] Resolved $($deviceIdToAzureADDeviceIdCache.Keys.Count) Azure AD Device IDs from $($uniqueDeviceIds.Count) devices"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Azure AD Device ID resolution complete: $($deviceIdToAzureADDeviceIdCache.Keys.Count) devices resolved" -LogLevel "Information"
+        } # End if ($uniqueDeviceIds.Count -gt 0)
 
         # Enrich events with Azure AD Device IDs
         $devicesEnrichedCount = 0
@@ -427,237 +507,256 @@ function Get-AutopilotEventAnalysis()
 
         Write-Verbose "[$functionName] Enriched $devicesEnrichedCount events with Azure AD Device IDs"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Enriched $devicesEnrichedCount events with Azure AD Device IDs" -LogLevel "Information"
-    }
 
-    # Filter out events with invalid dates to prevent downstream errors
-    $validEvents = @($Events | Where-Object {
-            $hasValidDate = $false
-            if ($_.eventDateTime)
-            {
-                try
+        # Filter out events with invalid dates to prevent downstream errors
+        $validEvents = @($Events | Where-Object {
+                $hasValidDate = $false
+                if ($_.eventDateTime)
                 {
-                    [void][DateTime]$_.eventDateTime
-                    $hasValidDate = $true
+                    try
+                    {
+                        [void][DateTime]$_.eventDateTime
+                        $hasValidDate = $true
+                    }
+                    catch
+                    {
+                        Write-Verbose "[$functionName] Skipping event with invalid date: $($_.eventDateTime)"
+                        Write-Log -LogFile $LogFile -Module $functionName -Message "Skipping event with invalid eventDateTime: $($_.eventDateTime)" -LogLevel "Warning"
+                    }
                 }
-                catch
-                {
-                    Write-Verbose "[$functionName] Skipping event with invalid date: $($_.eventDateTime)"
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "Skipping event with invalid eventDateTime: $($_.eventDateTime)" -LogLevel "Warning"
-                }
-            }
-            return $hasValidDate
-        })
+                return $hasValidDate
+            })
 
-    if ($validEvents.Count -ne $Events.Count)
-    {
-        $invalidCount = $Events.Count - $validEvents.Count
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Filtered out $invalidCount events with invalid dates" -LogLevel "Information"
-    }
-
-    $Events = $validEvents
-    # Filter events by date range if specified
-    $filteredEvents = $Events
-    if ($StartDate -or $EndDate)
-    {
-        $dateRangeMsg = "Filtering events"
-        if ($StartDate)
+        if ($validEvents.Count -ne $Events.Count)
         {
-            $dateRangeMsg += " from $($StartDate.ToString('yyyy-MM-dd'))"
-            $signInLogsStartDate = $StartDate.ToString("yyyy-MM-ddTHH:mm:ssZ")
+            $invalidCount = $Events.Count - $validEvents.Count
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Filtered out $invalidCount events with invalid dates" -LogLevel "Information"
         }
-        else
+
+        $Events = $validEvents
+        # Filter events by date range if specified
+        $filteredEvents = $Events
+        if ($StartDate -or $EndDate)
         {
-            # If no start date provided, use 30 days before end date or 30 days ago
-            $defaultStart = if ($EndDate)
+            $dateRangeMsg = "Filtering events"
+            if ($StartDate)
             {
-                $EndDate.AddDays(-30)
+                $dateRangeMsg += " from $($StartDate.ToString('yyyy-MM-dd'))"
+                $signInLogsStartDate = $StartDate.ToString("yyyy-MM-ddTHH:mm:ssZ")
             }
             else
             {
-                (Get-Date).AddDays(-30)
+                # If no start date provided, use 30 days before end date or 30 days ago
+                $defaultStart = if ($EndDate)
+                {
+                    $EndDate.AddDays(-30)
+                }
+                else
+                {
+                    (Get-Date).AddDays(-30)
+                }
+                $signInLogsStartDate = $defaultStart.ToString("yyyy-MM-ddTHH:mm:ssZ")
+                Write-Log -LogFile $LogFile -Module $functionName -Message "No StartDate provided, using default start date for sign-in logs: $($defaultStart.ToString('yyyy-MM-dd'))" -LogLevel "Verbose"
             }
-            $signInLogsStartDate = $defaultStart.ToString("yyyy-MM-ddTHH:mm:ssZ")
-            Write-Log -LogFile $LogFile -Module $functionName -Message "No StartDate provided, using default start date for sign-in logs: $($defaultStart.ToString('yyyy-MM-dd'))" -LogLevel "Verbose"
-        }
-        if ($EndDate)
-        {
-            $dateRangeMsg += " to $($EndDate.ToString('yyyy-MM-dd'))"
-            $signInLogsEndDate = $EndDate.ToString("yyyy-MM-ddTHH:mm:ssZ")
+            if ($EndDate)
+            {
+                $dateRangeMsg += " to $($EndDate.ToString('yyyy-MM-dd'))"
+                $signInLogsEndDate = $EndDate.ToString("yyyy-MM-ddTHH:mm:ssZ")
+            }
+            else
+            {
+                # If no end date provided, use current date
+                $defaultEnd = Get-Date
+                $signInLogsEndDate = $defaultEnd.ToString("yyyy-MM-ddTHH:mm:ssZ")
+                Write-Log -LogFile $LogFile -Module $functionName -Message "No EndDate provided, using default end date for sign-in logs: $($defaultEnd.ToString('yyyy-MM-dd'))" -LogLevel "Verbose"
+            }
+            Write-Log -LogFile $LogFile -Module $functionName -Message $dateRangeMsg -LogLevel "Information"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Sign-in log date range: $signInLogsStartDate to $signInLogsEndDate" -LogLevel "Verbose"
+
+            $filteredEvents = $Events | Where-Object {
+                $eventDate = $null
+                try
+                {
+                    $eventDate = [DateTime]$_.eventDateTime
+                }
+                catch
+                {
+                    return $false
+                }
+
+                $afterStart = (-not $StartDate) -or ($eventDate -ge $StartDate)
+                $beforeEnd = (-not $EndDate) -or ($eventDate -le $EndDate)
+                return ($afterStart -and $beforeEnd)
+            }
+            Write-Verbose "[$functionName] Filtered to $($filteredEvents.Count) events from $($Events.Count) total"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Filtered to $($filteredEvents.Count) events from $($Events.Count) total" -LogLevel "Information"
         }
         else
         {
-            # If no end date provided, use current date
-            $defaultEnd = Get-Date
-            $signInLogsEndDate = $defaultEnd.ToString("yyyy-MM-ddTHH:mm:ssZ")
-            Write-Log -LogFile $LogFile -Module $functionName -Message "No EndDate provided, using default end date for sign-in logs: $($defaultEnd.ToString('yyyy-MM-dd'))" -LogLevel "Verbose"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "No date filtering applied, analyzing all $($Events.Count) events" -LogLevel "Verbose"
+            $signInLogsStartDate = (Get-Date).AddDays(-30).ToString("yyyy-MM-ddTHH:mm:ssZ")
+            $signInLogsEndDate = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssZ")
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Sign-in log date range (default): $signInLogsStartDate to $signInLogsEndDate" -LogLevel "Verbose"
         }
-        Write-Log -LogFile $LogFile -Module $functionName -Message $dateRangeMsg -LogLevel "Information"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Sign-in log date range: $signInLogsStartDate to $signInLogsEndDate" -LogLevel "Verbose"
 
-        $filteredEvents = $Events | Where-Object {
-            $eventDate = $null
+        # Filter events by UserPrincipalName if specified
+        if ($UserPrincipalName)
+        {
             try
             {
-                $eventDate = [DateTime]$_.eventDateTime
+                $userObject = CallGraphAPI -ResourcePath "$userURI/$UserPrincipalName" -accessToken $accessToken
+
+                if ($null -eq $userObject -or $null -eq $userObject.id)
+                {
+                    Write-Log -logFile $LogFile -Module $functionName -Message "User not found or invalid response for: $UserPrincipalName" -LogLevel "Warning"
+                    Write-Warning "[$functionName] User not found: $UserPrincipalName. Continuing with all events."
+                }
+                else
+                {
+                    write-log -logFile $LogFile -Module $functionName -Message "Retrieved user object for $UserPrincipalName with id $($userObject.id)" -LogLevel "Information"
+                    $beforeUserFilter = $filteredEvents.Count
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Filtering events by UserPrincipalName: $UserPrincipalName" -LogLevel "Information"
+                    $filteredEvents = $filteredEvents | Where-Object {
+                        $_.userPrincipalName -eq $UserPrincipalName
+                    }
+                    Write-Verbose "[$functionName] Filtered to $($filteredEvents.Count) events from $beforeUserFilter for user $UserPrincipalName ($($userObject.displayName))"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Filtered to $($filteredEvents.Count) events from $beforeUserFilter for user $UserPrincipalName" -LogLevel "Information"
+
+                    if ($filteredEvents.Count -eq 0)
+                    {
+                        Write-Log -LogFile $LogFile -Module $functionName -Message "No events found for user: $UserPrincipalName" -LogLevel "Warning"
+                        Write-Warning "[$functionName] No events found for user: $UserPrincipalName"
+                    }
+                }
             }
             catch
             {
-                return $false
+                Write-Log -logFile $LogFile -Module $functionName -Message "Failed to retrieve user object for $UserPrincipalName : $($_.Exception.Message)" -LogLevel "Warning"
+                Write-Warning "[$functionName] Failed to retrieve user: $UserPrincipalName. Continuing with all events."
             }
-
-            $afterStart = (-not $StartDate) -or ($eventDate -ge $StartDate)
-            $beforeEnd = (-not $EndDate) -or ($eventDate -le $EndDate)
-            return ($afterStart -and $beforeEnd)
         }
-        Write-Verbose "[$functionName] Filtered to $($filteredEvents.Count) events from $($Events.Count) total"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Filtered to $($filteredEvents.Count) events from $($Events.Count) total" -LogLevel "Information"
-    }
-    else
-    {
-        Write-Log -LogFile $LogFile -Module $functionName -Message "No date filtering applied, analyzing all $($Events.Count) events" -LogLevel "Verbose"
-        $signInLogsStartDate = (Get-Date).AddDays(-30).ToString("yyyy-MM-ddTHH:mm:ssZ")
-        $signInLogsEndDate = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssZ")
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Sign-in log date range (default): $signInLogsStartDate to $signInLogsEndDate" -LogLevel "Verbose"
-    }
 
-    # Filter events by UserPrincipalName if specified
-    if ($UserPrincipalName)
-    {
-        if ($AccessToken)
+        # Enrich events with user IDs where missing
+        $upnToUserIdCache = @{}
+        $signInCache = @{}
+        $totalSignInsRetrieved = 0
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Enriching $($filteredEvents.Count) events with user IDs" -LogLevel "Information"
+
+        # Extract unique UPNs from filtered events that need user ID resolution
+        $uniqueUPNs = @($filteredEvents | Where-Object { $_.userPrincipalName} | Select-Object -ExpandProperty userPrincipalName -Unique)
+        Write-Verbose "[$functionName] Found $($uniqueUPNs.Count) unique UPNs requiring user ID lookup"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Found $($uniqueUPNs.Count) unique UPNs requiring user ID resolution" -LogLevel "Information"
+
+        # Create UPN to userId lookup cache
+        if ($uniqueUPNs.Count -gt 0)
         {
-            $userObject = CallGraphAPI -ResourcePath "$userURI/$UserPrincipalName" -accessToken $accessToken
-            write-log -logFile $LogFile -Module $functionName -Message "Retrieved user object for $UserPrincipalName with id $($userObject.id)" -LogLevel "Information"
-        }
-        $beforeUserFilter = $filteredEvents.Count
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Filtering events by UserPrincipalName: $UserPrincipalName" -LogLevel "Information"
-        $filteredEvents = $filteredEvents | Where-Object {
-            $_.userPrincipalName -eq $UserPrincipalName
-        }
-        Write-Verbose "[$functionName] Filtered to $($filteredEvents.Count) events from $beforeUserFilter for user $UserPrincipalName ($($userObject.displayName))"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Filtered to $($filteredEvents.Count) events from $beforeUserFilter for user $UserPrincipalName" -LogLevel "Information"
-    }
+            # Use batch processing for efficient API calls
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Fetching user IDs using batch processing for $($uniqueUPNs.Count) UPNs" -LogLevel "Information"
+            Write-Verbose "[$functionName] Using batch processing to fetch $($uniqueUPNs.Count) user IDs"
 
-    # Enrich events with user IDs where missing (only when AccessToken is available)
-    $upnToUserIdCache = @{}
-    $signInCache = @{}
-    $totalSignInsRetrieved = 0
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Enriching $($filteredEvents.Count) events with user IDs" -LogLevel "Information"
+            # Build resource paths for batch request
+            $userResourcePaths = @($uniqueUPNs | ForEach-Object { "$userURI/$_" })
 
-    # Extract unique UPNs from filtered events that need user ID resolution
-    $uniqueUPNs = @($filteredEvents | Where-Object { $_.userPrincipalName} | Select-Object -ExpandProperty userPrincipalName -Unique)
-    Write-Verbose "[$functionName] Found $($uniqueUPNs.Count) unique UPNs requiring user ID lookup"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Found $($uniqueUPNs.Count) unique UPNs requiring user ID resolution" -LogLevel "Information"
-
-    # Create UPN to userId lookup cache
-    $upnToUserIdCache = @{}
-    if ($uniqueUPNs.Count -gt 0)
-    {
-        # Use batch processing for efficient API calls
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Fetching user IDs using batch processing for $($uniqueUPNs.Count) UPNs" -LogLevel "Information"
-        Write-Verbose "[$functionName] Using batch processing to fetch $($uniqueUPNs.Count) user IDs"
-
-        # Build resource paths for batch request
-        $userResourcePaths = @($uniqueUPNs | ForEach-Object { "$userURI/$_" })
-
-        try
-        {
-            # CallGraphAPI supports batch processing when ResourcePath is an array
-            $batchResponse = CallGraphAPI -ResourcePath $userResourcePaths -accessToken $accessToken
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Batch API call completed with successCount: $($batchResponse.successCount), failureCount: $($batchResponse.failureCount)" -LogLevel "Information"
-
-            # Check for batch response in 'value' property (standard Graph API batch format)
-            if ($batchResponse -and $batchResponse.value)
+            try
             {
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Processing $($batchResponse.value.Count) batch responses" -LogLevel "Verbose"
-                Write-Verbose "[$functionName] Processing $($batchResponse.value.Count) batch responses"
+                # CallGraphAPI supports batch processing when ResourcePath is an array
+                $batchResponse = CallGraphAPI -ResourcePath $userResourcePaths -accessToken $accessToken
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Batch API call completed with successCount: $($batchResponse.successCount), failureCount: $($batchResponse.failureCount)" -LogLevel "Information"
 
-                # Process each batch response item
-                # Match responses to original UPNs by index (batch preserves request order)
-                for ($i = 0; $i -lt $batchResponse.value.Count; $i++)
+                # Check for batch response in 'value' property (standard Graph API batch format)
+                if ($batchResponse -and $batchResponse.value)
                 {
-                    $result = $batchResponse.value[$i]
-                    $originalUpn = if ($result.body -and $result.body.userPrincipalName)
-                    {
-                        $result.body.userPrincipalName
-                    }
-                    elseif ($i -lt $uniqueUPNs.Count)
-                    {
-                        $uniqueUPNs[$i]
-                    }
-                    else
-                    {
-                        'Unknown'
-                    }
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Processing $($batchResponse.value.Count) batch responses" -LogLevel "Verbose"
+                    Write-Verbose "[$functionName] Processing $($batchResponse.value.Count) batch responses"
 
-                    Write-Verbose "[$functionName] Processing batch item $($i + 1)/$($batchResponse.value.Count): UPN=$originalUpn, Status=$($result.status)"
-
-                    # Check if response was successful (status 200)
-                    if ($result.status -eq 200 -and $result.body)
+                    # Process each batch response item
+                    # Match responses to original UPNs by index (batch preserves request order)
+                    for ($i = 0; $i -lt $batchResponse.value.Count; $i++)
                     {
-                        # Extract user ID from response body
-                        if ($result.body.id -and $result.body.userPrincipalName)
+                        $result = $batchResponse.value[$i]
+                        $originalUpn = if ($result.body -and $result.body.userPrincipalName)
                         {
-                            $upnToUserIdCache[$result.body.userPrincipalName] = $result.body.id
-                            Write-Log -LogFile $LogFile -Module $functionName -Message "Resolved $($result.body.userPrincipalName) to user ID: $($result.body.id)" -LogLevel "Verbose"
+                            $result.body.userPrincipalName
+                        }
+                        elseif ($i -lt $uniqueUPNs.Count)
+                        {
+                            $uniqueUPNs[$i]
                         }
                         else
                         {
-                            Write-Log -LogFile $LogFile -Module $functionName -Message "Batch response for $originalUpn missing id or userPrincipalName in body" -LogLevel "Warning"
+                            'Unknown'
+                        }
+
+                        Write-Verbose "[$functionName] Processing batch item $($i + 1)/$($batchResponse.value.Count): UPN=$originalUpn, Status=$($result.status)"
+
+                        # Check if response was successful (status 200)
+                        if ($result.status -eq 200 -and $result.body)
+                        {
+                            # Extract user ID from response body
+                            if ($result.body.id -and $result.body.userPrincipalName)
+                            {
+                                $upnToUserIdCache[$result.body.userPrincipalName] = $result.body.id
+                                Write-Log -LogFile $LogFile -Module $functionName -Message "Resolved $($result.body.userPrincipalName) to user ID: $($result.body.id)" -LogLevel "Verbose"
+                            }
+                            else
+                            {
+                                Write-Log -LogFile $LogFile -Module $functionName -Message "Batch response for $originalUpn missing id or userPrincipalName in body" -LogLevel "Warning"
+                            }
+                        }
+                        else
+                        {
+                            Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to resolve user ID for UPN: $originalUpn (Status: $($result.status))" -LogLevel "Warning"
                         }
                     }
-                    else
-                    {
-                        Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to resolve user ID for UPN: $originalUpn (Status: $($result.status))" -LogLevel "Warning"
-                    }
-                }
 
-                Write-Verbose "[$functionName] Batch processing complete: $($upnToUserIdCache.Keys.Count) user IDs resolved"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Batch processing complete: $($upnToUserIdCache.Keys.Count) user IDs resolved" -LogLevel "Information"
+                    Write-Verbose "[$functionName] Batch processing complete: $($upnToUserIdCache.Keys.Count) user IDs resolved"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Batch processing complete: $($upnToUserIdCache.Keys.Count) user IDs resolved" -LogLevel "Information"
+                }
+                else
+                {
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Batch response did not contain expected 'value' property. Response structure: $($batchResponse.PSObject.Properties.Name -join ', ')" -LogLevel "Warning"
+                    Write-Verbose "[$functionName] Batch response missing 'value' property. Available properties: $($batchResponse.PSObject.Properties.Name -join ', ')"
+                }
             }
-            else
+            catch
             {
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Batch response did not contain expected 'value' property. Response structure: $($batchResponse.PSObject.Properties.Name -join ', ')" -LogLevel "Warning"
-                Write-Verbose "[$functionName] Batch response missing 'value' property. Available properties: $($batchResponse.PSObject.Properties.Name -join ', ')"
-            }
-        }
-        catch
-        {
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Batch user ID fetch failed, falling back to individual requests: $_" -LogLevel "Warning"
-            Write-Verbose "[$functionName] Batch request failed, falling back to individual requests"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Batch user ID fetch failed, falling back to individual requests: $_" -LogLevel "Warning"
+                Write-Verbose "[$functionName] Batch request failed, falling back to individual requests"
 
-            # Fallback to individual requests
-            $upnIndex = 0
-            foreach ($upn in $uniqueUPNs)
-            {
-                $upnIndex++
-                if ($upnIndex % 5 -eq 0 -or $upnIndex -eq 1)
+                # Fallback to individual requests
+                $upnIndex = 0
+                foreach ($upn in $uniqueUPNs)
                 {
-                    Write-Verbose "[$functionName] Fetching user ID for UPN $upnIndex/$($uniqueUPNs.Count): $upn"
-                }
-
-                try
-                {
-                    $userObject = CallGraphAPI -ResourcePath "$userURI/$upn" -accessToken $accessToken
-
-                    if ($userObject -and $userObject.id)
+                    $upnIndex++
+                    if ($upnIndex % 5 -eq 0 -or $upnIndex -eq 1)
                     {
-                        $upnToUserIdCache[$upn] = $userObject.id
-                        Write-Log -LogFile $LogFile -Module $functionName -Message "Resolved $upn to user ID: $($userObject.id)" -LogLevel "Verbose"
+                        Write-Verbose "[$functionName] Fetching user ID for UPN $upnIndex/$($uniqueUPNs.Count): $upn"
                     }
-                    else
+
+                    try
                     {
-                        Write-Log -LogFile $LogFile -Module $functionName -Message "No user ID found for UPN: $upn" -LogLevel "Warning"
+                        $userObject = CallGraphAPI -ResourcePath "$userURI/$upn" -accessToken $accessToken
+
+                        if ($userObject -and $userObject.id)
+                        {
+                            $upnToUserIdCache[$upn] = $userObject.id
+                            Write-Log -LogFile $LogFile -Module $functionName -Message "Resolved $upn to user ID: $($userObject.id)" -LogLevel "Verbose"
+                        }
+                        else
+                        {
+                            Write-Log -LogFile $LogFile -Module $functionName -Message "No user ID found for UPN: $upn" -LogLevel "Warning"
+                        }
                     }
-                }
-                catch
-                {
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to fetch user ID for UPN $upn : $_" -LogLevel "Warning"
+                    catch
+                    {
+                        Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to fetch user ID for UPN $upn : $_" -LogLevel "Warning"
+                    }
                 }
             }
-        }
 
-        Write-Verbose "[$functionName] Resolved $($upnToUserIdCache.Keys.Count) user IDs from $($uniqueUPNs.Count) UPNs"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "User ID resolution complete: $($upnToUserIdCache.Keys.Count) UPNs resolved out of $($uniqueUPNs.Count) requested" -LogLevel "Information"
+            Write-Verbose "[$functionName] Resolved $($upnToUserIdCache.Keys.Count) user IDs from $($uniqueUPNs.Count) UPNs"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "User ID resolution complete: $($upnToUserIdCache.Keys.Count) UPNs resolved out of $($uniqueUPNs.Count) requested" -LogLevel "Information"
+        } # End if ($uniqueUPNs.Count -gt 0)
 
         # Enrich filtered events with user IDs
         $eventsEnrichedCount = 0
@@ -680,67 +779,245 @@ function Get-AutopilotEventAnalysis()
 
         Write-Verbose "[$functionName] Enriched $eventsEnrichedCount events with user IDs"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Enriched $eventsEnrichedCount events with user IDs" -LogLevel "Information"
-    }
 
-    # Fetch sign-in activity data per user (more efficient than fetching all sign-ins)
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Extracting unique user IDs from $($filteredEvents.Count) autopilot events" -LogLevel "Information"
-    # Get unique userIds from autopilot events (now that they're enriched)
-    $uniqueUserIds = @($filteredEvents | Where-Object { $_.userId } | Select-Object -ExpandProperty userId -Unique)
-    Write-Verbose "[$functionName] Found $($uniqueUserIds.Count) unique user IDs in autopilot events"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Found $($uniqueUserIds.Count) unique user IDs to fetch sign-in data for" -LogLevel "Information"
+        # Fetch sign-in activity data per user (more efficient than fetching all sign-ins)
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Extracting unique user IDs from $($filteredEvents.Count) autopilot events" -LogLevel "Information"
 
-    if ($uniqueUserIds.Count -gt 0)
-    {
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Fetching sign-in data for $($uniqueUserIds.Count) users using batch processing" -LogLevel "Information"
-        Write-Verbose "[$functionName] Using batch processing to fetch sign-in data for $($uniqueUserIds.Count) users"
+        # Get unique userIds from autopilot events (now that they're enriched)
+        $uniqueUserIds = @($filteredEvents | Where-Object { $_.userId } | Select-Object -ExpandProperty userId -Unique)
+        Write-Verbose "[$functionName] Found $($uniqueUserIds.Count) unique user IDs in autopilot events"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Found $($uniqueUserIds.Count) unique user IDs to fetch sign-in data for" -LogLevel "Information"
 
-        # Build resource paths with filters for batch request
-        # Note: Graph API $batch doesn't support query parameters in the URL for batch items,
-        # so we need to construct full URLs with encoded filters
-        $signInResourcePaths = @()
-        foreach ($userId in $uniqueUserIds)
+        if ($uniqueUserIds.Count -gt 0)
         {
-            # Construct the filter for this specific user
-            $filterPart = "userId eq '$userId' and createdDateTime ge $signInLogsStartDate and createdDateTime le $signInLogsEndDate"
-            $fullPath = "$signInActivityURI`?`$filter=$filterPart&`$orderby=createdDateTime desc&`$top=50"
-            $signInResourcePaths += $fullPath
-        }
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Calculating per-user date ranges for optimized sign-in log retrieval" -LogLevel "Information"
+            Write-Verbose "[$functionName] Calculating per-user date ranges based on actual autopilot events"
 
-        try
-        {
-            # Use batch processing for sign-in requests
-            $batchResponse = CallGraphAPI -ResourcePath $signInResourcePaths -accessToken $accessToken
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Sign-in batch API call completed with successCount: $($batchResponse.successCount), failureCount: $($batchResponse.failureCount)" -LogLevel "Information"
-            Write-Verbose "[$functionName] Sign-in batch API call completed: successCount=$($batchResponse.successCount), failureCount=$($batchResponse.failureCount)"
-            # Check for batch response in 'value' property
-            if ($batchResponse -and $batchResponse.value)
+            # Calculate the actual date range for each user based on their autopilot events
+            # This avoids fetching sign-in logs for the entire period when a user only has events in a subset of that period
+            $userDateRanges = @{}
+            foreach ($userId in $uniqueUserIds)
             {
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Processing $($batchResponse.value.Count) sign-in batch responses" -LogLevel "Verbose"
-                Write-Verbose "[$functionName] Processing $($batchResponse.value.Count) sign-in batch responses"
+                # Find all events for this user
+                $userEvents = @($filteredEvents | Where-Object { $_.userId -eq $userId })
 
-                # Process each batch response item
-                # Match responses to original userIds by index (batch preserves request order)
-                for ($i = 0; $i -lt $batchResponse.value.Count; $i++)
+                if ($userEvents.Count -gt 0)
                 {
-                    $result = $batchResponse.value[$i]
-                    $userId = if ($i -lt $uniqueUserIds.Count)
+                    # Parse event dates and find min/max
+                    $eventDates = @()
+                    foreach ($userEvent in $userEvents)
                     {
-                        $uniqueUserIds[$i]
+                        try
+                        {
+                            $eventDate = [DateTime]$userEvent.eventDateTime
+                            $eventDates += $eventDate
+                        }
+                        catch
+                        {
+                            Write-Verbose "[$functionName] Failed to parse event date for userId $userId - $($userEvent.eventDateTime)"
+                        }
+                    }
+
+                    if ($eventDates.Count -gt 0)
+                    {
+                        # Calculate date range with a 1-day buffer on each side for sign-in activity correlation
+                        $minDate = ($eventDates | Measure-Object -Minimum).Minimum.AddDays(-1)
+                        $maxDate = ($eventDates | Measure-Object -Maximum).Maximum.AddDays(1)
+
+                        $userDateRanges[$userId] = @{
+                            StartDate  = ([DateTimeOffset]$minDate.ToUniversalTime()).ToString("o")
+                            EndDate    = ([DateTimeOffset]$maxDate.ToUniversalTime()).ToString("o")
+                            EventCount = $userEvents.Count
+                            DateSpan   = ($maxDate - $minDate).Days
+                        }
+
+                        Write-Verbose "[$functionName] User $userId : $($userEvents.Count) events spanning $($minDate.ToString('yyyy-MM-dd')) to $($maxDate.ToString('yyyy-MM-dd')) ($($userDateRanges[$userId].DateSpan) days)"
+                        Write-Log -LogFile $LogFile -Module $functionName -Message "User $userId date range: $($minDate.ToString('yyyy-MM-dd')) to $($maxDate.ToString('yyyy-MM-dd')) ($($userEvents.Count) events, $($userDateRanges[$userId].DateSpan) day span)" -LogLevel "Verbose"
                     }
                     else
                     {
-                        'Unknown'
+                        Write-Log -LogFile $LogFile -Module $functionName -Message "No valid event dates found for userId: $userId" -LogLevel "Warning"
+                    }
+                }
+            }
+
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Calculated date ranges for $($userDateRanges.Keys.Count) users" -LogLevel "Information"
+            Write-Verbose "[$functionName] Per-user date range calculation complete: $($userDateRanges.Keys.Count) users with valid ranges"
+
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Fetching sign-in data for $($userDateRanges.Keys.Count) users using batch processing with optimized date ranges" -LogLevel "Information"
+            Write-Verbose "[$functionName] Using batch processing to fetch sign-in data with per-user date ranges"
+
+            # Build resource paths with filters for batch request
+            # Note: Graph API $batch doesn't support query parameters in the URL for batch items,
+            # so we need to construct full URLs with encoded filters
+            $signInResourcePaths = @()
+            $totalDaysRequested = 0
+            foreach ($userId in $uniqueUserIds)
+            {
+                # Use per-user date range if available, otherwise fallback to global range
+                if ($userDateRanges.ContainsKey($userId))
+                {
+                    $userStartDate = $userDateRanges[$userId].StartDate
+                    $userEndDate = $userDateRanges[$userId].EndDate
+                    $totalDaysRequested += $userDateRanges[$userId].DateSpan
+                    $daySpan = $userDateRanges[$userId].DateSpan
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "User $userId - Requesting sign-ins from $userStartDate to $userEndDate ($daySpan days)" -LogLevel "Verbose"
+                    Write-Verbose "[$functionName] User $userId - Requesting sign-ins from $userStartDate to $userEndDate ($daySpan days)"
+                }
+                else
+                {
+                    # Fallback to global date range (shouldn't happen if events exist, but safety first)
+                    $userStartDate = $signInLogsStartDate
+                    $userEndDate = $signInLogsEndDate
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "No date range calculated for userId $userId, using global range" -LogLevel "Warning"
+                    Write-Verbose "[$functionName] No date range for userId $userId, using global range: $userStartDate to $userEndDate"
+                }
+
+                # Construct the filter for this specific user with their specific date range
+                $filterPart = "userId eq '$userId' and createdDateTime ge $userStartDate and createdDateTime le $userEndDate"
+                $fullPath = "$signInActivityURI`?`$filter=$filterPart&`$orderby=createdDateTime desc&`$top=50"
+                $signInResourcePaths += $fullPath
+            }
+
+            # Calculate and log optimization metrics
+            $globalDateSpan = if ($signInLogsStartDate -and $signInLogsEndDate)
+            {
+                $globalStart = [DateTime]::Parse($signInLogsStartDate)
+                $globalEnd = [DateTime]::Parse($signInLogsEndDate)
+                ($globalEnd - $globalStart).Days
+            }
+            else
+            {
+                30
+            }
+            $totalDaysWithoutOptimization = $globalDateSpan * $uniqueUserIds.Count
+            $daysSaved = $totalDaysWithoutOptimization - $totalDaysRequested
+            $percentReduction = if ($totalDaysWithoutOptimization -gt 0)
+            {
+                [Math]::Round(($daysSaved / $totalDaysWithoutOptimization) * 100, 1)
+            }
+            else
+            {
+                0
+            }
+
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Optimization: Requesting $totalDaysRequested user-days of sign-in logs vs. $totalDaysWithoutOptimization without optimization (${percentReduction}% reduction)" -LogLevel "Information"
+            Write-Verbose "[$functionName] Sign-in log optimization: $daysSaved user-days saved (${percentReduction}% reduction)"
+
+            try
+            {
+                # Use batch processing for sign-in requests
+                $batchResponse = CallGraphAPI -ResourcePath $signInResourcePaths -accessToken $accessToken
+
+                if ($null -eq $batchResponse)
+                {
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Sign-in batch API call returned null response" -LogLevel "Warning"
+                    throw "Batch API call returned null response"
+                }
+
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Sign-in batch API call completed with successCount: $($batchResponse.successCount), failureCount: $($batchResponse.failureCount)" -LogLevel "Information"
+                Write-Verbose "[$functionName] Sign-in batch API call completed: successCount=$($batchResponse.successCount), failureCount=$($batchResponse.failureCount)"
+                # Check for batch response in 'value' property
+                if ($batchResponse -and $batchResponse.value)
+                {
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Processing $($batchResponse.value.Count) sign-in batch responses" -LogLevel "Verbose"
+                    Write-Verbose "[$functionName] Processing $($batchResponse.value.Count) sign-in batch responses"
+
+                    # Process each batch response item
+                    # Match responses to original userIds by index (batch preserves request order)
+                    for ($i = 0; $i -lt $batchResponse.value.Count; $i++)
+                    {
+                        $result = $batchResponse.value[$i]
+                        $userId = if ($i -lt $uniqueUserIds.Count)
+                        {
+                            $uniqueUserIds[$i]
+                        }
+                        else
+                        {
+                            'Unknown'
+                        }
+
+                        Write-Verbose "[$functionName] Processing sign-in batch item $($i + 1)/$($batchResponse.value.Count): userId=$userId, Status=$($result.status)"
+
+                        # Check if response was successful (status 200)
+                        if ($result.status -eq 200 -and $result.body)
+                        {
+                            # Extract sign-ins from response body
+                            $userSignIns = if ($result.body.value)
+                            {
+                                @($result.body.value)
+                            }
+                            else
+                            {
+                                @()
+                            }
+
+                            if ($userSignIns.Count -gt 0)
+                            {
+                                $signInCache[$userId] = $userSignIns
+                                $totalSignInsRetrieved += $userSignIns.Count
+                                Write-Log -LogFile $LogFile -Module $functionName -Message "Retrieved $($userSignIns.Count) sign-ins for userId: $userId" -LogLevel "Verbose"
+                            }
+                            else
+                            {
+                                $signInCache[$userId] = @()
+                                Write-Log -LogFile $LogFile -Module $functionName -Message "No sign-ins found for userId: $userId" -LogLevel "Verbose"
+                            }
+                        }
+                        else
+                        {
+                            $signInCache[$userId] = @()
+                            Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to fetch sign-ins for userId: $userId (Status: $($result.status))" -LogLevel "Warning"
+                        }
                     }
 
-                    Write-Verbose "[$functionName] Processing sign-in batch item $($i + 1)/$($batchResponse.value.Count): userId=$userId, Status=$($result.status)"
+                    Write-Verbose "[$functionName] Sign-in batch processing complete: $totalSignInsRetrieved sign-ins retrieved for $($signInCache.Keys.Count) users"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Sign-in batch processing complete: $totalSignInsRetrieved sign-ins retrieved for $($signInCache.Keys.Count) users" -LogLevel "Information"
+                }
+                else
+                {
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Sign-in batch response did not contain expected 'value' property" -LogLevel "Warning"
+                    Write-Verbose "[$functionName] Sign-in batch response missing 'value' property"
+                }
+            }
+            catch
+            {
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Sign-in batch fetch failed, falling back to individual requests: $_" -LogLevel "Warning"
+                Write-Verbose "[$functionName] Sign-in batch request failed, falling back to individual requests"
 
-                    # Check if response was successful (status 200)
-                    if ($result.status -eq 200 -and $result.body)
+                # Fallback to individual requests
+                $userIndex = 0
+                foreach ($userId in $uniqueUserIds)
+                {
+                    $userIndex++
+
+                    if ($userIndex % 5 -eq 0 -or $userIndex -eq 1)
                     {
-                        # Extract sign-ins from response body
-                        $userSignIns = if ($result.body.value)
+                        Write-Verbose "[$functionName] Fetching sign-ins for user $userIndex/$($uniqueUserIds.Count)"
+                    }
+
+                    # Use per-user date range if available, otherwise fallback to global range
+                    if ($userDateRanges.ContainsKey($userId))
+                    {
+                        $userStartDate = $userDateRanges[$userId].StartDate
+                        $userEndDate = $userDateRanges[$userId].EndDate
+                    }
+                    else
+                    {
+                        $userStartDate = $signInLogsStartDate
+                        $userEndDate = $signInLogsEndDate
+                    }
+
+                    # Construct filter for this specific user with their specific date range
+                    $userSignInFilter = "filter=userId eq '$userId' and createdDateTime ge $userStartDate and createdDateTime le $userEndDate&orderby=createdDateTime desc&top=50"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Fetching sign-ins for user $userIndex/$($uniqueUserIds.Count) with filter: $userSignInFilter" -LogLevel "Verbose"
+
+                    try
+                    {
+                        $signInResponse = CallGraphAPI -ResourcePath $signInActivityURI -AccessToken $accessToken -ExtraParameters $userSignInFilter
+                        $userSignIns = if ($signInResponse.value)
                         {
-                            @($result.body.value)
+                            $signInResponse.value
                         }
                         else
                         {
@@ -749,7 +1026,7 @@ function Get-AutopilotEventAnalysis()
 
                         if ($userSignIns.Count -gt 0)
                         {
-                            $signInCache[$userId] = $userSignIns
+                            $signInCache[$userId] = @($userSignIns)
                             $totalSignInsRetrieved += $userSignIns.Count
                             Write-Log -LogFile $LogFile -Module $functionName -Message "Retrieved $($userSignIns.Count) sign-ins for userId: $userId" -LogLevel "Verbose"
                         }
@@ -759,565 +1036,512 @@ function Get-AutopilotEventAnalysis()
                             Write-Log -LogFile $LogFile -Module $functionName -Message "No sign-ins found for userId: $userId" -LogLevel "Verbose"
                         }
                     }
-                    else
+                    catch
                     {
+                        Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to fetch sign-ins for userId $userId : $_" -LogLevel "Warning"
                         $signInCache[$userId] = @()
-                        Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to fetch sign-ins for userId: $userId (Status: $($result.status))" -LogLevel "Warning"
                     }
                 }
 
-                Write-Verbose "[$functionName] Sign-in batch processing complete: $totalSignInsRetrieved sign-ins retrieved for $($signInCache.Keys.Count) users"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Sign-in batch processing complete: $totalSignInsRetrieved sign-ins retrieved for $($signInCache.Keys.Count) users" -LogLevel "Information"
+                Write-Verbose "[$functionName] Retrieved $totalSignInsRetrieved total sign-in records for $($signInCache.Keys.Count) users (fallback mode)"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Sign-in data retrieval complete (fallback): $totalSignInsRetrieved sign-ins for $($signInCache.Keys.Count) users" -LogLevel "Information"
             }
-            else
-            {
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Sign-in batch response did not contain expected 'value' property" -LogLevel "Warning"
-                Write-Verbose "[$functionName] Sign-in batch response missing 'value' property"
-            }
-        }
-        catch
-        {
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Sign-in batch fetch failed, falling back to individual requests: $_" -LogLevel "Warning"
-            Write-Verbose "[$functionName] Sign-in batch request failed, falling back to individual requests"
-
-            # Fallback to individual requests
-            $userIndex = 0
-            foreach ($userId in $uniqueUserIds)
-            {
-                $userIndex++
-
-                if ($userIndex % 5 -eq 0 -or $userIndex -eq 1)
-                {
-                    Write-Verbose "[$functionName] Fetching sign-ins for user $userIndex/$($uniqueUserIds.Count)"
-                }
-
-                # Construct filter for this specific user
-                $userSignInFilter = "filter=userId eq '$userId' and createdDateTime ge $signInLogsStartDate and createdDateTime le $signInLogsEndDate&orderby=createdDateTime desc&top=50"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Fetching sign-ins for user $userIndex/$($uniqueUserIds.Count) with filter: $userSignInFilter" -LogLevel "Verbose"
-
-                try
-                {
-                    $signInResponse = CallGraphAPI -ResourcePath $signInActivityURI -AccessToken $accessToken -ExtraParameters $userSignInFilter
-                    $userSignIns = if ($signInResponse.value)
-                    {
-                        $signInResponse.value
-                    }
-                    else
-                    {
-                        @()
-                    }
-
-                    if ($userSignIns.Count -gt 0)
-                    {
-                        $signInCache[$userId] = @($userSignIns)
-                        $totalSignInsRetrieved += $userSignIns.Count
-                        Write-Log -LogFile $LogFile -Module $functionName -Message "Retrieved $($userSignIns.Count) sign-ins for userId: $userId" -LogLevel "Verbose"
-                    }
-                    else
-                    {
-                        $signInCache[$userId] = @()
-                        Write-Log -LogFile $LogFile -Module $functionName -Message "No sign-ins found for userId: $userId" -LogLevel "Verbose"
-                    }
-                }
-                catch
-                {
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to fetch sign-ins for userId $userId : $_" -LogLevel "Warning"
-                    $signInCache[$userId] = @()
-                }
-            }
-
-            Write-Verbose "[$functionName] Retrieved $totalSignInsRetrieved total sign-in records for $($signInCache.Keys.Count) users (fallback mode)"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Sign-in data retrieval complete (fallback): $totalSignInsRetrieved sign-ins for $($signInCache.Keys.Count) users" -LogLevel "Information"
-        }
-    }
-    else
-    {
-        Write-Log -LogFile $LogFile -Module $functionName -Message "No user IDs to fetch sign-in data for" -LogLevel "Verbose"
-        Write-Verbose "[$functionName] No user IDs to fetch sign-in data for"
-    }
-
-    # Enrich all filtered events with sign-in data
-    Write-Verbose "[$functionName] Enriching $($filteredEvents.Count) events with sign-in activity data"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting event enrichment with sign-in data for $($filteredEvents.Count) events" -LogLevel "Information"
-
-    $enrichedEvents = @()
-    $matchStats = @{
-        TotalEvents      = 0
-        MatchedEvents    = 0
-        HighConfidence   = 0
-        MediumConfidence = 0
-        LowConfidence    = 0
-    }
-    $enrichmentIndex = 0
-
-    foreach ($filteredEvent in $filteredEvents)
-    {
-        $enrichmentIndex++
-        $matchStats.TotalEvents++
-
-        if ($enrichmentIndex % 10 -eq 0 -or $enrichmentIndex -eq 1)
-        {
-            Write-Verbose "[$functionName] Processing event $enrichmentIndex/$($filteredEvents.Count)"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Event enrichment progress: $enrichmentIndex/$($filteredEvents.Count)" -LogLevel "Verbose"
-        }
-
-        # Get sign-in match
-        Write-Verbose "[$functionName] Matching sign-in for event: $($filteredEvent.id), User: $($filteredEvent.userPrincipalName), Device: $($filteredEvent.managedDeviceName)"
-        $signInMatch = Get-SignInMatch -Event $filteredEvent -Cache $signInCache
-
-        # Track match statistics
-        if ($signInMatch.MatchFound)
-        {
-            $matchStats.MatchedEvents++
-            $confidenceLevel = ""
-            # With new scoring:
-            # - Azure AD Device ID match = 100 pts + 25 (userId) = 125+ = Definitive/High
-            # - Device Name + Time = 35 + 25 + up to 30 = up to 90 = High/Medium
-            # - Time only = 25 + up to 30 = up to 55 = Low/Medium
-            if ($signInMatch.ConfidenceScore -ge 100)
-            {
-                $matchStats.HighConfidence++
-                $confidenceLevel = "High"
-            }
-            elseif ($signInMatch.ConfidenceScore -ge 60)
-            {
-                $matchStats.MediumConfidence++
-                $confidenceLevel = "Medium"
-            }
-            else
-            {
-                $matchStats.LowConfidence++
-                $confidenceLevel = "Low"
-            }
-            Write-Verbose "[$functionName] Event $($enrichmentIndex): Match found with $confidenceLevel confidence (Score: $($signInMatch.ConfidenceScore))"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Event ID $($filteredEvent.id): Matched with $confidenceLevel confidence (Score: $($signInMatch.ConfidenceScore), Criteria: $($signInMatch.MatchedOn -join ', '))" -LogLevel "Verbose"
         }
         else
         {
-            Write-Verbose "[$functionName] Event $($enrichmentIndex): No match found"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "No user IDs to fetch sign-in data for" -LogLevel "Verbose"
+            Write-Verbose "[$functionName] No user IDs to fetch sign-in data for"
         }
 
-        # Create enriched event object
-        $enrichedEvent = $filteredEvent | Select-Object *
-        $enrichedEvent | Add-Member -NotePropertyName "SignIn_MatchFound" -NotePropertyValue $signInMatch.MatchFound -Force
-        $enrichedEvent | Add-Member -NotePropertyName "SignIn_ConfidenceScore" -NotePropertyValue $signInMatch.ConfidenceScore -Force
-        $enrichedEvent | Add-Member -NotePropertyName "SignIn_MatchedOn" -NotePropertyValue ($signInMatch.MatchedOn -join ", ") -Force
-        $enrichedEvent | Add-Member -NotePropertyName "SignIn_Location_City" -NotePropertyValue $signInMatch.Location_City -Force
-        $enrichedEvent | Add-Member -NotePropertyName "SignIn_Location_State" -NotePropertyValue $signInMatch.Location_State -Force
-        $enrichedEvent | Add-Member -NotePropertyName "SignIn_Location_Country" -NotePropertyValue $signInMatch.Location_Country -Force
-        $enrichedEvent | Add-Member -NotePropertyName "SignIn_IPAddress" -NotePropertyValue $signInMatch.IPAddress -Force
-        $enrichedEvent | Add-Member -NotePropertyName "SignIn_Status" -NotePropertyValue $signInMatch.SignInStatus -Force
-        $enrichedEvent | Add-Member -NotePropertyName "SignIn_FailureReason" -NotePropertyValue $signInMatch.SignInFailureReason -Force
-        $enrichedEvent | Add-Member -NotePropertyName "SignIn_ErrorCode" -NotePropertyValue $signInMatch.SignInErrorCode -Force
-        $enrichedEvent | Add-Member -NotePropertyName "SignIn_AppDisplayName" -NotePropertyValue $signInMatch.AppDisplayName -Force
-        $enrichedEvent | Add-Member -NotePropertyName "SignIn_DeviceDisplayName" -NotePropertyValue $signInMatch.DeviceDisplayName -Force
-        $enrichedEvent | Add-Member -NotePropertyName "SignIn_IsCompliant" -NotePropertyValue $signInMatch.IsCompliant -Force
-        $enrichedEvent | Add-Member -NotePropertyName "SignIn_IsManaged" -NotePropertyValue $signInMatch.IsManaged -Force
+        # Enrich all filtered events with sign-in data
+        Write-Verbose "[$functionName] Enriching $($filteredEvents.Count) events with sign-in activity data"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Starting event enrichment with sign-in data for $($filteredEvents.Count) events" -LogLevel "Information"
 
-        $enrichedEvents += $enrichedEvent
-    }
+        $enrichedEvents = @()
+        $matchStats = @{
+            TotalEvents      = 0
+            MatchedEvents    = 0
+            HighConfidence   = 0
+            MediumConfidence = 0
+            LowConfidence    = 0
+        }
+        $enrichmentIndex = 0
+        $matchStats.TotalEvents = $filteredEvents.Count
 
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Event enrichment complete: $($matchStats.MatchedEvents)/$($matchStats.TotalEvents) events matched with sign-in data" -LogLevel "Information"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Match confidence: High=$($matchStats.HighConfidence), Medium=$($matchStats.MediumConfidence), Low=$($matchStats.LowConfidence)" -LogLevel "Verbose"
+        foreach ($filteredEvent in $filteredEvents)
+        {
+            $enrichmentIndex++
 
-    # Update filtered events to enriched events
-    $filteredEvents = $enrichedEvents
+            # Get sign-in match
+            Write-Verbose "[$functionName] Matching sign-in for event: $($filteredEvent.id), User: $($filteredEvent.userPrincipalName), Device: $($filteredEvent.managedDeviceName)"
+            $signInMatch = Get-SignInMatch -Event $filteredEvent -Cache $signInCache
 
-    # 1. Earliest event date
-    $earliestEvent = $filteredEvents |
-        Where-Object { $_.eventDateTime -and $null -ne $_.deploymentState } |
-        Sort-Object eventDateTime |
-        Select-Object -First 1
-
-    $earliestDate = if ($earliestEvent)
-    {
-        [DateTime]$earliestEvent.eventDateTime
-    }
-    else
-    {
-        $null
-    }
-
-    # 2. Total number of events
-    $totalEvents = $filteredEvents.Count
-
-    # 3, 4 & 4b. Successful, failed, and in-progress events
-    $successfulEvents = @($filteredEvents | Where-Object { $_.deploymentState -eq 'success' })
-    $inProgressEvents = @($filteredEvents | Where-Object { $_.deploymentState -eq 'inProgress' })
-    $failedEvents = @($filteredEvents | Where-Object {
-            ($null -ne $_.deploymentState -and $_.deploymentState -notin @('success', 'inProgress', 'notStarted')) -or
-            ($_.deploymentState -eq 'notStarted' -and
-            (
-                ($null -ne $_.deviceSetupStatus -and $_.deviceSetupStatus -notin @('success', 'inProgress', 'notStarted')) -or
-                ($null -ne $_.accountSetupStatus -and $_.accountSetupStatus -notin @('success', 'inProgress', 'notStarted'))
-            ))
-        })
-
-    # 5. Average duration of successful deployments
-    $successDurations = @($successfulEvents | ForEach-Object {
-            $duration = ConvertFrom-ISO8601Duration -Duration $_.deploymentTotalDuration
-            if ($duration)
+            # Track match statistics
+            if ($signInMatch.MatchFound)
             {
-                $duration
-            }
-        })
-
-    $avgSuccessDuration = if ($successDurations.Count -gt 0)
-    {
-        $totalTicks = ($successDurations | Measure-Object -Property Ticks -Sum).Sum
-        New-Object TimeSpan($totalTicks / $successDurations.Count)
-    }
-    else
-    {
-        $null
-    }
-
-    # 6. Average duration of failed deployments
-    $failureDurations = @($failedEvents | ForEach-Object {
-            $duration = ConvertFrom-ISO8601Duration -Duration $_.deploymentTotalDuration
-            if ($duration)
-            {
-                $duration
-            }
-        })
-
-    $avgFailureDuration = if ($failureDurations.Count -gt 0)
-    {
-        $totalTicks = ($failureDurations | Measure-Object -Property Ticks -Sum).Sum
-        New-Object TimeSpan($totalTicks / $failureDurations.Count)
-    }
-    else
-    {
-        $null
-    }
-
-    # 6b. Categorize in-progress devices by phase
-    $devicePhaseInProgress = @($inProgressEvents | Where-Object {
-            $_.deviceSetupStatus -eq 'inProgress'
-        })
-
-    $userPhaseInProgress = @($inProgressEvents | Where-Object {
-            $_.deviceSetupStatus -eq 'success' -and
-            $_.accountSetupStatus -eq 'inProgress'
-        })
-
-    # 7. Categorize failures into mutually exclusive groups
-    # Device phase only: Device failed, account not started or success
-    $devicePhaseOnlyFailures = @($failedEvents | Where-Object {
-            $deviceFailed = $_.deviceSetupStatus -and
-            $_.deviceSetupStatus -notin @('success', 'notStarted', 'inProgress') -and
-            $null -ne $_.deviceSetupStatus
-            $accountNotFailed = (-not $_.accountSetupStatus) -or
-            $_.accountSetupStatus -in @('success', 'notStarted', 'inProgress')
-            $deviceFailed -and $accountNotFailed
-        })
-
-    # User/Account phase only: Device succeeded, account failed
-    $userPhaseOnlyFailures = @($failedEvents | Where-Object {
-            $deviceSuccess = $_.deviceSetupStatus -eq 'success'
-            $accountFailed = $_.accountSetupStatus -and
-            $_.accountSetupStatus -notin @('success', 'notStarted', 'inProgress') -and
-            $null -ne $_.accountSetupStatus
-            $deviceSuccess -and $accountFailed
-        })
-
-    # Both phases failed: Both device and account show failure
-    $bothPhasesFailures = @($failedEvents | Where-Object {
-            $deviceFailed = $_.deviceSetupStatus -and
-            $_.deviceSetupStatus -notin @('success', 'notStarted', 'inProgress') -and
-            $null -ne $_.deviceSetupStatus
-            $accountFailed = $_.accountSetupStatus -and
-            $_.accountSetupStatus -notin @('success', 'notStarted', 'inProgress') -and
-            $null -ne $_.accountSetupStatus
-            $deviceFailed -and $accountFailed
-        })
-
-    # Unknown/Other: Failures that don't clearly fall into above categories
-    $unknownPhaseFailures = @($failedEvents | Where-Object {
-            $deviceFailed = $_.deviceSetupStatus -and
-            $_.deviceSetupStatus -notin @('success', 'notStarted', 'inProgress') -and
-            $null -ne $_.deviceSetupStatus
-            $accountFailed = $_.accountSetupStatus -and
-            $_.accountSetupStatus -notin @('success', 'notStarted', 'inProgress') -and
-            $null -ne $_.accountSetupStatus
-            $deviceSuccess = $_.deviceSetupStatus -eq 'success'
-            $accountNotFailed = (-not $_.accountSetupStatus) -or
-            $_.accountSetupStatus -in @('success', 'notStarted', 'inProgress')
-
-            # Not in any of the three categories above
-            -not (($deviceFailed -and $accountNotFailed) -or
-                ($deviceSuccess -and $accountFailed) -or
-                ($deviceFailed -and $accountFailed))
-        })
-
-    # 8. Users with multiple enrollment failures
-    $userFailureGroups = $failedEvents |
-        Where-Object { -not [string]::IsNullOrWhiteSpace($_.userPrincipalName) } |
-        Group-Object -Property userPrincipalName |
-        Where-Object { $_.Count -gt 1 } |
-        Sort-Object -Property Count -Descending
-
-    $usersWithMultipleFailures = @()
-    foreach ($userGroup in $userFailureGroups)
-    {
-        # Check for eventual success
-        $userSuccesses = $successfulEvents |
-            Where-Object { $_.userPrincipalName -eq $userGroup.Name } |
-            Sort-Object eventDateTime
-
-        $lastFailureDate = ($userGroup.Group | Sort-Object eventDateTime -Descending | Select-Object -First 1).eventDateTime
-
-        $firstSuccessAfterFailures = $userSuccesses |
-            Where-Object {
-                if ($lastFailureDate)
+                $matchStats.MatchedEvents++
+                $confidenceLevel = ""
+                # With new scoring:
+                # - Azure AD Device ID match = 100 pts + 25 (userId) = 125+ = Definitive/High
+                # - Device Name + Time = 35 + 25 + up to 30 = up to 90 = High/Medium
+                # - Time only = 25 + up to 30 = up to 55 = Low/Medium
+                if ($signInMatch.ConfidenceScore -ge 100)
                 {
-                    ([DateTime]$_.eventDateTime) -gt ([DateTime]$lastFailureDate)
+                    $matchStats.HighConfidence++
+                    $confidenceLevel = "High"
+                }
+                elseif ($signInMatch.ConfidenceScore -ge 60)
+                {
+                    $matchStats.MediumConfidence++
+                    $confidenceLevel = "Medium"
                 }
                 else
                 {
-                    $true
+                    $matchStats.LowConfidence++
+                    $confidenceLevel = "Low"
                 }
-            } |
+                Write-Verbose "[$functionName] Event $($enrichmentIndex): Match found with $confidenceLevel confidence (Score: $($signInMatch.ConfidenceScore))"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Event ID $($filteredEvent.id): Matched with $confidenceLevel confidence (Score: $($signInMatch.ConfidenceScore), Criteria: $($signInMatch.MatchedOn -join ', '))" -LogLevel "Verbose"
+            }
+            else
+            {
+                Write-Verbose "[$functionName] Event $($enrichmentIndex): No match found"
+            }
+
+            # Create enriched event object
+            $enrichedEvent = $filteredEvent | Select-Object *
+            $enrichedEvent | Add-Member -NotePropertyName "SignIn_MatchFound" -NotePropertyValue $signInMatch.MatchFound -Force
+            $enrichedEvent | Add-Member -NotePropertyName "SignIn_ConfidenceScore" -NotePropertyValue $signInMatch.ConfidenceScore -Force
+            $enrichedEvent | Add-Member -NotePropertyName "SignIn_MatchedOn" -NotePropertyValue ($signInMatch.MatchedOn -join ", ") -Force
+            $enrichedEvent | Add-Member -NotePropertyName "SignIn_Location_City" -NotePropertyValue $signInMatch.Location_City -Force
+            $enrichedEvent | Add-Member -NotePropertyName "SignIn_Location_State" -NotePropertyValue $signInMatch.Location_State -Force
+            $enrichedEvent | Add-Member -NotePropertyName "SignIn_Location_Country" -NotePropertyValue $signInMatch.Location_Country -Force
+            $enrichedEvent | Add-Member -NotePropertyName "SignIn_IPAddress" -NotePropertyValue $signInMatch.IPAddress -Force
+            $enrichedEvent | Add-Member -NotePropertyName "SignIn_Status" -NotePropertyValue $signInMatch.SignInStatus -Force
+            $enrichedEvent | Add-Member -NotePropertyName "SignIn_FailureReason" -NotePropertyValue $signInMatch.SignInFailureReason -Force
+            $enrichedEvent | Add-Member -NotePropertyName "SignIn_ErrorCode" -NotePropertyValue $signInMatch.SignInErrorCode -Force
+            $enrichedEvent | Add-Member -NotePropertyName "SignIn_AppDisplayName" -NotePropertyValue $signInMatch.AppDisplayName -Force
+            $enrichedEvent | Add-Member -NotePropertyName "SignIn_DeviceDisplayName" -NotePropertyValue $signInMatch.DeviceDisplayName -Force
+            $enrichedEvent | Add-Member -NotePropertyName "SignIn_IsCompliant" -NotePropertyValue $signInMatch.IsCompliant -Force
+            $enrichedEvent | Add-Member -NotePropertyName "SignIn_IsManaged" -NotePropertyValue $signInMatch.IsManaged -Force
+
+            $enrichedEvents += $enrichedEvent
+        }
+
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Event enrichment complete: $($matchStats.MatchedEvents)/$($matchStats.TotalEvents) events matched with sign-in data" -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Match confidence: High=$($matchStats.HighConfidence), Medium=$($matchStats.MediumConfidence), Low=$($matchStats.LowConfidence)" -LogLevel "Verbose"
+
+        # Update filtered events to enriched events
+        $filteredEvents = $enrichedEvents
+
+        # 1. Earliest event date
+        $earliestEvent = $filteredEvents |
+            Where-Object { $_.eventDateTime -and $null -ne $_.deploymentState } |
+            Sort-Object eventDateTime |
             Select-Object -First 1
 
-        $usersWithMultipleFailures += [PSCustomObject]@{
-            UserPrincipalName = $userGroup.Name
-            FailureCount      = $userGroup.Count
-            FailedDevices     = @($userGroup.Group | Sort-Object eventDateTime)
-            EventualSuccess   = $null -ne $firstSuccessAfterFailures
-            SuccessDevice     = $firstSuccessAfterFailures
-            LastFailureDate   = $lastFailureDate
-        }
-    }
-
-    # 8b. Users with single failure followed by success
-    $singleFailureUsers = $failedEvents |
-        Where-Object { -not [string]::IsNullOrWhiteSpace($_.userPrincipalName) } |
-        Group-Object -Property userPrincipalName |
-        Where-Object { $_.Count -eq 1 }
-
-    $singleFailureWithSuccess = @()
-    foreach ($userGroup in $singleFailureUsers)
-    {
-        $userSuccesses = $successfulEvents | Where-Object { $_.userPrincipalName -eq $userGroup.Name }
-
-        if ($userSuccesses)
+        $earliestDate = if ($earliestEvent)
         {
-            $failureDate = $userGroup.Group[0].eventDateTime
-            $successAfter = $userSuccesses |
+            [DateTime]$earliestEvent.eventDateTime
+        }
+        else
+        {
+            $null
+        }
+
+        # 2. Total number of events
+        $totalEvents = $filteredEvents.Count
+
+        # 3, 4 & 4b. Successful, failed, and in-progress events
+        $successfulEvents = @($filteredEvents | Where-Object { $_.deploymentState -eq 'success' })
+        $inProgressEvents = @($filteredEvents | Where-Object { $_.deploymentState -eq 'inProgress' })
+        $failedEvents = @($filteredEvents | Where-Object {
+                ($null -ne $_.deploymentState -and $_.deploymentState -notin @('success', 'inProgress', 'notStarted')) -or
+                ($_.deploymentState -eq 'notStarted' -and
+                (
+                    ($null -ne $_.deviceSetupStatus -and $_.deviceSetupStatus -notin @('success', 'inProgress', 'notStarted')) -or
+                    ($null -ne $_.accountSetupStatus -and $_.accountSetupStatus -notin @('success', 'inProgress', 'notStarted'))
+                ))
+            })
+
+        # 5. Average duration of successful deployments
+        $successDurations = @($successfulEvents | ForEach-Object {
+                $duration = ConvertFrom-ISO8601Duration -Duration $_.deploymentTotalDuration
+                if ($duration)
+                {
+                    $duration
+                }
+            })
+
+        $avgSuccessDuration = if ($successDurations.Count -gt 0)
+        {
+            $totalTicks = ($successDurations | Measure-Object -Property Ticks -Sum).Sum
+            New-Object TimeSpan($totalTicks / $successDurations.Count)
+        }
+        else
+        {
+            $null
+        }
+
+        # 6. Average duration of failed deployments
+        $failureDurations = @($failedEvents | ForEach-Object {
+                $duration = ConvertFrom-ISO8601Duration -Duration $_.deploymentTotalDuration
+                if ($duration)
+                {
+                    $duration
+                }
+            })
+
+        $avgFailureDuration = if ($failureDurations.Count -gt 0)
+        {
+            $totalTicks = ($failureDurations | Measure-Object -Property Ticks -Sum).Sum
+            New-Object TimeSpan($totalTicks / $failureDurations.Count)
+        }
+        else
+        {
+            $null
+        }
+
+        # 6b. Categorize in-progress devices by phase
+        $devicePhaseInProgress = @($inProgressEvents | Where-Object {
+                $_.deviceSetupStatus -eq 'inProgress'
+            })
+
+        $userPhaseInProgress = @($inProgressEvents | Where-Object {
+                $_.deviceSetupStatus -eq 'success' -and
+                $_.accountSetupStatus -eq 'inProgress'
+            })
+
+        # 7. Categorize failures into mutually exclusive groups
+        # Device phase only: Device failed, account not started or success
+        $devicePhaseOnlyFailures = @($failedEvents | Where-Object {
+                $deviceFailed = $_.deviceSetupStatus -and
+                $_.deviceSetupStatus -notin @('success', 'notStarted', 'inProgress') -and
+                $null -ne $_.deviceSetupStatus
+                $accountNotFailed = (-not $_.accountSetupStatus) -or
+                $_.accountSetupStatus -in @('success', 'notStarted', 'inProgress')
+                $deviceFailed -and $accountNotFailed
+            })
+
+        # User/Account phase only: Device succeeded, account failed
+        $userPhaseOnlyFailures = @($failedEvents | Where-Object {
+                $deviceSuccess = $_.deviceSetupStatus -eq 'success'
+                $accountFailed = $_.accountSetupStatus -and
+                $_.accountSetupStatus -notin @('success', 'notStarted', 'inProgress') -and
+                $null -ne $_.accountSetupStatus
+                $deviceSuccess -and $accountFailed
+            })
+
+        # Both phases failed: Both device and account show failure
+        $bothPhasesFailures = @($failedEvents | Where-Object {
+                $deviceFailed = $_.deviceSetupStatus -and
+                $_.deviceSetupStatus -notin @('success', 'notStarted', 'inProgress') -and
+                $null -ne $_.deviceSetupStatus
+                $accountFailed = $_.accountSetupStatus -and
+                $_.accountSetupStatus -notin @('success', 'notStarted', 'inProgress') -and
+                $null -ne $_.accountSetupStatus
+                $deviceFailed -and $accountFailed
+            })
+
+        # Unknown/Other: Failures that don't clearly fall into above categories
+        $unknownPhaseFailures = @($failedEvents | Where-Object {
+                $deviceFailed = $_.deviceSetupStatus -and
+                $_.deviceSetupStatus -notin @('success', 'notStarted', 'inProgress') -and
+                $null -ne $_.deviceSetupStatus
+                $accountFailed = $_.accountSetupStatus -and
+                $_.accountSetupStatus -notin @('success', 'notStarted', 'inProgress') -and
+                $null -ne $_.accountSetupStatus
+                $deviceSuccess = $_.deviceSetupStatus -eq 'success'
+                $accountNotFailed = (-not $_.accountSetupStatus) -or
+                $_.accountSetupStatus -in @('success', 'notStarted', 'inProgress')
+
+                # Not in any of the three categories above
+                -not (($deviceFailed -and $accountNotFailed) -or
+                    ($deviceSuccess -and $accountFailed) -or
+                    ($deviceFailed -and $accountFailed))
+            })
+
+        # 8. Users with multiple enrollment failures
+        $userFailureGroups = $failedEvents |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_.userPrincipalName) } |
+            Group-Object -Property userPrincipalName |
+            Where-Object { $_.Count -gt 1 } |
+            Sort-Object -Property Count -Descending
+
+        $usersWithMultipleFailures = @()
+        foreach ($userGroup in $userFailureGroups)
+        {
+            # Check for eventual success
+            $userSuccesses = $successfulEvents |
+                Where-Object { $_.userPrincipalName -eq $userGroup.Name } |
+                Sort-Object eventDateTime
+
+            $lastFailureDate = ($userGroup.Group | Sort-Object eventDateTime -Descending | Select-Object -First 1).eventDateTime
+
+            $firstSuccessAfterFailures = $userSuccesses |
                 Where-Object {
-                    if ($failureDate)
+                    if ($lastFailureDate)
                     {
-                        ([DateTime]$_.eventDateTime) -gt ([DateTime]$failureDate)
+                        ([DateTime]$_.eventDateTime) -gt ([DateTime]$lastFailureDate)
                     }
                     else
                     {
-                        $false
+                        $true
                     }
                 } |
-                Sort-Object eventDateTime |
                 Select-Object -First 1
 
-            if ($successAfter)
+            $usersWithMultipleFailures += [PSCustomObject]@{
+                UserPrincipalName = $userGroup.Name
+                FailureCount      = $userGroup.Count
+                FailedDevices     = @($userGroup.Group | Sort-Object eventDateTime)
+                EventualSuccess   = $null -ne $firstSuccessAfterFailures
+                SuccessDevice     = $firstSuccessAfterFailures
+                LastFailureDate   = $lastFailureDate
+            }
+        }
+
+        # 8b. Users with single failure followed by success
+        $singleFailureUsers = $failedEvents |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_.userPrincipalName) } |
+            Group-Object -Property userPrincipalName |
+            Where-Object { $_.Count -eq 1 }
+
+        $singleFailureWithSuccess = @()
+        foreach ($userGroup in $singleFailureUsers)
+        {
+            $userSuccesses = $successfulEvents | Where-Object { $_.userPrincipalName -eq $userGroup.Name }
+
+            if ($userSuccesses)
             {
-                $singleFailureWithSuccess += [PSCustomObject]@{
-                    UserPrincipalName = $userGroup.Name
-                    FailureDate       = $failureDate
-                    FailureDevice     = $userGroup.Group[0]
-                    SuccessDate       = $successAfter.eventDateTime
-                    SuccessDevice     = $successAfter
+                $failureDate = $userGroup.Group[0].eventDateTime
+                $successAfter = $userSuccesses |
+                    Where-Object {
+                        if ($failureDate)
+                        {
+                            ([DateTime]$_.eventDateTime) -gt ([DateTime]$failureDate)
+                        }
+                        else
+                        {
+                            $false
+                        }
+                    } |
+                    Sort-Object eventDateTime |
+                    Select-Object -First 1
+
+                if ($successAfter)
+                {
+                    $singleFailureWithSuccess += [PSCustomObject]@{
+                        UserPrincipalName = $userGroup.Name
+                        FailureDate       = $failureDate
+                        FailureDevice     = $userGroup.Group[0]
+                        SuccessDate       = $successAfter.eventDateTime
+                        SuccessDevice     = $successAfter
+                    }
                 }
             }
         }
-    }
 
-    # 9. Failed devices sorted chronologically
-    $failedDevicesSorted = $failedEvents |
-        Where-Object { $_.deviceSerialNumber } |
-        Sort-Object eventDateTime
+        # 9. Failed devices sorted chronologically
+        $failedDevicesSorted = $failedEvents |
+            Where-Object { $_.deviceSerialNumber } |
+            Sort-Object eventDateTime
 
-    # 10. Location-based analysis (from sign-in data)
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Performing location-based analysis from sign-in data" -LogLevel "Information"
-    Write-Verbose "[$functionName] Analyzing events by location"
+        # 10. Location-based analysis (from sign-in data)
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Performing location-based analysis from sign-in data" -LogLevel "Information"
+        Write-Verbose "[$functionName] Analyzing events by location"
 
-    # Filter events that have location data from sign-in matching
-    $eventsWithLocation = @($filteredEvents | Where-Object { $_.SignIn_Location_Country -or $_.SignIn_Location_City })
-    Write-Verbose "[$functionName] Found $($eventsWithLocation.Count) events with location data"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Found $($eventsWithLocation.Count) events with location data" -LogLevel "Verbose"
+        # Filter events that have location data from sign-in matching
+        $eventsWithLocation = @($filteredEvents | Where-Object { $_.SignIn_Location_Country -or $_.SignIn_Location_City })
+        Write-Verbose "[$functionName] Found $($eventsWithLocation.Count) events with location data"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Found $($eventsWithLocation.Count) events with location data" -LogLevel "Verbose"
 
-    $locationStats = @{}
+        $locationStats = @{}
 
-    foreach ($locationEvent in $eventsWithLocation)
-    {
-        # Create location key (Country-State-City)
-        $locationKey = @(
-            $locationEvent.SignIn_Location_Country,
-            $locationEvent.SignIn_Location_State,
-            $locationEvent.SignIn_Location_City
-        ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_.Trim() }
-
-        $locationString = if ($locationKey.Count -gt 0)
+        foreach ($locationEvent in $eventsWithLocation)
         {
-            $locationKey -join ', '
-        }
-        else
-        {
-            'Unknown'
-        }
+            # Create location key (Country-State-City)
+            $locationKey = @(
+                $locationEvent.SignIn_Location_Country,
+                $locationEvent.SignIn_Location_State,
+                $locationEvent.SignIn_Location_City
+            ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_.Trim() }
 
-        # Initialize location entry if not exists
-        if (-not $locationStats.ContainsKey($locationString))
-        {
-            $locationStats[$locationString] = @{
-                Country         = $locationEvent.SignIn_Location_Country
-                State           = $locationEvent.SignIn_Location_State
-                City            = $locationEvent.SignIn_Location_City
-                TotalEvents     = 0
-                SuccessCount    = 0
-                FailureCount    = 0
-                InProgressCount = 0
-                Events          = [System.Collections.ArrayList]::new()
+            $locationString = if ($locationKey.Count -gt 0)
+            {
+                $locationKey -join ', '
+            }
+            else
+            {
+                'Unknown'
+            }
+
+            # Initialize location entry if not exists
+            if (-not $locationStats.ContainsKey($locationString))
+            {
+                $locationStats[$locationString] = @{
+                    Country         = $locationEvent.SignIn_Location_Country
+                    State           = $locationEvent.SignIn_Location_State
+                    City            = $locationEvent.SignIn_Location_City
+                    TotalEvents     = 0
+                    SuccessCount    = 0
+                    FailureCount    = 0
+                    InProgressCount = 0
+                    Events          = [System.Collections.ArrayList]::new()
+                }
+            }
+
+            # Increment counters
+            $locationStats[$locationString].TotalEvents++
+            [void]$locationStats[$locationString].Events.Add($locationEvent)
+
+            # Categorize by deployment state
+            if ($locationEvent.deploymentState -eq 'success')
+            {
+                $locationStats[$locationString].SuccessCount++
+            }
+            elseif ($locationEvent.deploymentState -eq 'inProgress')
+            {
+                $locationStats[$locationString].InProgressCount++
+            }
+            else
+            {
+                # Failed or other non-success states
+                $locationStats[$locationString].FailureCount++
             }
         }
 
-        # Increment counters
-        $locationStats[$locationString].TotalEvents++
-        [void]$locationStats[$locationString].Events.Add($locationEvent)
-
-        # Categorize by deployment state
-        if ($locationEvent.deploymentState -eq 'success')
-        {
-            $locationStats[$locationString].SuccessCount++
-        }
-        elseif ($locationEvent.deploymentState -eq 'inProgress')
-        {
-            $locationStats[$locationString].InProgressCount++
-        }
-        else
-        {
-            # Failed or other non-success states
-            $locationStats[$locationString].FailureCount++
-        }
-    }
-
-    # Convert to sorted array of location statistics
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Converting location statistics to sorted array with unique user/device counts" -LogLevel "Verbose"
-    $locationAnalysis = @($locationStats.GetEnumerator() | ForEach-Object {
-            # Calculate unique users and devices for this location
-            $locationEvents = $_.Value.Events
-            $uniqueUsers = @($locationEvents | Where-Object { $_.userId -or $_.userPrincipalName } |
-                    ForEach-Object { if ($_.userId)
-                        {
-                            $_.userId
-                        }
-                        else
-                        {
-                            $_.userPrincipalName
-                        } } |
-                    Select-Object -Unique).Count
-                $uniqueDevices = @($locationEvents | Where-Object { $_.managedDeviceName -or $_.deviceId } |
-                        ForEach-Object { if ($_.deviceId)
+        # Convert to sorted array of location statistics
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Converting location statistics to sorted array with unique user/device counts" -LogLevel "Verbose"
+        $locationAnalysis = @($locationStats.GetEnumerator() | ForEach-Object {
+                # Calculate unique users and devices for this location
+                $locationEvents = $_.Value.Events
+                $uniqueUsers = @($locationEvents | Where-Object { $_.userId -or $_.userPrincipalName } |
+                        ForEach-Object { if ($_.userId)
                             {
-                                $_.deviceId
+                                $_.userId
                             }
                             else
                             {
-                                $_.managedDeviceName
+                                $_.userPrincipalName
                             } } |
                         Select-Object -Unique).Count
+                    $uniqueDevices = @($locationEvents | Where-Object { $_.managedDeviceName -or $_.deviceId } |
+                            ForEach-Object { if ($_.deviceId)
+                                {
+                                    $_.deviceId
+                                }
+                                else
+                                {
+                                    $_.managedDeviceName
+                                } } |
+                            Select-Object -Unique).Count
 
-                    [PSCustomObject]@{
-                        Location         = $_.Key
-                        Country          = $_.Value.Country
-                        State            = $_.Value.State
-                        City             = $_.Value.City
-                        TotalEvents      = $_.Value.TotalEvents
-                        SuccessCount     = $_.Value.SuccessCount
-                        FailureCount     = $_.Value.FailureCount
-                        InProgressCount  = $_.Value.InProgressCount
-                        SuccessfulEvents = $_.Value.SuccessCount
-                        FailedEvents     = $_.Value.FailureCount
-                        InProgressEvents = $_.Value.InProgressCount
-                        UniqueUsers      = $uniqueUsers
-                        UniqueDevices    = $uniqueDevices
-                        SuccessRate      = if ($_.Value.TotalEvents -gt 0)
-                        {
-                            [Math]::Round(($_.Value.SuccessCount / $_.Value.TotalEvents) * 100, 2)
+                        [PSCustomObject]@{
+                            Location         = $_.Key
+                            Country          = $_.Value.Country
+                            State            = $_.Value.State
+                            City             = $_.Value.City
+                            TotalEvents      = $_.Value.TotalEvents
+                            SuccessCount     = $_.Value.SuccessCount
+                            FailureCount     = $_.Value.FailureCount
+                            InProgressCount  = $_.Value.InProgressCount
+                            SuccessfulEvents = $_.Value.SuccessCount
+                            FailedEvents     = $_.Value.FailureCount
+                            InProgressEvents = $_.Value.InProgressCount
+                            UniqueUsers      = $uniqueUsers
+                            UniqueDevices    = $uniqueDevices
+                            SuccessRate      = if ($_.Value.TotalEvents -gt 0)
+                            {
+                                [Math]::Round(($_.Value.SuccessCount / $_.Value.TotalEvents) * 100, 2)
+                            }
+                            else
+                            {
+                                0
+                            }
+                            FailureRate      = if ($_.Value.TotalEvents -gt 0)
+                            {
+                                [Math]::Round(($_.Value.FailureCount / $_.Value.TotalEvents) * 100, 2)
+                            }
+                            else
+                            {
+                                0
+                            }
+                            Events           = $_.Value.Events
                         }
-                        else
-                        {
-                            0
-                        }
-                        FailureRate      = if ($_.Value.TotalEvents -gt 0)
-                        {
-                            [Math]::Round(($_.Value.FailureCount / $_.Value.TotalEvents) * 100, 2)
-                        }
-                        else
-                        {
-                            0
-                        }
-                        Events           = $_.Value.Events
-                    }
-                } | Sort-Object -Property TotalEvents -Descending)
+                    } | Sort-Object -Property TotalEvents -Descending)
 
-    Write-Verbose "[$functionName] Location analysis complete: $($locationAnalysis.Count) unique locations"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Location analysis complete: $($locationAnalysis.Count) unique locations identified" -LogLevel "Information"
+        Write-Verbose "[$functionName] Location analysis complete: $($locationAnalysis.Count) unique locations"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Location analysis complete: $($locationAnalysis.Count) unique locations identified" -LogLevel "Information"
 
-    # Log top locations by event count
-    if ($locationAnalysis.Count -gt 0)
-    {
-        $topLocations = $locationAnalysis | Select-Object -First 5
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Top locations by event count:" -LogLevel "Verbose"
-        foreach ($loc in $topLocations)
+        # Log top locations by event count
+        if ($locationAnalysis.Count -gt 0)
         {
-            Write-Log -LogFile $LogFile -Module $functionName -Message "  $($loc.Location): $($loc.TotalEvents) events, $($loc.UniqueUsers) users, $($loc.UniqueDevices) devices (Success: $($loc.SuccessCount), Failure: $($loc.FailureCount), Success Rate: $($loc.SuccessRate)%)" -LogLevel "Verbose"
+            $topLocations = $locationAnalysis | Select-Object -First 5
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Top locations by event count:" -LogLevel "Verbose"
+            foreach ($loc in $topLocations)
+            {
+                Write-Log -LogFile $LogFile -Module $functionName -Message "  $($loc.Location): $($loc.TotalEvents) events, $($loc.UniqueUsers) users, $($loc.UniqueDevices) devices (Success: $($loc.SuccessCount), Failure: $($loc.FailureCount), Success Rate: $($loc.SuccessRate)%)" -LogLevel "Verbose"
+            }
         }
+
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Analysis complete: $totalEvents total events, $($successfulEvents.Count) successful, $($failedEvents.Count) failed, $($inProgressEvents.Count) in progress" -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "In-progress breakdown: Device phase=$($devicePhaseInProgress.Count), User phase=$($userPhaseInProgress.Count)" -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Failure breakdown: Device only=$($devicePhaseOnlyFailures.Count), User only=$($userPhaseOnlyFailures.Count), Both=$($bothPhasesFailures.Count), Unknown=$($unknownPhaseFailures.Count)" -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Users with multiple failures: $($usersWithMultipleFailures.Count), Single failure with success: $($singleFailureWithSuccess.Count)" -LogLevel "Verbose"
+
+        # Build result object
+        $result = [PSCustomObject]@{
+            TotalEvents                 = $totalEvents
+            TotalEventsBeforeFilter     = $Events.Count
+            StartDate                   = $StartDate
+            EndDate                     = $EndDate
+            UserPrincipalName           = $UserPrincipalName
+            EarliestEventDate           = $earliestDate
+            SuccessfulEvents            = $successfulEvents
+            SuccessCount                = $successfulEvents.Count
+            InProgressEvents            = $inProgressEvents
+            InProgressCount             = $inProgressEvents.Count
+            DevicePhaseInProgress       = $devicePhaseInProgress
+            DevicePhaseInProgressCount  = $devicePhaseInProgress.Count
+            UserPhaseInProgress         = $userPhaseInProgress
+            UserPhaseInProgressCount    = $userPhaseInProgress.Count
+            FailedEvents                = $failedEvents
+            FailureCount                = $failedEvents.Count
+            AverageSuccessDuration      = $avgSuccessDuration
+            AverageFailureDuration      = $avgFailureDuration
+            DevicePhaseOnlyFailures     = $devicePhaseOnlyFailures
+            DevicePhaseOnlyFailureCount = $devicePhaseOnlyFailures.Count
+            UserPhaseOnlyFailures       = $userPhaseOnlyFailures
+            UserPhaseOnlyFailureCount   = $userPhaseOnlyFailures.Count
+            BothPhasesFailures          = $bothPhasesFailures
+            BothPhasesFailureCount      = $bothPhasesFailures.Count
+            UnknownPhaseFailures        = $unknownPhaseFailures
+            UnknownPhaseFailureCount    = $unknownPhaseFailures.Count
+            UsersWithMultipleFailures   = $usersWithMultipleFailures
+            SingleFailureWithSuccess    = $singleFailureWithSuccess
+            FailedDevicesChronological  = $failedDevicesSorted
+            AllFilteredEvents           = $filteredEvents
+            AllEvents                   = $Events
+            SignInMatchStats            = $matchStats
+            LocationAnalysis            = $locationAnalysis
+            LocationAnalysisCount       = $locationAnalysis.Count
+        }
+
+        Write-Verbose "[$functionName] Analysis complete"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Autopilot event analysis completed successfully" -LogLevel "Information"
+        return $result
     }
+    catch
+    {
+        # Comprehensive error handler for any unexpected errors during analysis
+        $errorMsg = "Unexpected error during autopilot event analysis: $($_.Exception.Message)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message $errorMsg -LogLevel "Error"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Error details: $($_.Exception.GetType().FullName)" -LogLevel "Error"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Stack trace: $($_.ScriptStackTrace)" -LogLevel "Error"
+        Write-Error $errorMsg
 
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Analysis complete: $totalEvents total events, $($successfulEvents.Count) successful, $($failedEvents.Count) failed, $($inProgressEvents.Count) in progress" -LogLevel "Information"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "In-progress breakdown: Device phase=$($devicePhaseInProgress.Count), User phase=$($userPhaseInProgress.Count)" -LogLevel "Information"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Failure breakdown: Device only=$($devicePhaseOnlyFailures.Count), User only=$($userPhaseOnlyFailures.Count), Both=$($bothPhasesFailures.Count), Unknown=$($unknownPhaseFailures.Count)" -LogLevel "Information"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Users with multiple failures: $($usersWithMultipleFailures.Count), Single failure with success: $($singleFailureWithSuccess.Count)" -LogLevel "Verbose"
-
-    # Build result object
-    $result = [PSCustomObject]@{
-        TotalEvents                 = $totalEvents
-        TotalEventsBeforeFilter     = $Events.Count
-        StartDate                   = $StartDate
-        EndDate                     = $EndDate
-        UserPrincipalName           = $UserPrincipalName
-        EarliestEventDate           = $earliestDate
-        SuccessfulEvents            = $successfulEvents
-        SuccessCount                = $successfulEvents.Count
-        InProgressEvents            = $inProgressEvents
-        InProgressCount             = $inProgressEvents.Count
-        DevicePhaseInProgress       = $devicePhaseInProgress
-        DevicePhaseInProgressCount  = $devicePhaseInProgress.Count
-        UserPhaseInProgress         = $userPhaseInProgress
-        UserPhaseInProgressCount    = $userPhaseInProgress.Count
-        FailedEvents                = $failedEvents
-        FailureCount                = $failedEvents.Count
-        AverageSuccessDuration      = $avgSuccessDuration
-        AverageFailureDuration      = $avgFailureDuration
-        DevicePhaseOnlyFailures     = $devicePhaseOnlyFailures
-        DevicePhaseOnlyFailureCount = $devicePhaseOnlyFailures.Count
-        UserPhaseOnlyFailures       = $userPhaseOnlyFailures
-        UserPhaseOnlyFailureCount   = $userPhaseOnlyFailures.Count
-        BothPhasesFailures          = $bothPhasesFailures
-        BothPhasesFailureCount      = $bothPhasesFailures.Count
-        UnknownPhaseFailures        = $unknownPhaseFailures
-        UnknownPhaseFailureCount    = $unknownPhaseFailures.Count
-        UsersWithMultipleFailures   = $usersWithMultipleFailures
-        SingleFailureWithSuccess    = $singleFailureWithSuccess
-        FailedDevicesChronological  = $failedDevicesSorted
-        AllFilteredEvents           = $filteredEvents
-        AllEvents                   = $Events
-        SignInMatchStats            = $matchStats
-        LocationAnalysis            = $locationAnalysis
-        LocationAnalysisCount       = $locationAnalysis.Count
+        # Return null to indicate failure
+        return $null
     }
-
-    Write-Verbose "[$functionName] Analysis complete"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Autopilot event analysis completed successfully" -LogLevel "Information"
-    return $result
 }
