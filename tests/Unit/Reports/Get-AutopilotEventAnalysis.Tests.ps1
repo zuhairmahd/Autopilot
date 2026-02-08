@@ -210,9 +210,25 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
             }
         )
 
-        # Setup global mock for CallGraphAPI to handle user lookups, batch requests, and sign-in logs
+        # Setup global mock for CallGraphAPI to handle autopilot events, user lookups, batch requests, and sign-in logs
         Mock CallGraphAPI {
             param($ResourcePath, $AccessToken, $ExtraParameters)
+
+            # Handle autopilot events endpoint
+            if ($ResourcePath -eq 'deviceManagement/autopilotEvents') {
+                return @{ value = $script:SampleEvents }
+            }
+
+            # Handle managed device lookups for Azure AD Device ID
+            if ($ResourcePath -match '^deviceManagement/managedDevices/(.+)') {
+                $deviceId = $Matches[1].Split('?')[0]
+                # Return mock device with Azure AD Device ID
+                return @{
+                    id = $deviceId
+                    azureADDeviceId = "aad-$deviceId"
+                    deviceName = "TestDevice-$deviceId"
+                }
+            }
 
             # Handle batch request (array of resource paths)
             if ($ResourcePath -is [array] -and $ResourcePath.Count -gt 1) {
@@ -299,6 +315,22 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
                         $successCount++
                         $batchId++
                     }
+                    # Handle managed device lookups for Azure AD Device ID (deviceManagement/managedDevices/...)
+                    elseif ($path -match 'deviceManagement/managedDevices/([^?]+)') {
+                        $deviceId = $Matches[1]
+                        $batchResponses += @{
+                            id = $batchId
+                            status = 200
+                            headers = @{}
+                            body = @{
+                                id = $deviceId
+                                azureADDeviceId = "aad-$deviceId"
+                                deviceName = "TestDevice-$deviceId"
+                            }
+                        }
+                        $successCount++
+                        $batchId++
+                    }
                 }
 
                 # Return in standard Graph API $batch response format
@@ -369,64 +401,52 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
 
     Context "Event retrieval via Graph API" {
 
-        It "Should fetch events from Graph API when not provided" {
-            Mock CallGraphAPI {
-                return @{ value = $script:SampleEvents }
-            }
-
+        It "Should fetch events from Graph API" {
             $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             $result | Should -Not -BeNullOrEmpty
             $result.TotalEvents | Should -BeGreaterThan 0
         }
 
-        It "Should throw when AccessToken missing and Events not provided" {
+        It "Should throw when AccessToken is missing" {
             { Get-AutopilotEventAnalysis } | Should -Throw "*AccessToken is required*"
-        }
-
-        It "Should use provided Events array without API call" {
-            Mock CallGraphAPI { throw "Should not call API" }
-
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
-
-            $result.TotalEvents | Should -Be $script:SampleEvents.Count
         }
     }
 
     Context "Event counting and categorization" {
 
         It "Should count total events correctly" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             $result.TotalEvents | Should -Be 11
         }
 
         It "Should count successful events correctly" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             $result.SuccessCount | Should -Be 4
         }
 
         It "Should count failed events correctly" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             $result.FailureCount | Should -Be 5
         }
 
         It "Should count in-progress events correctly" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             $result.InProgressCount | Should -Be 2
         }
 
         It "Should identify device phase in-progress events" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             $result.DevicePhaseInProgressCount | Should -Be 1
         }
 
         It "Should identify user/account phase in-progress events" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             $result.UserPhaseInProgressCount | Should -Be 1
         }
@@ -435,25 +455,25 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
     Context "Failure phase categorization" {
 
         It "Should categorize device-only failures" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             $result.DevicePhaseOnlyFailureCount | Should -Be 3
         }
 
         It "Should categorize user/account-only failures" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             $result.UserPhaseOnlyFailureCount | Should -Be 1
         }
 
         It "Should categorize both-phases failures" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             $result.BothPhasesFailureCount | Should -Be 1
         }
 
         It "Should track unknown phase failures" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             $result.UnknownPhaseFailureCount | Should -BeGreaterOrEqual 0
         }
@@ -463,7 +483,7 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
 
         It "Should filter events by start date" {
             $startDate = [DateTime]"2025-02-05T00:00:00Z"
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents -StartDate $startDate
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -StartDate $startDate
 
             $result.TotalEvents | Should -BeLessOrEqual $script:SampleEvents.Count
             $result.StartDate | Should -Be $startDate
@@ -471,7 +491,7 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
 
         It "Should filter events by end date" {
             $endDate = [DateTime]"2025-02-05T23:59:59Z"
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents -EndDate $endDate
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -EndDate $endDate
 
             $result.TotalEvents | Should -BeLessOrEqual $script:SampleEvents.Count
             $result.EndDate | Should -Be $endDate
@@ -480,7 +500,7 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
         It "Should filter events by date range" {
             $startDate = [DateTime]"2025-02-05T00:00:00Z"
             $endDate = [DateTime]"2025-02-08T23:59:59Z"
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents -StartDate $startDate -EndDate $endDate
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -StartDate $startDate -EndDate $endDate
 
             $result.TotalEvents | Should -BeLessOrEqual $script:SampleEvents.Count
             $result.StartDate | Should -Be $startDate
@@ -504,26 +524,25 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
             )
 
             # The function should handle invalid dates without crashing
-            { $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $eventsWithBadDate } | Should -Not -Throw
+            Mock CallGraphAPI { return @{ value = $eventsWithBadDate } } -ParameterFilter { $ResourcePath -eq 'deviceManagement/autopilotEvents' }
+            { $result = Get-AutopilotEventAnalysis -AccessToken "test-token" } | Should -Not -Throw
         }
     }
 
     Context "User principal name filtering" {
 
         It "Should filter events by UserPrincipalName" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents -UserPrincipalName "user3@contoso.com"
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -UserPrincipalName "user3@contoso.com"
 
             $result.TotalEvents | Should -Be 3
             $result.UserPrincipalName | Should -Be "user3@contoso.com"
         }
 
         It "Should return only events matching the UPN" {
-            # Create a fresh copy to avoid cross-test contamination
-            $testEvents = $script:SampleEvents | ForEach-Object { $_.Clone() }
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $testEvents -UserPrincipalName "user1@contoso.com"
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -UserPrincipalName "user1@contoso.com"
 
             # Should filter to only events for this user
-            $result.TotalEvents | Should -BeLessOrEqual $testEvents.Count
+            $result.TotalEvents | Should -BeLessOrEqual $script:SampleEvents.Count
             # Verify filtering occurred (if user has events)
             if ($result.TotalEvents -gt 0) {
                 $result.UserPrincipalName | Should -Be "user1@contoso.com"
@@ -531,7 +550,7 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
         }
 
         It "Should return zero events for non-existent UPN" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents -UserPrincipalName "nonexistent@contoso.com"
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -UserPrincipalName "nonexistent@contoso.com"
 
             $result.TotalEvents | Should -Be 0
         }
@@ -540,14 +559,14 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
     Context "Duration calculation" {
 
         It "Should calculate average success duration" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             $result.AverageSuccessDuration | Should -Not -BeNullOrEmpty
             $result.AverageSuccessDuration.GetType().Name | Should -Be "TimeSpan"
         }
 
         It "Should calculate average failure duration" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             $result.AverageFailureDuration | Should -Not -BeNullOrEmpty
             $result.AverageFailureDuration.GetType().Name | Should -Be "TimeSpan"
@@ -563,7 +582,8 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
                 }
             )
 
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $eventsWithoutDuration
+            Mock CallGraphAPI { return @{ value = $eventsWithoutDuration } } -ParameterFilter { $ResourcePath -eq 'deviceManagement/autopilotEvents' }
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             $result.AverageSuccessDuration | Should -BeNullOrEmpty
         }
@@ -572,14 +592,14 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
     Context "User failure analysis" {
 
         It "Should identify users with multiple failures" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             $result.UsersWithMultipleFailures | Should -Not -BeNullOrEmpty
             $result.UsersWithMultipleFailures.Count | Should -BeGreaterThan 0
         }
 
         It "Should track eventual success for users with multiple failures" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             $user3 = $result.UsersWithMultipleFailures | Where-Object { $_.UserPrincipalName -eq "user3@contoso.com" }
             $user3.FailureCount | Should -Be 2
@@ -587,14 +607,14 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
         }
 
         It "Should identify users with single failure then success" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             $result.SingleFailureWithSuccess | Should -Not -BeNullOrEmpty
             $result.SingleFailureWithSuccess.Count | Should -BeGreaterThan 0
         }
 
         It "Should track single failure followed by success" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             $user8 = $result.SingleFailureWithSuccess | Where-Object { $_.UserPrincipalName -eq "user8@contoso.com" }
             $user8 | Should -Not -BeNullOrEmpty
@@ -605,14 +625,14 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
     Context "Chronological sorting" {
 
         It "Should sort failed devices chronologically" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             $result.FailedDevicesChronological | Should -Not -BeNullOrEmpty
             $result.FailedDevicesChronological.Count | Should -Be $result.FailureCount
         }
 
         It "Should order failures by event date ascending" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             $dates = $result.FailedDevicesChronological | ForEach-Object { [DateTime]$_.eventDateTime }
             for ($i = 0; $i -lt ($dates.Count - 1); $i++) {
@@ -624,7 +644,7 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
     Context "Result structure" {
 
         It "Should return PSCustomObject with all expected properties" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             $result.PSObject.TypeNames[0] | Should -Be "System.Management.Automation.PSCustomObject"
             $result.PSObject.Properties.Name | Should -Contain "TotalEvents"
@@ -634,21 +654,21 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
         }
 
         It "Should preserve original events array" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
-            $result.AllEvents | Should -Be $script:SampleEvents
+            $result.AllEvents | Should -Not -BeNullOrEmpty
             $result.AllEvents.Count | Should -Be $script:SampleEvents.Count
         }
 
         It "Should include filtered events when filters applied" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents -UserPrincipalName "user3@contoso.com"
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -UserPrincipalName "user3@contoso.com"
 
             $result.AllFilteredEvents | Should -Not -BeNullOrEmpty
             $result.AllFilteredEvents.Count | Should -BeLessOrEqual $script:SampleEvents.Count
         }
 
         It "Should track earliest event date" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             $result.EarliestEventDate | Should -Not -BeNullOrEmpty
             $result.EarliestEventDate | Should -Be ([DateTime]"2025-02-01T10:00:00Z")
@@ -658,7 +678,7 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
     Context "User ID enrichment" {
 
         It "Should enrich events with missing user IDs" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             # Check that events without userId now have one
             $enrichedEvent = $result.AllFilteredEvents | Where-Object { $_.userPrincipalName -eq "user2@contoso.com" }
@@ -669,7 +689,7 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
         It "Should fetch user IDs only for filtered events" {
             # Filter to specific date range
             $startDate = [DateTime]"2025-02-05T00:00:00Z"
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents -StartDate $startDate
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -StartDate $startDate
 
             # Should only have enriched events from the filtered date range
             $result.AllFilteredEvents.Count | Should -BeLessOrEqual $script:SampleEvents.Count
@@ -688,7 +708,7 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
         }
 
         It "Should preserve existing user IDs" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             # Check an event that already had userId
             $eventWithId = $result.AllFilteredEvents | Where-Object { $_.userPrincipalName -eq "user1@contoso.com" }
@@ -709,14 +729,15 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
             )
 
             # Should not throw, just log warning
-            { $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $eventsWithBadUPN } | Should -Not -Throw
+            Mock CallGraphAPI { return @{ value = $eventsWithBadUPN } } -ParameterFilter { $ResourcePath -eq 'deviceManagement/autopilotEvents' }
+            { $result = Get-AutopilotEventAnalysis -AccessToken "test-token" } | Should -Not -Throw
 
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $eventsWithBadUPN
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
             $result.TotalEvents | Should -Be 1
         }
 
         It "Should use enriched user IDs for sign-in matching" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             # Verify sign-in matching was performed
             $result.SignInMatchStats | Should -Not -BeNullOrEmpty
@@ -727,14 +748,14 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
     Context "Location analysis" {
 
         It "Should include location analysis in results" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             $result.PSObject.Properties.Name | Should -Contain "LocationAnalysis"
             $result.PSObject.Properties.Name | Should -Contain "LocationAnalysisCount"
         }
 
         It "Should analyze events by location from sign-in data" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             # LocationAnalysis should be an array or null if no location data
             if ($result.LocationAnalysis) {
@@ -743,7 +764,7 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
         }
 
         It "Should calculate success and failure counts per location" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             if ($result.LocationAnalysis.Count -gt 0) {
                 $firstLocation = $result.LocationAnalysis[0]
@@ -757,7 +778,7 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
         }
 
         It "Should include geographic details in location analysis" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             if ($result.LocationAnalysis.Count -gt 0) {
                 $firstLocation = $result.LocationAnalysis[0]
@@ -768,7 +789,7 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
         }
 
         It "Should sort locations by total event count descending" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             if ($result.LocationAnalysis.Count -gt 1) {
                 for ($i = 0; $i -lt ($result.LocationAnalysis.Count - 1); $i++) {
@@ -778,7 +799,7 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
         }
 
         It "Should calculate success rate correctly" {
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $script:SampleEvents
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             if ($result.LocationAnalysis.Count -gt 0) {
                 foreach ($location in $result.LocationAnalysis) {
@@ -801,7 +822,8 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
                 }
             )
 
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $eventsWithoutLocation
+            Mock CallGraphAPI { return @{ value = $eventsWithoutLocation } } -ParameterFilter { $ResourcePath -eq 'deviceManagement/autopilotEvents' }
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             # Should not crash, LocationAnalysis should exist (may be empty array)
             $result.PSObject.Properties.Name | Should -Contain "LocationAnalysis"
@@ -812,10 +834,11 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
     Context "Edge cases" {
 
         It "Should handle empty events array" {
-            # When Events array is provided (even if empty), no AccessToken needed
-            { $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events @() } | Should -Not -Throw
+            # Mock to return empty array
+            Mock CallGraphAPI { return @{ value = @() } } -ParameterFilter { $ResourcePath -eq 'deviceManagement/autopilotEvents' }
+            { $result = Get-AutopilotEventAnalysis -AccessToken "test-token" } | Should -Not -Throw
 
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events @()
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
             $result.TotalEvents | Should -Be 0
             $result.SuccessCount | Should -Be 0
             $result.FailureCount | Should -Be 0
@@ -832,7 +855,8 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
                 }
             )
 
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $eventsWithoutUPN
+            Mock CallGraphAPI { return @{ value = $eventsWithoutUPN } } -ParameterFilter { $ResourcePath -eq 'deviceManagement/autopilotEvents' }
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             $result.TotalEvents | Should -Be 1
             $result.UsersWithMultipleFailures.Count | Should -Be 0
@@ -849,7 +873,8 @@ Describe "Get-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
                 }
             )
 
-            $result = Get-AutopilotEventAnalysis -AccessToken "test-token" -Events $eventsWithoutSerial
+            Mock CallGraphAPI { return @{ value = $eventsWithoutSerial } } -ParameterFilter { $ResourcePath -eq 'deviceManagement/autopilotEvents' }
+            $result = Get-AutopilotEventAnalysis -AccessToken "test-token"
 
             $result.TotalEvents | Should -Be 1
             $result.FailedDevicesChronological.Count | Should -Be 0
