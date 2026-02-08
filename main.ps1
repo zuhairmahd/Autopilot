@@ -2157,7 +2157,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Autopilot enrollment re
     }
     if ($autopilotReportInput.UseLocationFilter)
     {
-        $analysisParams['ShowLocationAnalysis'] = $true
+        $analysisParams['ApplyLocationAnalysis'] = $true
     }
 
     Write-Log -logFile $logFile -Module $scriptName -Message "Analysis parameters set: $($analysisParams | Out-String)"
