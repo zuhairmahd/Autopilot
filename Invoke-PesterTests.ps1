@@ -100,6 +100,7 @@ param(
     [string]$TestType = 'All',
     [ValidateSet('None', 'Minimal', 'Normal', 'Detailed')]
     [string]$OutputVerbosity = 'Normal',
+    [Parameter(Position = 0)]
     [string]$TestFile,
     [switch]$skipModuleCheck,
     [Parameter(ParameterSetName = 'Default')]
@@ -428,11 +429,25 @@ function Select-ItemsFromList()
             $displayText = & $DisplayFormat $pageItems[$i]
 
             # Show [X] marker if already selected
-            $marker = if ($selectedIndices.ContainsKey($globalIndex)) { "[X]" } else { "[ ]" }
+            $marker = if ($selectedIndices.ContainsKey($globalIndex))
+            {
+                "[X]"
+            }
+            else
+            {
+                "[ ]"
+            }
 
             if ($AllowMultiple)
             {
-                Write-Host " $marker [$itemNumber] $displayText" -ForegroundColor $(if ($selectedIndices.ContainsKey($globalIndex)) { 'Green' } else { 'White' })
+                Write-Host " $marker [$itemNumber] $displayText" -ForegroundColor $(if ($selectedIndices.ContainsKey($globalIndex))
+                    {
+                        'Green'
+                    }
+                    else
+                    {
+                        'White'
+                    })
             }
             else
             {
