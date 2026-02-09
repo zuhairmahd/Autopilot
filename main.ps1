@@ -2206,6 +2206,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Autopilot enrollment re
                 Write-Host "Failed to export analysis: $($exportResult.Error)" -ForegroundColor Red
                 write-log -logFile $logFile -Module $scriptName -Message "Failed to export analysis: $($exportResult.Error)" -logLevel "ERROR"
             }
+            return $returnValues.backoutText
         }
         else
         {
