@@ -582,7 +582,7 @@ function Export-AutopilotEventAnalysis()
                 InProgressEvents,
                 @{N = "SuccessRate"; E = { if ($_.TotalEvents -gt 0)
                         {
-                            "{0:P2}" -f $_.SuccessRate
+                            "{0:N2}%" -f $_.SuccessRate
                         }
                         else
                         {
@@ -591,7 +591,7 @@ function Export-AutopilotEventAnalysis()
                 },
                 @{N = "FailureRate"; E = { if ($_.TotalEvents -gt 0)
                         {
-                            "{0:P2}" -f $_.FailureRate
+                            "{0:N2}%" -f $_.FailureRate
                         }
                         else
                         {
@@ -718,8 +718,8 @@ function Export-AutopilotEventAnalysis()
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Exporting all available data" -LogLevel "Information"
 
                     $exportParams = @{
-                        AnalysisData = $AnalysisData
-                        OutputPath   = $exportPath
+                        AnalysisData  = $AnalysisData
+                        OutputPath    = $exportPath
                         ExportSummary = $true
                     }
 

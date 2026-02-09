@@ -28,15 +28,15 @@ function Show-AutopilotEventAnalysis()
 
     .PARAMETER ShowChronologicalFailures
         Display failed devices in chronological order.
-        Uses paging with 10 items per page.
+        Uses paging with 5 items per page.
 
     .PARAMETER ShowInProgress
         Display devices currently in progress and which phase they are in.
-        Uses paging with 10 items per page.
+        Uses paging with 5 items per page.
 
     .PARAMETER ShowLocationAnalysis
         Display location-based analysis from sign-in data showing success/failure rates by location.
-        Uses paging with 10 items per page.
+        Uses paging with 5   items per page.
 
     .PARAMETER MaxChronologicalDisplay
         DEPRECATED: No longer used due to paging implementation.

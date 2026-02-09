@@ -2995,8 +2995,3 @@ Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary file
 # Finish logging
 Write-Log -LogFile $LogFile -FinishLogging
 #endregion Cleanup
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
-# Finish logging
-Write-Log -LogFile $LogFile -FinishLogging
-#endregion Cleanup
