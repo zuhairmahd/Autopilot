@@ -151,8 +151,8 @@ function Get-AutopilotEnrollmentReportInput()
     $endDate = $null
     if ([string]::IsNullOrWhiteSpace($endDateInput))
     {
-        Write-Verbose "[$functionName] Using default end date: no filter (all events)"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "User selected default end date (no filter)" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Using default end date: today's date (end-of-day filter)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "User selected default end date (today's date, end-of-day filter)" -LogLevel "Verbose"
         Write-Host "Using default: $((Get-Date).ToString('yyyy-MM-dd'))" -ForegroundColor Yellow
         #if we have a null string, then endDate will be today's date at 11:59:59 PM
         $endDate = ConvertTo-DateFilter -InputString "today" -IsEndDate $true
