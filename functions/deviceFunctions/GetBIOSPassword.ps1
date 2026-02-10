@@ -35,24 +35,24 @@ function GetBIOSPassword()
     $functionName = $MyInvocation.MyCommand.Name
     $returnObject = @()
     Write-Verbose "[$functionName] Starting BIOS password retrieval. Raw serial input: '$serialNumber'"
-write-log -logFile $LogFile -module $functionName -message "Starting BIOS password retrieval." -LogLevel "Verbose"
+Write-Log -logFile $LogFile -module $functionName -message "Starting BIOS password retrieval." -LogLevel "Verbose"
 
     # Normalize and validate input
     $sn = ("$serialNumber").Trim()
     if (-not $sn)
     {
         Write-Verbose "[$functionName] Serial number is null or empty after normalization. Aborting."
-        write-log -logFile $LogFile -module $functionName -message "Serial number is null or empty after normalization." -logLevel "Error"
+        Write-Log -logFile $LogFile -module $functionName -message "Serial number is null or empty after normalization." -logLevel "Error"
         Write-Error "Serial number is required."
         return $null
     }
-    write-log -logFile $LogFile -module $functionName -message "Normalized serial number: '$sn'" -logLevel "Information"
+    Write-Log -logFile $LogFile -module $functionName -message "Normalized serial number: '$sn'" -logLevel "Information"
 
     # Prepare Graph query
     $deviceHardwareDetailsURI = "deviceManagement/hardwarePasswordDetails"
     $filter = "serialNumber eq '$Sn'"
     Write-Verbose "[$functionName] Graph URI: $deviceHardwareDetailsURI | Filter: $filter"
-    write-log -logFile $LogFile -module $functionName -message "Querying Graph. URI=$deviceHardwareDetailsURI, Filter=$filter" -logLevel "Information"
+    Write-Log -logFile $LogFile -module $functionName -message "Querying Graph. URI=$deviceHardwareDetailsURI, Filter=$filter" -logLevel "Information"
 
     # Call Graph with timing and error handling
     $resp = $null
@@ -61,7 +61,7 @@ write-log -logFile $LogFile -module $functionName -message "Starting BIOS passwo
     {
         $resp = (CallGraphAPI -ResourcePath $deviceHardwareDetailsURI -filter $filter -accessToken $accessToken).value
         $sw.Stop()
-        write-log -logFile $LogFile -module $functionName -message "Graph call completed in $($sw.ElapsedMilliseconds) ms." -logLevel "Information"
+        Write-Log -logFile $LogFile -module $functionName -message "Graph call completed in $($sw.ElapsedMilliseconds) ms." -logLevel "Information"
         Write-Verbose "[$functionName] Graph returned $($resp.count) records"
         Write-log -logFile $LogFile -module $functionName -message "Graph returned $($resp.count) records." -logLevel "Information"
         if ($resp -and $resp.count -gt 0)
@@ -90,7 +90,7 @@ write-log -logFile $LogFile -module $functionName -message "Starting BIOS passwo
         }
         else
         {
-write-log -logFile $LogFile -module $functionName -message "No hardware password details found for serial '$sn'." -LogLevel "Verbose"
+Write-Log -logFile $LogFile -module $functionName -message "No hardware password details found for serial '$sn'." -LogLevel "Verbose"
             return $null
         }
         return $returnObject
@@ -99,7 +99,7 @@ write-log -logFile $LogFile -module $functionName -message "No hardware password
     {
         $sw.Stop()
         Write-Verbose "[$functionName] Graph call failed after $($sw.ElapsedMilliseconds) ms: $($_.Exception.Message)"
-        write-log -logFile $LogFile -module $functionName -message "Graph call failed: $($_.Exception.Message)" -logLevel "Error"
+        Write-Log -logFile $LogFile -module $functionName -message "Graph call failed: $($_.Exception.Message)" -logLevel "Error"
         Write-Error "Failed retrieving hardware password details for serial '$sn': $($_.Exception.Message)"
         return $null
     }

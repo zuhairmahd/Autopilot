@@ -59,13 +59,13 @@ function Test-MinimumSpecs()
 
     Write-Verbose "[$functionName] Strict mode: $strictMode"
     Write-Verbose "[$functionName] Write to console: $writeToConsole"
-    write-log -logFile $logFile -module $functionName -message "Strict mode: $strictMode, Write to console: $writeToConsole" -logLevel "Information"
+    Write-Log -logFile $logFile -module $functionName -message "Strict mode: $strictMode, Write to console: $writeToConsole" -logLevel "Information"
     Write-Verbose "[$functionName] Required minimum device memory: $($settings.minimumDevicePhysicalMemoryInGB) GB"
     Write-Verbose "[$functionName] Required operating system: $($settings.operatingSystem)"
     Write-Verbose "[$functionName] Required minimum OS build: $($settings.minimumOSBuild)"
-    write-log -logFile $logFile -module $functionName -message "Required minimum device memory: $($settings.minimumDevicePhysicalMemoryInGB) GB" -logLevel "Information"
-    write-log -logFile $logFile -module $functionName -message "Required operating system: $($settings.operatingSystem)" -logLevel "Information"
-    write-log -logFile $logFile -module $functionName -message "Required minimum OS build: $($settings.minimumOSBuild)" -logLevel "Information"
+    Write-Log -logFile $logFile -module $functionName -message "Required minimum device memory: $($settings.minimumDevicePhysicalMemoryInGB) GB" -logLevel "Information"
+    Write-Log -logFile $logFile -module $functionName -message "Required operating system: $($settings.operatingSystem)" -logLevel "Information"
+    Write-Log -logFile $logFile -module $functionName -message "Required minimum OS build: $($settings.minimumOSBuild)" -logLevel "Information"
 
     # Determine whether to run the PIV test: explicit parameter overrides settings.runPIVTest
     $runPIVRequested = if ($PSBoundParameters.ContainsKey('runPIVTest'))
@@ -90,13 +90,13 @@ function Test-MinimumSpecs()
     }
     $systemInformation = Get-SystemInformation
     $returnObject.SystemInformation = $systemInformation
-    write-log -logFile $logFile -module $functionName -message "System information retrieved: $($systemInformation | Out-String)" -logLevel "Information"
+    Write-Log -logFile $logFile -module $functionName -message "System information retrieved: $($systemInformation | Out-String)" -logLevel "Information"
 
     $PIVReaderStatus = @{ Success = $false; Status = "Not started" }
     if ($runPIVRequested)
     {
         Write-Verbose "[$functionName] Running PIV reader test as requested."
-        write-log -logFile $logFile -module $functionName -message "Running PIV reader test as requested." -logLevel "Information"
+        Write-Log -logFile $logFile -module $functionName -message "Running PIV reader test as requested." -logLevel "Information"
         Write-Host "Please insert your PIV card, then press Enter to continue." -ForegroundColor Yellow
         Read-Host "Press Enter after inserting your PIV"
         $PIVReaderStatus = Test-PIVReader
@@ -104,10 +104,10 @@ function Test-MinimumSpecs()
     else
     {
         Write-Verbose "[$functionName] Skipping PIV reader test as not requested."
-        write-log -logFile $logFile -module $functionName -message "Skipping PIV reader test as not requested." -logLevel "Information"
+        Write-Log -logFile $logFile -module $functionName -message "Skipping PIV reader test as not requested." -logLevel "Information"
         $PIVReaderStatus = @{ Success = $true; Status = "Not requested" }
     }
-    write-log -logFile $logFile -module $functionName -message "PIV Reader status: $($PIVReaderStatus | Out-String)" -logLevel "Information"
+    Write-Log -logFile $logFile -module $functionName -message "PIV Reader status: $($PIVReaderStatus | Out-String)" -logLevel "Information"
 
     $hasCorrectMemory = if ($null -ne $settings.minimumDevicePhysicalMemoryInGB -and $null -ne $systemInformation.TotalMemoryGB)
     {
@@ -118,7 +118,7 @@ function Test-MinimumSpecs()
         $null
     }
     Write-Verbose "[$functionName] Has correct memory: $hasCorrectMemory"
-    write-log -logFile $logFile -module $functionName -message "Has correct memory: $hasCorrectMemory" -logLevel "Information"
+    Write-Log -logFile $logFile -module $functionName -message "Has correct memory: $hasCorrectMemory" -logLevel "Information"
 
     $hasCorrectOS = if ($null -ne $settings.operatingSystem -and $null -ne $systemInformation.OSName)
     {
@@ -129,7 +129,7 @@ function Test-MinimumSpecs()
         $null
     }
     Write-Verbose "[$functionName] Has correct OS: $hasCorrectOS"
-    write-log -logFile $logFile -module $functionName -message "Has correct OS: $hasCorrectOS" -logLevel "Information"
+    Write-Log -logFile $logFile -module $functionName -message "Has correct OS: $hasCorrectOS" -logLevel "Information"
 
     $hasMinimumOS = if ($null -ne $systemInformation.OSBuild -and $null -ne $settings.minimumOSBuild)
     {
@@ -140,7 +140,7 @@ function Test-MinimumSpecs()
         $null
     }
     Write-Verbose "[$functionName] Has minimum OS build: $hasMinimumOS"
-    write-log -logFile $logFile -module $functionName -message "Has minimum OS build: $hasMinimumOS" -logLevel "Information"
+    Write-Log -logFile $logFile -module $functionName -message "Has minimum OS build: $hasMinimumOS" -logLevel "Information"
     $PIVReaderOK = if ($runPIVRequested)
     {
         $PIVReaderStatus.Success -eq $true
@@ -150,7 +150,7 @@ function Test-MinimumSpecs()
         $true
     }
     Write-Verbose "[$functionName] PIV reader status OK: $PIVReaderOK"
-    write-log -logFile $logFile -module $functionName -message "PIV reader status OK: $PIVReaderOK" -logLevel "Information"
+    Write-Log -logFile $logFile -module $functionName -message "PIV reader status OK: $PIVReaderOK" -logLevel "Information"
 
     if ($writeToConsole)
     {
@@ -256,13 +256,13 @@ function Test-MinimumSpecs()
     if ($returnObject.Success)
     {
         Write-Verbose "[$functionName] Device meets minimum specifications."
-        write-log -logFile $logFile -module $functionName -message "Device meets minimum specifications." -logLevel "Information"
+        Write-Log -logFile $logFile -module $functionName -message "Device meets minimum specifications." -logLevel "Information"
         return $returnObject
     }
     else
     {
         Write-Verbose "[$functionName] Device does not meet minimum specifications."
-        write-log -logFile $logFile -module $functionName -message "Device does not meet minimum specifications. $($returnObject.Message)" -logLevel "Warning"
+        Write-Log -logFile $logFile -module $functionName -message "Device does not meet minimum specifications. $($returnObject.Message)" -logLevel "Warning"
         if ($strictMode)
         {
             throw $returnObject.Message

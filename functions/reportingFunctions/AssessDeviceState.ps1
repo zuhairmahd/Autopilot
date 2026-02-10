@@ -1,4 +1,4 @@
-function AssessDeviceState() 
+function AssessDeviceState()
 {
     <#
     .SYNOPSIS
@@ -65,13 +65,13 @@ function AssessDeviceState()
             if ($enrollmentState.inAutopilot)
             {
                 $autopilotReadiness = GetAutopilotDeviceRelevantProperties -enrollmentState $enrollmentState
-                
+
                 # Initialize variables to avoid null reference errors
                 $managedDeviceReadiness = $null
                 $deviceLastContactDate = $null
-                
+
                 if ($enrollmentState.autopilot.device.enrollmentState -ne 'notContacted')
-                {   
+                {
                     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting managed device properties." -LogLevel "Information"
                     $managedDeviceReadiness = GetManagedDeviceRelevantProperties -enrollmentState $enrollmentState -settings $settings -username $username
                     $deviceLastContactDate = GetLastDeviceContactDate -accessToken $accessToken -enrollmentState $enrollmentState
@@ -84,28 +84,28 @@ function AssessDeviceState()
                     {
                         Write-Host "The device has not contacted Intune in $($deviceLastContactDate.numberOfDaysSinceLastContact) days. Last contact date: $($deviceLastContactDate.lastContactDate | FormatDateWithTimeZone)."
                         Write-Host "Please check the device's network connectivity and ensure it can reach Intune."
-                    }    
+                    }
                     $memoryMessage = "`n"
                     Write-Verbose "[$functionName] Managed device readiness good: $($managedDeviceReadiness.ReadyForNextUser)"
                     Write-Verbose "[$functionName] within threshold: $($deviceLastContactDate.withinThreshold)"
                 }
-                else 
+                else
                 {
                     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device enrollment state is 'notContacted', skipping managed device readiness check." -LogLevel "Information"
                     $memoryMessage = "We could not determine whether the device has the required $($settings.MinimumDevicePhysicalMemoryInGB ) GB of RAM. `n Please manually verify that the device has $($settings.MinimumDevicePhysicalMemoryInGB ) GB of RAM before proceeding."
                 }
                 Write-Verbose "Autopilot assignment good: $($autopilotReadiness.AutopilotAssignmentGood)"
-                
+
                 # Determine readiness - handle notContacted devices separately to avoid null reference errors
-                $isNotContactedReady = $autopilotReadiness.AutopilotAssignmentGood -and 
-                $enrollmentState.autopilot.device.enrollmentState -eq 'notContacted' -and 
+                $isNotContactedReady = $autopilotReadiness.AutopilotAssignmentGood -and
+                $enrollmentState.autopilot.device.enrollmentState -eq 'notContacted' -and
                 $enrollmentState.managed -eq $false
-                
-                $isEnrolledReady = $settings.includeEnrolledDevicesInNextUserReadiness -and 
-                $autopilotReadiness.AutopilotAssignmentGood -and 
+
+                $isEnrolledReady = $settings.includeEnrolledDevicesInNextUserReadiness -and
+                $autopilotReadiness.AutopilotAssignmentGood -and
                 $null -ne $managedDeviceReadiness -and
-                $managedDeviceReadiness.ReadyForNextUser -and 
-                ($settings.includeEnrolledDevicesInNextUserReadiness -and $enrollmentState.autopilot.device.enrollmentState -ne 'notContacted') -and 
+                $managedDeviceReadiness.ReadyForNextUser -and
+                ($settings.includeEnrolledDevicesInNextUserReadiness -and $enrollmentState.autopilot.device.enrollmentState -ne 'notContacted') -and
                 $null -ne $deviceLastContactDate -and
                 $deviceLastContactDate.withinThreshold
 
@@ -129,9 +129,9 @@ function AssessDeviceState()
                 Write-Verbose "[$functionName] isEnrolledReady: $isEnrolledReady"
                 Write-Verbose "[$functionName] isSameUserDevice: $isSameUserDevice"
                 Write-Verbose "[$functionName] isPendingActions: $isPendingActions"
-                write-log -logFile $LogFile -Module "$functionName" -Message "Device readiness for next user - isEnrolledReady: $isEnrolledReady, isNotContactedReady: $isNotContactedReady, isSameUserDevice: $isSameUserDevice, isPendingActions: $isPendingActions" -LogLevel "Information"
+                Write-Log -logFile $LogFile -Module "$functionName" -Message "Device readiness for next user - isEnrolledReady: $isEnrolledReady, isNotContactedReady: $isNotContactedReady, isSameUserDevice: $isSameUserDevice, isPendingActions: $isPendingActions" -LogLevel "Information"
                 Write-Log -logFile $LogFile -Module "$functionName" -Message "Device readiness for next user - isEnrolledReady: $isEnrolledReady, isNotContactedReady: $isNotContactedReady, isPendingActions: $isPendingActions" -LogLevel "Information"
-                
+
                 # Device is only ready if it passes readiness checks AND has no pending actions
                 # OR if it's registered to the same user with no enrollment issues
                 if ((($isEnrolledReady -or $isNotContactedReady) -and -not $isPendingActions) -or ($isSameUserDevice -and -not $isPendingActions))
@@ -139,7 +139,7 @@ function AssessDeviceState()
                     Write-Host "`n=== Device Readiness Assessment ===" -ForegroundColor Cyan
                     Write-Host "Status: " -NoNewline
                     Write-Host "READY" -ForegroundColor Green
-                    
+
                     if ($isSameUserDevice)
                     {
                         Write-Host "The device is already registered to this user and is compliant." -ForegroundColor Green
@@ -152,19 +152,19 @@ function AssessDeviceState()
                     }
                     Write-Host $memoryMessage
                     Write-Host "===================================`n" -ForegroundColor Cyan
-                    $readinessState = $deviceStates.ready 
+                    $readinessState = $deviceStates.ready
                     $action = $deviceActions.none
                     $device = if ($enrollmentState.managedDevice -and $enrollmentState.managedDevice.device.id)
-                    { 
-                        $enrollmentState.managedDevice.device.id 
+                    {
+                        $enrollmentState.managedDevice.device.id
                     }
                     elseif ($enrollmentState.autopilot -and $enrollmentState.autopilot.device.id)
-                    { 
-                        $enrollmentState.autopilot.device.id 
+                    {
+                        $enrollmentState.autopilot.device.id
                     }
                     else
-                    { 
-                        $null 
+                    {
+                        $null
                     }
                     $allIssues = @()  # No issues when ready
                     $allActions = @($deviceActions.none)
@@ -176,27 +176,27 @@ function AssessDeviceState()
                     Write-Host "NOT READY" -ForegroundColor Red
                     Write-Host "The device is not ready for the next user." -ForegroundColor Red
                     Write-Host "See below for more information.`n" -ForegroundColor Yellow
-                    
+
                     # Initialize arrays to collect all issues and actions
                     $allIssues = @()
                     $allActions = @()
                     $actionsPriority = @{}  # To track action priorities
-                    
+
                     # Set base readiness state and device ID
                     $readinessState = $deviceStates.notReady
                     $device = if ($enrollmentState.managedDevice -and $enrollmentState.managedDevice.device.id)
-                    { 
-                        $enrollmentState.managedDevice.device.id 
+                    {
+                        $enrollmentState.managedDevice.device.id
                     }
                     elseif ($enrollmentState.autopilot -and $enrollmentState.autopilot.device.id)
-                    { 
-                        $enrollmentState.autopilot.device.id 
+                    {
+                        $enrollmentState.autopilot.device.id
                     }
                     else
-                    { 
-                        $null 
+                    {
+                        $null
                     }
-                    
+
                     # Check for pending actions first (highest priority issue)
                     if ($isPendingActions)
                     {
@@ -204,7 +204,7 @@ function AssessDeviceState()
                         Write-Host "  [!] " -ForegroundColor Yellow -NoNewline
                         Write-Host $issue -ForegroundColor Yellow
                         $allIssues += $issue
-                        
+
                         # Display specific pending actions if available
                         if ($pendingActionsResult.PendingActions)
                         {
@@ -223,7 +223,7 @@ function AssessDeviceState()
                         }
                         $actionsPriority[$deviceActions.turnOnDevice] = 1  # Highest priority
                     }
-                    
+
                     # Check all other possible issues and collect them
                     if ($autopilotReadiness.CorrectProfile -eq $false)
                     {
@@ -313,9 +313,9 @@ function AssessDeviceState()
                         $issue = "The device appears to have already been enrolled. Devices must not be enrolled to be considered ready for the next user."
                         Write-Host "  [!] " -ForegroundColor Yellow -NoNewline
                         Write-Host $issue -ForegroundColor Red
-                        $allIssues += $issue                            
+                        $allIssues += $issue
                         $actionsPriority[$deviceActions.WipeOrClean] = 2
-                    }                           
+                    }
 
                     # Determine the primary action based on priority (lower number = higher priority)
                     if ($actionsPriority.Count -gt 0)
@@ -328,7 +328,7 @@ function AssessDeviceState()
                         $action = $deviceActions.none
                         $allActions = @($deviceActions.none)
                     }
-                    
+
                     # Display recommended actions summary
                     Write-Host "`nRecommended Actions:" -ForegroundColor Yellow
                     Write-Host "  Primary: " -NoNewline
@@ -340,7 +340,7 @@ function AssessDeviceState()
                             Write-Host "    - $_" -ForegroundColor Cyan
                         }
                     }
-                    
+
                     # Provide specific guidance based on primary action
                     Write-Host "`nGuidance:" -ForegroundColor Yellow
                     switch ($action)
@@ -377,12 +377,12 @@ function AssessDeviceState()
                 $readinessState = $deviceStates.notReady
                 $action = $deviceActions.contactAdmin
                 $device = if ($enrollmentState.managedDevice -and $enrollmentState.managedDevice.device.id)
-                { 
-                    $enrollmentState.managedDevice.device.id 
+                {
+                    $enrollmentState.managedDevice.device.id
                 }
                 else
-                { 
-                    $null 
+                {
+                    $null
                 }
                 $allIssues = @("The device is not registered in Autopilot.")
                 $allActions = @($deviceActions.contactAdmin)
@@ -393,28 +393,28 @@ function AssessDeviceState()
             Write-Host "Place holder text..."
             Write-Host "Troubleshooting the device..."
         }
-    }        
+    }
     # Ensure variables are initialized for all code paths
     if (-not $allIssues)
     {
-        $allIssues = @() 
+        $allIssues = @()
     }
     if (-not $allActions)
     {
-        $allActions = @($action) 
+        $allActions = @($action)
     }
-    
+
     # Build comprehensive return object (maintains backward compatibility)
     $returnValue.Add('ReadinessState', $readinessState)
     $returnValue.Add('Action', $action)  # Primary action (backward compatibility)
     $returnValue.Add('Device', $device)
-    
+
     # Enhanced information for comprehensive issue reporting
     $returnValue.Add('AllIssues', $allIssues)  # Array of all issues found
     $returnValue.Add('AllActions', $allActions)  # Array of all recommended actions
     $returnValue.Add('IssueCount', $allIssues.Count)  # Number of issues found
     $returnValue.Add('IsReady', ($readinessState -eq $deviceStates.ready))  # Boolean readiness check
-    
+
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning readiness state: $readinessState" -LogLevel "Information"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning primary action: $action" -LogLevel "Information"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning device: $device" -LogLevel "Information"

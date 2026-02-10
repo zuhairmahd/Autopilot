@@ -53,19 +53,19 @@ function Request-AdditionalScopes()
         [Parameter(Mandatory = $true)]
         [hashtable]$AuthParams
     )
-    
+
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Starting additional scope request process"
 Write-Log -LogFile $LogFile -Module $functionName -Message "Starting additional scope request for $($MissingScopes.Count) missing scopes" -LogLevel "Verbose"
     Write-Verbose "[$functionName] Starting additional scope request for $($MissingScopes.Count) missing scopes (Write-Log not available)"
-    
+
     $result = @{
         Success        = $false
         NewAccessToken = $null
         ErrorMessage   = ""
         UserCancelled  = $false
     }
-    
+
     # Handle empty missing scopes - nothing to request
     if ($MissingScopes.Count -eq 0)
     {
@@ -74,19 +74,19 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Starting additional 
         $result.ErrorMessage = "No additional scopes needed."
         return $result
     }
-    
+
     try
     {
         # Check if this is delegated authentication
         $isDelegated = $AuthConfiguration.Delegated -eq $true
-        
+
         if (-not $isDelegated)
         {
             # For application authentication, we cannot request additional scopes at runtime
             Write-Host "`nApplication authentication is being used." -ForegroundColor Yellow
             Write-Host "Missing application permissions cannot be requested at runtime." -ForegroundColor Yellow
             Write-Host "`nThe following application permissions need to be added by an administrator:" -ForegroundColor Cyan
-            write-log -logFile $LogFile -module $functionName -message "The following application permissions need to be added by an administrator:" -loglevel "Warning"
+            Write-Log -logFile $LogFile -module $functionName -message "The following application permissions need to be added by an administrator:" -loglevel "Warning"
             foreach ($scope in $MissingScopes)
             {
                 Write-Host "  - $($scope.Scope)" -ForegroundColor White
@@ -97,7 +97,7 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Starting additional 
                 }
                 Write-Host ""
             }
-            
+
             Write-Host "To add these permissions:" -ForegroundColor Cyan
             Write-Host "1. Go to the Microsoft Entra admin center (https://entra.microsoft.com)" -ForegroundColor White
             Write-Host "2. Navigate to 'Identity' > 'Applications' > 'App registrations'" -ForegroundColor White
@@ -107,18 +107,18 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Starting additional 
             Write-Host "6. Add the missing permissions listed above" -ForegroundColor White
             Write-Host "7. Click 'Grant admin consent for [your organization]'" -ForegroundColor White
             Write-Host ""
-            
+
             $result.ErrorMessage = "Application permissions require administrator consent and cannot be requested at runtime."
             Write-Log -LogFile $LogFile -Module $functionName -Message "Application authentication detected. Cannot request additional scopes at runtime." -LogLevel "Warning"
             Write-Verbose "[$functionName] Application authentication detected. Cannot request additional scopes at runtime."
             return $result
         }
-        
+
         # For delegated authentication, we can request additional scopes
         Write-Host "`nDelegated authentication is being used." -ForegroundColor Green
         Write-Host "Additional scopes can be requested by re-authenticating." -ForegroundColor Green
         Write-Host "`nThe following delegated permissions are missing:" -ForegroundColor Cyan
-        
+
         foreach ($scope in $MissingScopes)
         {
             Write-Host "  - $($scope.Scope)" -ForegroundColor White
@@ -129,20 +129,20 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Starting additional 
             }
             Write-Host ""
         }
-        
+
         # Ask user if they want to request additional scopes
         Write-Host "Would you like to re-authenticate to request these additional permissions?" -ForegroundColor Yellow
         Write-Host "This will open a browser window for authentication and consent." -ForegroundColor Gray
         Write-Host ""
         $userChoice = Read-Host "Enter 'Yes' to re-authenticate with additional scopes, or 'No' to continue with limited functionality"
-        
+
         while ($userChoice -notin @('Yes', 'No', 'Y', 'N'))
         {
             Write-Host "Invalid choice. Please enter 'Yes' or 'No'." -ForegroundColor Red
             [console]::beep(1000, 500)
             $userChoice = Read-Host "Enter 'Yes' to re-authenticate, or 'No' to continue with limited functionality"
         }
-        
+
         if ($userChoice -in @('No', 'N'))
         {
             Write-Host "Continuing with current permissions. Some functionality may be limited." -ForegroundColor Yellow
@@ -151,31 +151,31 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Starting additional 
             Write-Verbose "[$functionName] User chose not to re-authenticate for additional scopes"
             return $result
         }
-        
+
         # User chose to re-authenticate - combine current scopes with missing scopes
         Write-Host "Preparing to re-authenticate with additional scopes..." -ForegroundColor Green
-        
+
         # Build the new scope list
         $newScopes = @()
         $newScopes += $CurrentScopes | Where-Object { $_ -and $_.Trim() }
         $newScopes += $MissingScopes | ForEach-Object { $_.Scope } | Where-Object { $_ -and $_.Trim() }
-        
+
         # Remove duplicates and ensure we have the basic scopes
         $finalScopes = @('offline_access', 'openid') + ($newScopes | Sort-Object -Unique)
         $finalScopesString = $finalScopes -join ' '
-        
+
         Write-Verbose "[$functionName] New scope list: $finalScopesString"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Re-authenticating with scopes: $finalScopesString" -LogLevel "Information"
         # Create new auth parameters with additional scopes
         $newAuthParams = $AuthParams.Clone()
         $newAuthParams.Scope = $finalScopes
         $newAuthParams.ForceNewToken = $true
-        
+
         Write-Host "Re-authenticating with additional scopes..." -ForegroundColor Cyan
-        
+
         # Request new token with additional scopes
         $newAccessToken = GetGraphAccessToken @newAuthParams
-        
+
         if ($newAccessToken)
         {
             Write-Host "Successfully re-authenticated with additional scopes!" -ForegroundColor Green
@@ -190,7 +190,7 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Starting additional 
             $result.ErrorMessage = "Failed to obtain new access token during re-authentication."
             Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to obtain new access token with additional scopes" -LogLevel "Error"
         }
-        
+
         return $result
     }
     catch

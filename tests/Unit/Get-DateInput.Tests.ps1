@@ -12,8 +12,8 @@ BeforeAll {
     # Mock global variables that the function expects
     $global:logFile = "TestDrive:\test.log"
 
-    # Mock write-log to prevent actual logging
-    Mock write-log {}
+    # Mock Write-Log to prevent actual logging
+    Mock Write-Log {}
 }
 
 Describe "Get-DateInput" -Tags 'Unit', 'Utility' {
@@ -432,12 +432,12 @@ Describe "Get-DateInput" -Tags 'Unit', 'Utility' {
     }
 
     Context "Logging and Verbosity" {
-        It "Should call write-log during execution" {
+        It "Should call Write-Log during execution" {
             Mock Read-Host { return "" }
 
             $result = Get-DateInput
 
-            Should -Invoke write-log -Times 1 -Exactly:$false
+            Should -Invoke Write-Log -Times 1 -Exactly:$false
         }
 
         It "Should log with function name" {
@@ -445,7 +445,7 @@ Describe "Get-DateInput" -Tags 'Unit', 'Utility' {
 
             $result = Get-DateInput
 
-            Should -Invoke write-log -ParameterFilter {
+            Should -Invoke Write-Log -ParameterFilter {
                 $module -eq "Get-DateInput"
             } -Times 1 -Exactly:$false
         }

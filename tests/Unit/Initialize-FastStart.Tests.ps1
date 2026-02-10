@@ -5,7 +5,7 @@ BeforeAll {
     # Direct dot-sourcing of the function to test
     $script:RepoRoot = (Get-Item $PSScriptRoot).Parent.Parent.FullName
     . "$script:RepoRoot/functions/setupFunctions/Initialize-FastStart.ps1"
-    . "$script:RepoRoot/functions/utilityFunctions/write-log.ps1"
+    . "$script:RepoRoot/functions/utilityFunctions/Write-Log.ps1"
 
     # Setup test environment
     $script:TestContext = Initialize-AutopilotTestEnvironment
