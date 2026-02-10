@@ -28,15 +28,15 @@ function Show-AutopilotEventAnalysis()
 
     .PARAMETER ShowChronologicalFailures
         Display failed devices in chronological order.
-        Uses paging with 10 items per page.
+        Uses paging with 5 items per page.
 
     .PARAMETER ShowInProgress
         Display devices currently in progress and which phase they are in.
-        Uses paging with 10 items per page.
+        Uses paging with 5 items per page.
 
     .PARAMETER ShowLocationAnalysis
         Display location-based analysis from sign-in data showing success/failure rates by location.
-        Uses paging with 10 items per page.
+        Uses paging with 5   items per page.
 
     .PARAMETER MaxChronologicalDisplay
         DEPRECATED: No longer used due to paging implementation.
@@ -180,71 +180,74 @@ function Show-AutopilotEventAnalysis()
             Write-Host "N/A (no failed deployments with duration data)" -ForegroundColor Yellow
         }
 
-        Write-Host "`n8. Failure Breakdown (Mutually Exclusive):" -ForegroundColor Cyan
-        Write-Host "   - Device Phase Only: " -NoNewline
-        Write-Host $AnalysisData.DevicePhaseOnlyFailureCount -NoNewline -ForegroundColor $(if ($AnalysisData.DevicePhaseOnlyFailureCount -gt 0)
-            {
-                "Red"
-            }
-            else
-            {
-                "Green"
-            })
-        Write-Host " (device setup failed, account not started or succeeded)" -ForegroundColor Gray
-
-        Write-Host "   - User/Account Phase Only: " -NoNewline
-        Write-Host $AnalysisData.UserPhaseOnlyFailureCount -NoNewline -ForegroundColor $(if ($AnalysisData.UserPhaseOnlyFailureCount -gt 0)
-            {
-                "Red"
-            }
-            else
-            {
-                "Green"
-            })
-        Write-Host " (device setup succeeded, account setup failed)" -ForegroundColor Gray
-
-        Write-Host "   - Both Phases Failed: " -NoNewline
-        Write-Host $AnalysisData.BothPhasesFailureCount -NoNewline -ForegroundColor $(if ($AnalysisData.BothPhasesFailureCount -gt 0)
-            {
-                "Red"
-            }
-            else
-            {
-                "Green"
-            })
-        Write-Host " (both device and account setup failed)" -ForegroundColor Gray
-
-        if ($AnalysisData.UnknownPhaseFailureCount -gt 0)
+        # Only display failure breakdown when failures exist
+        if ($AnalysisData.FailureCount -gt 0)
         {
-            Write-Host "   - Unknown/Other: " -NoNewline
-            Write-Host $AnalysisData.UnknownPhaseFailureCount -NoNewline -ForegroundColor Yellow
-            Write-Host " (failure stage unclear)" -ForegroundColor Gray
+            Write-Host "`n8. Failure Breakdown (Mutually Exclusive):" -ForegroundColor Cyan
+            Write-Host "   - Device Phase Only: " -NoNewline
+            Write-Host $AnalysisData.DevicePhaseOnlyFailureCount -NoNewline -ForegroundColor $(if ($AnalysisData.DevicePhaseOnlyFailureCount -gt 0)
+                {
+                    "Red"
+                }
+                else
+                {
+                    "Green"
+                })
+            Write-Host " (device setup failed, account not started or succeeded)" -ForegroundColor Gray
+
+            Write-Host "   - User/Account Phase Only: " -NoNewline
+            Write-Host $AnalysisData.UserPhaseOnlyFailureCount -NoNewline -ForegroundColor $(if ($AnalysisData.UserPhaseOnlyFailureCount -gt 0)
+                {
+                    "Red"
+                }
+                else
+                {
+                    "Green"
+                })
+            Write-Host " (device setup succeeded, account setup failed)" -ForegroundColor Gray
+
+            Write-Host "   - Both Phases Failed: " -NoNewline
+            Write-Host $AnalysisData.BothPhasesFailureCount -NoNewline -ForegroundColor $(if ($AnalysisData.BothPhasesFailureCount -gt 0)
+                {
+                    "Red"
+                }
+                else
+                {
+                    "Green"
+                })
+            Write-Host " (both device and account setup failed)" -ForegroundColor Gray
+
+            if ($AnalysisData.UnknownPhaseFailureCount -gt 0)
+            {
+                Write-Host "   - Unknown/Other: " -NoNewline
+                Write-Host $AnalysisData.UnknownPhaseFailureCount -NoNewline -ForegroundColor Yellow
+                Write-Host " (failure stage unclear)" -ForegroundColor Gray
+            }
         }
 
         # Display sign-in match statistics if available
-        if ($AnalysisData.SignInMatchStats -and $AnalysisData.SignInMatchStats.TotalEvents -gt 0)
+        if ($AnalysisData.SignInMatchStats)
         {
             Write-Host "`n9. Sign-In Match Statistics:" -ForegroundColor Cyan
-            Write-Host "   Total Events: " -NoNewline
-            Write-Host "$($AnalysisData.SignInMatchStats.TotalEvents)" -ForegroundColor White
-            Write-Host "   Matched Events: " -NoNewline
-            Write-Host "$($AnalysisData.SignInMatchStats.MatchedEvents)" -ForegroundColor Green
-
-            if ($AnalysisData.SignInMatchStats.HighConfidence -and $AnalysisData.SignInMatchStats.HighConfidence -gt 0)
+            Write-Host "   - Total Events: " -NoNewline
+            Write-Host $AnalysisData.SignInMatchStats.TotalEvents -ForegroundColor Green
+            Write-Host "   - Matched Events: " -NoNewline
+            Write-Host $AnalysisData.SignInMatchStats.MatchedEvents -NoNewline -ForegroundColor Green
+            $matchPercentage = if ($AnalysisData.SignInMatchStats.TotalEvents -gt 0)
             {
-                Write-Host "   High Confidence: " -NoNewline
-                Write-Host "$($AnalysisData.SignInMatchStats.HighConfidence)" -ForegroundColor Green
+                [math]::Round(($AnalysisData.SignInMatchStats.MatchedEvents / $AnalysisData.SignInMatchStats.TotalEvents) * 100, 1)
             }
-            if ($AnalysisData.SignInMatchStats.MediumConfidence -and $AnalysisData.SignInMatchStats.MediumConfidence -gt 0)
+            else
             {
-                Write-Host "   Medium Confidence: " -NoNewline
-                Write-Host "$($AnalysisData.SignInMatchStats.MediumConfidence)" -ForegroundColor Yellow
+                0
             }
-            if ($AnalysisData.SignInMatchStats.LowConfidence -and $AnalysisData.SignInMatchStats.LowConfidence -gt 0)
-            {
-                Write-Host "   Low Confidence: " -NoNewline
-                Write-Host "$($AnalysisData.SignInMatchStats.LowConfidence)" -ForegroundColor Red
-            }
+            Write-Host " ($matchPercentage%)" -ForegroundColor Gray
+            Write-Host "   - High Confidence: " -NoNewline
+            Write-Host $AnalysisData.SignInMatchStats.HighConfidence -ForegroundColor Green
+            Write-Host "   - Medium Confidence: " -NoNewline
+            Write-Host $AnalysisData.SignInMatchStats.MediumConfidence -ForegroundColor Yellow
+            Write-Host "   - Low Confidence: " -NoNewline
+            Write-Host $AnalysisData.SignInMatchStats.LowConfidence -ForegroundColor Yellow
         }
 
         # Pause after summary to allow user to review before showing detailed sections
@@ -257,7 +260,7 @@ function Show-AutopilotEventAnalysis()
     if ($ShowInProgress)
     {
         Write-Log -LogFile $LogFile -Module $functionName -Message "Displaying in-progress devices section ($($AnalysisData.InProgressCount) devices)" -LogLevel "Verbose"
-        Write-Host "`n9. Devices Currently In Progress:" -ForegroundColor Cyan
+        Write-Host "`n10. Devices Currently In Progress:" -ForegroundColor Cyan
         if ($AnalysisData.InProgressCount -gt 0)
         {
             Write-Host "   Total in-progress devices: " -NoNewline
@@ -364,7 +367,7 @@ function Show-AutopilotEventAnalysis()
     if ($ShowLocationAnalysis)
     {
         Write-Log -LogFile $LogFile -Module $functionName -Message "Displaying location analysis section ($($AnalysisData.LocationAnalysis.Count) locations)" -LogLevel "Verbose"
-        Write-Host "`n9b. Sign-In Enrollment Analysis by Location:" -ForegroundColor Cyan
+        Write-Host "`n10b. Sign-In Enrollment Analysis by Location:" -ForegroundColor Cyan
         if ($AnalysisData.LocationAnalysis -and $AnalysisData.LocationAnalysis.Count -gt 0)
         {
             Write-Host "   Found enrollment activity in $($AnalysisData.LocationAnalysis.Count) location(s):" -ForegroundColor Yellow
@@ -525,7 +528,7 @@ function Show-AutopilotEventAnalysis()
     if ($ShowMultipleFailures)
     {
         Write-Log -LogFile $LogFile -Module $functionName -Message "Displaying users with multiple failures section ($($AnalysisData.UsersWithMultipleFailures.Count) users)" -LogLevel "Verbose"
-        Write-Host "`n10. Users with Multiple Enrollment Failures:" -ForegroundColor Cyan
+        Write-Host "`n11. Users with Multiple Enrollment Failures:" -ForegroundColor Cyan
         if ($AnalysisData.UsersWithMultipleFailures.Count -gt 0)
         {
             Write-Host "   Found $($AnalysisData.UsersWithMultipleFailures.Count) user(s) with multiple failures:" -ForegroundColor Yellow
@@ -603,7 +606,7 @@ function Show-AutopilotEventAnalysis()
     if ($ShowSingleFailures)
     {
         Write-Log -LogFile $LogFile -Module $functionName -Message "Displaying single failure with success section ($($AnalysisData.SingleFailureWithSuccess.Count) users)" -LogLevel "Verbose"
-        Write-Host "`n10b. Users with Failed Then Successful Enrollments (Single Failure):" -ForegroundColor Cyan
+        Write-Host "`n11b. Users with Failed Then Successful Enrollments (Single Failure):" -ForegroundColor Cyan
         if ($AnalysisData.SingleFailureWithSuccess.Count -gt 0)
         {
             Write-Host "   Found $($AnalysisData.SingleFailureWithSuccess.Count) user(s) with 1 failure followed by success:" -ForegroundColor Yellow
@@ -680,7 +683,7 @@ function Show-AutopilotEventAnalysis()
     if ($ShowChronologicalFailures)
     {
         Write-Log -LogFile $LogFile -Module $functionName -Message "Displaying chronological failures section ($($AnalysisData.FailedDevicesChronological.Count) devices, max display: $MaxChronologicalDisplay)" -LogLevel "Verbose"
-        Write-Host "`n11. Failed Devices (Chronological Order):" -ForegroundColor Cyan
+        Write-Host "`n12. Failed Devices (Chronological Order):" -ForegroundColor Cyan
         if ($AnalysisData.FailedDevicesChronological.Count -gt 0)
         {
             Write-Host "   Total failed devices: " -NoNewline

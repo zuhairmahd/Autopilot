@@ -151,8 +151,8 @@ function Get-AutopilotEnrollmentReportInput()
     $endDate = $null
     if ([string]::IsNullOrWhiteSpace($endDateInput))
     {
-        Write-Verbose "[$functionName] Using default end date: no filter (all events)"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "User selected default end date (no filter)" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Using default end date: today's date (end-of-day filter)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "User selected default end date (today's date, end-of-day filter)" -LogLevel "Verbose"
         Write-Host "Using default: $((Get-Date).ToString('yyyy-MM-dd'))" -ForegroundColor Yellow
         #if we have a null string, then endDate will be today's date at 11:59:59 PM
         $endDate = ConvertTo-DateFilter -InputString "today" -IsEndDate $true
@@ -193,30 +193,30 @@ function Get-AutopilotEnrollmentReportInput()
         Write-Log -LogFile $LogFile -Module $functionName -Message "No user principal name filter applied" -LogLevel "Verbose"
         Write-Verbose "[$functionName] No user principal name filter"
     }
-    # User Prompt for location data
-    Write-Host "`nLocation data:" -ForegroundColor Cyan
-    Write-Host "`nWould you like to use a location filter for the report?" -ForegroundColor Gray
+    # User prompt for including sign-in location analysis
+    Write-Host "`nLocation analysis:" -ForegroundColor Cyan
+    Write-Host "`nWould you like to include sign-in location analysis in the report?" -ForegroundColor Gray
     Write-Host "Please note this may take a long time with a large dataset." -ForegroundColor Yellow
-    $useLocationFilter = Read-Host "Use location filter? (Y/N) [default: N]"
+    $useLocationFilter = Read-Host "Include location analysis? (Y/N) [default: N]"
     while ($useLocationFilter -notin @("Y", "N", "y", "n", ""))
     {
         Write-Host "Invalid input. Please enter Y or N." -ForegroundColor Red
         try { [console]::Beep(1000, 500) } catch { <# Beep not supported on this platform #> }
-        $useLocationFilter = Read-Host "Use location filter? (Y/N) [default: N]"
+        $useLocationFilter = Read-Host "Include location analysis? (Y/N) [default: N]"
     }
 
     if ($useLocationFilter -in @("Y", "y"))
     {
-        Write-Host "Location filter will be applied." -ForegroundColor Green
-        Write-Log -LogFile $LogFile -Module $functionName -Message "User opted to use location filter" -LogLevel "Information"
-        Write-Verbose "[$functionName] User opted to use location filter"
+        Write-Host "Location analysis will be included." -ForegroundColor Green
+        Write-Log -LogFile $LogFile -Module $functionName -Message "User opted to include location analysis" -LogLevel "Information"
+        Write-Verbose "[$functionName] User opted to include location analysis"
         $useLocationFilter = $true
     }
     else
     {
-        Write-Host "No location filter will be applied." -ForegroundColor Yellow
-        Write-Log -LogFile $LogFile -Module $functionName -Message "User opted not to use location filter" -LogLevel "Information"
-        Write-Verbose "[$functionName] User opted not to use location filter"
+        Write-Host "No location analysis will be included." -ForegroundColor Yellow
+        Write-Log -LogFile $LogFile -Module $functionName -Message "User opted not to include location analysis" -LogLevel "Information"
+        Write-Verbose "[$functionName] User opted not to include location analysis"
         $useLocationFilter = $false
     }
 

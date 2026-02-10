@@ -157,6 +157,12 @@ function Get-AutopilotEventAnalysis()
         Write-Verbose "[$functionName] Found $($candidateSignIns.Count) candidate sign-ins for userId: $($Event.userId)"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Evaluating $($candidateSignIns.Count) candidate sign-ins" -LogLevel "Verbose"
 
+        # Diagnostic: Log availability of device details in candidate sign-ins
+        $signInsWithDeviceDetail = @($candidateSignIns | Where-Object { $_.deviceDetail })
+        $signInsWithDeviceId = @($candidateSignIns | Where-Object { $_.deviceDetail -and $_.deviceDetail.deviceId })
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Candidate sign-ins: $($candidateSignIns.Count) total, $($signInsWithDeviceDetail.Count) with deviceDetail, $($signInsWithDeviceId.Count) with deviceId" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Candidate breakdown: $($signInsWithDeviceDetail.Count)/$($candidateSignIns.Count) have deviceDetail, $($signInsWithDeviceId.Count)/$($candidateSignIns.Count) have deviceId"
+
         # Parse event date
         $eventDate = $null
         try
@@ -182,21 +188,100 @@ function Get-AutopilotEventAnalysis()
             Write-Verbose "[$functionName] Event has no Azure AD Device ID - will use fallback matching (device name, time proximity)"
         }
 
-        # Score each candidate sign-in
+        # Optimization: Use targeted filtering before full iteration
+        # Strategy 1: If we have Azure AD Device ID, try to find exact matches first (definitive match = 100+ points)
         $bestMatch = $null
         $bestScore = 0
-        $candidateIndex = 0
+        $matchedCriteria = @()
+        $candidatesToScore = @()
 
-        foreach ($signIn in $candidateSignIns)
+        if ($eventAzureADDeviceId)
+        {
+            # Pre-filter for Azure AD Device ID matches - these are definitive
+            $deviceIdMatches = @($candidateSignIns | Where-Object {
+                    $_.deviceDetail -and
+                    $_.deviceDetail.deviceId -and
+                    $_.deviceDetail.deviceId -eq $eventAzureADDeviceId
+                })
+
+            if ($deviceIdMatches.Count -gt 0)
+            {
+                Write-Verbose "[$functionName] Found $($deviceIdMatches.Count) sign-in(s) with matching Azure AD Device ID - scoring only these"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Pre-filtered to $($deviceIdMatches.Count) sign-in(s) with Azure AD Device ID match" -LogLevel "Verbose"
+                $candidatesToScore = $deviceIdMatches
+            }
+            else
+            {
+                Write-Verbose "[$functionName] No Azure AD Device ID matches found, will evaluate all candidates"
+                $candidatesToScore = $candidateSignIns
+            }
+        }
+        elseif ($Event.managedDeviceName)
+        {
+            # Strategy 2: If no Device ID but we have device name, pre-filter by name
+            $deviceNameMatches = @($candidateSignIns | Where-Object {
+                    $_.deviceDetail -and
+                    $_.deviceDetail.displayName -and
+                    $_.deviceDetail.displayName -eq $Event.managedDeviceName
+                })
+
+            if ($deviceNameMatches.Count -gt 0)
+            {
+                Write-Verbose "[$functionName] Found $($deviceNameMatches.Count) sign-in(s) with matching device name - scoring only these"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Pre-filtered to $($deviceNameMatches.Count) sign-in(s) with device name match" -LogLevel "Verbose"
+                $candidatesToScore = $deviceNameMatches
+            }
+            else
+            {
+                Write-Verbose "[$functionName] No device name matches found, will evaluate all candidates"
+                $candidatesToScore = $candidateSignIns
+            }
+        }
+        else
+        {
+            # No device identifiers - must score all candidates based on time/app
+            Write-Verbose "[$functionName] No device identifiers available, evaluating all $($candidateSignIns.Count) candidates"
+            $candidatesToScore = $candidateSignIns
+        }
+
+        # Score the filtered/all candidates
+        $candidateIndex = 0
+        $scoreThresholdForEarlyExit = 125 # DeviceId(100) + UserId(25) = definitive match
+
+        foreach ($signIn in $candidatesToScore)
         {
             $candidateIndex++
             $score = 0
-            $matchedCriteria = @()
-            Write-Verbose "[$functionName] Evaluating candidate $candidateIndex/$($candidateSignIns.Count) - SignIn date: $($signIn.createdDateTime)"
+            $currentMatchedCriteria = @()
+
+            # Diagnostic: Log device detail structure for this candidate
+            $signInDeviceId = if ($signIn.deviceDetail -and $signIn.deviceDetail.deviceId)
+            {
+                $signIn.deviceDetail.deviceId
+            }
+            else
+            {
+                "None"
+            }
+            $signInDeviceName = if ($signIn.deviceDetail -and $signIn.deviceDetail.displayName)
+            {
+                $signIn.deviceDetail.displayName
+            }
+            else
+            {
+                "None"
+            }
+            Write-Verbose "[$functionName] Evaluating candidate $candidateIndex/$($candidatesToScore.Count) - SignIn date: $($signIn.createdDateTime), DeviceId: $signInDeviceId, DeviceName: $signInDeviceName"
+
+            # Additional diagnostic for first candidate
+            if ($candidateIndex -eq 1)
+            {
+                Write-Log -LogFile $LogFile -Module $functionName -Message "First candidate structure: deviceDetail exists=$($null -ne $signIn.deviceDetail), deviceId=$signInDeviceId, displayName=$signInDeviceName" -LogLevel "Verbose"
+            }
 
             # 1. UserId match (minimum - already confirmed)
             $score += 25
-            $matchedCriteria += "UserId"
+            $currentMatchedCriteria += "UserId"
 
             # 2. Azure AD Device ID match (HIGHEST CONFIDENCE - definitive match)
             # This is the most reliable correlation between Autopilot events and sign-in logs
@@ -208,9 +293,26 @@ function Get-AutopilotEventAnalysis()
                 $eventAzureADDeviceId -eq $signIn.deviceDetail.deviceId)
             {
                 $score += 100
-                $matchedCriteria += "AzureADDeviceId"
+                $currentMatchedCriteria += "AzureADDeviceId"
                 Write-Verbose "[$functionName] DEFINITIVE MATCH: Azure AD Device ID match! Event azureADDeviceId: $eventAzureADDeviceId = SignIn deviceId: $($signIn.deviceDetail.deviceId)"
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Azure AD Device ID match (definitive): $eventAzureADDeviceId" -LogLevel "Verbose"
+            }
+            elseif ($eventAzureADDeviceId -and $candidateIndex -eq 1)
+            {
+                # Diagnostic: Log why device ID didn't match for first candidate
+                $reason = if (-not $signIn.deviceDetail)
+                {
+                    "signIn.deviceDetail is null"
+                }
+                elseif (-not $signIn.deviceDetail.deviceId)
+                {
+                    "signIn.deviceDetail.deviceId is null"
+                }
+                else
+                {
+                    "Device IDs don't match: Event='$eventAzureADDeviceId' vs SignIn='$($signIn.deviceDetail.deviceId)'"
+                }
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Device ID match failed for first candidate: $reason" -LogLevel "Verbose"
             }
 
             # 3. Device Name match (fallback if Azure AD Device ID not available)
@@ -220,7 +322,7 @@ function Get-AutopilotEventAnalysis()
                 $Event.managedDeviceName -eq $signIn.deviceDetail.displayName)
             {
                 $score += 35
-                $matchedCriteria += "DeviceName"
+                $currentMatchedCriteria += "DeviceName"
                 Write-Verbose "[$functionName] Device name match: '$($Event.managedDeviceName)'"
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Device name match: $($Event.managedDeviceName)" -LogLevel "Verbose"
             }
@@ -235,19 +337,19 @@ function Get-AutopilotEventAnalysis()
                 if ($timeDiff -le 60)
                 {
                     $score += 30
-                    $matchedCriteria += "Time_Within1Hour"
+                    $currentMatchedCriteria += "Time_Within1Hour"
                     Write-Verbose "[$functionName] Time match: Within 1 hour"
                 }
                 elseif ($timeDiff -le 120)
                 {
                     $score += 20
-                    $matchedCriteria += "Time_Within2Hours"
+                    $currentMatchedCriteria += "Time_Within2Hours"
                     Write-Verbose "[$functionName] Time match: Within 2 hours"
                 }
                 elseif ($timeDiff -le 360)
                 {
                     $score += 10
-                    $matchedCriteria += "Time_Within6Hours"
+                    $currentMatchedCriteria += "Time_Within6Hours"
                     Write-Verbose "[$functionName] Time match: Within 6 hours"
                 }
                 else
@@ -271,23 +373,35 @@ function Get-AutopilotEventAnalysis()
                 if ($intuneAppIds -contains $signIn.appId)
                 {
                     $score += 10
-                    $matchedCriteria += "IntuneApp"
+                    $currentMatchedCriteria += "IntuneApp"
                     Write-Verbose "[$functionName] Intune app match found: $($signIn.appId)"
                 }
             }
 
-            Write-Verbose "[$functionName] Candidate $candidateIndex final score: $score (Criteria: $($matchedCriteria -join ', '))"
+            Write-Verbose "[$functionName] Candidate $candidateIndex final score: $score (Criteria: $($currentMatchedCriteria -join ', '))"
 
             # Track best match
             if ($score -gt $bestScore)
             {
                 $bestScore = $score
                 $bestMatch = $signIn
-                $matchResult.MatchedOn = $matchedCriteria
+                $matchedCriteria = $currentMatchedCriteria
                 Write-Verbose "[$functionName] New best match with score: $bestScore"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "New best match found with score $bestScore (Criteria: $($matchedCriteria -join ', '))" -LogLevel "Verbose"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "New best match found with score $bestScore (Criteria: $($currentMatchedCriteria -join ', '))" -LogLevel "Verbose"
+
+                # Early exit optimization: If we have a definitive match (Device ID + UserId = 125+),
+                # we're extremely unlikely to find a better match, so stop searching
+                if ($bestScore -ge $scoreThresholdForEarlyExit)
+                {
+                    Write-Verbose "[$functionName] Definitive match found (score: $bestScore >= $scoreThresholdForEarlyExit), stopping search early"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Early exit: Definitive match found with score $bestScore" -LogLevel "Verbose"
+                    break
+                }
             }
         }
+
+        # Update match result with matched criteria
+        $matchResult.MatchedOn = $matchedCriteria
 
         # If we found a match (score > 25 means more than just userId)
         if ($bestMatch)
@@ -357,6 +471,9 @@ function Get-AutopilotEventAnalysis()
         try
         {
             $apiResponse = CallGraphAPI -ResourcePath $autopilotEventsURI -accessToken $AccessToken -consistencyLevel -extraParameters $autopilotExtraparameters
+            $global:e = $apiResponse
+            Write-Verbose "[$functionName] API response received. Response properties: $($apiResponse | Out-String)"
+            write-log -logFile $LogFile -Module $functionName -Message "API response received for autopilot events: $($apiResponse | Out-String)"
             $Events = $apiResponse.value
 
             if ($null -eq $Events)
@@ -429,90 +546,6 @@ function Get-AutopilotEventAnalysis()
             Write-Error $errorMsg
             return $null
         }
-
-        # Enrich autopilot events with Azure AD Device ID from managed devices
-        # This enables accurate correlation with sign-in logs which use Azure AD Device ID
-        $deviceIdToAzureADDeviceIdCache = @{}
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Enriching autopilot events with Azure AD Device IDs" -LogLevel "Information"
-        Write-Verbose "[$functionName] Fetching Azure AD Device IDs for $($Events.Count) autopilot events"
-
-        # Extract unique device IDs (Intune Managed Device IDs) from autopilot events
-        $uniqueDeviceIds = @($Events | Where-Object { $_.deviceId } | Select-Object -ExpandProperty deviceId -Unique)
-        Write-Verbose "[$functionName] Found $($uniqueDeviceIds.Count) unique device IDs requiring Azure AD Device ID lookup"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Found $($uniqueDeviceIds.Count) unique device IDs for Azure AD Device ID resolution" -LogLevel "Information"
-
-        # Create deviceId to azureADDeviceId lookup cache
-        if ($uniqueDeviceIds.Count -gt 0)
-        {
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Fetching Azure AD Device IDs using batch processing for $($uniqueDeviceIds.Count) devices" -LogLevel "Information"
-            Write-Verbose "[$functionName] Using batch processing to fetch $($uniqueDeviceIds.Count) Azure AD Device IDs"
-
-            # Build resource paths for batch request
-            $deviceResourcePaths = @($uniqueDeviceIds | ForEach-Object { "deviceManagement/managedDevices/$_?`$select=id,azureADDeviceId,deviceName" })
-
-            try
-            {
-                # CallGraphAPI supports batch processing when ResourcePath is an array
-                $batchResponse = CallGraphAPI -ResourcePath $deviceResourcePaths -accessToken $accessToken
-
-                if ($batchResponse -and $batchResponse.Count -gt 0)
-                {
-                    foreach ($response in $batchResponse)
-                    {
-                        if ($response.id -and $response.azureADDeviceId)
-                        {
-                            $deviceIdToAzureADDeviceIdCache[$response.id] = $response.azureADDeviceId
-                            Write-Verbose "[$functionName] Cached Azure AD Device ID for device: $($response.deviceName) - Intune ID: $($response.id) -> Azure AD ID: $($response.azureADDeviceId)"
-                        }
-                        elseif ($response.id)
-                        {
-                            Write-Verbose "[$functionName] No Azure AD Device ID found for device: $($response.id)"
-                            Write-Log -LogFile $LogFile -Module $functionName -Message "Device $($response.id) has no Azure AD Device ID (may not be Azure AD joined)" -LogLevel "Verbose"
-                        }
-                    }
-                }
-            }
-            catch
-            {
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Batch request for Azure AD Device IDs failed: $_" -LogLevel "Warning"
-                Write-Verbose "[$functionName] Batch request failed, attempting individual lookups"
-
-                # Fallback to individual requests
-                foreach ($deviceId in $uniqueDeviceIds)
-                {
-                    try
-                    {
-                        $deviceResponse = CallGraphAPI -ResourcePath "deviceManagement/managedDevices/$deviceId" -accessToken $accessToken -extraParameters "select=id,azureADDeviceId,deviceName"
-                        if ($deviceResponse.azureADDeviceId)
-                        {
-                            $deviceIdToAzureADDeviceIdCache[$deviceId] = $deviceResponse.azureADDeviceId
-                            Write-Verbose "[$functionName] Retrieved Azure AD Device ID for device: $deviceId -> $($deviceResponse.azureADDeviceId)"
-                        }
-                    }
-                    catch
-                    {
-                        Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to retrieve Azure AD Device ID for device ${deviceId}: $_" -LogLevel "Verbose"
-                    }
-                }
-            }
-
-            Write-Verbose "[$functionName] Resolved $($deviceIdToAzureADDeviceIdCache.Keys.Count) Azure AD Device IDs from $($uniqueDeviceIds.Count) devices"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Azure AD Device ID resolution complete: $($deviceIdToAzureADDeviceIdCache.Keys.Count) devices resolved" -LogLevel "Information"
-        } # End if ($uniqueDeviceIds.Count -gt 0)
-
-        # Enrich events with Azure AD Device IDs
-        $devicesEnrichedCount = 0
-        foreach ($autopilotEvent in $Events)
-        {
-            if ($autopilotEvent.deviceId -and $deviceIdToAzureADDeviceIdCache.ContainsKey($autopilotEvent.deviceId))
-            {
-                $autopilotEvent | Add-Member -NotePropertyName "azureADDeviceId" -NotePropertyValue $deviceIdToAzureADDeviceIdCache[$autopilotEvent.deviceId] -Force
-                $devicesEnrichedCount++
-            }
-        }
-
-        Write-Verbose "[$functionName] Enriched $devicesEnrichedCount events with Azure AD Device IDs"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Enriched $devicesEnrichedCount events with Azure AD Device IDs" -LogLevel "Information"
 
         # Filter out events with invalid dates to prevent downstream errors
         $validEvents = @($Events | Where-Object {
@@ -611,7 +644,9 @@ function Get-AutopilotEventAnalysis()
             try
             {
                 $userObject = CallGraphAPI -ResourcePath "$userURI/$UserPrincipalName" -accessToken $accessToken
-
+                $global:u = $userObject
+                Write-Verbose "[$functionName] API response for user lookup. Response properties: $($userObject | Out-String)"
+                write-log -logFile $LogFile -Module $functionName -Message "API response received for user lookup: $($userObject | Out-String)"
                 if ($null -eq $userObject -or $null -eq $userObject.id)
                 {
                     Write-Log -logFile $LogFile -Module $functionName -Message "User not found or invalid response for: $UserPrincipalName" -LogLevel "Warning"
@@ -624,8 +659,8 @@ function Get-AutopilotEventAnalysis()
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Filtering events by UserPrincipalName: $UserPrincipalName" -LogLevel "Information"
                     # Force array result to avoid single-object issues with .Count property
                     $filteredEvents = @($filteredEvents | Where-Object {
-                        $_.userPrincipalName -eq $UserPrincipalName
-                    })
+                            $_.userPrincipalName -eq $UserPrincipalName
+                        })
                     Write-Verbose "[$functionName] Filtered to $($filteredEvents.Count) events from $beforeUserFilter for user $UserPrincipalName ($($userObject.displayName))"
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Filtered to $($filteredEvents.Count) events from $beforeUserFilter for user $UserPrincipalName" -LogLevel "Information"
 
@@ -642,6 +677,110 @@ function Get-AutopilotEventAnalysis()
                 Write-Warning "[$functionName] Failed to retrieve user: $UserPrincipalName. Continuing with all events."
             }
         }
+
+        # Enrich autopilot events with Azure AD Device ID from managed devices
+        # This enables accurate correlation with sign-in logs which use Azure AD Device ID
+        # NOTE: This is done AFTER date filtering to minimize unnecessary API calls
+        $deviceIdToAzureADDeviceIdCache = @{}
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Enriching filtered autopilot events with Azure AD Device IDs" -LogLevel "Information"
+        Write-Verbose "[$functionName] Fetching Azure AD Device IDs for $($filteredEvents.Count) filtered autopilot events"
+
+        # Extract unique device IDs (Intune Managed Device IDs) from FILTERED autopilot events
+        $uniqueDeviceIds = @($filteredEvents | Where-Object { $_.deviceId } | Select-Object -ExpandProperty deviceId -Unique)
+        Write-Verbose "[$functionName] Found $($uniqueDeviceIds.Count) unique device IDs requiring Azure AD Device ID lookup"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Found $($uniqueDeviceIds.Count) unique device IDs for Azure AD Device ID resolution" -LogLevel "Information"
+
+        # Create deviceId to azureADDeviceId lookup cache
+        if ($uniqueDeviceIds.Count -gt 0)
+        {
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Fetching Azure AD Device IDs using batch processing for $($uniqueDeviceIds.Count) devices" -LogLevel "Information"
+            Write-Verbose "[$functionName] Using batch processing to fetch $($uniqueDeviceIds.Count) Azure AD Device IDs"
+
+            # Build resource paths for batch request (CallGraphAPI will prefix with /)
+            # Format: path?$param=value (no leading slash, include query params in path for batch-specific filtering)
+            $deviceResourcePaths = @($uniqueDeviceIds | ForEach-Object { "deviceManagement/managedDevices/$($_)?`$select=id,azureADDeviceId,deviceName" })
+
+            try
+            {
+                # CallGraphAPI supports batch processing when ResourcePath is an array
+                $batchResponse = CallGraphAPI -ResourcePath $deviceResourcePaths -accessToken $accessToken
+                $global:d = $batchResponse
+                Write-Verbose "[$functionName] Batch API call completed for Azure AD Device ID resolution. Response properties: $($batchResponse | Out-String)"
+                write-log -logFile $LogFile -Module $functionName -Message "Batch API response received for Azure AD Device ID resolution: $($batchResponse | Out-String)" -LogLevel "Verbose"
+                # Batch responses return a hashtable with .value array containing the actual results
+                if ($batchResponse -and $batchResponse.value -and $batchResponse.value.Count -gt 0)
+                {
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Processing $($batchResponse.value.Count) device batch responses" -LogLevel "Verbose"
+                    Write-Verbose "[$functionName] Processing $($batchResponse.value.Count) device batch responses"
+
+                    # Process each batch response item
+                    foreach ($batchItem in $batchResponse.value)
+                    {
+                        # Check if the batch item was successful (status 200) and has a body
+                        if ($batchItem.status -eq 200 -and $batchItem.body)
+                        {
+                            $device = $batchItem.body
+                            if ($device.id -and $device.azureADDeviceId)
+                            {
+                                $deviceIdToAzureADDeviceIdCache[$device.id] = $device.azureADDeviceId
+                                Write-Verbose "[$functionName] Cached Azure AD Device ID for device: $($device.deviceName) - Intune ID: $($device.id) -> Azure AD ID: $($device.azureADDeviceId)"
+                            }
+                            elseif ($device.id)
+                            {
+                                Write-Verbose "[$functionName] No Azure AD Device ID found for device: $($device.id)"
+                                Write-Log -LogFile $LogFile -Module $functionName -Message "Device $($device.id) has no Azure AD Device ID (may not be Azure AD joined)" -LogLevel "Verbose"
+                            }
+                        }
+                        else
+                        {
+                            Write-Log -LogFile $LogFile -Module $functionName -Message "Batch item failed with status: $($batchItem.status)" -LogLevel "Warning"
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Batch request for Azure AD Device IDs failed: $_" -LogLevel "Warning"
+                Write-Verbose "[$functionName] Batch request failed, attempting individual lookups"
+
+                # Fallback to individual requests
+                foreach ($deviceId in $uniqueDeviceIds)
+                {
+                    try
+                    {
+                        $deviceResponse = CallGraphAPI -ResourcePath "deviceManagement/managedDevices/$deviceId" -accessToken $accessToken -extraParameters "select=id,azureADDeviceId,deviceName"
+                        write-log -logFile $LogFile -Module $functionName -Message "Individual API response received for device ${$deviceId}: $($deviceResponse | Out-String)" -LogLevel "Verbose"
+                        Write-Verbose "[$functionName] Individual API response received for device $deviceId. Response properties: $($deviceResponse | Out-String)"
+                        if ($deviceResponse.azureADDeviceId)
+                        {
+                            $deviceIdToAzureADDeviceIdCache[$deviceId] = $deviceResponse.azureADDeviceId
+                            Write-Verbose "[$functionName] Retrieved Azure AD Device ID for device: $deviceId -> $($deviceResponse.azureADDeviceId)"
+                        }
+                    }
+                    catch
+                    {
+                        Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to retrieve Azure AD Device ID for device ${deviceId}: $_" -LogLevel "Verbose"
+                    }
+                }
+            }
+
+            Write-Verbose "[$functionName] Resolved $($deviceIdToAzureADDeviceIdCache.Keys.Count) Azure AD Device IDs from $($uniqueDeviceIds.Count) devices"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Azure AD Device ID resolution complete: $($deviceIdToAzureADDeviceIdCache.Keys.Count) devices resolved" -LogLevel "Information"
+        } # End if ($uniqueDeviceIds.Count -gt 0)
+        $global:dc = $deviceIdToAzureADDeviceIdCache
+        # Enrich events with Azure AD Device IDs
+        $devicesEnrichedCount = 0
+        foreach ($autopilotEvent in $Events)
+        {
+            if ($autopilotEvent.deviceId -and $deviceIdToAzureADDeviceIdCache.ContainsKey($autopilotEvent.deviceId))
+            {
+                $autopilotEvent | Add-Member -NotePropertyName "azureADDeviceId" -NotePropertyValue $deviceIdToAzureADDeviceIdCache[$autopilotEvent.deviceId] -Force
+                $devicesEnrichedCount++
+            }
+        }
+
+        Write-Verbose "[$functionName] Enriched $devicesEnrichedCount events with Azure AD Device IDs"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Enriched $devicesEnrichedCount events with Azure AD Device IDs" -LogLevel "Information"
 
         # Initialize sign-in matching variables
         $matchStats = @{
@@ -685,7 +824,8 @@ function Get-AutopilotEventAnalysis()
                     # CallGraphAPI supports batch processing when ResourcePath is an array
                     $batchResponse = CallGraphAPI -ResourcePath $userResourcePaths -accessToken $accessToken
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Batch API call completed with successCount: $($batchResponse.successCount), failureCount: $($batchResponse.failureCount)" -LogLevel "Information"
-
+                    write-log -logFile $LogFile -Module $functionName -Message "Batch API response for user ID resolution: $($batchResponse | Out-String)"
+                    Write-Verbose "[$functionName] Batch API response received for user ID resolution. Response properties: $($batchResponse | Out-String)"
                     # Check for batch response in 'value' property (standard Graph API batch format)
                     if ($batchResponse -and $batchResponse.value)
                     {
@@ -759,7 +899,8 @@ function Get-AutopilotEventAnalysis()
                         try
                         {
                             $userObject = CallGraphAPI -ResourcePath "$userURI/$upn" -accessToken $accessToken
-
+                            Write-Verbose "[$functionName] API response for user lookup. Response properties: $($userObject | Out-String)"
+                            write-log -logFile $LogFile -Module $functionName -Message "API response received for user lookup of ${$upn}: $($userObject | Out-String)"
                             if ($userObject -and $userObject.id)
                             {
                                 $upnToUserIdCache[$upn] = $userObject.id
@@ -818,6 +959,25 @@ function Get-AutopilotEventAnalysis()
 
                 # Calculate the actual date range for each user based on their autopilot events
                 # This avoids fetching sign-in logs for the entire period when a user only has events in a subset of that period
+
+                # Determine overall boundaries for date buffer calculation
+                $overallStartBoundary = if ($StartDate)
+                {
+                    $StartDate
+                }
+                else
+                {
+                    $null
+                }
+                $overallEndBoundary = if ($EndDate)
+                {
+                    $EndDate
+                }
+                else
+                {
+                    $null
+                }
+
                 $userDateRanges = @{}
                 foreach ($userId in $uniqueUserIds)
                 {
@@ -843,13 +1003,31 @@ function Get-AutopilotEventAnalysis()
 
                         if ($eventDates.Count -gt 0)
                         {
-                            # Calculate date range with a 1-day buffer on each side for sign-in activity correlation
-                            $minDate = ($eventDates | Measure-Object -Minimum).Minimum.AddDays(-1)
-                            $maxDate = ($eventDates | Measure-Object -Maximum).Maximum.AddDays(1)
+                            # Calculate base date range from events
+                            $eventMinDate = ($eventDates | Measure-Object -Minimum).Minimum
+                            $eventMaxDate = ($eventDates | Measure-Object -Maximum).Maximum
+
+                            # Add 1-day buffer on each side for sign-in activity correlation
+                            # but constrain to overall date range if specified
+                            $minDate = $eventMinDate.AddDays(-1)
+                            $maxDate = $eventMaxDate.AddDays(1)
+
+                            # Constrain to overall boundaries if they exist
+                            if ($overallStartBoundary -and $minDate -lt $overallStartBoundary)
+                            {
+                                $minDate = $overallStartBoundary
+                                Write-Verbose "[$functionName] User $userId min date constrained to overall start boundary: $($minDate.ToString('yyyy-MM-dd'))"
+                            }
+                            if ($overallEndBoundary -and $maxDate -gt $overallEndBoundary)
+                            {
+                                $maxDate = $overallEndBoundary
+                                Write-Verbose "[$functionName] User $userId max date constrained to overall end boundary: $($maxDate.ToString('yyyy-MM-dd'))"
+                            }
 
                             $userDateRanges[$userId] = @{
-                                StartDate  = ([DateTimeOffset]$minDate.ToUniversalTime()).ToString("o")
-                                EndDate    = ([DateTimeOffset]$maxDate.ToUniversalTime()).ToString("o")
+                                # Use custom format with Z suffix for UTC (avoids + character which needs URL encoding)
+                                StartDate  = $minDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffffffZ")
+                                EndDate    = $maxDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffffffZ")
                                 EventCount = $userEvents.Count
                                 DateSpan   = ($maxDate - $minDate).Days
                             }
@@ -897,8 +1075,14 @@ function Get-AutopilotEventAnalysis()
                     }
 
                     # Construct the filter for this specific user with their specific date range
+                    # Build filter with proper OData syntax: strings in quotes, datetimes bare ISO 8601
                     $filterPart = "userId eq '$userId' and createdDateTime ge $userStartDate and createdDateTime le $userEndDate"
-                    $fullPath = "$signInActivityURI`?`$filter=$filterPart&`$orderby=createdDateTime desc&`$top=50"
+
+                    # Build the full path for batch request (CallGraphAPI will prefix with /)
+                    # Format: basePath?$param=value&$param2=value2
+                    # Use explicit string operations to ensure proper variable expansion
+                    $fullPath = $signInActivityURI + "?`$filter=" + $filterPart + "&`$orderby=createdDateTime desc&`$top=50"
+                    Write-Verbose "[$functionName] Built sign-in path for user $userId`: $fullPath"
                     $signInResourcePaths += $fullPath
                 }
 
@@ -930,8 +1114,11 @@ function Get-AutopilotEventAnalysis()
                 try
                 {
                     # Use batch processing for sign-in requests
-                    $batchResponse = CallGraphAPI -ResourcePath $signInResourcePaths -accessToken $accessToken
-
+                    # Sign-in logs require ConsistencyLevel header for advanced queries
+                    $batchResponse = CallGraphAPI -ResourcePath $signInResourcePaths -accessToken $accessToken -consistencyLevel
+                    $global:s = $batchResponse
+                    Write-Verbose "[$functionName] Batch API call for sign-in data completed. Response properties: $($batchResponse |Out-String)"
+                    write-log -logFile $LogFile -Module $functionName -Message "Batch API response received for sign-in data retrieval: $($batchResponse | Out-String)" -LogLevel "Verbose"
                     if ($null -eq $batchResponse)
                     {
                         Write-Log -LogFile $LogFile -Module $functionName -Message "Sign-in batch API call returned null response" -LogLevel "Warning"
@@ -980,6 +1167,30 @@ function Get-AutopilotEventAnalysis()
                                     $signInCache[$userId] = $userSignIns
                                     $totalSignInsRetrieved += $userSignIns.Count
                                     Write-Log -LogFile $LogFile -Module $functionName -Message "Retrieved $($userSignIns.Count) sign-ins for userId: $userId" -LogLevel "Verbose"
+
+                                    # Diagnostic: Log structure of first sign-in to verify device details are accessible
+                                    if ($userSignIns.Count -gt 0)
+                                    {
+                                        $firstSignIn = $userSignIns[0]
+                                        $hasDeviceDetail = $null -ne $firstSignIn.deviceDetail
+                                        $deviceId = if ($hasDeviceDetail)
+                                        {
+                                            $firstSignIn.deviceDetail.deviceId
+                                        }
+                                        else
+                                        {
+                                            "N/A"
+                                        }
+                                        $deviceName = if ($hasDeviceDetail)
+                                        {
+                                            $firstSignIn.deviceDetail.displayName
+                                        }
+                                        else
+                                        {
+                                            "N/A"
+                                        }
+                                        Write-Log -LogFile $LogFile -Module $functionName -Message "Sign-in object structure check - HasDeviceDetail: $hasDeviceDetail, DeviceId: $deviceId, DeviceName: $deviceName" -LogLevel "Verbose"
+                                    }
                                 }
                                 else
                                 {
@@ -1038,6 +1249,8 @@ function Get-AutopilotEventAnalysis()
                         try
                         {
                             $signInResponse = CallGraphAPI -ResourcePath $signInActivityURI -AccessToken $accessToken -ExtraParameters $userSignInFilter
+                            Write-Verbose "[$functionName] API response for sign-in data retrieval for userId $userId. Response properties: $($signInResponse | Out-String)"
+                            write-log -logFile $LogFile -Module $functionName -Message "API response received for sign-in data retrieval for userId ${$userId}: $($signInResponse | Out-String)" -LogLevel "Verbose"
                             $userSignIns = if ($signInResponse.value)
                             {
                                 $signInResponse.value
@@ -1052,6 +1265,30 @@ function Get-AutopilotEventAnalysis()
                                 $signInCache[$userId] = @($userSignIns)
                                 $totalSignInsRetrieved += $userSignIns.Count
                                 Write-Log -LogFile $LogFile -Module $functionName -Message "Retrieved $($userSignIns.Count) sign-ins for userId: $userId" -LogLevel "Verbose"
+
+                                # Diagnostic: Log structure of first sign-in to verify device details are accessible (fallback path)
+                                if ($userSignIns.Count -gt 0)
+                                {
+                                    $firstSignIn = $userSignIns[0]
+                                    $hasDeviceDetail = $null -ne $firstSignIn.deviceDetail
+                                    $deviceId = if ($hasDeviceDetail)
+                                    {
+                                        $firstSignIn.deviceDetail.deviceId
+                                    }
+                                    else
+                                    {
+                                        "N/A"
+                                    }
+                                    $deviceName = if ($hasDeviceDetail)
+                                    {
+                                        $firstSignIn.deviceDetail.displayName
+                                    }
+                                    else
+                                    {
+                                        "N/A"
+                                    }
+                                    Write-Log -LogFile $LogFile -Module $functionName -Message "Sign-in object structure check (fallback) - HasDeviceDetail: $hasDeviceDetail, DeviceId: $deviceId, DeviceName: $deviceName" -LogLevel "Verbose"
+                                }
                             }
                             else
                             {
@@ -1146,6 +1383,89 @@ function Get-AutopilotEventAnalysis()
 
             Write-Log -LogFile $LogFile -Module $functionName -Message "Event enrichment complete: $($matchStats.MatchedEvents)/$($matchStats.TotalEvents) events matched with sign-in data" -LogLevel "Information"
             Write-Log -LogFile $LogFile -Module $functionName -Message "Match confidence: High=$($matchStats.HighConfidence), Medium=$($matchStats.MediumConfidence), Low=$($matchStats.LowConfidence)" -LogLevel "Verbose"
+
+            # Post-process: Filter out low-confidence matches when user has higher-confidence matches
+            # This prevents confusion from showing VPN/other device sign-ins when we have definitive device ID matches
+            Write-Verbose "[$functionName] Applying confidence-based filtering per user"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Starting confidence-based filtering to suppress low-confidence matches" -LogLevel "Information"
+
+            # Group events by userId to analyze confidence scores per user
+            $userGroups = @{}
+            foreach ($event in $enrichedEvents)
+            {
+                $userId = $event.userId
+                if ($userId)
+                {
+                    if (-not $userGroups.ContainsKey($userId))
+                    {
+                        $userGroups[$userId] = @{
+                            Events   = @()
+                            MaxScore = 0
+                        }
+                    }
+                    $userGroups[$userId].Events += $event
+                    if ($event.SignIn_MatchFound -and $event.SignIn_ConfidenceScore -gt $userGroups[$userId].MaxScore)
+                    {
+                        $userGroups[$userId].MaxScore = $event.SignIn_ConfidenceScore
+                    }
+                }
+            }
+
+            # For each user, if they have any high-confidence matches (score >= 60), suppress low-confidence matches (score < 60)
+            $suppressedCount = 0
+            foreach ($userId in $userGroups.Keys)
+            {
+                $userInfo = $userGroups[$userId]
+                $maxScore = $userInfo.MaxScore
+
+                # Only apply filtering if user has at least one medium/high confidence match
+                if ($maxScore -ge 60)
+                {
+                    Write-Verbose "[$functionName] User $userId has max confidence score of $maxScore - suppressing low-confidence matches"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "User ${$userId}: Max confidence score $maxScore - applying low-confidence filter (threshold: 60)" -LogLevel "Verbose"
+
+                    foreach ($event in $userInfo.Events)
+                    {
+                        if ($event.SignIn_MatchFound -and $event.SignIn_ConfidenceScore -lt 60)
+                        {
+                            # Suppress this low-confidence match by clearing the sign-in data
+                            $event.SignIn_MatchFound = $false
+                            $event.SignIn_ConfidenceScore = 0
+                            $event.SignIn_MatchedOn = ""
+                            $event.SignIn_Location_City = $null
+                            $event.SignIn_Location_State = $null
+                            $event.SignIn_Location_Country = $null
+                            $event.SignIn_IPAddress = $null
+                            $event.SignIn_Status = $null
+                            $event.SignIn_FailureReason = $null
+                            $event.SignIn_ErrorCode = $null
+                            $event.SignIn_AppDisplayName = $null
+                            $event.SignIn_DeviceDisplayName = $null
+                            $event.SignIn_IsCompliant = $null
+                            $event.SignIn_IsManaged = $null
+                            $suppressedCount++
+                            Write-Verbose "[$functionName] Suppressed low-confidence match (score: $($event.SignIn_ConfidenceScore)) for event ID: $($event.id)"
+                            Write-Log -LogFile $LogFile -Module $functionName -Message "Suppressed low-confidence match for event ID $($event.id) (score was below threshold)" -LogLevel "Verbose"
+                        }
+                    }
+                }
+                else
+                {
+                    Write-Verbose "[$functionName] User $userId has max confidence score of $maxScore - keeping all matches (low confidence is best available)"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "User ${$userId}: Max confidence score $maxScore - keeping all matches (no high-confidence alternatives)" -LogLevel "Verbose"
+                }
+            }
+
+            if ($suppressedCount -gt 0)
+            {
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Confidence-based filtering complete: Suppressed $suppressedCount low-confidence matches" -LogLevel "Information"
+                Write-Verbose "[$functionName] Suppressed $suppressedCount low-confidence sign-in matches where higher-confidence matches were available"
+            }
+            else
+            {
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Confidence-based filtering complete: No low-confidence matches suppressed" -LogLevel "Information"
+                Write-Verbose "[$functionName] No low-confidence matches suppressed"
+            }
 
             # Update filtered events to enriched events
             $filteredEvents = $enrichedEvents
@@ -1561,6 +1881,7 @@ function Get-AutopilotEventAnalysis()
 
         Write-Verbose "[$functionName] Analysis complete"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Autopilot event analysis completed successfully" -LogLevel "Information"
+        $global:r = $result
         return $result
     }
     catch

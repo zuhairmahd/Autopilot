@@ -94,7 +94,7 @@
             Reason    = 'Required to read sign-in activity logs for user authentication analysis in device reports.'
         },
         @{
-            Scope     = 'Directory.Read.All'
+            Scope     = 'AuditLog.Read.All'
             Endpoints = @(
                 'auditLogs/signIns',
                 'auditLogs/signIns/id'
