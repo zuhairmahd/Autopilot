@@ -58,12 +58,14 @@ cd autopilot
 |--------|-------------|
 | **Give a device to a user** | Assign devices with comprehensive readiness checks (pending actions, enrollment state, user association) |
 | **Check device status** | Lookup by serial number or user, assess readiness with detailed reporting |
-| **Autopilot menu** | Import devices, manage profiles, get device hash |
+| **Autopilot menu** | Import devices, manage profiles, get device hash, analyze enrollment events |
 | **Change application settings** | Configure global, domain, and authentication settings |
 | **Check for script updates** | Download latest features and security updates |
 | **Restart the device** | Remote device restart (requires permissions) |
+| **Shutdown the device** | Remote device shutdown (requires permissions) |
 | **Export Menu** | Export device lists, app assignments, group assignments |
 | **Device Reports Menu** | View and export device reports including assigned devices by user |
+| **Group Assignments Menu** | Manage device group memberships and assignments |
 | **About** | Version information and license details |
 
 ### Navigation
@@ -150,6 +152,74 @@ The report automatically applies configured filters:
 
 **Export Files:**
 CSV files are saved with timestamp: `AssignedDevicesByUserReport-YYYYMMDD_HHMM.csv`
+
+### Autopilot Event Analysis
+
+The **Autopilot Event Analysis** feature provides comprehensive analysis of Windows Autopilot enrollment events, helping you troubleshoot enrollment issues and understand deployment patterns.
+
+**Features:**
+- Analyze autopilot enrollment events with detailed success/failure tracking
+- Optional location correlation using sign-in logs (enriches events with IP address, location, and device compliance)
+- Filter by date range or specific user principal name
+- Identify users with multiple failures versus single failures with recovery
+- Chronological failure tracking and pattern analysis
+- Multi-section paged display with navigation controls
+- Export analysis results to CSV for further investigation
+
+**How to Use:**
+1. Navigate to **Autopilot menu** > **Autopilot enrollment report**
+2. Choose filtering options (date range, specific user, or all events)
+3. Enable location analysis if needed (requires additional processing time)
+4. View detailed analysis on screen or export to CSV
+
+**Analysis Includes:**
+- Event success and failure counts
+- Enrollment duration statistics
+- Device information (serial number, model, manufacturer)
+- User association and patterns
+- Timeline of events
+- Location data (when location analysis is enabled)
+- Device compliance status
+- Sign-in metadata correlation
+
+**Location Analysis:**
+When enabled with the `-ApplyLocationAnalysis` flag, the analysis correlates autopilot events with user sign-in logs to provide:
+- IP address information
+- Geographic location
+- Device compliance state at time of enrollment
+- Sign-in risk and authentication details
+
+### Device Preparation (v2 Autopilot)
+
+For organizations using Windows Autopilot Device Preparation, the tool provides management of **Corporate Device Identifiers**.
+
+**Features:**
+- Import corporate device identifiers for device preparation scenarios
+- Export identifiers for manual upload to Intune
+- Delete identifiers when devices are decommissioned
+
+**How to Use:**
+1. Navigate to **Autopilot menu**
+2. Select one of the following options:
+   - **Import Corporate Device Identifier for Device Preparation** - Import identifiers directly via API
+   - **Export Corporate Device Identifier for manual upload** - Generate export file for Intune portal
+   - **Delete Corporate Device Identifier** - Remove identifiers when no longer needed
+
+**Note:** These operations require administrator rights in Azure AD.
+
+### BitLocker and LAPS Management
+
+The tool provides quick access to critical security credentials:
+
+**BitLocker Recovery Keys:**
+- Retrieve BitLocker recovery keys for encrypted devices
+- Available from device status and management menus
+- Requires appropriate Graph API permissions
+
+**LAPS Credentials:**
+- Retrieve Local Administrator Password Solution (LAPS) credentials
+- Access local admin passwords for managed devices
+- Requires appropriate administrative permissions
 
 ### Other Available Reports
 
