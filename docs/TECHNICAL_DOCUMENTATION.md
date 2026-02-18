@@ -77,21 +77,22 @@ For complete menu system documentation, see [MENU_SYSTEM_DOCUMENTATION.md](./MEN
 
 ### Function Categories Overview
 
-The application organizes its **137 functions** across 9 logical categories:
+The application organizes its **212 functions** across 10 logical categories:
 
 | Category | Count | Purpose | Key Functions | Location |
 |----------|-------|---------|---------------|----------|
-| **menuFunctions** | 17 | User interface and navigation system | `DisplayNumericMenu`, `ShowMenu`, `Handle-MenuItemSelection` | `menuFunctions/` |
-| **setupFunctions** | 23 | Configuration management and initialization | `MergeSettings`, `Start-FirstRunWizard`, `Show-SettingsEditor` | `setupFunctions/` |
-| **utilityFunctions** | 18 | General-purpose helper functions | `Write-Log`, `GetUserInput`, `GetEntraUser` | `utilityFunctions/` |
-| **deviceFunctions** | 12 | Device queries, operations, and lifecycle | `GetDeviceByUser`, `RestartDevice`, `GetBitLockerRecoveryKey` | `deviceFunctions/` |
-| **autopilotFunctions** | 14 | Autopilot device enrollment and management | `ImportAutopilotDevice`, `GetDeviceHash`, `AddCorporateDeviceIdentifier` | `autopilotFunctions/v1/`, `autopilotFunctions/v2/` |
-| **graphFunctions** | 22 | Microsoft Graph API integration and authentication | `GetGraphAccessToken`, `CallGraphAPI`, `Get-DelegatedToken` | `graphFunctions/` |
-| **reportingFunctions** | 11 | Device assessment and readiness analysis | `GetNextUserReadinessReport`, `Export-DeviceList`, `ShowDeviceReport` | `reportingFunctions/` |
-| **encryptionFunctions** | 14 | Security, encryption, and credential management | `Load-EncryptedConfigFile`, `Get-SecurePassword`, `Invoke-JsonFileEncryption` | `encryptionFunctions/` |
-| **updateFunctions** | 6 | Application update and version management | `CheckForUpdates`, `GetLatestGithubRelease`, `Invoke-FileCertVerification` | `updateFunctions/` |
+| **setupFunctions** | 43 | Configuration management and initialization | `MergeSettings`, `Start-FirstRunWizard`, `Show-SettingsEditor` | `setupFunctions/` (includes `FirstRunWizardFunctions/` subdirectory) |
+| **menuFunctions** | 27 | User interface and navigation system | `DisplayNumericMenu`, `ShowMenu`, `Handle-MenuItemSelection` | `menuFunctions/` |
+| **graphFunctions** | 26 | Microsoft Graph API integration and authentication | `GetGraphAccessToken`, `CallGraphAPI`, `Get-DelegatedToken` | `graphFunctions/` |
+| **utilityFunctions** | 26 | General-purpose helper functions | `Write-Log`, `GetUserInput`, `Invoke-CacheManagement` | `utilityFunctions/` (includes `Export-PowershellDataFile/` subdirectory) |
+| **UserAndGroupFunctions** | 22 | User and group resolution, assignments, membership | `Resolve-DirectoryObject`, `Get-EntraDirectoryObject`, `Show-DirectoryObjectList` | `UserAndGroupFunctions/` |
+| **deviceFunctions** | 16 | Device queries, operations, and lifecycle | `GetDeviceByUser`, `RestartDevice`, `GetBitLockerRecoveryKey` | `deviceFunctions/` |
+| **autopilotFunctions** | 15 | Autopilot device enrollment and management | `ImportAutopilotDevice`, `GetDeviceHash`, `AddCorporateDeviceIdentifier` | `autopilotFunctions/` (includes `v1/`, `v2/`, `Reports/` subdirectories) |
+| **reportingFunctions** | 14 | Device assessment and readiness analysis | `AssessDeviceState`, `Export-DeviceList`, `ShowDeviceReport` | `reportingFunctions/` |
+| **encryptionFunctions** | 11 | Security, encryption, and credential management | `Load-EncryptedConfigFile`, `Get-SecurePassword`, `Invoke-JsonFileEncryption` | `encryptionFunctions/` |
+| **updateFunctions** | 5 | Application update and version management | `CheckForUpdates`, `GetLatestGithubRelease`, `Invoke-FileCertVerification` | `updateFunctions/` |
 
-**Total Functions**: 137 across 9 categories
+**Total Functions**: 212 across 10 categories
 
 ## Configuration System
 
