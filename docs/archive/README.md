@@ -4,6 +4,12 @@ This folder contains historical and implementation-specific documentation that i
 
 ## Categories
 
+### Project Summaries and Enhancements (Completed)
+Historical project milestone documentation:
+- **Main/** - Integration test documentation, enhancement and optimization summaries
+- **Enhancements/** - Certificate authentication, GitHub Actions, and initialization enhancements
+- **Integrations/** - GitHub Actions integration, certificate authentication, and groups editor integration
+
 ### Pester Migration (Completed)
 Documentation from the test framework migration to Pester v5:
 - `PESTER_MIGRATION_*.md` - Migration plans, progress, and lessons learned
@@ -40,14 +46,15 @@ Planning documents that led to implementations:
 - `*_ANALYSIS*.md` - Various analysis documents
 - `*_PLAN*.md` - Implementation plans
 - `COVERAGE_IMPROVEMENT_PLAN.md` - Test coverage planning
+- `Analyze-FunctionDependencies-README.md` - Function dependency analysis tool
 
 ## Note
 
 These documents are preserved for historical reference and may contain outdated information. For current documentation, see:
 - [Developer Guide](../DEVELOPER_GUIDE.md) - Current development guide
 - [Settings Reference](../SETTINGS.md) - Current settings documentation
-- [Technical Documentation](../TECHNICAL_DOCUMENTATION.md) - Technical reference
+- [Technical Documentation](../TECHNICAL_DOCUMENTATION.md) - Technical reference with 212 functions
 
 ---
 
-*Archived: November 2025*
+*Archived: November 2025 - February 2026*
