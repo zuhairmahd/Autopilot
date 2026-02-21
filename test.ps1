@@ -1038,7 +1038,7 @@ $scope = $auth.scope
 # $serialNumber = '0F3CFP724223KV'
 # $serialNumber = 'BTSB25000BCR'
 # $serialNumber = '5R3SBZ3'
-# $userUri = "users"
+$userUri = "users"
 # $groupUri = "groups"
 # $managedAppUri = "deviceAppManagement/mobileApps"
 # $appAssignmentURI = "deviceAppManagement/mobileApps/$($app.id)/assignments"
@@ -1069,11 +1069,12 @@ $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $sc
 # }
 
 
-$autopilotReportInput = Get-AutopilotEnrollmentReportInput
+$autopilotReportInput = Get-AutopilotEnrollmentReportInput -NoConfirmation
+Write-Log -logFile $logFile -module $scriptName -Message "User input received: $($autopilotReportInput | Out-String)"
 $analysisParams = @{
     accessToken = $accessToken
+    verbose     = $true
 }
-
 if ($autopilotReportInput.StartDate)
 {
     $analysisParams['StartDate'] = $autopilotReportInput.StartDate
@@ -1082,40 +1083,163 @@ if ($autopilotReportInput.EndDate)
 {
     $analysisParams['EndDate'] = $autopilotReportInput.EndDate
 }
-if ($autopilotReportInput.UserPrincipalName
-)
+if ($autopilotReportInput.UserPrincipalName)
 {
     $analysisParams['UserPrincipalName'] = $autopilotReportInput.UserPrincipalName
 }
-$analysis = Get-AutopilotEventAnalysis @analysisParams
-# Display results
-Show-AutopilotEventAnalysis -AnalysisData $analysis
-
-# Prompt for export
-Write-Host "`nWould you like to export the analysis to CSV? (Y/N): " -NoNewline -ForegroundColor Yellow
-$exportChoice = Read-Host
-while ($exportChoice -notin @('Y', 'y', 'N', 'n'))
+if ($autopilotReportInput.UseLocationFilter)
 {
-    Write-Host "Invalid choice. Please enter 'Y' for Yes or 'N' for No: " -NoNewline -ForegroundColor Yellow
-    [console]::beep(300, 100)
-    $exportChoice = Read-Host
+    $analysisParams['ApplyLocationAnalysis'] = $true
 }
-if ($exportChoice -eq 'Y' -or $exportChoice -eq 'y')
+Write-Log -logFile $logFile -Module $scriptName -Message "Analysis parameters set: $($analysisParams | Out-String)"
+$analysis = Get-AutopilotEventAnalysis @analysisParams
+Write-Log -logFile $logFile -Module $scriptName -Message "Analysis results obtained: $($analysis | Out-String)"
+if ($analysis.TotalEventsBeforeFilter -gt 0 -and $analysis.TotalEvents -gt 0)
 {
-
-    $exportResult = Export-AutopilotEventAnalysis -AnalysisData $analysis
-    if ($exportResult.success)
+    # Display results - only pass ShowLocationAnalysis if location analysis was performed
+    $displayParams = @{
+        AnalysisData              = $analysis
+        ShowSummary               = $true
+        ShowInProgress            = $true
+        ShowMultipleFailures      = $true
+        ShowSingleFailures        = $true
+        ShowChronologicalFailures = $true
+        ShowDetailedFailures      = $true
+    }
+    # Only show location analysis if it was actually performed (ApplyLocationAnalysis was used)
+    if ($analysis.LocationAnalysisCount -gt 0)
     {
-        Write-Host "Analysis exported successfully" -ForegroundColor Green
+        $displayParams['ShowLocationAnalysis'] = $true
+    }
+    Show-AutopilotEventAnalysis @displayParams
+    # Prompt for export
+    Write-Host "`nWould you like to export the analysis to CSV? (Y/N): " -NoNewline -ForegroundColor Yellow
+    $exportChoice = Read-Host
+    while ($exportChoice -notin @('Y', 'y', 'N', 'n'))
+    {
+        Write-Host "Invalid choice. Please enter 'Y' for Yes or 'N' for No: " -NoNewline -ForegroundColor Yellow
+        [console]::beep(300, 100)
+        $exportChoice = Read-Host
+    }
+    if ($exportChoice -eq 'Y' -or $exportChoice -eq 'y')
+    {
+        Write-Log -logFile $logFile -Module $scriptName -Message "User chose to export analysis results."
+        $exportResult = Export-AutopilotEventAnalysis -AnalysisData $analysis
+        Write-Log -logFile $logFile -Module $scriptName -Message "Export result: $($exportResult | Out-String)"
+        if ($exportResult.Success)
+        {
+            Write-Host "Analysis exported successfully" -ForegroundColor Green
+            write-log -logFile $logFile -Module $scriptName -Message "Analysis exported successfully to $($exportResult.ExportedFiles -join ', ')"
+        }
+        else
+        {
+            Write-Host "Failed to export analysis: $($exportResult.Error)" -ForegroundColor Red
+            write-log -logFile $logFile -Module $scriptName -Message "Failed to export analysis: $($exportResult.Error)" -logLevel "ERROR"
+        }
+        return $returnValues.backoutText
     }
     else
     {
-        Write-Host "Failed to export analysis: $($exportResult.errorMessage)" -ForegroundColor Red
+        Write-Log -logFile $logFile -Module $scriptName -Message "User chose not to export analysis results."
+        Write-Host "Export skipped." -ForegroundColor Yellow
+        return $returnValues.backoutText
     }
+}
+elseif ($analysis.TotalEventsBeforeFilter -eq 0 -and $analysis.TotalEvents -gt 0)
+{
+    Write-Log -logFile $logFile -Module $scriptName -Message "No Autopilot enrollment events found in the specified date range." -LogLevel "Warning"
+    return $returnValues.noValidAutopilotEventsFoundMessage
+}
+else
+{
+    Write-Log -logFile $logFile -Module $scriptName -Message "No Autopilot enrollment events found." -LogLevel "Warning"
+    return $returnValues.noAutopilotEventsFoundMessage
 }
 
 
 exit 0
+$userName = "mahmoudz@gao.gov"
+$user = "$userUri/$userName"
+$global:userObject = CallGraphAPI -ResourcePath $user -accessToken $accessToken
+$userId = $global:userObject.id
+$upn = $global:userObject.userPrincipalName
+Write-Host "User id is $userId"
+# Define date range for sign-in events
+$startDate = (Get-Date).AddDays(-1).ToString("yyyy-MM-ddTHH:mm:ssZ")
+$endDate = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssZ")
+
+# Build filter for sign-ins by userId and date range
+# Note: CallGraphAPI automatically adds $ prefix to OData parameters
+$signInActivityURI = "auditLogs/signIns"
+$filterParams = "filter=userId eq '$userId' and createdDateTime ge $startDate and createdDateTime le $endDate&orderby=createdDateTime desc"
+
+Write-Host "Fetching sign-in events between $startDate and $endDate"
+$global:activity = CallGraphAPI -ResourcePath $signInActivityURI -AccessToken $accessToken -ExtraParameters $filterParams -APIVersion 'v1.0' -Verbose
+
+# --- Additional Filter Examples for signIns ---
+# Note: Only one filter can be active at a time in these examples
+
+# Example 1: Filter by user and successful sign-ins only
+# $filterParams = "filter=userId eq '$userId' and status/errorCode eq 0&top=50"
+
+# Example 2: Filter by user and failed sign-ins only
+# $filterParams = "filter=userId eq '$userId' and status/errorCode ne 0&top=50"
+
+# Example 3: Filter by user and specific application (e.g., Office 365)
+# $appId = "00000002-0000-0ff1-ce00-000000000000"  # Office 365 Exchange Online
+# $filterParams = "filter=userId eq '$userId' and appId eq '$appId'&top=50"
+
+# Example 4: Filter by user and interactive sign-ins only
+# $filterParams = "filter=userId eq '$userId' and isInteractive eq true&top=50"
+
+# Example 5: Filter by user and specific location (city)
+# $filterParams = "filter=userId eq '$userId' and location/city eq 'Seattle'&top=50"
+
+# Example 6: Filter by user and risky sign-ins
+# $filterParams = "filter=userId eq '$userId' and riskLevel ne 'none'&top=50"
+
+# Example 7: Filter by user and device platform
+# $filterParams = "filter=userId eq '$userId' and deviceDetail/operatingSystem eq 'Windows'&top=50"
+
+# Example 8: Filter by user principal name instead of userId
+# $filterParams = "filter=userPrincipalName eq '$userName'&top=50"
+
+# Example 9: Filter by IP address pattern (startswith)
+# $filterParams = "filter=userId eq '$userId' and startswith(ipAddress, '192.168')&top=50"
+
+# Example 10: Filter by MFA requirement
+# $filterParams = "filter=userId eq '$userId' and mfaDetail/authMethod ne null&top=50"
+
+# Example 11: Complex filter - Failed sign-ins from specific country in date range
+# $filterParams = "filter=userId eq '$userId' and status/errorCode ne 0 and location/countryOrRegion eq 'US' and createdDateTime ge $startDate&top=50"
+
+# Example 12: Filter by conditional access status
+# $filterParams = "filter=userId eq '$userId' and conditionalAccessStatus eq 'success'&top=50"
+
+# Filterable properties reference:
+# - userId, userPrincipalName, userDisplayName
+# - appId, appDisplayName, resourceId, resourceDisplayName
+# - createdDateTime (use ge/le for ranges)
+# - status/errorCode (0 = success, non-zero = failure)
+# - isInteractive (true/false)
+# - ipAddress
+# - location/city, location/state, location/countryOrRegion
+# - deviceDetail/operatingSystem, deviceDetail/browser, deviceDetail/deviceId
+# - riskLevel (none, low, medium, high, hidden)
+# - riskState (none, confirmedSafe, remediated, dismissed, atRisk, confirmedCompromised)
+# - conditionalAccessStatus (success, failure, notApplied)
+# - clientAppUsed
+# - mfaDetail/authMethod
+
+# Supported OData operators:
+# - eq (equals), ne (not equals)
+# - ge (greater than or equal), le (less than or equal)
+# - and, or, not
+# - startswith(), endswith(), contains() functions
+
+exit 0
+
+
 $DMServers = @{
     'DM10-01-GOAL4_NETOPS' = 'WINDM16-01'
     'DM10-02-ALL_STAFF'    = 'WINDM16-02'

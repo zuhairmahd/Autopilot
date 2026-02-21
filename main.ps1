@@ -2155,42 +2155,75 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Autopilot enrollment re
     {
         $analysisParams['UserPrincipalName'] = $autopilotReportInput.UserPrincipalName
     }
+    if ($autopilotReportInput.UseLocationFilter)
+    {
+        $analysisParams['ApplyLocationAnalysis'] = $true
+    }
+
     Write-Log -logFile $logFile -Module $scriptName -Message "Analysis parameters set: $($analysisParams | Out-String)"
     $analysis = Get-AutopilotEventAnalysis @analysisParams
     Write-Log -logFile $logFile -Module $scriptName -Message "Analysis results obtained: $($analysis | Out-String)"
-    # Display results
-    Show-AutopilotEventAnalysis -AnalysisData $analysis -ShowSummary -ShowMultipleFailures -ShowSingleFailures -ShowChronologicalFailures -ShowDetailedFailures
 
-    # Prompt for export
-    Write-Host "`nWould you like to export the analysis to CSV? (Y/N): " -NoNewline -ForegroundColor Yellow
-    $exportChoice = Read-Host
-    while ($exportChoice -notin @('Y', 'y', 'N', 'n'))
+    if ($analysis.TotalEventsBeforeFilter -gt 0 -and $analysis.TotalEvents -gt 0)
     {
-        Write-Host "Invalid choice. Please enter 'Y' for Yes or 'N' for No: " -NoNewline -ForegroundColor Yellow
-        [console]::beep(300, 100)
-        $exportChoice = Read-Host
-    }
-    if ($exportChoice -eq 'Y' -or $exportChoice -eq 'y')
-    {
-        Write-Log -logFile $logFile -Module $scriptName -Message "User chose to export analysis results."
-        $exportResult = Export-AutopilotEventAnalysis -AnalysisData $analysis
-        Write-Log -logFile $logFile -Module $scriptName -Message "Export result: $($exportResult | Out-String)"
-        if ($exportResult.Success)
+        # Display results - only pass ShowLocationAnalysis if location analysis was performed
+        $displayParams = @{
+            AnalysisData              = $analysis
+            ShowSummary               = $true
+            ShowInProgress            = $true
+            ShowMultipleFailures      = $true
+            ShowSingleFailures        = $true
+            ShowChronologicalFailures = $true
+            ShowDetailedFailures      = $true
+        }
+        # Only show location analysis if it was actually performed (ApplyLocationAnalysis was used)
+        if ($analysis.LocationAnalysisCount -gt 0)
         {
-            Write-Host "Analysis exported successfully" -ForegroundColor Green
-            write-log -logFile $logFile -Module $scriptName -Message "Analysis exported successfully to $($exportResult.ExportedFiles -join ', ')"
+            $displayParams['ShowLocationAnalysis'] = $true
+        }
+        Show-AutopilotEventAnalysis @displayParams
+        # Prompt for export
+        Write-Host "`nWould you like to export the analysis to CSV? (Y/N): " -NoNewline -ForegroundColor Yellow
+        $exportChoice = Read-Host
+        while ($exportChoice -notin @('Y', 'y', 'N', 'n'))
+        {
+            Write-Host "Invalid choice. Please enter 'Y' for Yes or 'N' for No: " -NoNewline -ForegroundColor Yellow
+            [console]::beep(300, 100)
+            $exportChoice = Read-Host
+        }
+        if ($exportChoice -eq 'Y' -or $exportChoice -eq 'y')
+        {
+            Write-Log -logFile $logFile -Module $scriptName -Message "User chose to export analysis results."
+            $exportResult = Export-AutopilotEventAnalysis -AnalysisData $analysis
+            Write-Log -logFile $logFile -Module $scriptName -Message "Export result: $($exportResult | Out-String)"
+            if ($exportResult.Success)
+            {
+                Write-Host "Analysis exported successfully" -ForegroundColor Green
+                write-log -logFile $logFile -Module $scriptName -Message "Analysis exported successfully to $($exportResult.ExportedFiles -join ', ')"
+            }
+            else
+            {
+                Write-Host "Failed to export analysis: $($exportResult.Error)" -ForegroundColor Red
+                write-log -logFile $logFile -Module $scriptName -Message "Failed to export analysis: $($exportResult.Error)" -logLevel "ERROR"
+            }
+            return $returnValues.backoutText
         }
         else
         {
-            Write-Host "Failed to export analysis: $($exportResult.Error)" -ForegroundColor Red
-            write-log -logFile $logFile -Module $scriptName -Message "Failed to export analysis: $($exportResult.Error)" -logLevel "ERROR"
+            Write-Log -logFile $logFile -Module $scriptName -Message "User chose not to export analysis results."
+            Write-Host "Export skipped." -ForegroundColor Yellow
+            return $returnValues.backoutText
         }
+    }
+    elseif ($analysis.TotalEventsBeforeFilter -eq 0 -and $analysis.TotalEvents -gt 0)
+    {
+        Write-Log -logFile $logFile -Module $scriptName -Message "No Autopilot enrollment events found in the specified date range." -LogLevel "Warning"
+        return $returnValues.noValidAutopilotEventsFoundMessage
     }
     else
     {
-        Write-Log -logFile $logFile -Module $scriptName -Message "User chose not to export analysis results."
-        Write-Host "Export skipped." -ForegroundColor Yellow
-        return $returnValues.backoutText
+        Write-Log -logFile $logFile -Module $scriptName -Message "No Autopilot enrollment events found." -LogLevel "Warning"
+        return $returnValues.noAutopilotEventsFoundMessage
     }
 }
 #endregion Autopilot menu

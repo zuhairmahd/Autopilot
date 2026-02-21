@@ -58,6 +58,13 @@ Describe "Show-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
             UserPhaseOnlyFailureCount   = 1
             BothPhasesFailureCount      = 1
             UnknownPhaseFailureCount    = 0
+            SignInMatchStats            = @{
+                TotalEvents      = 10
+                MatchedEvents    = 8
+                HighConfidence   = 5
+                MediumConfidence = 2
+                LowConfidence    = 1
+            }
             UsersWithMultipleFailures   = @(
                 [PSCustomObject]@{
                     UserPrincipalName = "user1@contoso.com"
@@ -82,13 +89,27 @@ Describe "Show-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
             )
             InProgressEvents            = @(
                 @{
-                    deviceSerialNumber = "PQR678"
-                    managedDeviceName  = "Device1"
-                    userPrincipalName  = "user3@contoso.com"
-                    eventDateTime      = "2025-02-08T17:00:00Z"
-                    deploymentState    = "inProgress"
-                    deviceSetupStatus  = "inProgress"
-                    accountSetupStatus = "notStarted"
+                    deviceSerialNumber       = "PQR678"
+                    managedDeviceName        = "Device1"
+                    userPrincipalName        = "user3@contoso.com"
+                    eventDateTime            = "2025-02-08T17:00:00Z"
+                    deploymentState          = "inProgress"
+                    deviceSetupStatus        = "inProgress"
+                    accountSetupStatus       = "notStarted"
+                    SignIn_MatchFound        = $true
+                    SignIn_ConfidenceScore   = 90
+                    SignIn_MatchedOn         = "UserId, DeviceId, Time_Within1Hour"
+                    SignIn_Location_City     = "Seattle"
+                    SignIn_Location_State    = "Washington"
+                    SignIn_Location_Country  = "US"
+                    SignIn_IPAddress         = "192.168.1.1"
+                    SignIn_Status            = "Success"
+                    SignIn_FailureReason     = $null
+                    SignIn_ErrorCode         = $null
+                    SignIn_AppDisplayName    = "Microsoft Intune"
+                    SignIn_DeviceDisplayName = "Device1"
+                    SignIn_IsCompliant       = $true
+                    SignIn_IsManaged         = $true
                 }
             )
             FailedDevicesChronological  = @(
@@ -101,6 +122,20 @@ Describe "Show-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
                     deviceSetupStatus        = "failure"
                     accountSetupStatus       = "notStarted"
                     enrollmentFailureDetails = "Device setup failed"
+                    SignIn_MatchFound        = $true
+                    SignIn_ConfidenceScore   = 75
+                    SignIn_MatchedOn         = "UserId, DeviceId, Time_Within2Hours"
+                    SignIn_Location_City     = "Redmond"
+                    SignIn_Location_State    = "Washington"
+                    SignIn_Location_Country  = "US"
+                    SignIn_IPAddress         = "10.0.0.1"
+                    SignIn_Status            = "Failure"
+                    SignIn_FailureReason     = "Invalid credentials"
+                    SignIn_ErrorCode         = 50126
+                    SignIn_AppDisplayName    = "Microsoft Intune Enrollment"
+                    SignIn_DeviceDisplayName = "Device2"
+                    SignIn_IsCompliant       = $false
+                    SignIn_IsManaged         = $false
                 }
             )
             FailedEvents                = @(
@@ -116,6 +151,20 @@ Describe "Show-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
                     enrollmentState          = "enrolled"
                     enrollmentType           = "userDrivenAADJoin"
                     enrollmentFailureDetails = "Device setup failed"
+                    SignIn_MatchFound        = $true
+                    SignIn_ConfidenceScore   = 80
+                    SignIn_MatchedOn         = "UserId, DeviceId, Time_Within1Hour"
+                    SignIn_Location_City     = "San Francisco"
+                    SignIn_Location_State    = "California"
+                    SignIn_Location_Country  = "US"
+                    SignIn_IPAddress         = "172.16.0.1"
+                    SignIn_Status            = "Success"
+                    SignIn_FailureReason     = $null
+                    SignIn_ErrorCode         = $null
+                    SignIn_AppDisplayName    = "Microsoft Intune"
+                    SignIn_DeviceDisplayName = "Device3"
+                    SignIn_IsCompliant       = $true
+                    SignIn_IsManaged         = $true
                 }
             )
         }
@@ -264,6 +313,16 @@ Describe "Show-AutopilotEventAnalysis" -Tags 'Unit', 'Reports' {
             Should -Invoke Write-Host -ParameterFilter {
                 $Object -like "*Failure Breakdown*"
             } -Exactly 1
+        }
+
+        It "Should display sign-in match statistics when present" {
+            Mock Write-Host { }
+
+            Show-AutopilotEventAnalysis -AnalysisData $script:MockAnalysisData -ShowSummary
+
+            Should -Invoke Write-Host -Times 1 -ParameterFilter {
+                $Object -like "*Sign-In Match*"
+            }
         }
 
         It "Should prompt to continue after summary" {
