@@ -111,18 +111,19 @@ function Get-AutopilotEnrollmentReportInput()
     # Start Date Input
     Write-Host "`nStart Date Filter:" -ForegroundColor Cyan
     Write-Host "  Options:" -ForegroundColor Gray
-    Write-Host "    - Press Enter for default (no filter - all events)" -ForegroundColor Gray
+    Write-Host "    - Press Enter for default $((Get-Date).AddDays(-30).ToString('yyyy-MM-dd'))" -ForegroundColor Gray
     Write-Host "    - Type: today, yesterday, wtd (week-to-date), mtd (month-to-date)" -ForegroundColor Gray
     Write-Host "    - Or enter date: yyyy-MM-dd or MM/dd/yyyy" -ForegroundColor Gray
-    $startDateInput = Read-Host "`nStart Date [default: all events]"
+    $startDateInput = Read-Host "`nStart Date [default: $((Get-Date).AddDays(-30).ToString('yyyy-MM-dd'))]"
 
     $startDate = $null
     if ([string]::IsNullOrWhiteSpace($startDateInput))
     {
-        Write-Verbose "[$functionName] Using default start date: no filter (all events)"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "User selected default start date (no filter)" -LogLevel "Verbose"
-        Write-Host "Using default: No start date filter (all events)" -ForegroundColor Yellow
-        $startDate = $null
+        #set the start date to 30 days ago if no input is provided
+        $startDate = (Get-Date).AddDays(-30)
+        Write-Verbose "[$functionName] Using default start date: $($startDate.ToString('yyyy-MM-dd'))"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "User selected default start date: $($startDate.ToString('yyyy-MM-dd'))" -LogLevel "Information"
+        Write-Host "Using default: $($startDate.ToString('yyyy-MM-dd'))                     " -ForegroundColor Yellow
     }
     else
     {
@@ -142,18 +143,19 @@ function Get-AutopilotEnrollmentReportInput()
     # End Date Input
     Write-Host "`nEnd Date Filter:" -ForegroundColor Cyan
     Write-Host "  Options:" -ForegroundColor Gray
-    Write-Host "    - Press Enter for default (no filter - all events)" -ForegroundColor Gray
+    Write-Host "    - Press Enter for default (today's date)" -ForegroundColor Gray
     Write-Host "    - Type: today, yesterday, wtd (week-to-date), mtd (month-to-date)" -ForegroundColor Gray
     Write-Host "    - Or enter date: yyyy-MM-dd or MM/dd/yyyy" -ForegroundColor Gray
-    $endDateInput = Read-Host "`nEnd Date [default: all events]"
+    $endDateInput = Read-Host "`nEnd Date [default: Today's date]"
 
     $endDate = $null
     if ([string]::IsNullOrWhiteSpace($endDateInput))
     {
-        Write-Verbose "[$functionName] Using default end date: no filter (all events)"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "User selected default end date (no filter)" -LogLevel "Verbose"
-        Write-Host "Using default: No end date filter (all events)" -ForegroundColor Yellow
-        $endDate = $null
+        Write-Verbose "[$functionName] Using default end date: today's date (end-of-day filter)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "User selected default end date (today's date, end-of-day filter)" -LogLevel "Verbose"
+        Write-Host "Using default: $((Get-Date).ToString('yyyy-MM-dd'))" -ForegroundColor Yellow
+        #if we have a null string, then endDate will be today's date at 11:59:59 PM
+        $endDate = ConvertTo-DateFilter -InputString "today" -IsEndDate $true
     }
     else
     {
@@ -191,6 +193,32 @@ function Get-AutopilotEnrollmentReportInput()
         Write-Log -LogFile $LogFile -Module $functionName -Message "No user principal name filter applied" -LogLevel "Verbose"
         Write-Verbose "[$functionName] No user principal name filter"
     }
+    # User prompt for including sign-in location analysis
+    Write-Host "`nLocation analysis:" -ForegroundColor Cyan
+    Write-Host "`nWould you like to include sign-in location analysis in the report?" -ForegroundColor Gray
+    Write-Host "Please note this may take a long time with a large dataset." -ForegroundColor Yellow
+    $useLocationFilter = Read-Host "Include location analysis? (Y/N) [default: N]"
+    while ($useLocationFilter -notin @("Y", "N", "y", "n", ""))
+    {
+        Write-Host "Invalid input. Please enter Y or N." -ForegroundColor Red
+        try { [console]::Beep(1000, 500) } catch { <# Beep not supported on this platform #> }
+        $useLocationFilter = Read-Host "Include location analysis? (Y/N) [default: N]"
+    }
+
+    if ($useLocationFilter -in @("Y", "y"))
+    {
+        Write-Host "Location analysis will be included." -ForegroundColor Green
+        Write-Log -LogFile $LogFile -Module $functionName -Message "User opted to include location analysis" -LogLevel "Information"
+        Write-Verbose "[$functionName] User opted to include location analysis"
+        $useLocationFilter = $true
+    }
+    else
+    {
+        Write-Host "No location analysis will be included." -ForegroundColor Yellow
+        Write-Log -LogFile $LogFile -Module $functionName -Message "User opted not to include location analysis" -LogLevel "Information"
+        Write-Verbose "[$functionName] User opted not to include location analysis"
+        $useLocationFilter = $false
+    }
 
     # Build result hashtable
     $result = @{}
@@ -206,7 +234,12 @@ function Get-AutopilotEnrollmentReportInput()
     {
         $result['UserPrincipalName'] = $userPrincipalName
     }
-
+    if ($useLocationFilter)
+    {
+        $result['UseLocationFilter'] = $true
+    }
+    Write-Verbose "[$functionName] Collected input parameters: $($result.Keys -join ', ')"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Collected input parameters: $($result.Keys -join ', ')" -LogLevel "Verbose"
     # Summary
     Write-Host "`n" -NoNewline
     Write-Host ("=" * 60) -ForegroundColor Cyan
@@ -253,6 +286,22 @@ function Get-AutopilotEnrollmentReportInput()
         {
             "All users"
         }) -ForegroundColor $(if ($userPrincipalName)
+        {
+            "Green"
+        }
+        else
+        {
+            "Yellow"
+        })
+    Write-Host "  Location Filter: " -NoNewline -ForegroundColor Gray
+    Write-Host $(if ($useLocationFilter)
+        {
+            "Enabled"
+        }
+        else
+        {
+            "Disabled"
+        }) -ForegroundColor $(if ($useLocationFilter)
         {
             "Green"
         }
