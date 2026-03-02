@@ -1,10 +1,9 @@
 {
-    "date": "2026-02-05 09:35:54",
-    "version": "2026.3.0.31200",
-    "guid": "c2c08149-3c1f-4558-9e4c-87487943bbf5",
-    "hash": "BD85BAA86CF22D06F8700AB07D1E5B647DE203417A2CE4C7A61D9020F35C6BD2",
-    "stringsVersion": "1.3.0.0",
-    "releaseNotes": "Fixed a bug in calculating the minimum OS build value",
-    "settingsVersion": "1.3.0.0",
-    "hashUpdated": true
+  "date": "2026-03-02 22:50:54",
+  "version": "2026.3.0.31201",
+  "guid": "c2c08149-3c1f-4558-9e4c-87487943bbf5",
+  "hash": "1BDEFAD1EA7BA83FCFE553023A8003017DB4534C72129E724BF18C6E5424A2B2",
+  "stringsVersion": "1.3.0.0",
+  "settingsVersion": "1.3.0.0",
+  "hashUpdated": true
 }
