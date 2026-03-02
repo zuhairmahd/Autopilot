@@ -121,7 +121,7 @@ function Get-ApplicationDefaults()
             maxMenuItemsPerPage                       = 15
             release                                   = "auto"
             operatingSystem                           = "Windows"
-            minimumOSBuild                            = 26100
+            minimumOSBuild                            = 22610
             verifyAutopilotDeviceMinimumSpecs         = $true
             runPIVTest                                = $false
             preferredBrowser                          = 'Chrome'
