@@ -63,61 +63,61 @@ function Initialize-FastStart()
     $domainFilePath = Join-Path -Path $ScriptPath -ChildPath "$domain.psd1"
     Write-Verbose "[$functionName] Starting fast start initialization with parameters; InitFile: $InitFile, stringsFile: $stringsFile, menuFile: $menuFile, menuCacheFile: $menuCacheFile, domain: $domain, ScriptPath: $ScriptPath, StrictValidation: $strictValidation"
     Write-Verbose "[$functionName] Domain file path: $domainFilePath    "
-    write-log -logFile $logFile -module $functionName -message "Starting fast start initialization with parameters; InitFile: $InitFile, stringsFile: $stringsFile, menuFile: $menuFile, menuCacheFile: $menuCacheFile, domain: $domain, ScriptPath: $ScriptPath, DomainFilePath: $domainFilePath, StrictValidation: $strictValidation"
+    Write-Log -logFile $logFile -module $functionName -message "Starting fast start initialization with parameters; InitFile: $InitFile, stringsFile: $stringsFile, menuFile: $menuFile, menuCacheFile: $menuCacheFile, domain: $domain, ScriptPath: $ScriptPath, DomainFilePath: $domainFilePath, StrictValidation: $strictValidation"
     $filesLoaded = $true
-    write-log -logFile $logFile -module $functionName -message "Attempting fast start configuration load."
+    Write-Log -logFile $logFile -module $functionName -message "Attempting fast start configuration load."
     Write-Verbose "[$functionName] Attempting fast start configuration load."
     if (Test-Path $InitFile)
     {
-        write-log -logFile $logFile -module $functionName -message "Loading init file: $InitFile"
+        Write-Log -logFile $logFile -module $functionName -message "Loading init file: $InitFile"
         Write-Verbose "[$functionName] Loading init file: $InitFile"
         $initContent = Import-PowerShellDataFile -Path $InitFile
     }
     else
     {
         $filesLoaded = $false
-        write-log -logFile $logFile -module $functionName -message "Init file not found: $InitFile"
+        Write-Log -logFile $logFile -module $functionName -message "Init file not found: $InitFile"
         Write-Verbose "[$functionName] Init file not found: $InitFile"
     }
     if (Test-Path $stringsFile)
     {
-        write-log -logFile $logFile -module $functionName -message "Loading strings file: $stringsFile"
+        Write-Log -logFile $logFile -module $functionName -message "Loading strings file: $stringsFile"
         Write-Verbose "[$functionName] Loading strings file: $stringsFile"
         $stringContent = Import-PowerShellDataFile -Path $stringsFile
     }
     else
     {
         $filesLoaded = $false
-        write-log -logFile $logFile -module $functionName -message "Strings file not found: $stringsFile"
+        Write-Log -logFile $logFile -module $functionName -message "Strings file not found: $stringsFile"
         Write-Verbose "[$functionName] Strings file not found: $stringsFile"
     }
     if (Test-Path $domainFilePath)
     {
-        write-log -logFile $logFile -module $functionName -message "Loading domain settings file: $domainFilePath"
+        Write-Log -logFile $logFile -module $functionName -message "Loading domain settings file: $domainFilePath"
         Write-Verbose "[$functionName] Loading domain settings file: $domainFilePath"
         $domainContent = Import-PowerShellDataFile -Path $domainFilePath
     }
     else
     {
         $filesLoaded = $false
-        write-log -logFile $logFile -module $functionName -message "Domain settings file not found: $domainFilePath"
+        Write-Log -logFile $logFile -module $functionName -message "Domain settings file not found: $domainFilePath"
         Write-Verbose "[$functionName] Domain settings file not found: $domainFilePath"
     }
     if (Test-Path $menuFile)
     {
-        write-log -logFile $logFile -module $functionName -message "Loading menu file: $menuFile"
+        Write-Log -logFile $logFile -module $functionName -message "Loading menu file: $menuFile"
         Write-Verbose "[$functionName] Loading menu file: $menuFile"
         $menuContent = Import-PowerShellDataFile -Path $menuFile
     }
     else
     {
         $filesLoaded = $false
-        write-log -logFile $logFile -module $functionName -message "Menu file not found: $menuFile"
+        Write-Log -logFile $logFile -module $functionName -message "Menu file not found: $menuFile"
         Write-Verbose "[$functionName] Menu file not found: $menuFile"
     }
     if (Test-Path $menuCacheFile)
     {
-        write-log -logFile $logFile -module $functionName -message "Menu cache file found: $menuCacheFile"
+        Write-Log -logFile $logFile -module $functionName -message "Menu cache file found: $menuCacheFile"
         Write-Verbose "[$functionName] Menu cache file found: $menuCacheFile"
         $menuCache = Get-Content -Path $menuCacheFile -ErrorAction SilentlyContinue -Force | ConvertFrom-Json
     }
@@ -126,18 +126,18 @@ function Initialize-FastStart()
         if ($strictValidation)
         {
             Write-Verbose "[$functionName] Strict validation enabled - marking filesLoaded as false due to missing menu cache file."
-            write-log -logFile $logFile -module $functionName -message "Strict validation enabled - marking filesLoaded as false due to missing menu cache file."
+            Write-Log -logFile $logFile -module $functionName -message "Strict validation enabled - marking filesLoaded as false due to missing menu cache file."
             $filesLoaded = $false
         }
         else
         {
-            write-log -logFile $logFile -module $functionName -message "Menu cache file not found: $menuCacheFile, but continuing due to non-strict validation.         "
+            Write-Log -logFile $logFile -module $functionName -message "Menu cache file not found: $menuCacheFile, but continuing due to non-strict validation.         "
             Write-Verbose "[$functionName] Menu cache file not found: $menuCacheFile, but continuing due to non-strict validation. "
         }
     }
     # Validate fastStart configuration completeness
     Write-Verbose "[$functionName] FastStart validation: filesLoaded=$filesLoaded"
-    write-log -logFile $logFile -module $functionName -message "FastStart validation: filesLoaded=$filesLoaded"
+    Write-Log -logFile $logFile -module $functionName -message "FastStart validation: filesLoaded=$filesLoaded"
     # Check each required property and log what's missing
     $authValid = $null -ne $initContent.auth
     $globalSettingsValid = $null -ne $initContent.globalSettings
@@ -149,51 +149,51 @@ function Initialize-FastStart()
     $stringContentValid = $null -ne $stringContent
     $menuCacheFileValid = $null -ne $menuCache
     Write-Verbose "[$functionName] FastStart property validation: auth=$authValid, globalSettings=$globalSettingsValid, repoInfo=$repoInfoValid, requiredScopes=$requiredScopesValid, cacheSettings=$cacheSettingsValid, domain=$domainContentValid, menu=$menuContentValid, strings=$stringContentValid, menuCacheFile=$menuCacheFileValid"
-    write-log -logFile $logFile -module $functionName -message "FastStart property validation: auth=$authValid, globalSettings=$globalSettingsValid, repoInfo=$repoInfoValid, requiredScopes=$requiredScopesValid, cacheSettings=$cacheSettingsValid, domain=$domainContentValid, menu=$menuContentValid, strings=$stringContentValid, menuCacheFile=$menuCacheFileValid        "
+    Write-Log -logFile $logFile -module $functionName -message "FastStart property validation: auth=$authValid, globalSettings=$globalSettingsValid, repoInfo=$repoInfoValid, requiredScopes=$requiredScopesValid, cacheSettings=$cacheSettingsValid, domain=$domainContentValid, menu=$menuContentValid, strings=$stringContentValid, menuCacheFile=$menuCacheFileValid        "
     if (-not $authValid)
     {
         Write-Verbose "[$functionName] FastStart: auth is null"
-        write-log -logFile $logFile -module $functionName -message "FastStart: auth is null"
+        Write-Log -logFile $logFile -module $functionName -message "FastStart: auth is null"
     }
     if (-not $globalSettingsValid)
     {
         Write-Verbose "[$functionName] FastStart: globalSettings is null"
-        write-log -logFile $logFile -module $functionName -message "FastStart: globalSettings is null"
+        Write-Log -logFile $logFile -module $functionName -message "FastStart: globalSettings is null"
     }
     if (-not $repoInfoValid)
     {
         Write-Verbose "[$functionName] FastStart: repoInfo is null"
-        write-log -logFile $logFile -module $functionName -message "FastStart: repoInfo is null"
+        Write-Log -logFile $logFile -module $functionName -message "FastStart: repoInfo is null"
     }
     if (-not $requiredScopesValid)
     {
         Write-Verbose "[$functionName] FastStart: requiredScopes is null"
-        write-log -logFile $logFile -module $functionName -message "FastStart: requiredScopes is null"
+        Write-Log -logFile $logFile -module $functionName -message "FastStart: requiredScopes is null"
     }
     if (-not $cacheSettingsValid)
     {
         Write-Verbose "[$functionName] FastStart: cacheSettings is null"
-        write-log -logFile $logFile -module $functionName -message "FastStart: cacheSettings is null"
+        Write-Log -logFile $logFile -module $functionName -message "FastStart: cacheSettings is null"
     }
     if (-not $domainContentValid)
     {
         Write-Verbose "[$functionName] FastStart: domainContent is null"
-        write-log -logFile $logFile -module $functionName -message "FastStart: domainContent is null"
+        Write-Log -logFile $logFile -module $functionName -message "FastStart: domainContent is null"
     }
     if (-not $menuContentValid)
     {
         Write-Verbose "[$functionName] FastStart: menuContent is null"
-        write-log -logFile $logFile -module $functionName -message "FastStart: menuContent is null"
+        Write-Log -logFile $logFile -module $functionName -message "FastStart: menuContent is null"
     }
     if (-not $stringContentValid)
     {
         Write-Verbose "[$functionName] FastStart: stringContent is null"
-        write-log -logFile $logFile -module $functionName -message "FastStart: stringContent is null"
+        Write-Log -logFile $logFile -module $functionName -message "FastStart: stringContent is null"
     }
     if (-not $menuCacheFileValid)
     {
         Write-Verbose "[$functionName] FastStart: menuCacheFile not found"
-        write-log -logFile $logFile -module $functionName -message "FastStart: menuCacheFile not found"
+        Write-Log -logFile $logFile -module $functionName -message "FastStart: menuCacheFile not found"
     }
 
     $configResult = @{

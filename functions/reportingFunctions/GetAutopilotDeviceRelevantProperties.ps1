@@ -32,37 +32,37 @@ function GetAutopilotDeviceRelevantProperties()
     )
     $functionName = $MyInvocation.MyCommand.Name
     $autopilotDeviceProperties = [ordered] @{}
-    
+
     # Check for new autopilotProfilesToInclude format first, then fall back to legacy DesiredAutopilotProfiles
     $desiredAutopilotProfiles = $null
     $profileNames = @()
     $profileIds = @()
-    
+
     if ($null -ne $settings.autopilotProfilesToInclude -and $settings.autopilotProfilesToInclude.Count -gt 0)
     {
         Write-Verbose "[$functionName] Found autopilotProfilesToInclude in settings (new format)"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found autopilotProfilesToInclude in settings with $($settings.autopilotProfilesToInclude.Count) profiles (new format)" -LogLevel "Information"
-        
+
         # Extract names and IDs from the new format
         $profileNames, $profileIds = Convert-AutopilotProfilesToStandardFormat -profiles $settings.autopilotProfilesToInclude
-        
+
         Write-Verbose "[$functionName] Extracted profile names: $($profileNames -join ', ')"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Extracted profile names: $($profileNames -join ', ')" -LogLevel "Verbose"
         Write-Verbose "[$functionName] Extracted profile IDs: $($profileIds -join ', ')"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Extracted profile IDs: $($profileIds -join ', ')" -LogLevel "Verbose"
-        
+
         $desiredAutopilotProfiles = $settings.autopilotProfilesToInclude
     }
     elseif ($null -ne $settings.DesiredAutopilotProfiles -and $settings.DesiredAutopilotProfiles.Count -gt 0)
     {
         Write-Verbose "[$functionName] Found DesiredAutopilotProfiles in settings (legacy format)"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found DesiredAutopilotProfiles in settings with $($settings.DesiredAutopilotProfiles.Count) profiles (legacy format)" -LogLevel "Information"
-        
+
         # Legacy format - just profile names
         $profileNames = $settings.DesiredAutopilotProfiles
         $profileIds = @()  # No IDs available in legacy format
         $desiredAutopilotProfiles = $settings.DesiredAutopilotProfiles
-        
+
         Write-Verbose "[$functionName] Using legacy format profile names: $($profileNames -join ', ')"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Using legacy format profile names: $($profileNames -join ', ')" -LogLevel "Verbose"
     }
@@ -85,18 +85,18 @@ function GetAutopilotDeviceRelevantProperties()
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device profile assignment state is not valid: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)." -LogLevel "Information"
         $profileAssigned = $false
     }
-    
+
     # Enhanced profile matching logic - prioritize ID matching over display name matching
     $correctProfile = $false
     if ($null -ne $desiredAutopilotProfiles -and $profileAssigned -eq $true)
     {
         $deviceProfileId = $enrollmentState.autopilot.device.deploymentProfile.id
         $deviceProfileDisplayName = $enrollmentState.autopilot.device.deploymentProfile.displayName
-        
+
         Write-Verbose "[$functionName] Device profile ID: $deviceProfileId"
         Write-Verbose "[$functionName] Device profile display name: $deviceProfileDisplayName"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device profile ID: $deviceProfileId, Display name: $deviceProfileDisplayName" -LogLevel "Verbose"
-        
+
         # First priority: Check if device profile ID matches any of the desired profile IDs
         if ($profileIds.Count -gt 0 -and $deviceProfileId -and $deviceProfileId -in $profileIds)
         {
@@ -112,7 +112,7 @@ function GetAutopilotDeviceRelevantProperties()
             Write-Verbose "[$functionName] Device autopilot profile matched by display name: $deviceProfileDisplayName"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device autopilot profile matched by display name: $deviceProfileDisplayName" -LogLevel "Information"
             $correctProfile = $true
-            
+
             # Log a note if we have IDs available but had to fall back to name matching
             if ($profileIds.Count -gt 0)
             {
@@ -167,10 +167,10 @@ function GetAutopilotDeviceRelevantProperties()
     if ($null -ne $enrollmentState.autopilot.device.enrollmentState -and $enrollmentState.autopilot.device.enrollmentState -eq 'notContacted')
     {
         Write-Host "The device has not yet contacted Autopilot service for enrollment."
-        Write-Host "This is normal for new devices that have not yet been powered on."      
-        write-log -LogFile $LogFile -Module "$functionName" -Message "The device has not yet contacted Autopilot service for enrollment. This is normal for new devices that have not yet been powered on." -LogLevel "Information"     
+        Write-Host "This is normal for new devices that have not yet been powered on."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device has not yet contacted Autopilot service for enrollment. This is normal for new devices that have not yet been powered on." -LogLevel "Information"
         $enrollmentStateGood = $true
-    }           
+    }
     elseif ($enrollmentState.autopilot.device.enrollmentState -eq 'enrolled')
     {
         Write-Verbose "[$functionName] The device enrollment state is valid: $($enrollmentState.autopilot.device.enrollmentState)."
@@ -225,7 +225,7 @@ function GetAutopilotDeviceRelevantProperties()
         Write-Verbose "[$functionName] There are issues with this device's autopilot assignment."
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "There are issues with this device's autopilot assignment." -LogLevel "Information"
         $AutopilotAssignmentGood = $false
-        
+
     }
     Write-Verbose "[$functionName] Autopilot assignment good: $AutopilotAssignmentGood"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Autopilot assignment good: $AutopilotAssignmentGood" -LogLevel "Information"

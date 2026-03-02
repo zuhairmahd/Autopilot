@@ -162,7 +162,7 @@
         timeInSeconds                             = 60
         useGridForLogDisplay                      = $true
         privateSession                            = $false
-        minimumOSBuild                            = 26100
+        minimumOSBuild                            = 22610
         repoInfo                                  = @{
             repoPath      = 'zuhairmahd'
             baseSourceURL = 'https://raw.githubusercontent.com'

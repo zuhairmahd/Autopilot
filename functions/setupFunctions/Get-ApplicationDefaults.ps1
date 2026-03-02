@@ -121,7 +121,7 @@ function Get-ApplicationDefaults()
             maxMenuItemsPerPage                       = 15
             release                                   = "auto"
             operatingSystem                           = "Windows"
-            minimumOSBuild                            = 26100
+            minimumOSBuild                            = 22610
             verifyAutopilotDeviceMinimumSpecs         = $true
             runPIVTest                                = $false
             preferredBrowser                          = 'Chrome'
@@ -786,6 +786,18 @@ function Get-ApplicationDefaults()
                         includeInDisplayModes = @(
                             'full',
                             'admin',
+                            'advancedRegistration'
+                        )
+                    },
+                    @{
+                        description           = 'Generate an Autopilot enrollment report'
+                        name                  = "Autopilot enrollment report"
+                        type                  = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced',
+                            'registration',
                             'advancedRegistration'
                         )
                     }

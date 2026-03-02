@@ -73,6 +73,81 @@ Write-Host "[PASS] Test completed"
 Write-Host "✓ Test completed"
 ```
 
+### Logging
+**All functions must implement comprehensive logging** using the `Write-Log` function:
+
+#### Logging Requirements
+1. **Initialize function name** at the start of every function:
+   ```powershell
+   $functionName = $MyInvocation.MyCommand.Name
+   ```
+
+2. **Log function entry** with Information level:
+   ```powershell
+   Write-Log -LogFile $LogFile -Module $functionName -Message "Starting [operation description]" -LogLevel "Information"
+   ```
+
+3. **Log key operations** with appropriate levels:
+   - **Verbose**: Detailed step-by-step operations, loop iterations, data counts
+   - **Information**: Major milestones, successful completions, important state changes
+   - **Warning**: Non-critical issues, fallbacks, deprecated feature usage
+   - **Error**: Failures, exceptions, invalid states
+
+4. **Log function exit** with completion message:
+   ```powershell
+   Write-Log -LogFile $LogFile -Module $functionName -Message "[Operation] completed successfully" -LogLevel "Information"
+   ```
+
+5. **Log errors before throwing**:
+   ```powershell
+   Write-Log -LogFile $LogFile -Module $functionName -Message "Error description" -LogLevel "Error"
+   throw "Error message"
+   ```
+
+#### Logging Example
+```powershell
+function Get-DeviceInfo
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$DeviceId
+    )
+
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting device information retrieval for: $DeviceId" -LogLevel "Information"
+
+    try
+    {
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Fetching device from Graph API" -LogLevel "Verbose"
+        $device = CallGraphAPI -ResourcePath "devices/$DeviceId" -AccessToken $token
+
+        if (-not $device)
+        {
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Device not found: $DeviceId" -LogLevel "Warning"
+            return $null
+        }
+
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Device retrieved successfully: $($device.displayName)" -LogLevel "Information"
+        return $device
+    }
+    catch
+    {
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to retrieve device: $_" -LogLevel "Error"
+        throw
+    }
+}
+```
+
+#### Log Levels
+- **Error** (1): Failures requiring immediate attention
+- **Warning** (2): Potential issues, deprecations, non-critical failures
+- **Information** (3): Normal operation milestones, completions
+- **Verbose** (4): Detailed operational information, useful for troubleshooting
+- **Debug** (5): Low-level diagnostic information
+
+The global `$MinimumLogLevel` variable controls which messages are written to the log file.
+
 ## Testing
 
 ### Requirements
@@ -96,7 +171,7 @@ Describe "Feature" -Tags 'Unit' {
         $script:RepoRoot = (Get-Item $PSScriptRoot).Parent.Parent.FullName
         . "$script:RepoRoot/functions/category/Function.ps1"
     }
-    
+
     It "Should work" {
         $result = Test-Function
         $result | Should -Be "expected"

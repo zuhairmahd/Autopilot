@@ -18,7 +18,7 @@ The FastStart performance tests were returning 0 milliseconds for both FastStart
 ```powershell
 $duration = (Get-Date) - $startTime
 Write-Host "Initialization completed in $($duration.Minutes) minutes and $($duration.Seconds) seconds."
-write-log -logFile $logFile -module $scriptName -message "Initialization completed in $($duration.Minutes) minutes and $($duration.Seconds) seconds."
+Write-Log -logFile $logFile -module $scriptName -message "Initialization completed in $($duration.Minutes) minutes and $($duration.Seconds) seconds."
 ```
 
 **After:**
@@ -26,7 +26,7 @@ write-log -logFile $logFile -module $scriptName -message "Initialization complet
 $duration = (Get-Date) - $startTime
 $durationMs = $duration.TotalMilliseconds
 Write-Host "Initialization completed in $($duration.Minutes) minutes and $($duration.Seconds) seconds ($([math]::Round($durationMs, 2)) ms)."
-write-log -logFile $logFile -module $scriptName -message "Initialization completed in $([math]::Round($durationMs, 2)) milliseconds."
+Write-Log -logFile $logFile -module $scriptName -message "Initialization completed in $([math]::Round($durationMs, 2)) milliseconds."
 ```
 
 **Benefits:**

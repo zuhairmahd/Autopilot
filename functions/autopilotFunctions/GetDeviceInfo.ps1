@@ -54,13 +54,13 @@ function GetDeviceInfo()
         [Parameter(Mandatory = $false)]
         [string]$ManufacturerOverride
     )
-    $functionName = $MyInvocation.MyCommand.Name    
+    $functionName = $MyInvocation.MyCommand.Name
     #Print verbose logs of the received parameters.
     Write-Verbose "[$functionName] GroupTag: $GroupTag"
-    
+
     Write-Verbose "[$functionName] AssignedUser: $AssignedUser"
     Write-Verbose "[$functionName] NoHash: $NoHash"
-    write-log -logFile $logFile -module $functionName -message "GroupTag: $GroupTag, AssignedUser: $AssignedUser, NoHash: $NoHash" 
+    Write-Log -logFile $logFile -module $functionName -message "GroupTag: $GroupTag, AssignedUser: $AssignedUser, NoHash: $NoHash"
     $device = @{}
     $session = New-CimSession
     $serial = (Get-CimInstance -CimSession $session -Class Win32_BIOS).SerialNumber
@@ -88,7 +88,7 @@ function GetDeviceInfo()
     $device.add('GroupTag', $GroupTag)
     Write-Verbose "[$functionName] The assigned user is $AssignedUser"
     $device.add('AssignedUser', $AssignedUser)
-    write-log -logFile $logFile -module $functionName -message "Device info collected: $($device | ConvertTo-Json -Depth $maxJSONDepth)"
+    Write-Log -logFile $logFile -module $functionName -message "Device info collected: $($device | ConvertTo-Json -Depth $maxJSONDepth)"
     if (-not $NoHash)
     {
         Write-Verbose "[$functionName] Checking for hardware hash."
@@ -114,13 +114,13 @@ function GetDeviceInfo()
     # Default to not evaluated yet
     $device['deviceAllowed'] = $true
     Write-Verbose "[$functionName] Checking whether the device manufacturer is allowed from a list of $($settings.autopilotDeviceAllowedVendors.count) vendors."
-    write-log -logFile $logFile -module $functionName -message "Checking whether the device manufacturer '$make' is in the allowed vendors list: $($settings.autopilotDeviceAllowedVendors -join ', ')."
+    Write-Log -logFile $logFile -module $functionName -message "Checking whether the device manufacturer '$make' is in the allowed vendors list: $($settings.autopilotDeviceAllowedVendors -join ', ')."
     if ($make -and $settings.autopilotDeviceAllowedVendors -and $settings.autopilotDeviceAllowedVendors.count -gt 0)
     {
         # Normalization helper: remove common suffixes & punctuation for broader matching
         $normalize = { param($s) if (-not $s)
             {
-                return '' 
+                return ''
             } ($s -replace '(?i)\b(corporation|corp\.?|inc\.?|co\.?|limited|ltd\.?|llc)\b', '').Trim().ToLower() }
         $normalizedMake = & $normalize $make
         $allowed = $false
@@ -128,12 +128,12 @@ function GetDeviceInfo()
         {
             $normalizedCandidate = & $normalize $candidate
             Write-Verbose "[$functionName] Comparing raw: '$make' vs '$candidate' | normalized: '$normalizedMake' vs '$normalizedCandidate'"
-            write-log -logFile $logFile -module $functionName -message "Comparing manufacturer '$make' (normalized '$normalizedMake') with allowed vendor '$candidate' (normalized '$normalizedCandidate')."
+            Write-Log -logFile $logFile -module $functionName -message "Comparing manufacturer '$make' (normalized '$normalizedMake') with allowed vendor '$candidate' (normalized '$normalizedCandidate')."
             if ($normalizedMake -eq $normalizedCandidate -or $normalizedMake.StartsWith($normalizedCandidate) -or $normalizedCandidate.StartsWith($normalizedMake))
             {
                 $allowed = $true
                 Write-Verbose "[$functionName] Match found: '$make' allowed by list entry '$candidate'."
-                write-log -logFile $logFile -module $functionName -message "Match found: Manufacturer '$make' allowed by list entry '$candidate'."
+                Write-Log -logFile $logFile -module $functionName -message "Match found: Manufacturer '$make' allowed by list entry '$candidate'."
                 break
             }
         }
@@ -145,13 +145,13 @@ function GetDeviceInfo()
         {
             $device['deviceAllowed'] = $false
             Write-Verbose "[$functionName] Manufacturer '$make' NOT found in allowed vendors list after evaluation."
-            write-log -logFile $logFile -module $functionName -message "Manufacturer '$make' NOT found in allowed vendors list after evaluation. Allowed list: $($settings.autopilotDeviceAllowedVendors -join ', ')."
+            Write-Log -logFile $logFile -module $functionName -message "Manufacturer '$make' NOT found in allowed vendors list after evaluation. Allowed list: $($settings.autopilotDeviceAllowedVendors -join ', ')."
         }
     }
     else
     {
         Write-Verbose "[$functionName] No allowed vendors are specified, all manufacturers are implicitly allowed."
-        write-log -logFile $logFile -module $functionName -message "No allowed vendors specified; manufacturer '$make' accepted by default."  
+        Write-Log -logFile $logFile -module $functionName -message "No allowed vendors specified; manufacturer '$make' accepted by default."
     }
     return $device
 }

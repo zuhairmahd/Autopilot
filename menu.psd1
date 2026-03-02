@@ -357,6 +357,18 @@
                     'admin',
                     'advancedRegistration'
                 )
+            },
+            @{
+                description           = 'Generate an Autopilot enrollment report'
+                name                  = "Autopilot enrollment report"
+                type                  = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin',
+                    'advanced',
+                    'registration',
+                    'advancedRegistration'
+                )
             }
         )
         includeInDisplayModes = @(
