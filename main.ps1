@@ -1853,6 +1853,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Quick Import device int
         Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
         return $null
     }
+    $settings.verifyAutopilotDeviceMinimumSpecs = $false
     if ($settings.verifyAutopilotDeviceMinimumSpecs)
     {
         Write-Host "Verifying device meets $($settings.companyName) minimum specifications for Autopilot enrollment..."
