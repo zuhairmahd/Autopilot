@@ -93,7 +93,19 @@ function Get-SystemInformation()
         {
             $null
         }
-        $OSServiceRelease = (Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion").DisplayVersion
+        $osRegProps = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion" -ErrorAction SilentlyContinue
+        if ($null -ne $osRegProps)
+        {
+            $OSServiceRelease = $osRegProps.DisplayVersion
+            if (-not $OSServiceRelease)
+            {
+                $OSServiceRelease = $osRegProps.ReleaseId
+            }
+        }
+        else
+        {
+            $OSServiceRelease = $null
+        }
         $computerInfo = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
 
         Write-Log -LogFile $logFile -Module $functionName -Message "OS: $($osInfo.Caption), Version: $($osInfo.Version), Build: $($osInfo.BuildNumber)" -LogLevel "Information"
