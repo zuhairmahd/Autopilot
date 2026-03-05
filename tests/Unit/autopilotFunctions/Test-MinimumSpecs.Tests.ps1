@@ -18,8 +18,12 @@ Describe "Function: Test-MinimumSpecs" -Tags 'Unit', 'AutopilotFunctions' {
         Mock Write-Log {}
         Mock Read-Host {}
 
-        function Get-SystemInformation {}
-        function Test-PIVReader {}
+        function Get-SystemInformation
+        {
+        }
+        function Test-PIVReader
+        {
+        }
 
         $script:logFile = "TestDrive:\autopilot.log"
     }
@@ -29,11 +33,12 @@ Describe "Function: Test-MinimumSpecs" -Tags 'Unit', 'AutopilotFunctions' {
             $script:settings = @{
                 minimumDevicePhysicalMemoryInGB = 8
                 operatingSystem                 = "Windows 10"
+                operatingSystemVersion          = 10
                 minimumOSBuild                  = 19041
                 runPIVTest                      = $false
             }
 
-            Mock Get-SystemInformation { return [PSCustomObject]@{ TotalMemoryGB = 16; OSName = "Windows 10 Enterprise"; OSBuild = 19045 } }
+            Mock Get-SystemInformation { return [PSCustomObject]@{ TotalMemoryGB = 16; OSName = "Windows 10 Enterprise"; OSVersion = "10"; OSBuild = 19045 } }
             Mock Test-PIVReader { return @{ Success = $true } }
         }
 
@@ -51,11 +56,12 @@ Describe "Function: Test-MinimumSpecs" -Tags 'Unit', 'AutopilotFunctions' {
             $script:settings = @{
                 minimumDevicePhysicalMemoryInGB = 16
                 operatingSystem                 = "Windows 11"
+                operatingSystemVersion          = 11
                 minimumOSBuild                  = 22000
                 runPIVTest                      = $true
             }
 
-            Mock Get-SystemInformation { return [PSCustomObject]@{ TotalMemoryGB = 8; OSName = "Windows 10 Enterprise"; OSBuild = 19044 } }
+            Mock Get-SystemInformation { return [PSCustomObject]@{ TotalMemoryGB = 8; OSName = "Windows 10 Enterprise"; OSVersion = "10"; OSBuild = 19044 } }
             Mock Test-PIVReader { return @{ Success = $false } }
         }
 
@@ -79,6 +85,7 @@ Describe "Function: Test-MinimumSpecs" -Tags 'Unit', 'AutopilotFunctions' {
             $script:settings = @{
                 minimumDevicePhysicalMemoryInGB = 8
                 operatingSystem                 = "Windows 10"
+                operatingSystemVersion          = 10
                 minimumOSBuild                  = 19041
                 runPIVTest                      = $true
             }
@@ -88,7 +95,7 @@ Describe "Function: Test-MinimumSpecs" -Tags 'Unit', 'AutopilotFunctions' {
         }
 
         It "uses green for passing checks and red for failing ones" {
-            Mock Get-SystemInformation { return [PSCustomObject]@{ TotalMemoryGB = 4; OSName = "Windows 10 Pro"; OSBuild = 19045 } }
+            Mock Get-SystemInformation { return [PSCustomObject]@{ TotalMemoryGB = 4; OSName = "Windows 10 Pro"; OSVersion = "10"; OSBuild = 19045 } }
 
             Test-MinimumSpecs -settings $script:settings -writeToConsole
 
@@ -99,7 +106,7 @@ Describe "Function: Test-MinimumSpecs" -Tags 'Unit', 'AutopilotFunctions' {
         }
 
         It "uses yellow when a value is unknown" {
-            Mock Get-SystemInformation { return [PSCustomObject]@{ TotalMemoryGB = $null; OSName = $null; OSBuild = $null } }
+            Mock Get-SystemInformation { return [PSCustomObject]@{ TotalMemoryGB = $null; OSName = $null; OSVersion = $null; OSBuild = $null } }
 
             Test-MinimumSpecs -settings $script:settings -writeToConsole
 
@@ -109,7 +116,7 @@ Describe "Function: Test-MinimumSpecs" -Tags 'Unit', 'AutopilotFunctions' {
         }
 
         It "prompts the user when running the PIV test" {
-            Mock Get-SystemInformation { return [PSCustomObject]@{ TotalMemoryGB = 8; OSName = "Windows 10 Enterprise"; OSBuild = 19045 } }
+            Mock Get-SystemInformation { return [PSCustomObject]@{ TotalMemoryGB = 8; OSName = "Windows 10 Enterprise"; OSVersion = "10"; OSBuild = 19045 } }
             Mock Read-Host {}
 
             Test-MinimumSpecs -settings $script:settings -writeToConsole
