@@ -238,7 +238,7 @@ function Get-ApplicationDefaults()
             operatingSystem                           = "Windows"
             operatingSystemVersion                    = 11
             operatingSystemServiceRelease             = '22h2'
-            minimumOSBuild                            = 26100
+            minimumOSBuild                            = '22h2'
             minUsernameLength                         = 3
             maxUserNameLength                         = 50
             maxSerialNumberLength                     = 50
