@@ -120,9 +120,9 @@ function Test-MinimumSpecs()
     Write-Verbose "[$functionName] Has correct memory: $hasCorrectMemory"
     Write-Log -logFile $logFile -module $functionName -message "Has correct memory: $hasCorrectMemory" -logLevel "Information"
 
-    $hasCorrectOS = if ($null -ne $settings.operatingSystem -and $null -ne $systemInformation.OSName)
+    $hasCorrectOS = if ($null -ne $systemInformation.OSName)
     {
-        $systemInformation.OSName -like "*$($settings.operatingSystem)*"
+        $systemInformation.OSName -like "*Windows 11*"
     }
     else
     {
