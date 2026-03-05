@@ -122,8 +122,7 @@ function Get-ApplicationDefaults()
             release                                   = "auto"
             operatingSystem                           = "Windows"
             operatingSystemVersion                    = 11
-            operatingSystemServiceRelease             = '22h2'
-            minimumOSBuild                            = '22h2'
+            minimumOSServiceRelease                   = '22h2'
             verifyAutopilotDeviceMinimumSpecs         = $true
             runPIVTest                                = $false
             preferredBrowser                          = 'Chrome'
@@ -237,8 +236,7 @@ function Get-ApplicationDefaults()
             runPIVTest                                = $false
             operatingSystem                           = "Windows"
             operatingSystemVersion                    = 11
-            operatingSystemServiceRelease             = '22h2'
-            minimumOSBuild                            = '22h2'
+            minimumOSServiceRelease                   = '22h2'
             minUsernameLength                         = 3
             maxUserNameLength                         = 50
             maxSerialNumberLength                     = 50

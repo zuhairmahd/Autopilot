@@ -155,7 +155,7 @@
         licenseURL                                = 'https://github.com/zuhairmahd/Autopilot/blob/master/LICENSE'
         operatingSystem                           = 'Windows'
         operatingSystemVersion                    = 11
-        operatingSystemServiceRelease             = '22h2'
+        minimumOSServiceRelease                   = '22h2'
         autoUpdate                                = $true
         preferredBrowser                          = 'Chrome'
         showLicenseBanner                         = $true
@@ -164,7 +164,7 @@
         timeInSeconds                             = 60
         useGridForLogDisplay                      = $true
         privateSession                            = $false
-        minimumOSBuild                            = '22h2'
+        minimumOSServiceRelease                   = '22h2'
         repoInfo                                  = @{
             repoPath      = 'zuhairmahd'
             baseSourceURL = 'https://raw.githubusercontent.com'

@@ -4,11 +4,11 @@ function Test-MinimumSpecs()
     .SYNOPSIS
         Validates whether the device meets minimum specifications.
     .DESCRIPTION
-        Checks operating system, OS build, memory, and PIV reader availability using provided settings and
+        Checks operating system, OS version, OS service release, memory, and PIV reader availability using provided settings and
         system probes. Logs results and can optionally emit color-coded console output. When strict mode is
         enabled, the function throws if requirements are not met instead of returning $false.
     .PARAMETER settings
-        Hashtable containing minimumDevicePhysicalMemoryInGB, operatingSystem, and minimumOSBuild values used
+        Hashtable containing minimumDevicePhysicalMemoryInGB, operatingSystem, operatingSystemVersion, and minimumOSServiceRelease values used
         for validation. Defaults to the global $settings variable when not provided.
     .PARAMETER writeToConsole
         Writes validation results and system information to the console when specified, using color-coded
@@ -62,10 +62,12 @@ function Test-MinimumSpecs()
     Write-Log -logFile $logFile -module $functionName -message "Strict mode: $strictMode, Write to console: $writeToConsole" -logLevel "Information"
     Write-Verbose "[$functionName] Required minimum device memory: $($settings.minimumDevicePhysicalMemoryInGB) GB"
     Write-Verbose "[$functionName] Required operating system: $($settings.operatingSystem)"
-    Write-Verbose "[$functionName] Required minimum OS build: $($settings.minimumOSBuild)"
+    Write-Verbose "[$functionName] Required minimum OS version: $($settings.operatingSystemVersion)"
+    Write-Verbose "[$functionName] Required minimum OS service release: $($settings.minimumOSServiceRelease)"
     Write-Log -logFile $logFile -module $functionName -message "Required minimum device memory: $($settings.minimumDevicePhysicalMemoryInGB) GB" -logLevel "Information"
     Write-Log -logFile $logFile -module $functionName -message "Required operating system: $($settings.operatingSystem)" -logLevel "Information"
-    Write-Log -logFile $logFile -module $functionName -message "Required minimum OS build: $($settings.minimumOSBuild)" -logLevel "Information"
+    Write-Log -logFile $logFile -module $functionName -message "Required minimum OS version: $($settings.operatingSystemVersion)" -logLevel "Information"
+    Write-Log -logFile $logFile -module $functionName -message "Required minimum OS service release: $($settings.minimumOSServiceRelease)" -logLevel "Information"
 
     # Determine whether to run the PIV test: explicit parameter overrides settings.runPIVTest
     $runPIVRequested = if ($PSBoundParameters.ContainsKey('runPIVTest'))
@@ -131,16 +133,30 @@ function Test-MinimumSpecs()
     Write-Verbose "[$functionName] Has correct OS: $hasCorrectOS"
     Write-Log -logFile $logFile -module $functionName -message "Has correct OS: $hasCorrectOS" -logLevel "Information"
 
-    $hasMinimumOS = if ($null -ne $systemInformation.OSVersion -and $null -ne $settings.operatingSystemVersion)
+    $hasMinimumOSVersion = if ($null -ne $systemInformation.OSMajorVersion -and $null -ne $settings.operatingSystemVersion)
     {
-        $systemInformation.OSVersion -ge $settings.operatingSystemVersion
+        $systemInformation.OSMajorVersion -ge $settings.operatingSystemVersion
     }
     else
     {
         $null
     }
-    Write-Verbose "[$functionName] Has minimum OS version: $hasMinimumOS"
-    Write-Log -logFile $logFile -module $functionName -message "Has minimum OS version: $hasMinimumOS" -logLevel "Information"
+    Write-Verbose "[$functionName] Has minimum OS major version: $hasMinimumOSVersion"
+    Write-Log -logFile $logFile -module $functionName -message "Has minimum OS major version: $hasMinimumOSVersion" -logLevel "Information"
+
+    $hasMinimumServiceRelease = if ($null -ne $systemInformation.OSServiceRelease -and $null -ne $settings.minimumOSServiceRelease)
+    {
+        # Service releases are compared as strings (e.g., '22h2', '23h2')
+        # For now, we'll just check if they match or if actual is >= required
+        # This is a simple string comparison; more sophisticated version comparison could be added
+        $systemInformation.OSServiceRelease -ge $settings.minimumOSServiceRelease
+    }
+    else
+    {
+        $null
+    }
+    Write-Verbose "[$functionName] Has minimum OS service release: $hasMinimumServiceRelease"
+    Write-Log -logFile $logFile -module $functionName -message "Has minimum OS service release: $hasMinimumServiceRelease" -logLevel "Information"
     $PIVReaderOK = if ($runPIVRequested)
     {
         $PIVReaderStatus.Success -eq $true
@@ -155,7 +171,8 @@ function Test-MinimumSpecs()
     if ($writeToConsole)
     {
         Write-BooleanStatus -Label "Has correct OS" -Value $hasCorrectOS
-        Write-BooleanStatus -Label "Has minimum OS build" -Value $hasMinimumOS
+        Write-BooleanStatus -Label "Has minimum OS version" -Value $hasMinimumOSVersion
+        Write-BooleanStatus -Label "Has minimum OS service release" -Value $hasMinimumServiceRelease
         Write-BooleanStatus -Label "Has correct memory" -Value $hasCorrectMemory
         $pivDisplayValue = if ($runPIVRequested)
         {
@@ -189,17 +206,31 @@ function Test-MinimumSpecs()
         }
     }
     $checks += [pscustomobject]@{
-        Name     = "OSBuild"
-        Passed   = $hasMinimumOS -eq $true
-        Expected = "Build >= $($settings.minimumOSBuild)"
-        Actual   = $systemInformation.OSBuild
-        Message  = if ($hasMinimumOS -eq $true)
+        Name     = "OSVersion"
+        Passed   = $hasMinimumOSVersion -eq $true
+        Expected = "Windows $($settings.operatingSystemVersion) or higher"
+        Actual   = "Windows $($systemInformation.OSMajorVersion)"
+        Message  = if ($hasMinimumOSVersion -eq $true)
         {
-            "OS build meets requirement."
+            "OS version meets requirement."
         }
         else
         {
-            "Expected OS build >= $($settings.minimumOSBuild), actual $($systemInformation.OSBuild)"
+            "Expected Windows $($settings.operatingSystemVersion) or higher, actual Windows $($systemInformation.OSMajorVersion)"
+        }
+    }
+    $checks += [pscustomobject]@{
+        Name     = "OSServiceRelease"
+        Passed   = $hasMinimumServiceRelease -eq $true
+        Expected = "Service release $($settings.minimumOSServiceRelease) or higher"
+        Actual   = $systemInformation.OSServiceRelease
+        Message  = if ($hasMinimumServiceRelease -eq $true)
+        {
+            "OS service release meets requirement."
+        }
+        else
+        {
+            "Expected service release $($settings.minimumOSServiceRelease) or higher, actual $($systemInformation.OSServiceRelease)"
         }
     }
     $checks += [pscustomobject]@{
