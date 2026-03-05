@@ -121,6 +121,8 @@ function Get-ApplicationDefaults()
             maxMenuItemsPerPage                       = 15
             release                                   = "auto"
             operatingSystem                           = "Windows"
+            operatingSystemVersion                    = 11
+            operatingSystemServiceRelease             = '22h2'
             minimumOSBuild                            = '22h2'
             verifyAutopilotDeviceMinimumSpecs         = $true
             runPIVTest                                = $false
@@ -234,6 +236,8 @@ function Get-ApplicationDefaults()
             verifyAutopilotDeviceMinimumSpecs         = $true
             runPIVTest                                = $false
             operatingSystem                           = "Windows"
+            operatingSystemVersion                    = 11
+            operatingSystemServiceRelease             = '22h2'
             minimumOSBuild                            = 26100
             minUsernameLength                         = 3
             maxUserNameLength                         = 50

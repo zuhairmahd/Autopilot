@@ -154,6 +154,8 @@
         documentationURL                          = 'https://github.com/zuhairmahd/Autopilot/blob/master/readme.md'
         licenseURL                                = 'https://github.com/zuhairmahd/Autopilot/blob/master/LICENSE'
         operatingSystem                           = 'Windows'
+        operatingSystemVersion                    = 11
+        operatingSystemServiceRelease             = '22h2'
         autoUpdate                                = $true
         preferredBrowser                          = 'Chrome'
         showLicenseBanner                         = $true

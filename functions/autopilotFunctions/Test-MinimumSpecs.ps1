@@ -120,9 +120,9 @@ function Test-MinimumSpecs()
     Write-Verbose "[$functionName] Has correct memory: $hasCorrectMemory"
     Write-Log -logFile $logFile -module $functionName -message "Has correct memory: $hasCorrectMemory" -logLevel "Information"
 
-    $hasCorrectOS = if ($null -ne $systemInformation.OSName)
+    $hasCorrectOS = if ($null -ne $systemInformation.OSName -and $null -ne $settings.operatingSystem)
     {
-        $systemInformation.OSName -like "*Windows 11*"
+        ($systemInformation.OSName -like "*$($settings.operatingSystem)*")
     }
     else
     {
@@ -131,16 +131,16 @@ function Test-MinimumSpecs()
     Write-Verbose "[$functionName] Has correct OS: $hasCorrectOS"
     Write-Log -logFile $logFile -module $functionName -message "Has correct OS: $hasCorrectOS" -logLevel "Information"
 
-    $hasMinimumOS = if ($null -ne $systemInformation.OSBuild -and $null -ne $settings.minimumOSBuild)
+    $hasMinimumOS = if ($null -ne $systemInformation.OSVersion -and $null -ne $settings.operatingSystemVersion)
     {
-        $systemInformation.OSBuild -ge $settings.minimumOSBuild
+        $systemInformation.OSVersion -ge $settings.operatingSystemVersion
     }
     else
     {
         $null
     }
-    Write-Verbose "[$functionName] Has minimum OS build: $hasMinimumOS"
-    Write-Log -logFile $logFile -module $functionName -message "Has minimum OS build: $hasMinimumOS" -logLevel "Information"
+    Write-Verbose "[$functionName] Has minimum OS version: $hasMinimumOS"
+    Write-Log -logFile $logFile -module $functionName -message "Has minimum OS version: $hasMinimumOS" -logLevel "Information"
     $PIVReaderOK = if ($runPIVRequested)
     {
         $PIVReaderStatus.Success -eq $true

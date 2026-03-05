@@ -85,6 +85,14 @@ function Get-SystemInformation()
         Write-Verbose "[$functionName] Retrieving operating system information"
 
         $osInfo = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
+        $OSVersion = if ($osInfo.Caption -match 'Windows\s+(\d+)')
+        {
+            $Matches[1]
+        }
+        else
+        {
+            $null
+        }
         $OSServiceRelease = (Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion").DisplayVersion
         $computerInfo = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
 
@@ -147,7 +155,7 @@ function Get-SystemInformation()
 
             # Operating System
             OSName                     = $osInfo.Caption
-            OSVersion                  = $osInfo.Version
+            OSVersion                  = $OSVersion
             OSServiceRelease           = $OSServiceRelease
             OSBuild                    = $osInfo.BuildNumber
             OSArchitecture             = $osInfo.OSArchitecture
