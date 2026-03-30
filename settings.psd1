@@ -1,4 +1,51 @@
-@{
+﻿@{
+    description       = 'This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.'
+    version           = '1.3.0.0'
+    auth              = @{
+        changePwOnNextStart = $false
+        authType            = 'PublicAuthFlow'
+        noSaveRefreshToken  = $false
+        forceNewToken       = $false
+        renewalLeadTime     = 5
+        scope               = @(
+            'Device.ReadWrite.All',
+            'DeviceManagementApps.Read.All',
+            'DeviceManagementConfiguration.ReadWrite.All',
+            'Mail.Send',
+            'DeviceManagementScripts.Read.All',
+            'DeviceManagementManagedDevices.PrivilegedOperations.All',
+            'DeviceManagementManagedDevices.ReadWrite.All',
+            'DeviceManagementServiceConfig.ReadWrite.All'
+        )
+        cacheType           = 'Disk'
+        secureString        = $false
+        delegated           = $true
+    }
+    cacheSettings     = @{
+        enabled                  = $true
+        defaultExpirationMinutes = 15
+        maxCacheSize             = 1000
+        cacheTypes               = @{
+            Configuration    = @{
+                enabled           = $true
+                expirationMinutes = 60
+            }
+            DirectoryObjects = @{
+                enabled           = $true
+                expirationMinutes = 15
+            }
+            Devices          = @{
+                enabled           = $true
+                expirationMinutes = 15
+            }
+        }
+    }
+    repoInfo          = @{
+        repoName      = 'Autopilot'
+        baseSourceURL = 'https://raw.githubusercontent.com'
+        baseURL       = 'https://www.github.com'
+        repoPath      = 'zuhairmahd'
+    }
     requiredScopes    = @(
         @{
             Scope     = 'User.Read.All'
@@ -24,9 +71,9 @@
             Reason    = 'Required to read application information and manage app assignments.'
         },
         @{
-            Scope     = 'Mail.Send'
-            Endpoints = @('me/sendMail')
-            Reason    = 'Required to send emails on behalf of the signed-in user.'
+            scope     = 'Mail.Send'
+            endpoints = @('me/sendMail')
+            reason    = 'Required to send emails on behalf of the signed-in user.'
         },
         @{
             Scope     = 'DeviceManagementConfiguration.Read.All'
@@ -61,134 +108,64 @@
             Reason    = 'Required to read BitLocker recovery keys for all devices.'
         },
         @{
-            Scope     = 'DeviceManagementConfiguration.ReadWrite.All'
-            Endpoints = @('deviceManagement/deviceConfigurations')
-            Reason    = 'Required to create, update, and delete Intune device configuration policies.'
+            scope     = 'DeviceManagementConfiguration.ReadWrite.All'
+            endpoints = @('deviceManagement/deviceConfigurations')
+            reason    = 'Required to create, update, and delete Intune device configuration policies.'
         },
         @{
-            Scope     = 'DeviceManagementApps.Read.All'
-            Endpoints = @('deviceAppManagement/mobileApps')
-            Reason    = 'Required to read application information in Intune.'
+            scope     = 'DeviceManagementApps.Read.All'
+            endpoints = @('deviceAppManagement/mobileApps')
+            reason    = 'Required to read application information in Intune.'
         },
         @{
-            Scope     = 'DeviceManagementManagedDevices.ReadWrite.All'
-            Endpoints = @('deviceManagement/managedDevices')
-            Reason    = 'Required to create, update, and delete Intune managed device properties.'
+            scope     = 'DeviceManagementManagedDevices.ReadWrite.All'
+            endpoints = @('deviceManagement/managedDevices')
+            reason    = 'Required to create, update, and delete Intune managed device properties.'
         },
         @{
-            Scope     = 'DeviceManagementScripts.Read.All'
-            Endpoints = @('deviceManagement/deviceHealthScripts')
-            Reason    = 'Required to read Intune device management scripts.'
+            scope     = 'DeviceManagementScripts.Read.All'
+            endpoints = @('deviceManagement/deviceHealthScripts')
+            reason    = 'Required to read Intune device management scripts.'
         },
         @{
-            Scope     = 'DeviceManagementScripts.ReadWrite.All'
-            Endpoints = @('deviceManagement/deviceHealthScripts')
-            Reason    = 'Required to create, update, and delete Intune device management scripts.'
-        },
-        @{
-            Scope     = 'AuditLog.Read.All'
-            Endpoints = @(
-                'auditLogs/signIns',
-                'auditLogs/signIns/id'
-            )
-            Reason    = 'Required to read sign-in activity logs for user authentication analysis in device reports.'
-        },
-        @{
-            Scope     = 'AuditLog.Read.All'
-            Endpoints = @(
-                'auditLogs/signIns',
-                'auditLogs/signIns/id'
-            )
-            Reason    = 'Required alongside AuditLog.Read.All to access sign-in logs and conditional access policy details.'
+            scope     = 'DeviceManagementScripts.ReadWrite.All'
+            endpoints = @('deviceManagement/deviceHealthScripts')
+            reason    = 'Required to create, update, and delete Intune device management scripts.'
         }
     )
-    auth              = @{
-        authType            = 'PublicAuthFlow'
-        noSaveRefreshToken  = $false
-        changePwOnNextStart = $false
-        scope               = @(
-            'Device.ReadWrite.All',
-            'DeviceManagementApps.Read.All',
-            'DeviceManagementConfiguration.ReadWrite.All',
-            'DeviceManagementScripts.Read.All',
-            'Mail.Send',
-            'DeviceManagementManagedDevices.PrivilegedOperations.All',
-            'DeviceManagementManagedDevices.ReadWrite.All',
-            'DeviceManagementServiceConfig.ReadWrite.All',
-            'AuditLog.Read.All',
-            'Directory.Read.All'
-        )
-        renewalLeadTime     = 5
-        forceNewToken       = $false
-        secureString        = $false
-        cacheType           = 'File'
-        delegated           = $true
-    }
-    repoInfo          = @{
-        repoName      = 'Autopilot'
-        baseSourceURL = 'https://raw.githubusercontent.com'
-        baseURL       = 'https://www.github.com'
-        repoPath      = 'zuhairmahd'
-    }
-    cacheSettings     = @{
-        maxCacheSize             = 1000
-        cacheTypes               = @{
-            Devices          = @{
-                enabled           = $true
-                expirationMinutes = 15
-            }
-            Configuration    = @{
-                enabled           = $true
-                expirationMinutes = 60
-            }
-            DirectoryObjects = @{
-                enabled           = $true
-                expirationMinutes = 15
-            }
-        }
-        defaultExpirationMinutes = 15
-        enabled                  = $true
-    }
     corporateSettings = @{
         useCorporateSettings       = $false
         corporateDomain            = ''
         corporateSettingsFilePaths = @()
     }
     globalSettings    = @{
-        release                                   = 'auto'
-        maxUserMatchDisplay                       = 10
-        includeEnrolledDevicesInNextUserReadiness = $true
-        runPIVTest                                = $false
-        hideEmptyMenus                            = $true
-        appModes                                  = @('full')
-        strongMappingOptional                     = $true
-        checkStrongMapping                        = $false
-        deviceContactThresholdInDays              = 30
-        maxWaitTime                               = 30
         configFile                                = '.\.secrets\config.json'
+        maxWaitTime                               = 30
+        showLicenseBanner                         = $true
         validateScopes                            = $true
+        deviceContactThresholdInDays              = 30
+        includeEnrolledDevicesInNextUserReadiness = $true
+        useGridForLogDisplay                      = $true
         DisplayManualFilterSelection              = $false
+        appModes                                  = @('full')
+        timeInSeconds                             = 60
+        maxUserMatchDisplay                       = 10
+        checkStrongMapping                        = $false
+        strongMappingOptional                     = $true
+        maxGroupMatchDisplay                      = 10
         maxMenuItemsPerPage                       = 15
+        release                                   = 'auto'
+        operatingSystem                           = 'Windows'
+        operatingSystemVersion                    = 11
+        minimumOSServiceRelease                   = '22h2'
+        verifyAutopilotDeviceMinimumSpecs         = $true
+        runPIVTest                                = $false
+        preferredBrowser                          = 'Chrome'
         documentationURL                          = 'https://github.com/zuhairmahd/Autopilot/blob/master/readme.md'
         licenseURL                                = 'https://github.com/zuhairmahd/Autopilot/blob/master/LICENSE'
-        operatingSystem                           = 'Windows'
-        autoUpdate                                = $true
-        preferredBrowser                          = 'Chrome'
-        showLicenseBanner                         = $true
-        maxGroupMatchDisplay                      = 10
-        migrateLegacyConfiguration                = $true
-        timeInSeconds                             = 60
-        useGridForLogDisplay                      = $true
         privateSession                            = $false
-        minimumOSBuild                            = 22610
-        repoInfo                                  = @{
-            repoPath      = 'zuhairmahd'
-            baseSourceURL = 'https://raw.githubusercontent.com'
-            repoName      = 'Autopilot'
-            baseURL       = 'https://www.github.com'
-        }
-        verifyAutopilotDeviceMinimumSpecs         = $true
+        migrateLegacyConfiguration                = $true
+        hideEmptyMenus                            = $true
+        autoUpdate                                = $true
     }
-    description       = 'This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.'
-    version           = '1.3.0.0'
 }

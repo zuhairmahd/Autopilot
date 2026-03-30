@@ -25,7 +25,9 @@ function Get-SystemInformation()
 
         Operating System:
         - OSName: The operating system name (Caption)
-        - OSVersion: The operating system version number
+        - OSVersion: The full operating system version (e.g., "10.0.22631.3155")
+        - OSMajorVersion: The major Windows version as an integer (e.g., 10, 11)
+        - OSServiceRelease: The Windows service release (e.g., '22h2', '23h2')
         - OSBuild: The operating system build number
         - OSArchitecture: The OS architecture (e.g., 64-bit)
         - InstallDate: The date the OS was installed
@@ -85,6 +87,35 @@ function Get-SystemInformation()
         Write-Verbose "[$functionName] Retrieving operating system information"
 
         $osInfo = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
+
+        # Preserve the full OS version string (e.g., "10.0.22631.3155")
+        $OSVersion = $osInfo.Version
+
+        # Extract the major Windows version as an integer (e.g., 10, 11) for numeric comparisons
+        $OSMajorVersion = if ($osInfo.Caption -match 'Windows\s+(\d+)')
+        {
+            [int]$Matches[1]
+        }
+        else
+        {
+            $null
+        }
+
+        # Extract OS Service Release (e.g., '22h2', '23h2') from registry
+        $osRegProps = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion" -ErrorAction SilentlyContinue
+        if ($null -ne $osRegProps)
+        {
+            $OSServiceRelease = $osRegProps.DisplayVersion
+            if (-not $OSServiceRelease)
+            {
+                $OSServiceRelease = $osRegProps.ReleaseId
+            }
+        }
+        else
+        {
+            $OSServiceRelease = $null
+        }
+
         $computerInfo = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
 
         Write-Log -LogFile $logFile -Module $functionName -Message "OS: $($osInfo.Caption), Version: $($osInfo.Version), Build: $($osInfo.BuildNumber)" -LogLevel "Information"
@@ -146,7 +177,9 @@ function Get-SystemInformation()
 
             # Operating System
             OSName                     = $osInfo.Caption
-            OSVersion                  = $osInfo.Version
+            OSVersion                  = $OSVersion
+            OSMajorVersion             = $OSMajorVersion
+            OSServiceRelease           = $OSServiceRelease
             OSBuild                    = $osInfo.BuildNumber
             OSArchitecture             = $osInfo.OSArchitecture
             InstallDate                = $osInfo.InstallDate
