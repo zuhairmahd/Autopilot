@@ -103,18 +103,7 @@ function Get-SystemInformation()
 
         # Extract OS Service Release (e.g., '22h2', '23h2') from registry
         $osRegProps = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion" -ErrorAction SilentlyContinue
-        if ($null -ne $osRegProps)
-        {
-            $OSServiceRelease = $osRegProps.DisplayVersion
-            if (-not $OSServiceRelease)
-            {
-                $OSServiceRelease = $osRegProps.ReleaseId
-            }
-        }
-        else
-        {
-            $OSServiceRelease = $null
-        }
+        $OSServiceRelease = if ($osRegProps.DisplayVersion) { $osRegProps.DisplayVersion } else { $osRegProps.ReleaseId }
 
         $computerInfo = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
 

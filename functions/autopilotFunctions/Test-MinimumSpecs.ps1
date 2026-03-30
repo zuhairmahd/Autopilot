@@ -74,10 +74,6 @@ function Test-MinimumSpecs()
     {
         [bool]$runPIVTest
     }
-    elseif ($settings -is [hashtable] -and $settings.ContainsKey('runPIVTest'))
-    {
-        [bool]$settings['runPIVTest']
-    }
     else
     {
         [bool]$settings.runPIVTest
@@ -146,9 +142,7 @@ function Test-MinimumSpecs()
 
     $hasMinimumServiceRelease = if ($null -ne $systemInformation.OSServiceRelease -and $null -ne $settings.minimumOSServiceRelease)
     {
-        # Service releases are compared as strings (e.g., '22h2', '23h2')
-        # For now, we'll just check if they match or if actual is >= required
-        # This is a simple string comparison; more sophisticated version comparison could be added
+        # String comparison of service release labels (e.g., '22h2', '23h2')
         $systemInformation.OSServiceRelease -ge $settings.minimumOSServiceRelease
     }
     else
@@ -157,14 +151,7 @@ function Test-MinimumSpecs()
     }
     Write-Verbose "[$functionName] Has minimum OS service release: $hasMinimumServiceRelease"
     Write-Log -logFile $logFile -module $functionName -message "Has minimum OS service release: $hasMinimumServiceRelease" -logLevel "Information"
-    $PIVReaderOK = if ($runPIVRequested)
-    {
-        $PIVReaderStatus.Success -eq $true
-    }
-    else
-    {
-        $true
-    }
+    $PIVReaderOK = (-not $runPIVRequested) -or ($PIVReaderStatus.Success -eq $true)
     Write-Verbose "[$functionName] PIV reader status OK: $PIVReaderOK"
     Write-Log -logFile $logFile -module $functionName -message "PIV reader status OK: $PIVReaderOK" -logLevel "Information"
 
