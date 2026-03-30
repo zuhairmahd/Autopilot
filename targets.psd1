@@ -14,14 +14,14 @@
                 noCleanup       = $false
                 skipModuleCheck = $true
             }
-            
+
             # Settings to apply to global settings.psd1
             globalSettings    = @{
                 autoUpdate        = $false
                 showLicenseBanner = $false
                 validateScopes    = $false
             }
-            
+
             # Settings to apply to corporate section
             corporateSettings = @{
                 useCorporateSettings       = $false
@@ -40,10 +40,10 @@
                 delegated           = $true
                 forceNewToken       = $false
             }
-            
+
             # Domain to use for domain-specific settings (optional)
             domain            = 'arabictutor.com'
-            
+
             # Settings to apply to domain configuration (when domain is specified)
             domainSettings    = @{
                 privateSession                  = $false
@@ -64,7 +64,7 @@
                 maxNumberOfDevicesAllowed       = 15
                 autopilotDeviceAllowedVendors   = @(
                     'vmware'
-                ) 
+                )
                 autopilotProfilesToInclude      = @(
                     @{
                         id   = 'edaca6f4-58e4-4a55-a985-52c8f74fb6c4'
@@ -114,10 +114,10 @@
                 domain                          = 'arabictutor.com'
                 deviceNamePrefix                = 'vmware'
             }
-            
+
             description       = 'Development build with test mode enabled and signing disabled'
         }
-        
+
         # LHM build (example for gao.gov)
         lhm        = @{
             buildParameters = @{
@@ -126,13 +126,13 @@
                 Overwrite       = $true
                 skipModuleCheck = $true
             }
-            
+
             globalSettings  = @{
                 testMode       = $false
                 autoUpdate     = $true
                 validateScopes = $false
             }
-            
+
             authSettings    = @{
                 changePwOnNextStart = $true
                 validateScopes      = $false
@@ -155,9 +155,9 @@
                 secureString        = $false
                 renewalLeadTime     = 5
             }
-            
+
             domain          = 'gao.gov'
-            
+
             domainSettings  = @{
                 privateSession                            = $true
                 appModes                                  = @(
@@ -191,6 +191,8 @@
                 minUsernameLength                         = 3
                 version                                   = '1.3.0.0'
                 operatingSystem                           = 'Windows'
+                operatingSystemVersion                    = 11
+                minimumOSServiceRelease                   = '23h2'
                 minSerialNumberLength                     = 7
                 maxUserNameLength                         = 50
                 validateScopes                            = $false
@@ -241,10 +243,10 @@
                 domain                                    = 'gao.gov'
                 deviceNamePrefix                          = 'w11-'
             }
-            
+
             description     = 'LHM build for gao.gov'
         }
-        
+
         # Production build target
         production = @{
             # Build parameters that are passed to CreateRelease.ps1
@@ -256,14 +258,14 @@
                 skipModuleCheck = $true
                 noCleanup       = $false
             }
-            
+
             # Settings to apply to global settings.psd1
             globalSettings  = @{
                 autoUpdate        = $true
                 showLicenseBanner = $true
                 validateScopes    = $true
             }
-            
+
             authSettings    = @{
                 changePwOnNextStart = $true
                 validateScopes      = $false
@@ -285,10 +287,10 @@
                 secureString        = $false
                 renewalLeadTime     = 5
             }
-            
+
             # Domain to use for domain-specific settings (optional)
-            domain          = 'gao.gov'            
-            
+            domain          = 'gao.gov'
+
             # Settings to apply to domain configuration (when domain is specified)
             domainSettings  = @{
                 privateSession                  = $true
@@ -366,10 +368,10 @@
                 domain                          = 'gao.gov'
                 deviceNamePrefix                = 'w11-'
             }
-            
+
             description     = 'Production build with full settings and signing enabled'
         }
-        
+
         # Testing target for CI/CD validation
         ci_test    = @{
             buildParameters = @{
@@ -380,20 +382,20 @@
                 Overwrite       = $true
                 noCleanup       = $false
             }
-            
+
             globalSettings  = @{
                 testMode       = $true
                 autoUpdate     = $false
                 validateScopes = $false
             }
-            
+
             authSettings    = @{
                 changePwOnNextStart = $false
             }
-            
+
             domain          = $null
             domainSettings  = @{}
-            
+
             description     = 'CI/CD testing target with minimal settings for pipeline validation'
         }
     }
