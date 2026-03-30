@@ -160,7 +160,8 @@
         maxMenuItemsPerPage = 15
         release = 'auto'
         operatingSystem = 'Windows'
-        minimumOSBuild = 22610
+        operatingSystemVersion = 11
+        minimumOSServiceRelease = '22h2'
         verifyAutopilotDeviceMinimumSpecs = $true
         runPIVTest = $false
         preferredBrowser = 'Chrome'
