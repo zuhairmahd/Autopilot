@@ -174,6 +174,7 @@
     All operations are logged to the specified log file. Use -LogLevel to control verbosity.
     Use -OverwriteLogs to start with a fresh log file on each run.
 #>
+
 [CmdletBinding()]
 param(
     [string]$configFile = "$pwd\.secrets\config.json",
@@ -374,6 +375,7 @@ function Find-FolderPath()
         return $null
     }
 }
+
 $functionsFolder = find-folderPath -Path $scriptPath -FolderName 'functions'
 if (Test-Path $functionsFolder)
 {
@@ -551,7 +553,7 @@ if ($testMode -and -not $script:testModeOptions.cleanup)
 }
 else
 {
-    $filesCleaned = Remove-TempFiles
+    $filesCleaned = cleanupTempFiles
     if ($filesCleaned.AllRemoved)
     {
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
@@ -629,6 +631,8 @@ if ($testMode -and -not $script:testModeOptions.config)
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode: Skipping configuration loading" -LogLevel "Information"
     # Set minimal test values
     $domain = "test.contoso.com"
+    $appId = "00000000-0000-0000-0000-000000000000"
+    $tenantId = "00000000-0000-0000-0000-000000000000"
     $name = "Test Application"
 }
 # In test mode without a test password and config file exists, skip config loading
@@ -638,6 +642,8 @@ elseif ($testMode -and -not $TestPassword -and (Test-Path $configFile))
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode enabled without test password, skipping encrypted config file loading" -LogLevel "Information"
     # Set dummy values for required variables
     $domain = "test.local"
+    $appId = "test-app-id"
+    $tenantId = "test-tenant-id"
     $name = "Test Configuration"
 }
 elseif (Test-Path $configFile)
@@ -656,6 +662,8 @@ elseif (Test-Path $configFile)
 
     $configContent = $sessionResult.ConfigContent
     $domain = $sessionResult.Domain
+    $appId = $sessionResult.AppId
+    $tenantId = $sessionResult.TenantId
     $name = $sessionResult.Name
 
     if (-not ($sessionResult.encrypted))
@@ -693,6 +701,8 @@ else
 
         # Set default test values
         $domain = "test.contoso.com"
+        $appId = "00000000-0000-0000-0000-000000000000"
+        $tenantId = "00000000-0000-0000-0000-000000000000"
         $name = "Test Application"
 
         # Skip config file loading in test mode
@@ -738,6 +748,8 @@ else
 
                 $configContent = $sessionResult.ConfigContent
                 $domain = $sessionResult.Domain
+                $appId = $sessionResult.AppId
+                $tenantId = $sessionResult.TenantId
                 $name = $sessionResult.Name
                 Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully for domain: $domain" -LogLevel "Information"
                 # Clear the config content from memory
@@ -784,8 +796,9 @@ else
         Write-Verbose "[$scriptName] Global settings count: $($globalSettings.Count)"
         Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
         Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
+        Write-Verbose "[$scriptName] Menus count: $($menus.Count)"
         Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
     }
     else
     {
@@ -800,32 +813,17 @@ else
 
 #region initialize script objects
 Write-Host "Loading configuration..."
-
-$startTime = Get-Date
-
-$configResult = Initialize-FastStart -initFile $InitFile -stringsFile $stringsFile -menuFile $menuFile -menuCacheFile $menuCacheFile -domain $domain -ScriptPath $ScriptPath
-if ($configResult.success)
+# Use domain if available, otherwise default to contoso.com
+$domainForDefaults = if ($domain)
 {
-    Write-Log -logFile $logFile -module $scriptName -message "Fast start configuration load succeeded."
-    Write-Verbose "[$scriptName] Fast start configuration load succeeded."
-    Write-Host "Fast start configuration load succeeded."
-    $script:menus = if ($configResult.menus)
-    {
-        $configResult.menus
-    }
-    else
-    {
-        $null
-    }
+    $domain
 }
 else
 {
-    Write-Log -logFile $logFile -module $scriptName -message "Fast start configuration load failed, falling back to full initialization."
-    Write-Verbose "[$scriptName] Fast start configuration load failed, falling back to full initialization."
-    Write-Host "Performing full configuration initialization..."
-    $configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domain -BoundParameters $PSBoundParameters
+    "contoso.com"
 }
 
+$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -BoundParameters $PSBoundParameters
 if (-not $configResult.Success)
 {
     Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
@@ -859,7 +857,7 @@ Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
 Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
 Write-Verbose "[$scriptName] Menus count: $($configResult.menu.Count)"
 Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
-Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
 if (-not $version.version)
 {
     Write-Verbose "[$scriptName] Unable to get file version."
@@ -1017,6 +1015,7 @@ if ($showAuth)
 {
     Write-Host "$($key): $($getTokenParams[$key])" -ForegroundColor Cyan
     $global:previousMenu = New-Object System.Collections.Hashtable
+    # Device enrollment state cache content has been migrated to the unified cache system.
 }
 Write-Verbose "[$scriptName] Using authentication parameters: $($getTokenParams | ConvertTo-Json -Depth $maxJSONDepth)"
 Write-Verbose "[$scriptName] Loading strings from: $stringsFile"
@@ -1049,7 +1048,7 @@ if ($settings.showLicenseBanner)
     Write-Host "Use at your own risk. The author is not responsible for any damage or data loss." -ForegroundColor Red
     Write-Host "==========================================================`n" -ForegroundColor White
 }
-if ($updateAvailable.success -and $updateAvailable.updateAvailable -and $scriptName.EndsWith('.exe'))
+if ($updateAvailable.success -and $updateAvailable.updateAvailable)
 {
     Write-Verbose "[$scriptName] An update is available: $($updateAvailable.version.major).$($updateAvailable.version.minor).$($updateAvailable.version.build) ($($updateAvailable.version.revision))"
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "An update is available: $($updateAvailable.version.major).$($updateAvailable.version.minor).$($updateAvailable.version.build) (revision $($updateAvailable.version.revision))"
@@ -1388,24 +1387,29 @@ else
         }
     }
 }
+
+# Early exit point for test mode when exitAfter is true
+if ($testMode -and $script:testModeOptions.exitAfter)
+{
+    Write-Verbose "[$scriptName] Test mode: Exiting after initialization phases (testModeOptions.exitAfter = true)"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode: Exiting after initialization phases complete" -LogLevel "Information"
+    Write-Host "Test mode: Initialization phases completed successfully" -ForegroundColor Green
+
+    # Cleanup before exit
+    Clear-SecureMemory -ClearScriptVariables
+    Write-Log -LogFile $LogFile -FinishLogging
+    exit 0
+}
 #endregion initialization block with access token
 
 #region Create menus
-#load menus from cache if they were returned by the Invoke-FastStart function
-if ($null -ne $script:menus)
+# Clear menu configuration cache to ensure fresh menu loading
+# Write-Verbose "[$scriptName] Clearing menu configuration cache"
+# Invoke-CacheManagement -Action ClearSpecific -CacheType Menu
+#Now load the menu configuration
+$menuConfig = $configResult.menu
+if ($menuConfig)
 {
-    Write-Verbose "[$scriptName] Loaded $($script:menus.Count) menu items from cache."
-    Write-Log -LogFile $LogFile -Module $scriptName -Message "Loaded $($script:menus.Count) menu items from cache."
-    Write-Host "Menus initialized through fast start." -ForegroundColor Green
-}
-else
-{
-    Write-Host "Loading menu configuration..."
-    # Clear menu configuration cache to ensure fresh menu loading
-    Write-Verbose "[$scriptName] Clearing menu configuration cache"
-    Invoke-CacheManagement -Action ClearSpecific -CacheType Menu
-    #Now load the menu configuration
-    $menuConfig = $configResult.menu
     # Convert the flat menu.psd1 structure to array format for Test-MenuItemIncluded
     foreach ($menuName in $menuConfig.keys)
     {
@@ -1417,39 +1421,6 @@ else
         }
     }
     Write-Verbose "Loaded $($script:menus.Count) menu items for filtering"
-    Write-Host "Building menu cache..."
-    $script:menus | ConvertTo-Json -Depth $maxJSONDepth | Out-File -FilePath $menuCacheFile -Encoding UTF8 -Force
-    if (Test-Path $menuCacheFile)
-    {
-        Write-Verbose "[$scriptName] Menu configuration cached to $menuCacheFile"
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Menu configuration cached to $menuCacheFile" -LogLevel "Information"
-        Write-Host "Menu configuration cached successfully." -ForegroundColor Green
-    }
-    else
-    {
-        Write-Verbose "[$scriptName] Failed to cache menu configuration to $menuCacheFile"
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to cache menu configuration to $menuCacheFile" -LogLevel "Warning"
-        Write-Host "Failed to cache menu configuration." -ForegroundColor Yellow -NoNewline
-        Write-Host "Will try next time."
-    }
-}
-
-$duration = (Get-Date) - $startTime
-$durationMs = $duration.TotalMilliseconds
-Write-Host "Initialization completed in $($duration.Minutes) minutes and $($duration.Seconds) seconds ($([math]::Round($durationMs, 2)) ms)." -ForegroundColor Green
-Write-Log -logFile $logFile -module $scriptName -message "Initialization completed in $([math]::Round($durationMs, 2)) milliseconds." -LogLevel "Information"
-
-# Early exit point for test mode when exitAfter is true (after duration is calculated)
-if ($testMode -and $script:testModeOptions.exitAfter)
-{
-    Write-Verbose "[$scriptName] Test mode: Exiting after initialization complete with duration measurement (testModeOptions.exitAfter = true)"
-    Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode: Exiting after initialization complete. Duration: $([math]::Round($durationMs, 2)) milliseconds." -LogLevel "Information"
-    Write-Host "Test mode: Initialization completed in $([math]::Round($durationMs, 2)) ms" -ForegroundColor Green
-
-    # Cleanup before exit
-    Clear-SecureMemory -ClearScriptVariables
-    Write-Log -LogFile $LogFile -FinishLogging
-    exit 0
 }
 $mainMenu = NewMenu -MenuName "mainMenu"
 $CheckMenu = NewMenu -MenuName "checkMenu"
@@ -1763,25 +1734,7 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial nu
         if ($null -eq $result)
         {
             Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
-            Write-Log -logFile $logFile -module $scriptName -message "ProcessSerialNumber returned exit signal" -LogLevel "Information"
             return "EXIT_APPLICATION"
-        }
-        elseif ($result -eq $true)
-        {
-            Write-Verbose "[$scriptName] Operation completed successfully for serial number $serialNumber."
-            Write-Log -logFile $logFile -module $scriptName -message "Operation completed successfully for serial number $serialNumber." -LogLevel "Information"
-        }
-        elseif ($result -in @($returnValues.exitString, $returnValues.backoutText, "Main Menu"))
-        {
-            Write-Verbose "[$scriptName] Returning special value: $result"
-            Write-Log -logFile $logFile -module $scriptName -message "Returning special value from serial number processing: $result" -LogLevel "Information"
-            return $result
-        }
-        elseif ($result) # Catches any other non-null, non-false, non-empty-string result
-        {
-            Write-Verbose "[$scriptName] Operation returned result for serial number $($serialNumber): $result"
-            Write-Log -logFile $logFile -module $scriptName -message "Operation returned result for serial number $($serialNumber): $result" -LogLevel "Information"
-            Write-Host $result
         }
     }
     else
@@ -1853,34 +1806,6 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Quick Import device int
         Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
         return $null
     }
-    if ($settings.verifyAutopilotDeviceMinimumSpecs)
-    {
-        Write-Host "Verifying device meets $($settings.companyName) minimum specifications for Autopilot enrollment..."
-        Write-Log -logFile $LogFile -Module $scriptName -Message "Verifying device meets $($settings.companyName) minimum specifications for Autopilot enrollment." -LogLevel "Information"
-        $minimumSpecResult = Test-MinimumSpecs -settings $settings -writeToConsole
-        if ($minimumSpecResult.Success)
-        {
-            Write-Verbose "[$scriptName] Device meets minimum specifications for Autopilot."
-            Write-Log -logFile $LogFile -Module $scriptName -Message "Device meets minimum specifications for Autopilot." -LogLevel "Information"
-            Write-Host "This device meets the minimum specifications for Autopilot enrollment as defined in the settings." -ForegroundColor Green
-        }
-        else
-        {
-            Write-Host "This device does not meet the minimum specifications for Autopilot enrollment as defined in the settings." -ForegroundColor Red
-            Write-Host "Details: $($minimumSpecResult.Message)" -ForegroundColor Yellow
-            foreach ($check in $minimumSpecResult.Checks | Where-Object { $_.Passed -ne $true })
-            {
-                Write-Host " - $($check.Name): expected $($check.Expected); actual $($check.Actual)" -ForegroundColor Yellow
-            }
-            Write-Host "Please review and adjust the settings if you wish to proceed with importing this device." -ForegroundColor Red
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "Device does not meet minimum specifications for Autopilot. $($minimumSpecResult.Message)" -LogLevel "Error"
-            return $returnValues.minimumSpecsNotMetMessage
-        }
-    }
-    else
-    {
-        Write-Log -logFile $LogFile -Module $scriptName -Message "Skipping minimum specifications check for Autopilot as it is disabled in settings." -LogLevel "Information"
-    }
     $result = PrepareImportDevice -accessToken $accessToken
     Write-Verbose "[$scriptName] Result of quick import: $result"
 }
@@ -1896,42 +1821,6 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Custom import device in
         Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
         Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
         return $null
-    }
-    Write-Host "Would you like to perform the minimum device specification check before proceeding with the custom import?"
-    $performCheck = Read-Host -Prompt "Enter 'yes' to perform the check or 'no' to skip"
-    while ($performCheck -notin @('yes', 'no', 'y', 'n'))
-    {
-        Write-Host "Invalid choice. Please enter 'yes' or 'no'." -ForegroundColor Red
-        [console]::beep(1000, 500)
-        $performCheck = Read-Host -Prompt "Enter 'yes' to perform the check or 'no' to skip"
-    }
-    if ($performCheck -in @('yes', 'y'))
-    {
-        Write-Host "Verifying device meets $($settings.companyName) minimum specifications for Autopilot enrollment..."
-        Write-Log -logFile $LogFile -Module $scriptName -Message "Verifying device meets $($settings.companyName) minimum specifications for Autopilot enrollment." -LogLevel "Information"
-        $minimumSpecResult = Test-MinimumSpecs -settings $settings -writeToConsole
-        if ($minimumSpecResult.Success)
-        {
-            Write-Verbose "[$scriptName] Device meets minimum specifications for Autopilot."
-            Write-Log -logFile $LogFile -Module $scriptName -Message "Device meets minimum specifications for Autopilot." -LogLevel "Information"
-            Write-Host "This device meets the minimum specifications for Autopilot enrollment as defined in the settings." -ForegroundColor Green
-        }
-        else
-        {
-            Write-Host "This device does not meet the minimum specifications for Autopilot enrollment as defined in the settings." -ForegroundColor Red
-            Write-Host "Details: $($minimumSpecResult.Message)" -ForegroundColor Yellow
-            foreach ($check in $minimumSpecResult.Checks | Where-Object { $_.Passed -ne $true })
-            {
-                Write-Host " - $($check.Name): expected $($check.Expected); actual $($check.Actual)" -ForegroundColor Yellow
-            }
-            Write-Host "Please review and adjust the settings if you wish to proceed with importing this device." -ForegroundColor Red
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "Device does not meet minimum specifications for Autopilot. $($minimumSpecResult.Message)" -LogLevel "Error"
-            return $returnValues.minimumSpecsNotMetMessage
-        }
-    }
-    else
-    {
-        Write-Log -logFile $LogFile -Module $scriptName -Message "Skipping minimum specifications check for Autopilot as per user choice." -LogLevel "Information"
     }
     $result = PrepareImportDevice -accessToken $accessToken -CustomImport
     if ($result -eq $returnValues.backoutText)
@@ -1955,11 +1844,11 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import Corporate Device
     }
     $deviceIdentifier = GetDeviceInfo -nohash
     Write-Verbose "[$scriptName] Device identifier: $($deviceIdentifier | Out-String)"
-    Write-Log -logFile $LogFile -Module $scriptName -Message "Device identifier: $($deviceIdentifier | Out-String)" -LogLevel "Verbose"
+    Write-Log -logFile $LogFile -Module $functionName -Message "Device identifier: $($deviceIdentifier | Out-String)" -LogLevel "Verbose"
     if ($deviceIdentifier.deviceAllowed -eq $false)
     {
         Write-Host "The device manufacturer $($deviceIdentifier.manufacturer) is not allowed." -ForegroundColor Red
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Device manufacturer $($deviceIdentifier.manufacturer) is not allowed" -LogLevel "Error"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Device manufacturer $($deviceIdentifier.manufacturer) is not allowed" -LogLevel "Error"
         return $returnValues.manufacturerNotAllowed
     }
     if ($deviceIdentifier -and $deviceIdentifier.SerialNumber)
@@ -2137,96 +2026,9 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Auto
         Write-Verbose "[$scriptName] Device deletion result: $result"
     }
 }
-$autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Autopilot enrollment report" -action {
-    $autopilotReportInput = Get-AutopilotEnrollmentReportInput
-    Write-Log -logFile $logFile -module $scriptName -Message "User input received: $($autopilotReportInput | Out-String)"
-    $analysisParams = @{
-        accessToken = $accessToken
-    }
-    if ($autopilotReportInput.StartDate)
-    {
-        $analysisParams['StartDate'] = $autopilotReportInput.StartDate
-    }
-    if ($autopilotReportInput.EndDate)
-    {
-        $analysisParams['EndDate'] = $autopilotReportInput.EndDate
-    }
-    if ($autopilotReportInput.UserPrincipalName)
-    {
-        $analysisParams['UserPrincipalName'] = $autopilotReportInput.UserPrincipalName
-    }
-    Write-Log -logFile $logFile -Module $scriptName -Message "Analysis parameters set: $($analysisParams | Out-String)"
-    $analysis = Get-AutopilotEventAnalysis @analysisParams
-    Write-Log -logFile $logFile -Module $scriptName -Message "Analysis results obtained: $($analysis | Out-String)"
-    # Display results
-    Show-AutopilotEventAnalysis -AnalysisData $analysis -ShowSummary -ShowMultipleFailures -ShowSingleFailures -ShowChronologicalFailures -ShowDetailedFailures
-
-    # Prompt for export
-    Write-Host "`nWould you like to export the analysis to CSV? (Y/N): " -NoNewline -ForegroundColor Yellow
-    $exportChoice = Read-Host
-    while ($exportChoice -notin @('Y', 'y', 'N', 'n'))
-    {
-        Write-Host "Invalid choice. Please enter 'Y' for Yes or 'N' for No: " -NoNewline -ForegroundColor Yellow
-        [console]::beep(300, 100)
-        $exportChoice = Read-Host
-    }
-    if ($exportChoice -eq 'Y' -or $exportChoice -eq 'y')
-    {
-        Write-Log -logFile $logFile -Module $scriptName -Message "User chose to export analysis results."
-        $exportResult = Export-AutopilotEventAnalysis -AnalysisData $analysis
-        Write-Log -logFile $logFile -Module $scriptName -Message "Export result: $($exportResult | Out-String)"
-        if ($exportResult.Success)
-        {
-            Write-Host "Analysis exported successfully" -ForegroundColor Green
-            write-log -logFile $logFile -Module $scriptName -Message "Analysis exported successfully to $($exportResult.ExportedFiles -join ', ')"
-        }
-        else
-        {
-            Write-Host "Failed to export analysis: $($exportResult.Error)" -ForegroundColor Red
-            write-log -logFile $logFile -Module $scriptName -Message "Failed to export analysis: $($exportResult.Error)" -logLevel "ERROR"
-        }
-    }
-    else
-    {
-        Write-Log -logFile $logFile -Module $scriptName -Message "User chose not to export analysis results."
-        Write-Host "Export skipped." -ForegroundColor Yellow
-        return $returnValues.backoutText
-    }
-}
 #endregion Autopilot menu
 
 #region Environment menu
-$environmentMenu = AddMenuItem -menu $environmentMenu -Name "View global environment settings" -Action {
-    Write-Host "Displaying global environment settings..." -ForegroundColor Cyan
-    $success = Show-SettingsViewer -SettingsType "Global" -SettingsFile $InitFile
-    if ($success)
-    {
-        Write-Host "`nGlobal settings displayed successfully." -ForegroundColor Green
-    }
-    else
-    {
-        Write-Host "`nFailed to display global settings. Please check the logs for details." -ForegroundColor Red
-    }
-}
-$environmentMenu = AddMenuItem -menu $environmentMenu -Name "View domain specific environment settings" -Action {
-    Write-Host "Displaying domain-specific environment settings..." -ForegroundColor Cyan
-    # Get the current domain from settings
-    $currentDomain = $domain
-    if ([string]::IsNullOrWhiteSpace($currentDomain))
-    {
-        Write-Host "No domain specified. Cannot view domain-specific settings." -ForegroundColor Red
-        return $returnValues.backoutText
-    }
-    $success = Show-SettingsViewer -SettingsType "Domain" -DomainName $currentDomain -SettingsFile $InitFile
-    if ($success)
-    {
-        Write-Host "`nDomain settings for '$currentDomain' displayed successfully." -ForegroundColor Green
-    }
-    else
-    {
-        Write-Host "`nFailed to display domain settings. Please check the logs for details." -ForegroundColor Red
-    }
-}
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "View group inclusion/exclusion settings for all domains" -Action {
     Write-Host "Displaying group inclusion/exclusion settings..." -ForegroundColor Cyan
     Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
@@ -2285,8 +2087,6 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change authenticati
     }
 }
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change inclusion/exclusion" -subMenu $inclusionExclusionMenu
-#endregion Environment menu
-
 $inclusionExclusionMenu = AddMenuItem -menu $inclusionExclusionMenu -Name "Change group inclusion/exclusion" -Action {
     Write-Host "Launching groups editor..." -ForegroundColor Cyan
     Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
@@ -2335,6 +2135,7 @@ $inclusionExclusionMenu = AddMenuItem -menu $inclusionExclusionMenu -Name "Chang
         return $result
     }
 }
+#endregion Environment menu
 
 #region Settings menu
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment settings" -subMenu $environmentMenu
@@ -2392,7 +2193,7 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settin
     {
         Write-Host "Auto Update settings saved successfully." -ForegroundColor Green
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Auto Update settings saved successfully." -LogLevel "Information"
-        $filesCleaned = Remove-TempFiles
+        $filesCleaned = cleanupTempFiles
         if ($filesCleaned.AllRemoved)
         {
             Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
@@ -2437,19 +2238,19 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings"
         }
         if ($saveResult)
         {
-            Write-Log -LogFile $logFile -Module $scriptName -Message "Successfully saved app mode configuration to $storageType" -LogLevel "Information"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Successfully saved app mode configuration to $storageType" -LogLevel "Information"
             Write-Host "App mode configuration saved successfully to $storageType" -ForegroundColor Green
         }
         else
         {
-            Write-Log -LogFile $logFile -Module $scriptName -Message "Failed to save app mode configuration" -LogLevel "Error"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to save app mode configuration" -LogLevel "Error"
             Write-Host "Failed to save app mode configuration" -ForegroundColor Red
         }
     }
     catch
     {
         $errorMessage = "Error saving app mode configuration: $($_.Exception.Message)"
-        Write-Log -LogFile $logFile -Module $scriptName -Message $errorMessage -LogLevel "Error"
+        Write-Log -LogFile $logFile -Module $functionName -Message $errorMessage -LogLevel "Error"
         Write-Host $errorMessage -ForegroundColor Red
         return $null
     }
@@ -2676,10 +2477,10 @@ $script:ShowGroupAssignmentsAction = {
     }
     #endregion Resolve group using unified Resolve-DirectoryObject with entity return
 
-    # Call ShowGroupAssignments to display the group's assignments
-    Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName) with IncludeIndirect=$IncludeIndirectAssignments"
-    Write-Log -logFile $LogFile -Module $scriptName -Message "Building splat for ShowGroupAssignments call" -LogLevel "Information"
-    $showGroupAssignmentsSplat = @{
+    # Call Show-GroupAssignments to display the group's assignments
+    Write-Verbose "[$scriptName] Calling Show-GroupAssignments for group: $($selectedGroup.displayName) with IncludeIndirect=$IncludeIndirectAssignments"
+    Write-Log -logFile $LogFile -Module $scriptName -Message "Building splat for Show-GroupAssignments call" -LogLevel "Information"
+    $ShowGroupAssignmentsSplat = @{
         AccessToken = $accessToken
         Settings    = $global:settings
         Group       = $selectedGroup
@@ -2687,24 +2488,24 @@ $script:ShowGroupAssignmentsAction = {
 
     if ($IncludeIndirectAssignments)
     {
-        $showGroupAssignmentsSplat['ShowIndirectAssignments'] = $true
-        $showGroupAssignmentsSplat['SpecialGroups'] = $specialGroups
-        Write-Log -logFile $LogFile -Module $scriptName -Message "Added ShowIndirectAssignments and SpecialGroups parameters to ShowGroupAssignments splat" -LogLevel "Information"
+        $ShowGroupAssignmentsSplat['ShowIndirectAssignments'] = $true
+        $ShowGroupAssignmentsSplat['SpecialGroups'] = $specialGroups
+        Write-Log -logFile $LogFile -Module $scriptName -Message "Added ShowIndirectAssignments and SpecialGroups parameters to Show-GroupAssignments splat" -LogLevel "Information"
     }
 
     if ($exportInstead)
     {
-        $showGroupAssignmentsSplat['exportInstead'] = $true
-        Write-Log -logFile $LogFile -Module $scriptName -Message "Added exportInstead parameter to ShowGroupAssignments splat" -LogLevel "Information"
+        $ShowGroupAssignmentsSplat['exportInstead'] = $true
+        Write-Log -logFile $LogFile -Module $scriptName -Message "Added exportInstead parameter to Show-GroupAssignments splat" -LogLevel "Information"
     }
     if ($settings.HideEmptyMenus)
     {
-        $showGroupAssignmentsSplat['HideEmptyMenus'] = $true
-        Write-Log -logFile $LogFile -Module $scriptName -Message "Added HideEmptyMenus parameter to ShowGroupAssignments splat" -LogLevel "Information"
+        $ShowGroupAssignmentsSplat['HideEmptyMenus'] = $true
+        Write-Log -logFile $LogFile -Module $scriptName -Message "Added HideEmptyMenus parameter to Show-GroupAssignments splat" -LogLevel "Information"
     }
-    $ShowGroupAssignmentsResponse = ShowGroupAssignments @showGroupAssignmentsSplat
+    $ShowGroupAssignmentsResponse = Show-GroupAssignments @ShowGroupAssignmentsSplat
     Write-Log -logFile $LogFile -Module $scriptName -Message "ShowGroupAssignments returned: $($ShowGroupAssignmentsResponse | Out-String)" -LogLevel "Verbose"
-    #region Handle navigation responses from ShowGroupAssignments
+    #region Handle navigation responses from Show-GroupAssignments
     if ($ShowGroupAssignmentsResponse -eq "Back" -or $ShowGroupAssignmentsResponse -eq "back")
     {
         Write-Verbose "[$scriptName] User selected Back from group assignment selection, returning to previous menu"
@@ -2729,7 +2530,7 @@ $script:ShowGroupAssignmentsAction = {
         Write-Log -logFile $LogFile -Module $scriptName -Message "Continuing script after group assignment selection" -LogLevel "Information"
         return $ShowGroupAssignmentsResponse
     }
-    #endregion Handle navigation responses from ShowGroupAssignments
+    #endregion Handle navigation responses from Show-GroupAssignments
 }
 
 $script:ExportGroupAssignmentsAction = {
@@ -2796,7 +2597,6 @@ $getGroupAssignmentsMenu = AddMenuItem -Menu $getGroupAssignmentsMenu -Name "Exp
     & $script:ExportGroupAssignmentsAction -RespectOperatingSystem $false
 }
 #endregion Show Group Assignments menu
-
 
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
     $username = GetUserInput -Message "Enter the username (Email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
@@ -2952,7 +2752,7 @@ else
 Clear-SecureMemory -ClearScriptVariables
 
 # Cleanup temporary files
-$filesCleaned = Remove-TempFiles
+$filesCleaned = cleanupTempFiles
 if ($filesCleaned.AllRemoved)
 {
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"

@@ -1,4 +1,4 @@
-function GetGroupDirectAssignments()
+function Get-GroupDirectAssignments()
 {
     <#
     .SYNOPSIS
@@ -37,8 +37,8 @@ function GetGroupDirectAssignments()
     assigned to the group. Uses Initialize-AssignmentResultObject structure.
 
     .EXAMPLE
-    $assignments = GetGroupDirectAssignments -AccessToken $token -GroupName $group
-    $assignments = GetGroupDirectAssignments -AccessToken $token -GroupName $group -IncludeBeta -ShowSummary
+    $assignments = Get-GroupDirectAssignments -AccessToken $token -GroupName $group
+    $assignments = Get-GroupDirectAssignments -AccessToken $token -GroupName $group -IncludeBeta -ShowSummary
 
     .NOTES
     Queries multiple Intune configuration types: device configurations, compliance policies,
@@ -66,7 +66,7 @@ function GetGroupDirectAssignments()
     $functionName = $MyInvocation.MyCommand.Name
     #region log the incoming parameters
     Write-Verbose "[$functionName] Incoming parameters:"
-    Write-Log -logFile $logFile -Module $functionName -Message "Incoming parameters for:" -logLevel "Information"
+    write-log -logFile $logFile -Module $functionName -Message "Incoming parameters for:" -logLevel "Information"
     if ($AccessToken)
     {
         Write-Verbose "[$functionName] AccessToken provided"
@@ -78,8 +78,11 @@ function GetGroupDirectAssignments()
     Write-Verbose "[$functionName] IncludeIndirectAssignments: $IncludeIndirectAssignments"
     Write-Verbose "[$functionName] BatchSize: $BatchSize"
     Write-Verbose "[$functionName] Settings provided: $($null -ne $Settings)"
-    if ($Settings) { Write-Verbose "[$functionName] Settings.operatingSystem: $($Settings.operatingSystem)" }
-    #now Write-Log them.
+    if ($Settings)
+    {
+        Write-Verbose "[$functionName] Settings.operatingSystem: $($Settings.operatingSystem)" 
+    }
+    #now write-log them.
     Write-Log -logFile $LogFile -module $functionName -Message "Incoming parameters:" -logLevel "Information"
     Write-Log -logFile $LogFile -module $functionName -Message "GroupName: $GroupName" -logLevel "Information"
     Write-Log -logFile $LogFile -module $functionName -Message "IncludeBeta: $IncludeBeta" -logLevel "Information"
@@ -215,7 +218,7 @@ function GetGroupDirectAssignments()
         # Get all resource lists using unified helper function
         Write-Log -logFile $LogFile -module $functionName -Message "Getting all resource lists for assignments using unified helper" -logLevel "Information"
 
-        $resourceLists = Get-IntuneResourceLists -AccessToken $AccessToken -IncludeBeta:$IncludeBeta -Settings $Settings -ResultObject $assignments
+        $global:resourceLists = Get-IntuneResourceLists -AccessToken $AccessToken -IncludeBeta:$IncludeBeta -Settings $Settings -ResultObject $assignments
 
         # Extract resource lists from helper result
         $mobileApps = $resourceLists.mobileApps
@@ -351,7 +354,14 @@ function GetGroupDirectAssignments()
 
     # Summary
     $totalAssignments = $assignments.AllAssignments.Count
-    $summaryTitle = if ($IncludeIndirectAssignments.IsPresent) { "Group Direct and Indirect Assignments Summary" } else { "Group Direct Assignments Summary" }
+    $summaryTitle = if ($IncludeIndirectAssignments.IsPresent)
+    {
+        "Group Direct and Indirect Assignments Summary" 
+    }
+    else
+    {
+        "Group Direct Assignments Summary" 
+    }
     Write-Log -logFile $LogFile -module $functionName -Message "Total assignments found for group '$($groupId.displayName)': $totalAssignments" -LogLevel "Verbose"
     if ($ShowSummary)
     {

@@ -47,7 +47,7 @@ Updated all files that use `NewMenu` to leverage the new dynamic system:
 - `main.ps1`: Main application menus (mainMenu, checkMenu, serialNumberMenu, exportMenu, settingsMenu, autopilotMenu, environmentMenu)
 - `Show-GroupsEditor.ps1`: groupsEditMenu with domain name substitution
 - `ProcessSerialNumber.ps1`: deviceActionsMenu with device name substitution
-- `ProcessDevice.ps1`: deviceWaitMenu with serial number substitution  
+- `ProcessDevice.ps1`: deviceWaitMenu with serial number substitution
 - `ShowDeviceReport.ps1`: reportExportMenu
 
 #### Dynamic Menus (Use Configuration for Base Structure)
@@ -55,7 +55,7 @@ Updated all files that use `NewMenu` to leverage the new dynamic system:
 - `DisplayGroupList.ps1`: groupMenu for runtime-generated group lists
 - `DisplayUserList.ps1`: userMenu for runtime-generated user lists
 - `GetDeviceByUser.ps1`: deviceMenu for runtime-generated device lists
-- `ShowGroupAssignments.ps1`: groupAssignmentsMenu with group name substitution
+- `Show-GroupAssignments.ps1`: groupAssignmentsMenu with group name substitution
 
 ### 5. Configuration Migration
 - **Removed**: Entire `menus` array from `settings.json` (354 lines removed)
@@ -74,7 +74,7 @@ Updated all files that use `NewMenu` to leverage the new dynamic system:
 {
   "menuName": {
     "Title": "Menu Title",
-    "Description": "Menu description", 
+    "Description": "Menu description",
     "type": "static|dynamic",
     "items": [
       {
@@ -97,7 +97,7 @@ Updated all files that use `NewMenu` to leverage the new dynamic system:
 ### Variable Substitution Support
 Menu titles and descriptions support runtime variable substitution:
 - `$deviceName` → Actual device name
-- `$DomainName` → Current domain name  
+- `$DomainName` → Current domain name
 - `$serialNumber` → Device serial number
 - `$groupName` → Group name
 - `$menuTitle` → Dynamic menu title
@@ -163,7 +163,7 @@ if (-not $menu) {
 - **Reduced Code Duplication**: Menu definitions separated from logic
 - **Easier Updates**: Change menu structure without touching code
 
-### Flexibility  
+### Flexibility
 - **Variable Substitution**: Dynamic content based on runtime context
 - **App Mode Filtering**: Granular control over menu visibility
 - **Mixed Approach**: Static configuration + dynamic runtime generation

@@ -336,7 +336,7 @@ function ShowDeviceReport()
     $reportExportMenu = AddMenuItem -Menu $reportExportMenu -Name "Export to CSV" -Action $CSVAction -ReturnsValue
 
     # Loop to keep showing the menu until user chooses to navigate away
-    # Similar approach to ShowGroupAssignments function
+    # Similar approach to Show-GroupAssignments function
     while ($true)
     {
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "=== LOOP ITERATION START ===" -LogLevel "Debug"

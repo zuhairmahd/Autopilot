@@ -174,6 +174,7 @@
     All operations are logged to the specified log file. Use -LogLevel to control verbosity.
     Use -OverwriteLogs to start with a fresh log file on each run.
 #>
+
 [CmdletBinding()]
 param(
     [string]$configFile = "$pwd\.secrets\config.json",
@@ -374,6 +375,7 @@ function Find-FolderPath()
         return $null
     }
 }
+
 $functionsFolder = find-folderPath -Path $scriptPath -FolderName 'functions'
 if (Test-Path $functionsFolder)
 {
@@ -551,7 +553,7 @@ if ($testMode -and -not $script:testModeOptions.cleanup)
 }
 else
 {
-    $filesCleaned = Remove-TempFiles
+    $filesCleaned = cleanupTempFiles
     if ($filesCleaned.AllRemoved)
     {
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
@@ -629,6 +631,8 @@ if ($testMode -and -not $script:testModeOptions.config)
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode: Skipping configuration loading" -LogLevel "Information"
     # Set minimal test values
     $domain = "test.contoso.com"
+    $appId = "00000000-0000-0000-0000-000000000000"
+    $tenantId = "00000000-0000-0000-0000-000000000000"
     $name = "Test Application"
 }
 # In test mode without a test password and config file exists, skip config loading
@@ -638,6 +642,8 @@ elseif ($testMode -and -not $TestPassword -and (Test-Path $configFile))
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode enabled without test password, skipping encrypted config file loading" -LogLevel "Information"
     # Set dummy values for required variables
     $domain = "test.local"
+    $appId = "test-app-id"
+    $tenantId = "test-tenant-id"
     $name = "Test Configuration"
 }
 elseif (Test-Path $configFile)
@@ -656,6 +662,8 @@ elseif (Test-Path $configFile)
 
     $configContent = $sessionResult.ConfigContent
     $domain = $sessionResult.Domain
+    $appId = $sessionResult.AppId
+    $tenantId = $sessionResult.TenantId
     $name = $sessionResult.Name
 
     if (-not ($sessionResult.encrypted))
@@ -693,6 +701,8 @@ else
 
         # Set default test values
         $domain = "test.contoso.com"
+        $appId = "00000000-0000-0000-0000-000000000000"
+        $tenantId = "00000000-0000-0000-0000-000000000000"
         $name = "Test Application"
 
         # Skip config file loading in test mode
@@ -738,6 +748,8 @@ else
 
                 $configContent = $sessionResult.ConfigContent
                 $domain = $sessionResult.Domain
+                $appId = $sessionResult.AppId
+                $tenantId = $sessionResult.TenantId
                 $name = $sessionResult.Name
                 Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully for domain: $domain" -LogLevel "Information"
                 # Clear the config content from memory
@@ -784,8 +796,9 @@ else
         Write-Verbose "[$scriptName] Global settings count: $($globalSettings.Count)"
         Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
         Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
+        Write-Verbose "[$scriptName] Menus count: $($menus.Count)"
         Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
     }
     else
     {
@@ -800,32 +813,17 @@ else
 
 #region initialize script objects
 Write-Host "Loading configuration..."
-
-$startTime = Get-Date
-
-$configResult = Initialize-FastStart -initFile $InitFile -stringsFile $stringsFile -menuFile $menuFile -menuCacheFile $menuCacheFile -domain $domain -ScriptPath $ScriptPath
-if ($configResult.success)
+# Use domain if available, otherwise default to contoso.com
+$domainForDefaults = if ($domain)
 {
-    Write-Log -logFile $logFile -module $scriptName -message "Fast start configuration load succeeded."
-    Write-Verbose "[$scriptName] Fast start configuration load succeeded."
-    Write-Host "Fast start configuration load succeeded."
-    $script:menus = if ($configResult.menus)
-    {
-        $configResult.menus
-    }
-    else
-    {
-        $null
-    }
+    $domain
 }
 else
 {
-    Write-Log -logFile $logFile -module $scriptName -message "Fast start configuration load failed, falling back to full initialization."
-    Write-Verbose "[$scriptName] Fast start configuration load failed, falling back to full initialization."
-    Write-Host "Performing full configuration initialization..."
-    $configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domain -BoundParameters $PSBoundParameters
+    "contoso.com"
 }
 
+$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -BoundParameters $PSBoundParameters
 if (-not $configResult.Success)
 {
     Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
@@ -859,7 +857,7 @@ Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
 Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
 Write-Verbose "[$scriptName] Menus count: $($configResult.menu.Count)"
 Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
-Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
 if (-not $version.version)
 {
     Write-Verbose "[$scriptName] Unable to get file version."
@@ -932,7 +930,7 @@ else
 }
 #endregion Check for password change requirement
 
-#region Define variables
+#region Define upstream variables
 #define repo parameters
 $defaultBranch = 'master'
 $baseSourceURL = if ($repoInfo.baseSourceURL)
@@ -1017,6 +1015,7 @@ if ($showAuth)
 {
     Write-Host "$($key): $($getTokenParams[$key])" -ForegroundColor Cyan
     $global:previousMenu = New-Object System.Collections.Hashtable
+    # Device enrollment state cache content has been migrated to the unified cache system.
 }
 Write-Verbose "[$scriptName] Using authentication parameters: $($getTokenParams | ConvertTo-Json -Depth $maxJSONDepth)"
 Write-Verbose "[$scriptName] Loading strings from: $stringsFile"
@@ -1029,7 +1028,7 @@ Write-Verbose "[$scriptName] Loaded $($returnValues.Count) return values, $($dev
 $Global:History = [System.Collections.ArrayList]::new()
 $Global:MenuHistory = [System.Collections.ArrayList]::new()
 $global:previousMenu = New-Object System.Collections.Hashtable
-#endregion Define variables
+#endregion Define upstream variables
 
 #region Define variables
 $scope = $auth.scope
@@ -1043,11 +1042,11 @@ $scope = $auth.scope
 # $managedAppUri = "deviceAppManagement/mobileApps"
 # $appAssignmentURI = "deviceAppManagement/mobileApps/$($app.id)/assignments"
 # $importedAutopilotDeviceURI = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
-# $importedAutopilotDeviceExtraParameters = "select=serialNumber, importId, groupTag, state"
+# $importedAutopilotDeviceExtraParameters = "select=serialNumber,importId,groupTag,state"
 # $unmanagedDeviceUri = "devices"
 # $managedDeviceUri = "deviceManagement/managedDevices"
 # $autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
-# $autopilotExtraParameters = "select=serialNumber, groupTag, manufacturer, model, systemFamily, enrollmentState, deploymentProfileAssignmentStatus&top=9999&skip=0&count=true"
+# $autopilotExtraParameters = "select=serialNumber,groupTag,manufacturer,model,systemFamily,enrollmentState,deploymentProfileAssignmentStatus&top=9999&skip=0&count=true"
 # $managedDeviceFilter = "serialNumber eq '$serialNumber'"
 # $managedDeviceFilter = "startswith(deviceName,'w11-')"
 # $autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
@@ -1067,71 +1066,176 @@ $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $sc
 # "imported"  = $importedDevices
 # "unmanaged" = $unmanagedDevices
 # }
+#endregion Define variables
 
 
-$autopilotReportInput = Get-AutopilotEnrollmentReportInput
-$analysisParams = @{
-    accessToken = $accessToken
-}
+#region show Group Assignments menu
+$script:ShowGroupAssignmentsAction = {
+    <#
+    This script-scoped variable defines a reusable script block for showing group assignments in the Intune Helpdesk Menu.
+    It is defined at script scope to allow sharing between multiple menu items (e.g., direct and indirect assignment views),
+    avoiding code duplication and ensuring consistent behavior. The script block encapsulates the logic for prompting the user
+    for a group name, resolving the group, and handling navigation commands, and is invoked by different menu actions as needed.
+    #>
+    param(
+        [bool]$IncludeIndirectAssignments,
+        [bool]$exportInstead
+    )
 
-if ($autopilotReportInput.StartDate)
-{
-    $analysisParams['StartDate'] = $autopilotReportInput.StartDate
-}
-if ($autopilotReportInput.EndDate)
-{
-    $analysisParams['EndDate'] = $autopilotReportInput.EndDate
-}
-if ($autopilotReportInput.UserPrincipalName
-)
-{
-    $analysisParams['UserPrincipalName'] = $autopilotReportInput.UserPrincipalName
-}
-$analysis = Get-AutopilotEventAnalysis @analysisParams
-# Display results
-Show-AutopilotEventAnalysis -AnalysisData $analysis
-
-# Prompt for export
-Write-Host "`nWould you like to export the analysis to CSV? (Y/N): " -NoNewline -ForegroundColor Yellow
-$exportChoice = Read-Host
-while ($exportChoice -notin @('Y', 'y', 'N', 'n'))
-{
-    Write-Host "Invalid choice. Please enter 'Y' for Yes or 'N' for No: " -NoNewline -ForegroundColor Yellow
-    [console]::beep(300, 100)
-    $exportChoice = Read-Host
-}
-if ($exportChoice -eq 'Y' -or $exportChoice -eq 'y')
-{
-
-    $exportResult = Export-AutopilotEventAnalysis -AnalysisData $analysis
-    if ($exportResult.success)
+    $assignmentScope = if ($IncludeIndirectAssignments)
     {
-        Write-Host "Analysis exported successfully" -ForegroundColor Green
+        "indirect (All Users/All Devices)"
     }
     else
     {
-        Write-Host "Failed to export analysis: $($exportResult.errorMessage)" -ForegroundColor Red
+        "direct"
     }
+    $specialGroups = @("*", "?")
+    $messageText = if ($IncludeIndirectAssignments)
+    {
+        "Enter the name of the group whose indirect (All Users/All Devices) assignments you want to view. Enter any of $specialGroups for all assignments"
+    }
+    else
+    {
+        "Enter the name of the group whose direct assignments you want to view."
+    }
+    Write-Log -logFile $LogFile -Module $scriptName -Message "Prompting user for group name to view $assignmentScope assignments" -LogLevel "Information"
+    $groupName = GetUserInput -Message $messageText -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
+    $needsResolution = if ($IncludeIndirectAssignments -and $groupName -in $specialGroups)
+    {
+        $false
+    }
+    else
+    {
+        $true
+    }
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "GroupName: $groupName, IncludeIndirectAssignments: $IncludeIndirectAssignments, AssignmentScope: $assignmentScope, SpecialGroups: $specialGroups, NeedsResolution: $needsResolution"
+
+    if ($null -eq $groupName)
+    {
+        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
+        Write-Log -logFile $LogFile -Module $scriptName -Message "User pressed Enter without providing a group name. Returning $($returnValues.BackoutText)." -LogLevel "Information"
+        return $returnValues.backoutText
+    }
+
+    if ($groupName)
+    {
+        Write-Verbose "[$scriptName] Got group name: $groupName"
+        Write-Log -logFile $LogFile -Module $scriptName -Message "Got group name: $groupName" -LogLevel "Information"
+    }
+
+    #region Resolve group using unified Resolve-DirectoryObject with entity return
+    if ($needsResolution)
+    {
+        Write-Verbose "[$scriptName] Resolving group: $groupName"
+        Write-Log -logFile $LogFile -Module $scriptName -Message "Resolving group: $groupName" -LogLevel "Information"
+        $selectedGroup = Resolve-DirectoryObject -EntityName $groupName -AccessToken $accessToken -Settings $settings -ReturnValues $returnValues -EntityType "Group" -ReturnEntity
+        Write-Log -logFile $LogFile -Module $scriptName -Message "Resolve-DirectoryObject returned: $($selectedGroup | Out-String)" -LogLevel "Verbose"
+        # Handle navigation commands - check these FIRST before trying to use as group object
+        if ($selectedGroup -eq "EXIT_APPLICATION")
+        {
+            Write-Verbose "[$scriptName] User requested application exit from group resolution"
+            Write-Log -logFile $LogFile -Module $scriptName -Message "User requested application exit from group resolution" -LogLevel "Information"
+            return "EXIT_APPLICATION"
+        }
+        elseif ($selectedGroup -eq "Main Menu")
+        {
+            Write-Verbose "[$scriptName] User selected Main Menu from group resolution"
+            Write-Log -logFile $LogFile -Module $scriptName -Message "User selected Main Menu from group resolution" -LogLevel "Information"
+            return "Main Menu"
+        }
+        elseif ($selectedGroup -in $returnValues.Values)
+        {
+            Write-Verbose "[$scriptName] Resolve-DirectoryObject returned navigation command: $selectedGroup"
+            Write-Log -logFile $LogFile -Module $scriptName -Message "Resolve-DirectoryObject returned navigation command: $selectedGroup" -LogLevel "Information"
+            return $selectedGroup
+        }
+
+        # Validate we got a valid group object
+        if ($null -eq $selectedGroup -or -not $selectedGroup.id -or -not $selectedGroup.displayName)
+        {
+            Write-Log -logFile $LogFile -Module $scriptName -Message "Invalid group object returned from Resolve-DirectoryObject" -LogLevel "Error"
+            Write-Host "No group found for the specified group name." -ForegroundColor Red
+            return $returnValues.noGroupFoundMessage
+        }
+        Write-Verbose "[$scriptName] Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))"
+        Write-Log -logFile $LogFile -Module $scriptName -Message "Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))" -LogLevel "Information"
+    }
+    else
+    {
+        Write-Verbose "[$scriptName] Special group selected, skipping resolution: $groupName"
+        Write-Log -logFile $LogFile -Module $scriptName -Message "Special group selected, skipping resolution: $groupName" -LogLevel "Information"
+        $selectedGroup = $groupName
+    }
+    #endregion Resolve group using unified Resolve-DirectoryObject with entity return
+
+    # Call Show-GroupAssignments to display the group's assignments
+    Write-Verbose "[$scriptName] Calling Show-GroupAssignments for group: $($selectedGroup.displayName) with IncludeIndirect=$IncludeIndirectAssignments"
+    Write-Log -logFile $LogFile -Module $scriptName -Message "Building splat for Show-GroupAssignments call" -LogLevel "Information"
+    $ShowGroupAssignmentsSplat = @{
+        AccessToken = $accessToken
+        Settings    = $global:settings
+        Group       = $selectedGroup
+    }
+
+    if ($IncludeIndirectAssignments)
+    {
+        $ShowGroupAssignmentsSplat['ShowIndirectAssignments'] = $true
+        $ShowGroupAssignmentsSplat['SpecialGroups'] = $specialGroups
+        Write-Log -logFile $LogFile -Module $scriptName -Message "Added ShowIndirectAssignments and SpecialGroups parameters to Show-GroupAssignments splat" -LogLevel "Information"
+    }
+
+    if ($exportInstead)
+    {
+        $ShowGroupAssignmentsSplat['exportInstead'] = $true
+        Write-Log -logFile $LogFile -Module $scriptName -Message "Added exportInstead parameter to Show-GroupAssignments splat" -LogLevel "Information"
+    }
+    if ($settings.HideEmptyMenus)
+    {
+        $ShowGroupAssignmentsSplat['HideEmptyMenus'] = $true
+        Write-Log -logFile $LogFile -Module $scriptName -Message "Added HideEmptyMenus parameter to Show-GroupAssignments splat" -LogLevel "Information"
+    }
+    $ShowGroupAssignmentsResponse = Show-GroupAssignments @ShowGroupAssignmentsSplat
+    Write-Log -logFile $LogFile -Module $scriptName -Message "Show-GroupAssignments returned: $($ShowGroupAssignmentsResponse | Out-String)" -LogLevel "Verbose"
+    #region Handle navigation responses from Show-GroupAssignments
+    if ($ShowGroupAssignmentsResponse -eq "Back" -or $ShowGroupAssignmentsResponse -eq "back")
+    {
+        Write-Verbose "[$scriptName] User selected Back from group assignment selection, returning to previous menu"
+        Write-Log -logFile $LogFile -Module $scriptName -Message "User selected Back from group assignment selection, returning to previous menu" -LogLevel "Information"
+        return $returnValues.backoutText
+    }
+    elseif ($ShowGroupAssignmentsResponse -eq "Main Menu" -or $ShowGroupAssignmentsResponse -eq "main menu")
+    {
+        Write-Verbose "[$scriptName] User selected Main Menu from group assignment selection"
+        Write-Log -logFile $LogFile -Module $scriptName -Message "User selected Main Menu from group assignment selection" -LogLevel "Information"
+        return "EXIT_APPLICATION"
+    }
+    elseif ([string]::IsNullOrWhiteSpace($ShowGroupAssignmentsResponse) -or $null -eq $ShowGroupAssignmentsResponse)
+    {
+        Write-Verbose "[$scriptName] User requested application exit from group assignment selection."
+        Write-Log -logFile $LogFile -Module $scriptName -Message "User requested application exit from group assignment selection" -LogLevel "Information"
+        return "EXIT_APPLICATION"
+    }
+    else
+    {
+        Write-Verbose "[$scriptName] Continuing script..."
+        Write-Log -logFile $LogFile -Module $scriptName -Message "Continuing script after group assignment selection" -LogLevel "Information"
+        return $ShowGroupAssignmentsResponse
+    }
+    #endregion Handle navigation responses from Show-GroupAssignments
 }
+
+#"View direct group assignments"
+& $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $false -exportInstead $false
+
+#View indirect group assignments (All Users/All Devices)
+& $script:ShowGroupAssignmentsAction -IncludeIndirectAssignments $true -exportInstead $false
+#endregion Show Group Assignments menu
+
+
 
 
 exit 0
-$DMServers = @{
-    'DM10-01-GOAL4_NETOPS' = 'WINDM16-01'
-    'DM10-02-ALL_STAFF'    = 'WINDM16-02'
-    'DM10-03-ALL_STAFF'    = 'WINDM16-03'
-    'DM10-04-ALL_STAFF'    = 'WINDM16-04'
-    'DM10-06-ALL_STAFF'    = 'WINDM16-06'
-    'DM10-07-ALL_STAFF'    = 'WINDM16-07'
-    'DM10-ET-01-ALL_STAFF' = 'WINDM16-ET-01'
-    'DM10-CT-01-ALL_STAFF' = 'WINDM16-CT-01'
-    'DM10-MT-01-ALL_STAFF' = 'WINDM16-MT-01'
-    'DM10-WT-01-ALL_STAFF' = 'WINDM16-WT-01'
-}
-$dmGroups = @($DMServers.Keys)
-$global:groupIds = GetGroupIdsByNames -accessToken $accessToken -groupNames $dmGroups
-exit 0
-
 #region Usage examples for GetGraphObjectMetadata
 # Example 1: Get metadata for users collection
 $usersResponse = CallGraphAPI -accessToken $accessToken -ResourcePath "users"

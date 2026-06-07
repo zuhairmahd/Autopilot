@@ -81,7 +81,7 @@ Get-IndirectResourceAssignments -ResultObject $indirectAssignments `
                                 -AssignmentCategory "Application"
 ```
 
-### 4. Updated GetGroupDirectAssignments.ps1
+### 4. Updated Get-GroupDirectAssignments.ps1
 **Key Changes:**
 - Changed to use `Initialize-AssignmentResultObject -GroupName ... -GroupId ...`
 - Updated nested `Get-ResourceAssignments` function to accept `ResultObject` and `GroupIdValue` parameters
@@ -112,7 +112,7 @@ Get-ResourceAssignments -ResultObject $assignments `
 - Changes made inside nested functions are visible to the caller
 
 ### 3. Code Reusability
-- Common functions reduce duplication between GetGroupDirectAssignments and GetGroupIndirectAssignments
+- Common functions reduce duplication between Get-GroupDirectAssignments and GetGroupIndirectAssignments
 - `Test-ResourcePlatformMatch` already existed as a separate function (good pattern to follow)
 - Consistent error handling across all assignment functions
 
@@ -132,11 +132,11 @@ Get-ResourceAssignments -ResultObject $assignments `
 ```powershell
 function Parent {
     $result = [PSCustomObject]@{ Items = @() }
-    
+
     function Nested {
         $result.Items += "Item1"  # Creates LOCAL copy of $result!
     }
-    
+
     Nested
     Write-Host $result.Items.Count  # Still 0! 😱
 }
@@ -146,12 +146,12 @@ function Parent {
 ```powershell
 function Parent {
     $result = [PSCustomObject]@{ Items = @() }
-    
+
     function Nested {
         param([PSCustomObject]$ResultObject)  # Explicit parameter
         $ResultObject.Items += "Item1"  # Modifies the passed reference
     }
-    
+
     Nested -ResultObject $result
     Write-Host $result.Items.Count  # Now 1! ✅
 }
@@ -160,23 +160,23 @@ function Parent {
 ## Testing Validation
 
 ### Unit Tests Status
-- **ShowGroupAssignments.Tests.ps1**: 18/18 passing ✅
-- **GetGroupDirectAssignments.Tests.ps1**: Some pre-existing failures (unrelated to refactoring)
+- **Show-GroupAssignments.Tests.ps1**: 18/18 passing ✅
+- **Get-GroupDirectAssignments.Tests.ps1**: Some pre-existing failures (unrelated to refactoring)
 - **GetGroupIndirectAssignments.Tests.ps1**: Some pre-existing failures (unrelated to refactoring)
 
 ### Integration Testing Needed
 1. Run application with a group that has assignments
 2. Trigger a 400 error (e.g., call resourceAccessProfiles with v1.0 API)
 3. Verify `$global:as.FailedResources` contains error objects
-4. Verify ShowGroupAssignments displays yellow warning message
+4. Verify Show-GroupAssignments displays yellow warning message
 5. Check logs for detailed error information
 
 ## Files Modified
 1. **Created**: `functions/UserAndGroupFunctions/Get-GroupAssignments-Common.ps1` (NEW)
 2. **Modified**: `functions/UserAndGroupFunctions/Get-IndirectResourceAssignments.ps1`
 3. **Modified**: `functions/UserAndGroupFunctions/GetGroupIndirectAssignments.ps1`
-4. **Modified**: `functions/UserAndGroupFunctions/GetGroupDirectAssignments.ps1`
-5. **Modified**: `functions/UserAndGroupFunctions/ShowGroupAssignments.ps1` (from previous iteration)
+4. **Modified**: `functions/UserAndGroupFunctions/Get-GroupDirectAssignments.ps1`
+5. **Modified**: `functions/UserAndGroupFunctions/Show-GroupAssignments.ps1` (from previous iteration)
 
 ## Migration Path for Other Functions
 This pattern can be applied to other nested functions in the codebase:

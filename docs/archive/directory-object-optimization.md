@@ -1,14 +1,14 @@
 # Directory Object Function Optimization
 
-**Date:** October 1, 2025  
-**Related Issue:** Performance optimization and redundant API call elimination  
+**Date:** October 1, 2025
+**Related Issue:** Performance optimization and redundant API call elimination
 **Affected Functions:** `Resolve-DirectoryObject`, "Show Group Assignments" action
 
 ## Problem Statement
 
 The codebase had a **redundant API call pattern** in the "Show Group Assignments" menu action where:
 1. `Resolve-DirectoryObject` was called to find and validate a group (which internally calls `Get-EntraDirectoryObject`)
-2. A second call to `Get-EntraDirectoryObject` was made to retrieve the full group object for `ShowGroupAssignments`
+2. A second call to `Get-EntraDirectoryObject` was made to retrieve the full group object for `Show-GroupAssignments`
 
 This resulted in:
 - **Duplicate Graph API calls** for the same entity
@@ -19,7 +19,7 @@ This resulted in:
 ```
 User Input → Resolve-DirectoryObject (calls Get-EntraDirectoryObject) → Returns group name
            → Get-EntraDirectoryObject AGAIN with group name → Returns group object
-           → ShowGroupAssignments with group object
+           → Show-GroupAssignments with group object
 ```
 
 ## Architecture Clarification
@@ -42,7 +42,7 @@ Enhanced `Resolve-DirectoryObject` with a **`-ReturnEntity` switch parameter** t
 ### New Code Flow (Optimized)
 ```
 User Input → Resolve-DirectoryObject -ReturnEntity → Returns full group object directly
-           → ShowGroupAssignments with group object
+           → Show-GroupAssignments with group object
 ```
 
 **Result:** 50% reduction in Graph API calls for this workflow.
@@ -79,16 +79,16 @@ return $resolvedName
 
 **For Fuzzy Matches:**
 ```powershell
-# If ReturnEntity is specified and result is not a navigation command, 
+# If ReturnEntity is specified and result is not a navigation command,
 # find and return the entity object
-if ($ReturnEntity -and $result -notin $ReturnValues.Values -and 
+if ($ReturnEntity -and $result -notin $ReturnValues.Values -and
     $result -ne "EXIT_APPLICATION" -and $result -ne "Main Menu")
 {
     $selectedEntity = $entityInfo[0].value | Where-Object {
         if ($EntityType -eq "User") { $_.userPrincipalName -eq $result }
         else { $_.displayName -eq $result }
     } | Select-Object -First 1
-    
+
     if ($null -ne $selectedEntity)
     {
         return $selectedEntity
@@ -109,8 +109,8 @@ $resolvedGroupName = Resolve-DirectoryObject -EntityName $groupName ...
 $groupInfo = Get-EntraDirectoryObject -EntityName $resolvedGroupName ...
 
 # Extract selected group from results
-$selectedGroup = $groupInfo[0].value | Where-Object { 
-    $_.displayName -eq $resolvedGroupName 
+$selectedGroup = $groupInfo[0].value | Where-Object {
+    $_.displayName -eq $resolvedGroupName
 } | Select-Object -First 1
 ```
 
@@ -171,7 +171,7 @@ $groupObject = Resolve-DirectoryObject -EntityName "Marketing" -AccessToken $tok
     -Settings $settings -ReturnValues $returnValues -EntityType "Group" -ReturnEntity
 
 if ($groupObject.id) {
-    ShowGroupAssignments -AccessToken $token -Group $groupObject
+    Show-GroupAssignments -AccessToken $token -Group $groupObject
 }
 ```
 
