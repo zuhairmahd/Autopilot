@@ -553,7 +553,7 @@ if ($testMode -and -not $script:testModeOptions.cleanup)
 }
 else
 {
-    $filesCleaned = cleanupTempFiles
+    $filesCleaned = Remove-TempFiles
     if ($filesCleaned.AllRemoved)
     {
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"

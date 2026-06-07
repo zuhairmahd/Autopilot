@@ -553,7 +553,7 @@ if ($testMode -and -not $script:testModeOptions.cleanup)
 }
 else
 {
-    $filesCleaned = cleanupTempFiles
+    $filesCleaned = Remove-TempFiles
     if ($filesCleaned.AllRemoved)
     {
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
@@ -2193,7 +2193,7 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settin
     {
         Write-Host "Auto Update settings saved successfully." -ForegroundColor Green
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Auto Update settings saved successfully." -LogLevel "Information"
-        $filesCleaned = cleanupTempFiles
+        $filesCleaned = Remove-TempFiles
         if ($filesCleaned.AllRemoved)
         {
             Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
@@ -2752,7 +2752,7 @@ else
 Clear-SecureMemory -ClearScriptVariables
 
 # Cleanup temporary files
-$filesCleaned = cleanupTempFiles
+$filesCleaned = Remove-TempFiles
 if ($filesCleaned.AllRemoved)
 {
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
