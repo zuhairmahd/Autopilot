@@ -166,7 +166,7 @@ function Get-GroupDirectAssignments()
 
             try
             {
-                $indirectAssignments = GetGroupIndirectAssignments -AccessToken $AccessToken -IncludeBeta:$IncludeBeta -BatchSize $BatchSize -Settings $Settings
+                $indirectAssignments = Get-GroupIndirectAssignments -AccessToken $AccessToken -IncludeBeta:$IncludeBeta -BatchSize $BatchSize -Settings $Settings
 
                 if ($indirectAssignments -and $indirectAssignments.AllAssignments.Count -gt 0)
                 {
@@ -313,7 +313,7 @@ function Get-GroupDirectAssignments()
 
         try
         {
-            $indirectAssignments = GetGroupIndirectAssignments -AccessToken $AccessToken -IncludeBeta:$IncludeBeta -BatchSize $BatchSize -Settings $Settings
+            $indirectAssignments = Get-GroupIndirectAssignments -AccessToken $AccessToken -IncludeBeta:$IncludeBeta -BatchSize $BatchSize -Settings $Settings
 
             if ($indirectAssignments -and $indirectAssignments.AllAssignments.Count -gt 0)
             {

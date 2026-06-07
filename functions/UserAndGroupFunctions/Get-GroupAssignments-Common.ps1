@@ -1,4 +1,4 @@
-# Common functions and utilities for Get-GroupDirectAssignments and GetGroupIndirectAssignments
+# Common functions and utilities for Get-GroupDirectAssignments and Get-GroupIndirectAssignments
 # This module contains shared code to reduce duplication and improve maintainability
 
 function Initialize-AssignmentResultObject()
@@ -920,10 +920,17 @@ function Get-ResourceAssignments()
     {
         Write-Log -logFile $LogFile -module $functionName -Message "Processing $($batchResult.value.Count) batch responses for ${ResourceType}" -LogLevel "Verbose"
 
-        for ($i = 0; $i -lt $batchResult.value.Count; $i++)
+        $responseLookup = Build-BatchResponseLookup -BatchResponses $batchResult.value
+        for ($i = 0; $i -lt $Resources.Count; $i++)
         {
-            $batchResponse = $batchResult.value[$i]
+            $expectedResponseId = ($i + 1).ToString()
+            $batchResponse = $responseLookup[$expectedResponseId]
             $resource = $Resources[$i]
+            if (-not $batchResponse)
+            {
+                Write-Log -logFile $LogFile -module $functionName -Message "No batch response for resource '$($resource.displayName)' (expected ID '$expectedResponseId')" -logLevel "Warning"
+                continue
+            }
 
             # CRITICAL FIX: CallGraphAPI batch responses have structure: { id, status, body }
             # The actual assignment data is in the 'body' property, not directly in 'value'
@@ -957,9 +964,10 @@ function Get-ResourceAssignments()
                 {
                     'Direct'
                     {
-                        # Filter for specific group assignments only
+                        # Filter for specific group assignments (included and excluded)
                         $relevantAssignments = $responseData.value | Where-Object {
-                            $_.target.'@odata.type' -eq '#microsoft.graph.groupAssignmentTarget' -and
+                            ($_.target.'@odata.type' -eq '#microsoft.graph.groupAssignmentTarget' -or
+                             $_.target.'@odata.type' -eq '#microsoft.graph.exclusionGroupAssignmentTarget') -and
                             $_.target.groupId -eq $GroupIdValue
                         }
                         Write-Log -logFile $LogFile -module $functionName -Message "Found $($relevantAssignments.Count) direct group assignment(s) for '$($resource.displayName)'" -logLevel "Debug"
@@ -1004,7 +1012,14 @@ function Get-ResourceAssignments()
                     # Determine assignment scope based on mode and target type
                     $assignmentScope = if ($AssignmentMode -eq 'Direct')
                     {
-                        'Direct'
+                        if ($assignment.target.'@odata.type' -eq '#microsoft.graph.exclusionGroupAssignmentTarget')
+                        {
+                            'Excluded'
+                        }
+                        else
+                        {
+                            'Direct'
+                        }
                     }
                     else
                     {
@@ -2210,7 +2225,7 @@ function Get-IntuneResourceLists()
 
     This function consolidates duplicate resource fetching logic previously present in:
     - Get-GroupDirectAssignments
-    - GetGroupIndirectAssignments
+    - Get-GroupIndirectAssignments
     - Export-ConfigurationAssignments
 
     .PARAMETER AccessToken

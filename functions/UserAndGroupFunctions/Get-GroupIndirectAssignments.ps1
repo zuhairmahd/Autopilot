@@ -1,4 +1,4 @@
-function GetGroupIndirectAssignments()
+function Get-GroupIndirectAssignments()
 {
     <#
     .SYNOPSIS
@@ -34,11 +34,11 @@ function GetGroupIndirectAssignments()
     Optional settings hashtable for platform filtering and other options.
 
     .EXAMPLE
-    GetGroupIndirectAssignments -AccessToken $token -IncludeBeta
+    Get-GroupIndirectAssignments -AccessToken $token -IncludeBeta
     Returns all resources assigned to All Users or All Devices.
 
     .EXAMPLE
-    GetGroupIndirectAssignments -AccessToken $token -GroupId "abc-123" -IncludeBeta
+    Get-GroupIndirectAssignments -AccessToken $token -GroupId "abc-123" -IncludeBeta
     Returns only resources assigned to BOTH the specified group AND All Users/All Devices.
 
     .NOTES

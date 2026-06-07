@@ -15,7 +15,7 @@ BeforeAll {
     # Load required functions
     . "$script:RepoRoot/functions/graphFunctions/CallGraphAPI.ps1"
     . "$script:RepoRoot/functions/UserAndGroupFunctions/Get-GroupDirectAssignments.ps1"
-    . "$script:RepoRoot/functions/UserAndGroupFunctions/GetGroupIndirectAssignments.ps1"
+    . "$script:RepoRoot/functions/UserAndGroupFunctions/Get-GroupIndirectAssignments.ps1"
     . "$script:RepoRoot/functions/UserAndGroupFunctions/Get-GroupAssignments-Common.ps1"
     . "$script:RepoRoot/functions/utilityFunctions/Write-Log.ps1"
     . "$script:RepoRoot/functions/utilityFunctions/Get-CachedData.ps1"
@@ -427,18 +427,18 @@ Describe "Function: Get-GroupDirectAssignments" -Tags 'Unit' {
     }
 
     Context "Indirect Assignments Integration" {
-        It "Should not call GetGroupIndirectAssignments when IncludeIndirectAssignments not specified" {
+        It "Should not call Get-GroupIndirectAssignments when IncludeIndirectAssignments not specified" {
             Mock CallGraphAPI { return @{ responses = @() } }
-            Mock GetGroupIndirectAssignments { }
+            Mock Get-GroupIndirectAssignments { }
 
             Get-GroupDirectAssignments -AccessToken $TestAccessToken -GroupName $TestGroup
 
-            Assert-MockCalled GetGroupIndirectAssignments -Times 0
+            Assert-MockCalled Get-GroupIndirectAssignments -Times 0
         }
 
-        It "Should call GetGroupIndirectAssignments when IncludeIndirectAssignments specified" {
+        It "Should call Get-GroupIndirectAssignments when IncludeIndirectAssignments specified" {
             Mock CallGraphAPI { return @{ responses = @() } }
-            Mock GetGroupIndirectAssignments {
+            Mock Get-GroupIndirectAssignments {
                 return @{
                     AppAssignments                          = @()
                     ConfigurationAssignments                = @()
@@ -459,12 +459,12 @@ Describe "Function: Get-GroupDirectAssignments" -Tags 'Unit' {
 
             Get-GroupDirectAssignments -AccessToken $TestAccessToken -GroupName $TestGroup -IncludeIndirectAssignments
 
-            Assert-MockCalled GetGroupIndirectAssignments -Times 1
+            Assert-MockCalled Get-GroupIndirectAssignments -Times 1
         }
 
-        It "Should pass IncludeBeta parameter to GetGroupIndirectAssignments" {
+        It "Should pass IncludeBeta parameter to Get-GroupIndirectAssignments" {
             Mock CallGraphAPI { return @{ responses = @() } }
-            Mock GetGroupIndirectAssignments {
+            Mock Get-GroupIndirectAssignments {
                 return @{
                     AllAssignments = @()
                 }
@@ -472,7 +472,7 @@ Describe "Function: Get-GroupDirectAssignments" -Tags 'Unit' {
 
             Get-GroupDirectAssignments -AccessToken $TestAccessToken -GroupName $TestGroup -IncludeIndirectAssignments -IncludeBeta
 
-            Assert-MockCalled GetGroupIndirectAssignments -ParameterFilter {
+            Assert-MockCalled Get-GroupIndirectAssignments -ParameterFilter {
                 $IncludeBeta -eq $true
             }
         }
@@ -514,7 +514,7 @@ Describe "Function: Get-GroupDirectAssignments" -Tags 'Unit' {
             }
 
             # Setup indirect assignments
-            Mock GetGroupIndirectAssignments {
+            Mock Get-GroupIndirectAssignments {
                 return @{
                     AppAssignments                          = @(
                         @{
@@ -563,7 +563,7 @@ Describe "Function: Get-GroupDirectAssignments" -Tags 'Unit' {
 
         It "Should handle empty indirect assignments gracefully" {
             Mock CallGraphAPI { return @{ responses = @() } }
-            Mock GetGroupIndirectAssignments {
+            Mock Get-GroupIndirectAssignments {
                 return @{
                     AllAssignments = @()
                 }
@@ -608,7 +608,7 @@ Describe "Function: Get-GroupDirectAssignments" -Tags 'Unit' {
                 }
                 return @{ value = @() }
             }
-            Mock GetGroupIndirectAssignments {
+            Mock Get-GroupIndirectAssignments {
                 return @{
                     AllAssignments = @()
                 }
@@ -622,9 +622,9 @@ Describe "Function: Get-GroupDirectAssignments" -Tags 'Unit' {
             }
         }
 
-        It "Should handle GetGroupIndirectAssignments errors without failing" {
+        It "Should handle Get-GroupIndirectAssignments errors without failing" {
             Mock CallGraphAPI { return @{ responses = @() } }
-            Mock GetGroupIndirectAssignments { throw "Indirect API Error" }
+            Mock Get-GroupIndirectAssignments { throw "Indirect API Error" }
 
             { Get-GroupDirectAssignments -AccessToken $TestAccessToken -GroupName $TestGroup -IncludeIndirectAssignments } | Should -Not -Throw
         }
@@ -632,7 +632,7 @@ Describe "Function: Get-GroupDirectAssignments" -Tags 'Unit' {
         It "Should merge multiple indirect assignment types correctly" {
             Mock CallGraphAPI { return @{ responses = @() } }
 
-            Mock GetGroupIndirectAssignments {
+            Mock Get-GroupIndirectAssignments {
                 return @{
                     AppAssignments                          = @(
                         @{ Type = "Application"; Name = "App1"; AssignmentScope = "All Users" }

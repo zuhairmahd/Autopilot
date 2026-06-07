@@ -76,7 +76,7 @@ function Show-GroupAssignments()
 
     Dependencies:
     - Get-GroupDirectAssignments: Retrieves assignments for a specific group
-    - GetGroupIndirectAssignments: Retrieves All Users/All Devices assignments
+    - Get-GroupIndirectAssignments: Retrieves All Users/All Devices assignments
     - ShowMenu, AddMenuItem, NewMenu: Menu system functions
     - Show-PagedContent: Paginated display function
     - Write-Log: Logging function
@@ -187,9 +187,9 @@ function Show-GroupAssignments()
         Write-Host "This may take a while..."
 
         # Get only indirect assignments
-        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Calling GetGroupIndirectAssignments with Settings.operatingSystem='$($Settings.operatingSystem)'" -logLevel "Debug"
-        $assignments = GetGroupIndirectAssignments -AccessToken $accessToken -IncludeBeta -Settings $Settings
-        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: GetGroupIndirectAssignments returned $(if ($assignments.AllAssignments) { $assignments.AllAssignments.Count } else { 0 }) total assignments" -logLevel "Debug"
+        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Calling Get-GroupIndirectAssignments with Settings.operatingSystem='$($Settings.operatingSystem)'" -logLevel "Debug"
+        $assignments = Get-GroupIndirectAssignments -AccessToken $accessToken -IncludeBeta -Settings $Settings
+        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Get-GroupIndirectAssignments returned $(if ($assignments.AllAssignments) { $assignments.AllAssignments.Count } else { 0 }) total assignments" -logLevel "Debug"
 
         if ($null -eq $assignments -or $assignments.AllAssignments.count -eq 0)
         {

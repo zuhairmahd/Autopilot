@@ -6,7 +6,7 @@
     Tests end-to-end workflows for retrieving and displaying group assignments.
     Validates the integration between:
     - Get-GroupDirectAssignments (direct assignments to groups)
-    - GetGroupIndirectAssignments (All Users/All Devices assignments)
+    - Get-GroupIndirectAssignments (All Users/All Devices assignments)
     - Show-GroupAssignments (interactive display and menu workflows)
 
     These tests cover scenarios that cannot be tested in unit tests due to:
@@ -21,7 +21,7 @@
     These integration tests complement the unit tests in:
     - tests/Unit/Show-GroupAssignments.Tests.ps1
     - tests/Unit/Get-GroupDirectAssignments.Tests.ps1 (to be created)
-    - tests/Unit/GetGroupIndirectAssignments.Tests.ps1 (to be created)
+    - tests/Unit/Get-GroupIndirectAssignments.Tests.ps1 (to be created)
 #>
 
 #Requires -Version 5.1
@@ -40,7 +40,7 @@ BeforeAll {
 
     # Load required functions via direct dot-sourcing
     . "$script:RepoRoot/functions/UserAndGroupFunctions/Get-GroupDirectAssignments.ps1"
-    . "$script:RepoRoot/functions/UserAndGroupFunctions/GetGroupIndirectAssignments.ps1"
+    . "$script:RepoRoot/functions/UserAndGroupFunctions/Get-GroupIndirectAssignments.ps1"
     . "$script:RepoRoot/functions/UserAndGroupFunctions/Show-GroupAssignments.ps1"
     . "$script:RepoRoot/functions/UserAndGroupFunctions/Get-GroupAssignments-Common.ps1"
     . "$script:RepoRoot/functions/graphFunctions/CallGraphAPI.ps1"
@@ -297,7 +297,7 @@ Describe "Get-GroupDirectAssignments Integration" -Tags 'Integration', 'GroupAss
     }
 }
 
-Describe "GetGroupIndirectAssignments Integration" -Tags 'Integration', 'GroupAssignments' {
+Describe "Get-GroupIndirectAssignments Integration" -Tags 'Integration', 'GroupAssignments' {
 
     Context "Virtual Group Assignment Detection" {
         It "Should identify All Users assignments correctly" {
@@ -346,7 +346,7 @@ Describe "GetGroupIndirectAssignments Integration" -Tags 'Integration', 'GroupAs
                 return @{ value = @() }
             }
 
-            $result = GetGroupIndirectAssignments -AccessToken $script:TestAccessToken -IncludeBeta
+            $result = Get-GroupIndirectAssignments -AccessToken $script:TestAccessToken -IncludeBeta
 
             $result.AllAssignments.Count | Should -Be 1
             $result.AllAssignments[0].AssignmentScope | Should -Be "All Users"
@@ -381,10 +381,11 @@ Describe "GetGroupIndirectAssignments Integration" -Tags 'Integration', 'GroupAs
                     $responses = @()
                     for ($i = 0; $i -lt $ResourcePath.Count; $i++)
                     {
+                        $responseId = ($i + 1).ToString()
                         if ($ResourcePath[$i] -match "config-alldevices")
                         {
                             $responses += @{
-                                id     = "$i"
+                                id     = $responseId
                                 status = 200
                                 body   = @{
                                     value = @(
@@ -397,7 +398,7 @@ Describe "GetGroupIndirectAssignments Integration" -Tags 'Integration', 'GroupAs
                         }
                         else
                         {
-                            $responses += @{ id = "$i"; status = 200; body = @{ value = @() } }
+                            $responses += @{ id = $responseId; status = 200; body = @{ value = @() } }
                         }
                     }
                     return @{ value = $responses }
@@ -406,7 +407,7 @@ Describe "GetGroupIndirectAssignments Integration" -Tags 'Integration', 'GroupAs
                 return @{ value = @() }
             }
 
-            $result = GetGroupIndirectAssignments -AccessToken $script:TestAccessToken -IncludeBeta
+            $result = Get-GroupIndirectAssignments -AccessToken $script:TestAccessToken -IncludeBeta
 
             $result.AllAssignments.Count | Should -Be 1
             $result.AllAssignments[0].AssignmentScope | Should -Be "All Devices"
@@ -474,7 +475,7 @@ Describe "GetGroupIndirectAssignments Integration" -Tags 'Integration', 'GroupAs
                 return @{ value = @() }
             }
 
-            $result = GetGroupIndirectAssignments -AccessToken $script:TestAccessToken -IncludeBeta
+            $result = Get-GroupIndirectAssignments -AccessToken $script:TestAccessToken -IncludeBeta
 
             # Verify beta resource was processed
             $result.AutopilotAssignments.Count | Should -Be 1

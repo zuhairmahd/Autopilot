@@ -42,7 +42,7 @@ Describe "Profile Assignment Integration" -Tags 'Integration', 'Profile', 'Assig
 
         # Now load functions that will use the mocked CallGraphAPI
         . (Join-Path $script:RepoRoot "functions/UserAndGroupFunctions/Get-GroupDirectAssignments.ps1")
-        . (Join-Path $script:RepoRoot "functions/UserAndGroupFunctions/GetGroupIndirectAssignments.ps1")
+        . (Join-Path $script:RepoRoot "functions/UserAndGroupFunctions/Get-GroupIndirectAssignments.ps1")
         . (Join-Path $script:RepoRoot "functions/UserAndGroupFunctions/Get-GroupAssignments-Common.ps1")
         . (Join-Path $script:RepoRoot "functions/utilityFunctions/Get-CachedData.ps1")
 

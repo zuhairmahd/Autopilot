@@ -753,4 +753,152 @@ Describe "Function: Get-ResourceAssignments" -Tags 'Unit', 'GroupAssignments', '
             $script:TestResultObject.AllAssignments.Count | Should -Be 1
         }
     }
+
+    Context "Regression: Batch response ordering" {
+        BeforeEach {
+            $script:TestResultObject = Initialize-AssignmentResultObject -GroupName "Test Group" -GroupId $script:TestGroupId
+        }
+
+        It "Should correctly correlate responses returned in reverse order" {
+            # This test would have FAILED before the Build-BatchResponseLookup fix.
+            # The Graph API does not guarantee response ordering — responses for
+            # resource 1 and resource 2 may arrive in any order. The fix keys
+            # responses by their 'id' field rather than array position.
+            $testResources = @(
+                @{ id = "app-1"; displayName = "App One"; description = ""; '@odata.type' = '#microsoft.graph.win32LobApp' }
+                @{ id = "app-2"; displayName = "App Two"; description = ""; '@odata.type' = '#microsoft.graph.win32LobApp' }
+            )
+
+            Mock CallGraphAPI {
+                return @{
+                    value = @(
+                        # Response for request ID "2" (App Two) arrives FIRST
+                        @{
+                            id     = "2"
+                            status = 200
+                            body   = @{
+                                value = @(
+                                    @{
+                                        target = @{ '@odata.type' = '#microsoft.graph.groupAssignmentTarget'; groupId = $script:TestGroupId }
+                                        intent = "required"
+                                    }
+                                )
+                            }
+                        }
+                        # Response for request ID "1" (App One) arrives SECOND
+                        @{
+                            id     = "1"
+                            status = 200
+                            body   = @{ value = @() }  # App One has NO matching assignments
+                        }
+                    )
+                }
+            }
+
+            Get-ResourceAssignments -ResultObject $script:TestResultObject -AccessToken $script:TestAccessToken `
+                -ApiVersion 'v1.0' -Resources $testResources -ResourceType 'Mobile Apps' `
+                -BaseUri 'deviceAppManagement/mobileApps' -EndpointId 'mobileApps' `
+                -AssignmentMode 'Direct' -GroupIdValue $script:TestGroupId
+
+            # Only App Two should be in results — App One has no assignments for the group
+            $script:TestResultObject.AllAssignments.Count | Should -Be 1
+            $script:TestResultObject.AllAssignments[0].Name | Should -Be 'App Two'
+        }
+    }
+
+    Context "Regression: Excluded group assignments" {
+        BeforeEach {
+            $script:TestResultObject = Initialize-AssignmentResultObject -GroupName "Test Group" -GroupId $script:TestGroupId
+        }
+
+        It "Should return excluded assignments with AssignmentScope 'Excluded'" {
+            $testResources = @(
+                @{ id = "policy-1"; displayName = "Compliance Policy"; description = ""; '@odata.type' = '#microsoft.graph.windows10CompliancePolicy' }
+            )
+
+            Mock CallGraphAPI {
+                return @{
+                    value = @(
+                        @{
+                            id     = "1"
+                            status = 200
+                            body   = @{
+                                value = @(
+                                    @{
+                                        target = @{
+                                            '@odata.type' = '#microsoft.graph.exclusionGroupAssignmentTarget'
+                                            groupId       = $script:TestGroupId
+                                        }
+                                        intent = "required"
+                                    }
+                                )
+                            }
+                        }
+                    )
+                }
+            }
+
+            Get-ResourceAssignments -ResultObject $script:TestResultObject -AccessToken $script:TestAccessToken `
+                -ApiVersion 'v1.0' -Resources $testResources -ResourceType 'Compliance Policies' `
+                -BaseUri 'deviceManagement/deviceCompliancePolicies' -EndpointId 'compliancePolicies' `
+                -AssignmentMode 'Direct' -GroupIdValue $script:TestGroupId
+
+            $script:TestResultObject.AllAssignments.Count | Should -Be 1
+            $script:TestResultObject.AllAssignments[0].AssignmentScope | Should -Be 'Excluded'
+            $script:TestResultObject.AllAssignments[0].Name | Should -Be 'Compliance Policy'
+        }
+
+        It "Should return both Direct and Excluded assignments for the same resource" {
+            $testResources = @(
+                @{ id = "policy-1"; displayName = "Mixed Policy"; description = ""; '@odata.type' = '#microsoft.graph.windows10CompliancePolicy' }
+            )
+            $otherGroupId = "other-group-guid-99999"
+
+            Mock CallGraphAPI {
+                return @{
+                    value = @(
+                        @{
+                            id     = "1"
+                            status = 200
+                            body   = @{
+                                value = @(
+                                    @{
+                                        target = @{
+                                            '@odata.type' = '#microsoft.graph.groupAssignmentTarget'
+                                            groupId       = $script:TestGroupId
+                                        }
+                                        intent = "required"
+                                    }
+                                    @{
+                                        target = @{
+                                            '@odata.type' = '#microsoft.graph.exclusionGroupAssignmentTarget'
+                                            groupId       = $script:TestGroupId
+                                        }
+                                        intent = "required"
+                                    }
+                                    @{
+                                        # Assignment for a different group — should not appear
+                                        target = @{
+                                            '@odata.type' = '#microsoft.graph.groupAssignmentTarget'
+                                            groupId       = $otherGroupId
+                                        }
+                                        intent = "required"
+                                    }
+                                )
+                            }
+                        }
+                    )
+                }
+            }
+
+            Get-ResourceAssignments -ResultObject $script:TestResultObject -AccessToken $script:TestAccessToken `
+                -ApiVersion 'v1.0' -Resources $testResources -ResourceType 'Compliance Policies' `
+                -BaseUri 'deviceManagement/deviceCompliancePolicies' -EndpointId 'compliancePolicies' `
+                -AssignmentMode 'Direct' -GroupIdValue $script:TestGroupId
+
+            $script:TestResultObject.AllAssignments.Count | Should -Be 2
+            $script:TestResultObject.AllAssignments | Where-Object { $_.AssignmentScope -eq 'Direct' } | Should -Not -BeNullOrEmpty
+            $script:TestResultObject.AllAssignments | Where-Object { $_.AssignmentScope -eq 'Excluded' } | Should -Not -BeNullOrEmpty
+        }
+    }
 }

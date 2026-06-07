@@ -15,7 +15,7 @@ BeforeAll {
     # Load required functions
     . "$script:RepoRoot/functions/UserAndGroupFunctions/Show-GroupAssignments.ps1"
     . "$script:RepoRoot/functions/UserAndGroupFunctions/Get-GroupDirectAssignments.ps1"
-    . "$script:RepoRoot/functions/UserAndGroupFunctions/GetGroupIndirectAssignments.ps1"
+    . "$script:RepoRoot/functions/UserAndGroupFunctions/Get-GroupIndirectAssignments.ps1"
     . "$script:RepoRoot/functions/menuFunctions/NewMenu.ps1"
     . "$script:RepoRoot/functions/menuFunctions/AddMenuItem.ps1"
     . "$script:RepoRoot/functions/menuFunctions/ShowMenu.ps1"
