@@ -17,7 +17,7 @@
             'DeviceManagementManagedDevices.ReadWrite.All',
             'DeviceManagementServiceConfig.ReadWrite.All'
         )
-        cacheType           = 'Disk'
+        cacheType           = 'file'
         secureString        = $false
         delegated           = $true
     }
