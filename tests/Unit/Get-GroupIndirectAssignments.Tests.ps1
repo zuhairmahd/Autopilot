@@ -1,5 +1,5 @@
-# GetGroupIndirectAssignments.Tests.ps1
-# Unit tests for GetGroupIndirectAssignments function
+# Get-GroupIndirectAssignments.Tests.ps1
+# Unit tests for Get-GroupIndirectAssignments function
 
 #Requires -Version 5.1
 
@@ -12,7 +12,7 @@ BeforeAll {
     $script:TestEnv = Initialize-AutopilotTestEnvironment
     
     # Load required functions
-    . "$script:RepoRoot/functions/UserAndGroupFunctions/GetGroupIndirectAssignments.ps1"
+    . "$script:RepoRoot/functions/UserAndGroupFunctions/Get-GroupIndirectAssignments.ps1"
     . "$script:RepoRoot/functions/UserAndGroupFunctions/Get-GroupAssignments-Common.ps1"
     . "$script:RepoRoot/functions/graphFunctions/CallGraphAPI.ps1"
     . "$script:RepoRoot/functions/utilityFunctions/Write-Log.ps1"
@@ -25,7 +25,7 @@ BeforeAll {
     $script:TestAccessToken = "test-token-12345"
 }
 
-Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
+Describe "Function: Get-GroupIndirectAssignments" -Tags 'Unit' {
     BeforeAll {
         # Mock caching functions to prevent cross-test contamination
         Mock Get-CachedData { return $null }
@@ -34,7 +34,7 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
     
     Context "Parameter Validation" {
         It "Should require accessToken parameter" {
-            { GetGroupIndirectAssignments -AccessToken $null } | Should -Throw
+            { Get-GroupIndirectAssignments -AccessToken $null } | Should -Throw
         }
         
         It "Should accept valid accessToken" {
@@ -44,7 +44,7 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
                 } 
             }
             
-            { GetGroupIndirectAssignments -AccessToken $TestAccessToken } | Should -Not -Throw
+            { Get-GroupIndirectAssignments -AccessToken $TestAccessToken } | Should -Not -Throw
         }
         
         It "Should default to v1.0 API version when IncludeBeta not specified" {
@@ -55,7 +55,7 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
                 }
             }
             
-            GetGroupIndirectAssignments -AccessToken $TestAccessToken
+            Get-GroupIndirectAssignments -AccessToken $TestAccessToken
             
             Assert-MockCalled CallGraphAPI -ParameterFilter { 
                 $APIVersion -eq 'v1.0' 
@@ -70,7 +70,7 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
                 }
             }
             
-            GetGroupIndirectAssignments -AccessToken $TestAccessToken -IncludeBeta
+            Get-GroupIndirectAssignments -AccessToken $TestAccessToken -IncludeBeta
             
             Assert-MockCalled CallGraphAPI -ParameterFilter { 
                 $APIVersion -eq 'beta' 
@@ -84,7 +84,7 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
                 } 
             }
             
-            { GetGroupIndirectAssignments -AccessToken $TestAccessToken -BatchSize 50 } | Should -Not -Throw
+            { Get-GroupIndirectAssignments -AccessToken $TestAccessToken -BatchSize 50 } | Should -Not -Throw
         }
     }
     
@@ -96,7 +96,7 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
                 } 
             }
             
-            $result = GetGroupIndirectAssignments -AccessToken $TestAccessToken
+            $result = Get-GroupIndirectAssignments -AccessToken $TestAccessToken
             
             $result.PSObject.Properties.Name | Should -Contain "AppAssignments"
             $result.PSObject.Properties.Name | Should -Contain "ConfigurationAssignments"
@@ -121,7 +121,7 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
                 } 
             }
             
-            $result = GetGroupIndirectAssignments -AccessToken $TestAccessToken
+            $result = Get-GroupIndirectAssignments -AccessToken $TestAccessToken
             
             $result.AppAssignments.Count | Should -Be 0
             $result.AllAssignments.Count | Should -Be 0
@@ -142,7 +142,7 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
                 }
             }
             
-            GetGroupIndirectAssignments -AccessToken $TestAccessToken
+            Get-GroupIndirectAssignments -AccessToken $TestAccessToken
             
             $script:capturedBody | Should -Not -BeNullOrEmpty
             $bodyObject = $script:capturedBody | ConvertFrom-Json
@@ -164,7 +164,7 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
                 }
             }
             
-            GetGroupIndirectAssignments -AccessToken $TestAccessToken -IncludeBeta
+            Get-GroupIndirectAssignments -AccessToken $TestAccessToken -IncludeBeta
             
             $script:capturedBody | Should -Not -BeNullOrEmpty
             $bodyObject = $script:capturedBody | ConvertFrom-Json
@@ -188,7 +188,7 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
                 }
             }
             
-            GetGroupIndirectAssignments -AccessToken $TestAccessToken
+            Get-GroupIndirectAssignments -AccessToken $TestAccessToken
             
             $script:capturedBody | Should -Not -BeNullOrEmpty
             $bodyObject = $script:capturedBody | ConvertFrom-Json
@@ -252,7 +252,7 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
                 }
             }
             
-            $result = GetGroupIndirectAssignments -AccessToken $TestAccessToken
+            $result = Get-GroupIndirectAssignments -AccessToken $TestAccessToken
             
             $result.AllAssignments.Count | Should -Be 1
             $result.AllAssignments[0].AssignmentScope | Should -Be 'All Users'
@@ -314,7 +314,7 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
                 }
             }
             
-            $result = GetGroupIndirectAssignments -AccessToken $TestAccessToken
+            $result = Get-GroupIndirectAssignments -AccessToken $TestAccessToken
             
             $result.AllAssignments.Count | Should -Be 1
             $result.AllAssignments[0].AssignmentScope | Should -Be 'All Devices'
@@ -376,7 +376,7 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
                 }
             }
             
-            $result = GetGroupIndirectAssignments -AccessToken $TestAccessToken
+            $result = Get-GroupIndirectAssignments -AccessToken $TestAccessToken
             
             $assignment = $result.AllAssignments[0]
             $assignment.Type | Should -Be "Application"
@@ -442,7 +442,7 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
                 }
             }
             
-            $result = GetGroupIndirectAssignments -AccessToken $TestAccessToken
+            $result = Get-GroupIndirectAssignments -AccessToken $TestAccessToken
             
             $result.AllAssignments[0].Description | Should -Be ""
         }
@@ -483,7 +483,7 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
                 else { return $assignmentsResponse }
             }
             
-            $result = GetGroupIndirectAssignments -AccessToken $TestAccessToken
+            $result = Get-GroupIndirectAssignments -AccessToken $TestAccessToken
             
             $result.AppAssignments.Count | Should -Be 1
             $result.AllAssignments[0].Type | Should -Be "Application"
@@ -523,7 +523,7 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
                 else { return $assignmentsResponse }
             }
             
-            $result = GetGroupIndirectAssignments -AccessToken $TestAccessToken
+            $result = Get-GroupIndirectAssignments -AccessToken $TestAccessToken
             
             $result.ConfigurationAssignments.Count | Should -Be 1
             $result.AllAssignments[0].Type | Should -Be "Configuration"
@@ -568,7 +568,7 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
                 else { return $assignmentsResponse }
             }
             
-            $result = GetGroupIndirectAssignments -AccessToken $TestAccessToken -IncludeBeta
+            $result = Get-GroupIndirectAssignments -AccessToken $TestAccessToken -IncludeBeta
             
             $result.ConfigurationPolicyAssignments[0].Name | Should -Be "Test Policy"
         }
@@ -630,7 +630,7 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
                 else { return $assignmentsResponse }
             }
             
-            $result = GetGroupIndirectAssignments -AccessToken $TestAccessToken
+            $result = Get-GroupIndirectAssignments -AccessToken $TestAccessToken
             
             # Should only have 2 assignments (All Users and All Devices), not the direct group assignment
             $result.AllAssignments.Count | Should -Be 2
@@ -646,7 +646,7 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
                 throw "API Error" 
             }
             
-            { GetGroupIndirectAssignments -AccessToken $TestAccessToken } | Should -Not -Throw
+            { Get-GroupIndirectAssignments -AccessToken $TestAccessToken } | Should -Not -Throw
         }
         
         It "Should return empty assignments on error" {
@@ -654,7 +654,7 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
                 throw "API Error" 
             }
             
-            $result = GetGroupIndirectAssignments -AccessToken $TestAccessToken
+            $result = Get-GroupIndirectAssignments -AccessToken $TestAccessToken
             
             $result.AllAssignments.Count | Should -Be 0
         }
@@ -678,7 +678,7 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
                 return $batchResponse
             }
             
-            $result = GetGroupIndirectAssignments -AccessToken $TestAccessToken
+            $result = Get-GroupIndirectAssignments -AccessToken $TestAccessToken
             
             $result.AllAssignments.Count | Should -Be 0
         }
@@ -700,7 +700,7 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
                 return $batchResponse
             }
             
-            $result = GetGroupIndirectAssignments -AccessToken $TestAccessToken
+            $result = Get-GroupIndirectAssignments -AccessToken $TestAccessToken
             
             $result.AllAssignments.Count | Should -Be 0
         }
@@ -784,7 +784,7 @@ Describe "Function: GetGroupIndirectAssignments" -Tags 'Unit' {
                 return @{ value = @() }
             }
             
-            $result = GetGroupIndirectAssignments -AccessToken $TestAccessToken
+            $result = Get-GroupIndirectAssignments -AccessToken $TestAccessToken
             
             $result.AllAssignments.Count | Should -Be 3
             $result.AppAssignments.Count | Should -Be 1

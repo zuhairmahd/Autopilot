@@ -1,19 +1,19 @@
-function ShowGroupAssignments()
+function Show-GroupAssignments()
 {
     <#
 .SYNOPSIS
     Displays or exports Microsoft Intune policy and profile assignments for a specified group or special assignment scenarios.
 
 .DESCRIPTION
-    ShowGroupAssignments retrieves and displays Intune assignments for various resource types including applications, 
+    Show-GroupAssignments retrieves and displays Intune assignments for various resource types including applications,
     device configurations, compliance policies, scripts, and more. The function supports multiple operational modes:
-    
+
     - Direct group assignments: Show assignments targeted to a specific Azure AD group
     - Indirect assignments: Show assignments targeted to "All Users" and "All Devices"
     - Export mode: Export assignment data to CSV instead of displaying
-    
-    The function consolidates duplicate assignments with multiple scopes (Direct, All Users, All Devices) into 
-    single entries for cleaner display. It provides an interactive menu to filter assignments by type and supports 
+
+    The function consolidates duplicate assignments with multiple scopes (Direct, All Users, All Devices) into
+    single entries for cleaner display. It provides an interactive menu to filter assignments by type and supports
     paginated display for large result sets.
 
 .PARAMETER Group
@@ -23,7 +23,7 @@ function ShowGroupAssignments()
     Required. The Microsoft Graph API access token for authentication.
 
 .PARAMETER specialGroups
-    Array of special group names (e.g., "All Users", "All Devices") that trigger specific handling 
+    Array of special group names (e.g., "All Users", "All Devices") that trigger specific handling
     when combined with -ShowIndirectAssignments.
 
 .PARAMETER exportInstead
@@ -34,11 +34,11 @@ function ShowGroupAssignments()
     Only relevant when -exportInstead is used.
 
 .PARAMETER ShowIndirectAssignments
-    Switch parameter. When used with a specific group, includes indirect assignments (All Users/All Devices) 
+    Switch parameter. When used with a specific group, includes indirect assignments (All Users/All Devices)
     in addition to direct group assignments. When used with special groups, shows only indirect assignments.
 
     .PARAMETER HideEmptyMenus
-    Switch parameter. When present, assignment type menu will omit options for assignment types with zero entries.                      
+    Switch parameter. When present, assignment type menu will omit options for assignment types with zero entries.
 
 .PARAMETER Settings
     Hashtable containing configuration settings, including:
@@ -52,35 +52,35 @@ function ShowGroupAssignments()
     - Return value messages for specific scenarios (no assignments found, etc.)
 
 .EXAMPLE
-    ShowGroupAssignments -Group "Finance-Users" -accessToken $token
-    
+    Show-GroupAssignments -Group "Finance-Users" -accessToken $token
+
     Displays all assignment types for the "Finance-Users" group in an interactive menu.
 
 .EXAMPLE
-    ShowGroupAssignments -Group "IT-Admins" -accessToken $token -ShowIndirectAssignments
-    
+    Show-GroupAssignments -Group "IT-Admins" -accessToken $token -ShowIndirectAssignments
+
     Displays direct assignments to "IT-Admins" plus all indirect assignments (All Users/All Devices).
 
 .EXAMPLE
-    ShowGroupAssignments -Group "All Users" -accessToken $token -ShowIndirectAssignments -specialGroups @("All Users", "All Devices")
-    
+    Show-GroupAssignments -Group "All Users" -accessToken $token -ShowIndirectAssignments -specialGroups @("All Users", "All Devices")
+
     Displays only indirect assignments (All Users and All Devices) without filtering to a specific group.
 
 .EXAMPLE
-    ShowGroupAssignments -Group "Marketing" -accessToken $token -exportInstead -ExportFilePath "C:\Reports"
-    
+    Show-GroupAssignments -Group "Marketing" -accessToken $token -exportInstead -ExportFilePath "C:\Reports"
+
     Exports all assignments for the "Marketing" group to a CSV file in C:\Reports directory.
 
 .NOTES
     Author: Function from Autopilot management system
-    
+
     Dependencies:
-    - GetGroupDirectAssignments: Retrieves assignments for a specific group
-    - GetGroupIndirectAssignments: Retrieves All Users/All Devices assignments
+    - Get-GroupDirectAssignments: Retrieves assignments for a specific group
+    - Get-GroupIndirectAssignments: Retrieves All Users/All Devices assignments
     - ShowMenu, AddMenuItem, NewMenu: Menu system functions
     - Show-PagedContent: Paginated display function
     - Write-Log: Logging function
-    
+
     Assignment Types Supported:
     - Application
     - Configuration (Device Configuration)
@@ -98,9 +98,9 @@ function ShowGroupAssignments()
     - WindowsFeatureUpdate (Windows Feature Updates)
     - WindowsQualityUpdate (Windows Quality Updates)
     - WindowsDriverUpdate (Windows Driver Updates)
-    
-    The function automatically consolidates assignments that appear multiple times due to different 
-    assignment scopes (e.g., same policy assigned directly and via All Users) into a single entry 
+
+    The function automatically consolidates assignments that appear multiple times due to different
+    assignment scopes (e.g., same policy assigned directly and via All Users) into a single entry
     with combined scope information.
 
 .LINK
@@ -121,7 +121,7 @@ function ShowGroupAssignments()
 
     $functionName = $MyInvocation.MyCommand.Name
     Write-Log -logFile $LogFile -Module $functionName -Message "Function started - Group: '$Group', ShowIndirectAssignments: $($ShowIndirectAssignments.IsPresent), exportInstead: $($exportInstead.IsPresent), HideEmptyMenus: $($HideEmptyMenus.IsPresent)" -logLevel "Information"
-    
+
     #region process initial setup
     #define the action type
     if ($exportInstead.IsPresent)
@@ -133,25 +133,25 @@ function ShowGroupAssignments()
     {
         $actionType = "Show"
         Write-Log -logFile $LogFile -Module $functionName -Message "Action type set to: Show" -logLevel "Verbose"
-    }           
+    }
     # Extract group name for logging and display
     $groupName = if ($Group -and $Group.displayName)
-    { 
-        $Group.displayName 
+    {
+        $Group.displayName
     }
     elseif ($Group -is [hashtable] -and $Group.ContainsKey('displayName'))
     {
         $Group['displayName']
     }
     elseif ($Group -is [string])
-    { 
-        $Group 
+    {
+        $Group
     }
     else
-    { 
-        "Unknown" 
+    {
+        "Unknown"
     }
-    
+
     # Validate access token
     if (-not $accessToken)
     {
@@ -164,7 +164,7 @@ function ShowGroupAssignments()
         Write-Verbose "[$functionName] Access token is present."
         Write-Log -logFile $LogFile -Module $functionName -Message "Access token is present."
     }
-    
+
     # Log Settings parameter
     Write-Verbose "[$functionName] Settings provided: $($null -ne $Settings)"
     Write-Log -logFile $LogFile -Module $functionName -Message "Settings provided: $($null -ne $Settings)" -logLevel "Information"
@@ -173,7 +173,7 @@ function ShowGroupAssignments()
         Write-Verbose "[$functionName] Settings.operatingSystem: $($Settings.operatingSystem)"
         Write-Log -logFile $LogFile -Module $functionName -Message "Settings.operatingSystem: $($Settings.operatingSystem)" -logLevel "Information"
     }
-    
+
     # Log operational mode for debugging
     Write-Log -logFile $LogFile -Module $functionName -Message "Operational mode - ShowIndirectAssignments: $($ShowIndirectAssignments.IsPresent), exportInstead: $($exportInstead.IsPresent)" -logLevel "Information"
     Write-Verbose "[$functionName] Operational mode - ShowIndirectAssignments: $($ShowIndirectAssignments.IsPresent), exportInstead: $($exportInstead.IsPresent)"
@@ -185,19 +185,19 @@ function ShowGroupAssignments()
         Write-Verbose "[$functionName] Entering ShowIndirectAssignments with special group branch"
         Write-Host "Getting all indirect assignments (All Users and All Devices)..."
         Write-Host "This may take a while..."
-        
+
         # Get only indirect assignments
-        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Calling GetGroupIndirectAssignments with Settings.operatingSystem='$($Settings.operatingSystem)'" -logLevel "Debug"
-        $assignments = GetGroupIndirectAssignments -AccessToken $accessToken -IncludeBeta -Settings $Settings
-        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: GetGroupIndirectAssignments returned $(if ($assignments.AllAssignments) { $assignments.AllAssignments.Count } else { 0 }) total assignments" -logLevel "Debug"
-        
+        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Calling Get-GroupIndirectAssignments with Settings.operatingSystem='$($Settings.operatingSystem)'" -logLevel "Debug"
+        $assignments = Get-GroupIndirectAssignments -AccessToken $accessToken -IncludeBeta -Settings $Settings
+        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Get-GroupIndirectAssignments returned $(if ($assignments.AllAssignments) { $assignments.AllAssignments.Count } else { 0 }) total assignments" -logLevel "Debug"
+
         if ($null -eq $assignments -or $assignments.AllAssignments.count -eq 0)
         {
             Write-Log -logFile $LogFile -Module $functionName -Message "No indirect assignments found." -LogLevel "Verbose"
             Write-Host "No indirect assignments found." -ForegroundColor Yellow
             return $returnValues.noGroupAssignmentsFoundMessage
         }
-        
+
         $groupName = "All Users/All Devices"
         Write-Verbose "[$functionName] Completed ShowIndirectAssignments with special group branch successfully"
     }
@@ -213,14 +213,14 @@ function ShowGroupAssignments()
         }
         Write-Host "This may take a while..."
         # Get group assignments (fetch once and reuse)
-        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Calling GetGroupDirectAssignments for group '$Group', IncludeIndirectAssignments=$($ShowIndirectAssignments.IsPresent), Settings.operatingSystem='$($Settings.operatingSystem)'" -logLevel "Debug"
-        $assignments = GetGroupDirectAssignments -accessToken $accessToken -GroupName $Group -includeBeta -IncludeIndirectAssignments:$ShowIndirectAssignments -Settings $Settings
-        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: GetGroupDirectAssignments returned $(if ($assignments -and $assignments -ne 'noGroup' -and $assignments.AllAssignments) { $assignments.AllAssignments.Count } else { 0 }) total assignments" -logLevel "Debug"
+        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Calling Get-GroupDirectAssignments for group '$Group', IncludeIndirectAssignments=$($ShowIndirectAssignments.IsPresent), Settings.operatingSystem='$($Settings.operatingSystem)'" -logLevel "Debug"
+        $assignments = Get-GroupDirectAssignments -accessToken $accessToken -GroupName $Group -includeBeta -IncludeIndirectAssignments:$ShowIndirectAssignments -Settings $Settings
+        Write-Log -logFile $LogFile -module $functionName -Message "DEBUG: Get-GroupDirectAssignments returned $(if ($assignments -and $assignments -ne 'noGroup' -and $assignments.AllAssignments) { $assignments.AllAssignments.Count } else { 0 }) total assignments" -logLevel "Debug"
         if ($assignments -eq 'noGroup')
         {
             Write-Log -logFile $LogFile -Module $functionName -Message "No group found for name '$groupName'." -LogLevel "Verbose"
             return $returnValues.noGroupFoundMessage
-        }   
+        }
         if ($null -eq $assignments -or $assignments.AllAssignments.count -eq 0)
         {
             Write-Log -logFile $LogFile -Module $functionName -Message "No assignments found for group '$groupName'." -LogLevel "Verbose"
@@ -241,22 +241,22 @@ function ShowGroupAssignments()
         else
         {
             @()
-        }                                       
-        
+        }
+
         $displayableFailures = $assignments.FailedResources | Where-Object { $_.ResourceType -notin $knownBackendIssues }
-        
+
         if ($displayableFailures -and $displayableFailures.Count -gt 0)
         {
             $failedResourceTypes = ($displayableFailures | Select-Object -ExpandProperty ResourceType -Unique) -join ', '
             Write-Host "Warning: Some resources could not be fetched: $failedResourceTypes" -ForegroundColor Yellow
             Write-Log -logFile $LogFile -Module $functionName -Message "Failed to fetch $($displayableFailures.Count) resource type(s)" -logLevel "Warning"
-            
+
             foreach ($failedResource in $displayableFailures)
             {
                 Write-Log -logFile $LogFile -Module $functionName -Message "Failed Resource - Type: $($failedResource.ResourceType), Status: $($failedResource.StatusCode), API Version: $($failedResource.ApiVersion), Error: $($failedResource.ErrorMessage)" -logLevel "Error"
             }
         }
-        
+
         # Still log known backend issues but don't display warning to user
         $knownIssueFailures = $assignments.FailedResources | Where-Object { $_.ResourceType -in $knownBackendIssues }
         foreach ($failedResource in $knownIssueFailures)
@@ -264,18 +264,18 @@ function ShowGroupAssignments()
             Write-Log -logFile $LogFile -Module $functionName -Message "Known Backend Issue - Type: $($failedResource.ResourceType), Status: $($failedResource.StatusCode), API Version: $($failedResource.ApiVersion), Error: $($failedResource.ErrorMessage) (suppressed from user display)" -logLevel "Verbose"
         }
     }
-    
+
     # Cache all assignments to avoid re-query per selection
     $allAssignments = @($assignments.allAssignments)
     Write-Log -logFile $LogFile -Module $functionName -Message "Cached $($allAssignments.Count) total assignments for processing" -logLevel "Information"
-        
+
     # Consolidate duplicate assignments with multiple scopes
     Write-Verbose "[$functionName] Consolidating duplicate assignments with multiple scopes"
     Write-Log -logFile $LogFile -Module $functionName -Message "Consolidating duplicate assignments (before: $($allAssignments.Count) entries)" -logLevel "Verbose"
-    
+
     # Group assignments by unique identifier (Type + Name + Id)
     $groupedAssignments = $allAssignments | Group-Object -Property { "$($_.Type)|$($_.Name)|$($_.Id)" }
-    
+
     # Consolidate each group
     $consolidatedAssignments = @()
     foreach ($group in $groupedAssignments)
@@ -294,7 +294,7 @@ function ShowGroupAssignments()
                 # Direct assignment only
                 @("Direct")
             }
-            
+
             # Create new consolidated object
             $consolidatedAssignments += [PSCustomObject]@{
                 Type            = $assignment.Type
@@ -311,7 +311,7 @@ function ShowGroupAssignments()
         {
             # Multiple assignments - consolidate into one with combined scopes
             $primaryAssignment = $group.Group[0]
-            
+
             # Collect all unique scopes
             $allScopes = @()
             foreach ($assignment in $group.Group)
@@ -327,10 +327,10 @@ function ShowGroupAssignments()
                     $allScopes += "Direct"
                 }
             }
-            
+
             # Remove duplicates and sort for consistency
             $uniqueScopes = @($allScopes | Select-Object -Unique | Sort-Object)
-            
+
             # Create new consolidated object with combined scopes
             $consolidatedAssignments += [PSCustomObject]@{
                 Type            = $primaryAssignment.Type
@@ -344,12 +344,12 @@ function ShowGroupAssignments()
             }
         }
     }
-    
+
     # Replace allAssignments with consolidated version
     $allAssignments = @($consolidatedAssignments)
     Write-Verbose "[$functionName] Consolidation complete (after: $($allAssignments.Count) entries)"
     Write-Log -logFile $LogFile -Module $functionName -Message "Consolidation complete (after: $($allAssignments.Count) entries)" -logLevel "Information"
-    
+
     # Update the assignments object with consolidated data
     # Re-categorize the consolidated assignments
     $assignments.AllAssignments = $allAssignments
@@ -369,9 +369,9 @@ function ShowGroupAssignments()
     $assignments.WindowsFeatureUpdateAssignments = @($allAssignments | Where-Object { $_.Type -eq 'WindowsFeatureUpdate' })
     $assignments.WindowsQualityUpdateAssignments = @($allAssignments | Where-Object { $_.Type -eq 'WindowsQualityUpdate' })
     $assignments.WindowsDriverUpdateAssignments = @($allAssignments | Where-Object { $_.Type -eq 'WindowsDriverUpdate' })
-    #endregion                  
-    
-    #region Build and show assignment type menu    
+    #endregion
+
+    #region Build and show assignment type menu
     Write-Log -logFile $LogFile -Module $functionName -Message "Building assignment type menu (Hide EmptyMenus: $($HideEmptyMenus.IsPresent))" -logLevel "Verbose"
     $groupAssignmentsMenu = NewMenu -MenuName "groupAssignmentsMenu"
     if (-not $groupAssignmentsMenu)
@@ -390,10 +390,10 @@ function ShowGroupAssignments()
         else
         {
             "Assignments for $groupName"
-        }       
+        }
         Write-Log -logFile $LogFile -Module $functionName -Message "Menu loaded from config, title updated with group name" -logLevel "Debug"
     }
-    
+
     if (-not $HideEmptyMenus -or $assignments.AppAssignments.count -gt 0)
     {
         $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "$actionType Application Assignments ($($assignments.AppAssignments.count))" -Action {
@@ -513,7 +513,7 @@ function ShowGroupAssignments()
             return 'All'
         } -returnsValue
     }
-    
+
     Write-Log -logFile $LogFile -Module $functionName -Message "Assignment type menu built with $($groupAssignmentsMenu.MenuItems.Count) visible items" -logLevel "Information"
     #endregion
 
@@ -524,11 +524,11 @@ function ShowGroupAssignments()
     {
         $loopIteration++
         Write-Log -logFile $LogFile -Module $functionName -Message "Assignment type menu loop iteration: $loopIteration" -logLevel "Debug"
-        
+
         # Use proper stack operation to maintain menu navigation integrity
         $assignmentType = ShowMenu -Menu $groupAssignmentsMenu -CalledBy 'Custom_GroupAssignmentSubmenu' -StackOperation 'Push'
         Write-Log -logFile $LogFile -Module $functionName -Message "User selected assignment type: '$assignmentType'" -logLevel "Information"
-        
+
         # Validate that we got a proper assignment, not a navigation option
         if ($assignmentType -eq "Back" -or $assignmentType -eq "Main Menu" -or $assignmentType -eq 0 -or $assignmentType -eq "0")
         {
@@ -543,7 +543,7 @@ function ShowGroupAssignments()
             Write-Log -logFile $LogFile -Module $functionName -Message "ShowMenu returned null, user navigated away" -logLevel "Information"
             return $null
         }
-        
+
         #region Process assignments
         # Filter assignments by type for display
         if ($assignmentType -ne 'All')
@@ -567,7 +567,7 @@ function ShowGroupAssignments()
                 'WindowsQualityUpdate'         = 'WindowsQualityUpdate'
                 'WindowsDriverUpdate'          = 'WindowsDriverUpdate'
             }
-            
+
             $internalType = $typePropertyMap[$assignmentType]
             if ($internalType)
             {
@@ -606,17 +606,17 @@ function ShowGroupAssignments()
                 {
                     # Use current directory
                     Join-Path -Path (Get-Location).Path -ChildPath $exportFileName
-                }                   
-                
+                }
+
                 Write-Host "Exporting $($selectedAssignments.Count) assignments to CSV..." -ForegroundColor Cyan
                 Write-Log -logFile $LogFile -Module $functionName -Message "Starting export - Type: '$assignmentType', Count: $($selectedAssignments.Count), Path: '$exportPath'" -LogLevel "Information"
-                
+
                 try
                 {
                     # Prepare export data with all relevant properties
                     $exportData = $selectedAssignments | ForEach-Object {
                         $assignment = $_
-                        
+
                         # Format AssignmentScope array for CSV export
                         $scopeValue = if ($assignment.AssignmentScope -and $assignment.AssignmentScope.Count -gt 0)
                         {
@@ -626,7 +626,7 @@ function ShowGroupAssignments()
                         {
                             "Direct"
                         }
-                        
+
                         # Create export object with all relevant properties
                         [PSCustomObject]@{
                             GroupName       = $groupName
@@ -640,15 +640,15 @@ function ShowGroupAssignments()
                             Settings        = if ($assignment.Settings) { ($assignment.Settings | ConvertTo-Json -Compress -Depth 10) } else { "" }
                         }
                     }
-                    
+
                     # Export to CSV
                     $exportData | Export-Csv -Path $exportPath -NoTypeInformation -Encoding UTF8
                     $exportFileSize = (Get-Item $exportPath).Length
-                    
+
                     Write-Host "Export completed successfully!" -ForegroundColor Green
                     Write-Host "File location: $exportPath" -ForegroundColor White
                     Write-Log -logFile $LogFile -Module $functionName -Message "Export completed successfully - Records: $($exportData.Count), File size: $exportFileSize bytes, Path: '$exportPath'" -LogLevel "Information"
-                    
+
                     # Offer to open the file
                     Write-Host ""
                     $openChoice = Read-Host "Would you like to open the exported file? (yes/no)"
@@ -668,7 +668,7 @@ function ShowGroupAssignments()
                     Write-Host "Error exporting assignments: $($_.Exception.Message)" -ForegroundColor Red
                     Write-Log -logFile $LogFile -Module $functionName -Message "Export failed - Error: $($_.Exception.Message), Stack: $($_.ScriptStackTrace)" -LogLevel "Error"
                 }
-                
+
                 Write-Host ""
                 Write-Host "Press any key to continue..."
                 [void][System.Console]::ReadKey($true)
@@ -678,14 +678,14 @@ function ShowGroupAssignments()
                 # Display mode: Show assignments using Show-PagedContent for large datasets
                 # Initialize counter for item numbering (tracked outside scriptblock)
                 $script:itemCounter = 0
-                
+
                 # Create display scriptblock for formatting each assignment in tabular format
                 $displayScript = {
                     param($assignment)
-                    
+
                     # Increment counter for each item displayed
                     $script:itemCounter++
-                    
+
                     # Prepare columns
                     $typeColumn = if ($assignmentType -eq 'All')
                     {
@@ -695,7 +695,7 @@ function ShowGroupAssignments()
                     {
                         ""
                     }
-                    
+
                     # Truncate name if too long (max 50 chars)
                     $nameColumn = if ($assignment.Name.Length -gt 50)
                     {
@@ -705,7 +705,7 @@ function ShowGroupAssignments()
                     {
                         $assignment.Name
                     }
-                    
+
                     # Format intent if present
                     $intentColumn = if ($null -ne $assignment.Intent)
                     {
@@ -715,7 +715,7 @@ function ShowGroupAssignments()
                     {
                         ""
                     }
-                    
+
                     # Format assignment scope
                     $scopeDisplay = if ($assignment.AssignmentScope -and $assignment.AssignmentScope.Count -gt 0)
                     {
@@ -725,7 +725,7 @@ function ShowGroupAssignments()
                     {
                         "Direct"
                     }
-                    
+
                     # Determine scope color
                     $scopeColor = "Green"  # Default for Direct only
                     if ($assignment.AssignmentScope -and $assignment.AssignmentScope.Count -gt 1)
@@ -736,7 +736,7 @@ function ShowGroupAssignments()
                     {
                         $scopeColor = "Cyan"  # Indirect only
                     }
-                    
+
                     # Display in single line format
                     Write-Host "$($script:itemCounter). " -NoNewline -ForegroundColor Gray
                     if ($assignmentType -eq 'All')
@@ -761,14 +761,14 @@ function ShowGroupAssignments()
                     "$assignmentType Assignments for '$groupName' ($($selectedAssignments.Count) total)"
                 }
                 Write-Log -logFile $LogFile -Module $functionName -Message "Starting paged display - Type: '$assignmentType', Count: $($selectedAssignments.Count), PageSize: 10, Title: '$pageTitle'" -LogLevel "Information"
-                
+
                 # Use Show-PagedContent for display
                 $pagingResult = Show-PagedContent -Content $selectedAssignments `
                     -DisplayScriptBlock $displayScript `
                     -Title $pageTitle `
                     -PageSize 15 `
                     -ShowPageInfo $true
-                    
+
                 Write-Log -logFile $LogFile -Module $functionName -Message "Paged display completed - Result: '$pagingResult'" -LogLevel "Information"
             }
         }

@@ -4,14 +4,14 @@
 - `PESTER_MIGRATION_STATUS.md` (current status)
 - `PESTER_MIGRATION_GUIDE.md` (technical guide)
 
-**Date Archived:** October 14, 2025  
+**Date Archived:** October 14, 2025
 **Reason:** Consolidated to eliminate contradictory information
 
 **Historical Version Information:**
-- **Document Version:** 2.1  
-- **Last Updated:** October 14, 2025  
-- **Status at Archive:** Phases 1-3 Complete, Phase 4 In Progress  
-- **Overall Progress:** 169 of ~250 tests migrated (68%)  
+- **Document Version:** 2.1
+- **Last Updated:** October 14, 2025
+- **Status at Archive:** Phases 1-3 Complete, Phase 4 In Progress
+- **Overall Progress:** 169 of ~250 tests migrated (68%)
 - **Pass Rate:** 100% (169/169 passing)
 
 ---
@@ -43,8 +43,8 @@ The Pester migration is **ahead of schedule** with significant progress through 
 
 ### Phase 0: Foundation Setup ✅ COMPLETE
 
-**Duration:** Week 1 (as planned)  
-**Status:** ✅ Complete  
+**Duration:** Week 1 (as planned)
+**Status:** ✅ Complete
 **Deliverables:**
 
 1. **Directory Structure Created:**
@@ -71,7 +71,7 @@ The Pester migration is **ahead of schedule** with significant progress through 
      - Clear-MockGlobalVariables
      - New-MockWriteLog
      - Merge-HashTableDeep
-   
+
    - ✅ `tests/Helpers/AutopilotGraphMocks.psm1` (Layer 2a - Graph API)
      - Initialize-GraphMockEnvironment
      - Add-MockUser / Get-MockUsers
@@ -81,7 +81,7 @@ The Pester migration is **ahead of schedule** with significant progress through 
      - Invoke-MockGraphAPI (search, filter, expand support)
      - New-MockAuthToken
      - Clear-GraphMockEnvironment
-   
+
    - ✅ `tests/Helpers/AutopilotMenuMocks.psm1` (Layer 2b - Menu System)
      - Initialize-MenuTestEnvironment
      - Clear-MenuTestEnvironment
@@ -101,9 +101,9 @@ The Pester migration is **ahead of schedule** with significant progress through 
 
 ### Phase 1: Pilot Migration ✅ COMPLETE
 
-**Duration:** Week 2 (as planned)  
-**Status:** ✅ Complete  
-**Tests Migrated:** 3 syntax/validation tests  
+**Duration:** Week 2 (as planned)
+**Status:** ✅ Complete
+**Tests Migrated:** 3 syntax/validation tests
 **Pass Rate:** 100% (3/3)
 
 **Tests Converted:**
@@ -125,14 +125,14 @@ Import-Module "$PSScriptRoot/../Helpers/AutopilotTestHelpers.psm1" -Force
 Describe "Feature Name" -Tags 'Unit', 'Feature' {
     BeforeAll {
         $script:RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-        
+
         # Direct dot-sourcing (PS 5.1 compatible)
         $functionsPath = Join-Path $script:RepoRoot "functions"
         Get-ChildItem -Path $functionsPath -Recurse -Filter *.ps1 | ForEach-Object {
             . $_.FullName
         }
     }
-    
+
     Context "Test Group" {
         It "Should do something" {
             $result = Test-Function
@@ -150,9 +150,9 @@ Describe "Feature Name" -Tags 'Unit', 'Feature' {
 
 ### Phase 2: Unit Tests Migration ✅ COMPLETE
 
-**Duration:** Weeks 3-4 (as planned, completed efficiently)  
-**Status:** ✅ Complete  
-**Tests Migrated:** 144 unit tests  
+**Duration:** Weeks 3-4 (as planned, completed efficiently)
+**Status:** ✅ Complete
+**Tests Migrated:** 144 unit tests
 **Pass Rate:** 100% (144/144)
 
 **Tests Converted (Organized by Feature Area):**
@@ -255,9 +255,9 @@ Describe "Feature Name" -Tags 'Unit', 'Feature' {
 
 ### Phase 3: Integration Tests Migration ✅ COMPLETE
 
-**Duration:** Weeks 5-6 (on track)  
+**Duration:** Weeks 5-6 (on track)
 **Status:** ✅ Complete
-**Tests Migrated:** 12 of 12 planned integration tests  
+**Tests Migrated:** 12 of 12 planned integration tests
 **Pass Rate:** 100% (12/12)
 
 **Tests Converted:**
@@ -271,7 +271,7 @@ Describe "Feature Name" -Tags 'Unit', 'Feature' {
 
 **Challenge: Identifying Assignment Logic**
 - **Problem:** Legacy test files for device/user and profile assignments were missing, and no direct assignment functions were found.
-- **Solution:** Analyzed application workflows (`ImportAutopilotDevice`, `GetGroupDirectAssignments`) to identify the actual integration points. Enhanced mock API helpers to support `POST` operations and mock the assignment backend.
+- **Solution:** Analyzed application workflows (`ImportAutopilotDevice`, `Get-GroupDirectAssignments`) to identify the actual integration points. Enhanced mock API helpers to support `POST` operations and mock the assignment backend.
 - **Impact:** Tests were created that accurately reflect the application's behavior, even though it differed from the initial plan's assumptions. This demonstrates the robustness of the "improve helpers" philosophy.
 
 **Helper Enhancements (Phase 3):**
@@ -287,21 +287,21 @@ Import-Module "$PSScriptRoot/../Helpers/AutopilotMenuMocks.psm1" -Force
 Describe "Menu Integration" -Tags 'Integration', 'Menu' {
     BeforeAll {
         $script:RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-        
+
         # Initialize menu environment
         Initialize-MenuTestEnvironment -AppMode "helpdesk"
-        
+
         # Create test menu structure
         $script:testMenus = New-MockMenuStructure -IncludeNestedMenus -IncludeActions
-        
+
         # Load functions
         . (Join-Path $script:RepoRoot "functions/menuFunctions/Get-MenuItemsToShow.ps1")
     }
-    
+
     AfterAll {
         Clear-MenuTestEnvironment
     }
-    
+
     It "Should filter menus correctly" {
         $filtered = Get-MenuItemsToShow -menus $script:testMenus -settings $Global:settings
         $filtered.Count | Should -BeGreaterThan 0
@@ -375,8 +375,8 @@ Describe "Menu Integration" -Tags 'Integration', 'Menu' {
 
 ### Phase 4: Comprehensive Tests (3-4 weeks)
 
-**Status:** 🔄 In Progress (Week 7)  
-**Complexity:** High - Multi-step workflows  
+**Status:** 🔄 In Progress (Week 7)
+**Complexity:** High - Multi-step workflows
 **Tests to Migrate:** 9 comprehensive tests (1 complete, 8 remaining)
 
 **Completed Tests:**
@@ -408,8 +408,8 @@ Describe "Menu Integration" -Tags 'Integration', 'Menu' {
 
 ### Phase 5: Specialized Tests (2-3 weeks)
 
-**Status:** ⏳ Evaluation Needed  
-**Complexity:** Mixed  
+**Status:** ⏳ Evaluation Needed
+**Complexity:** Mixed
 **Tests to Evaluate:** ~20 tests across multiple categories
 
 **Categories for Review:**
@@ -462,12 +462,12 @@ Describe "Menu Integration" -Tags 'Integration', 'Menu' {
 
 ### Qualitative Metrics
 
-✅ **Test Maintainability:** Excellent - Consistent patterns, helper-based  
-✅ **Developer Experience:** Excellent - Fast iteration, -TestFile support  
-✅ **Code Quality:** Excellent - No duplication, clear separation  
-✅ **Documentation:** Excellent - Comprehensive, decision records maintained  
-✅ **Team Confidence:** High - 100% pass rate maintained throughout  
-✅ **AI Agent Readiness:** Excellent - Clear patterns for automation  
+✅ **Test Maintainability:** Excellent - Consistent patterns, helper-based
+✅ **Developer Experience:** Excellent - Fast iteration, -TestFile support
+✅ **Code Quality:** Excellent - No duplication, clear separation
+✅ **Documentation:** Excellent - Comprehensive, decision records maintained
+✅ **Team Confidence:** High - 100% pass rate maintained throughout
+✅ **AI Agent Readiness:** Excellent - Clear patterns for automation
 
 ---
 
@@ -542,7 +542,7 @@ $matching = $results | Where-Object { ... } | Sort-Object propertyName
 1. **Complete Phase 3 Integration Tests (4 remaining)**
    - Menu navigation flows
    - Device/user integration
-   - Profile assignment integration  
+   - Profile assignment integration
    - Reporting integration
 
 2. **Update Documentation**

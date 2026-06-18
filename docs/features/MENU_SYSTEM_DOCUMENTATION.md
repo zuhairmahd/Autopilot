@@ -432,14 +432,14 @@ Security, encryption, and credential management.
 | `GetCachedDeviceEnrollmentState` | Get cached enrollment status | Performance optimization |
 | `getEntraGroup` | Look up Azure AD groups | Group management |
 | `GetEntraUser` | Look up Azure AD users | User management |
-| `GetGroupDirectAssignments` | Get direct group assignments | Assignment analysis |
+| `Get-GroupDirectAssignments` | Get direct group assignments | Assignment analysis |
 | `GetGroupIdsByNames` | Convert group names to IDs | Group resolution |
 | `GetTimeZoneAbbreviation` | Get timezone abbreviations | Date formatting |
 | `GetUserInput` | Validated user input collection | User interface |
 | `Globals` | Global variable definitions | Application state |
 | `normalizeADUserDisplayName` | Normalize AD user names | User name processing |
 | `NormalizeUserName` | Normalize usernames | User name processing |
-| `ShowGroupAssignments` | Display group assignments | Information display |
+| `Show-GroupAssignments` | Display group assignments | Information display |
 | `validateInput` | Input validation functions | Data validation |
 | `Write-Log` | Centralized logging system | Application logging |
 

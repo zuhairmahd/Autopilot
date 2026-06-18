@@ -1,8 +1,8 @@
 # Phase 3 Integration Test Migration - Status Report
 
-**Date:** October 10, 2025  
-**Phase:** 3 of 12 (Integration Tests)  
-**Overall Progress:** 27 of 33 tests passing (81.8%)  
+**Date:** October 10, 2025
+**Phase:** 3 of 12 (Integration Tests)
+**Overall Progress:** 27 of 33 tests passing (81.8%)
 **Status:** Substantially Complete ✅
 
 ## Executive Summary
@@ -41,7 +41,7 @@ Phase 3 integration test migration has achieved **81.8% pass rate** (27/33 tests
    - CSV export functionality
    - Status: COMPLETE ✨ (Fixed during this session)
 
-5. **ProfileAssignment.Tests.ps1**: 3/3 passing  
+5. **ProfileAssignment.Tests.ps1**: 3/3 passing
    - Returns no assignments when none exist
    - Returns no assignments for different group
    - Finds profile assigned to group
@@ -71,7 +71,7 @@ Phase 3 integration test migration has achieved **81.8% pass rate** (27/33 tests
 
 **Issue:** The batch API endpoint handler wasn't parsing the JSON `$Body` parameter from CallGraphAPI before iterating over `$Body.requests`. This caused the entire batch request flow to fail silently.
 
-**Root Cause:**  
+**Root Cause:**
 When CallGraphAPI calls the mock with `-Body ($batchRequestBody | ConvertTo-Json ...)`, the Body arrives as a JSON string, not an object. The code attempted `foreach ($request in $Body.requests)` which failed because a string doesn't have a `.requests` property.
 
 **Fix Applied:**
@@ -85,7 +85,7 @@ if ($ResourcePath -eq '$batch' -and $Method -eq "POST")
     } else {
         $Body
     }
-    
+
     $responses = @()
     foreach ($request in $bodyObject.requests)
     {
@@ -94,12 +94,12 @@ if ($ResourcePath -eq '$batch' -and $Method -eq "POST")
 }
 ```
 
-**Impact:**  
+**Impact:**
 - ProfileAssignment.Tests.ps1 now 3/3 passing (was 2/3)
 - Batch API now works correctly for all resource types
 - Phase 3 completion improved from 79% to 82%
 
-**Testing:**  
+**Testing:**
 Debug script (`tools/Debug-ProfileAssignment.ps1`) confirmed:
 - First batch request returns 3 autopilot profiles including Test-Profile-1
 - Second batch request fetches assignments for all 3 profiles
@@ -171,8 +171,8 @@ foreach ($profile in $script:MockProfiles.GetEnumerator()) {  # Was MockAutopilo
 
 ### Issue #1: MenuNavigation Test Architecture Mismatch
 
-**Severity:** High  
-**Effort Required:** 4-6 hours  
+**Severity:** High
+**Effort Required:** 4-6 hours
 **Priority:** Medium (can defer to later phase)
 
 **Problem:**
@@ -191,12 +191,12 @@ Option C: Split into smaller unit tests for specific menu functions
 
 ### Issue #2: ProfileAssignment Batch API Processing
 
-**Severity:** Medium  
-**Effort Required:** 2-3 hours  
+**Severity:** Medium
+**Effort Required:** 2-3 hours
 **Priority:** High (blocks Phase 3 completion)
 
 **Problem:**
-- GetGroupDirectAssignments uses complex batch API flow:
+- Get-GroupDirectAssignments uses complex batch API flow:
   1. Batch request to list all profiles
   2. Second batch request to get assignments for each profile
   3. Filter assignments by target group ID
@@ -211,7 +211,7 @@ Option C: Split into smaller unit tests for specific menu functions
 **Files Affected:**
 - `tests/Integration/ProfileAssignment.Tests.ps1`
 - `tests/Helpers/AutopilotGraphMocks.psm1` (Invoke-MockGraphAPI function)
-- `functions/UserAndGroupFunctions/GetGroupDirectAssignments.ps1`
+- `functions/UserAndGroupFunctions/Get-GroupDirectAssignments.ps1`
 
 ## Test Count Analysis vs. Completion Plan
 
@@ -230,7 +230,7 @@ Option C: Split into smaller unit tests for specific menu functions
 **MenuNavigation:** Missing 2 tests
 - Recommended: Add tests for menu stack depth limits, circular navigation prevention
 
-**DeviceUserAssignment:** Missing 8 tests  
+**DeviceUserAssignment:** Missing 8 tests
 - Recommended: Add tests for bulk operations, concurrent assignments, validation edge cases
 
 **ProfileAssignment:** Missing 12 tests
@@ -281,7 +281,7 @@ Option C: Split into smaller unit tests for specific menu functions
    - Verify with ShowMenu integration
    - Target: 100% Phase 3 completion
 
-**Recommendation:** **Choose Option A**  
+**Recommendation:** **Choose Option A**
 Rationale:
 - 82% completion is excellent for an integration test phase
 - MenuNavigation requires architectural redesign, not a simple fix
@@ -330,7 +330,7 @@ Phase 3 has made significant progress with 78.8% of tests passing. The remaining
 
 The Export-DeviceReport bug fix is a valuable production improvement that benefits the entire application beyond just tests.
 
-**Recommended Decision Point:** 
+**Recommended Decision Point:**
 - Option A: Invest 2-3 hours to fix ProfileAssignment, defer MenuNavigation to Phase 4
 - Option B: Mark Phase 3 as "substantially complete" at 78.8% and move to Phase 4
 - Option C: Allocate 1-2 days to fully complete Phase 3 including MenuNavigation rewrite

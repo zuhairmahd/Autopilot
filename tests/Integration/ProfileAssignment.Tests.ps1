@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     Tests the application's ability to correctly identify Autopilot profiles
-    assigned to groups by testing the GetGroupDirectAssignments function against
+    assigned to groups by testing the Get-GroupDirectAssignments function against
     a mock Graph API backend.
     Addresses Phase 3 of the Pester Migration Plan.
 
@@ -34,15 +34,15 @@ Describe "Profile Assignment Integration" -Tags 'Integration', 'Profile', 'Assig
         function global:CallGraphAPI
         {
             param($accessToken, $ResourcePath, $Filter, $ExtraParameters, [switch]$consistencyLevel, [string]$Method = 'GET', $Body = $null, [string]$apiVersion = 'v1.0')
-            
+
             return Invoke-MockGraphAPI -accessToken $accessToken -ResourcePath $ResourcePath `
                 -Filter $Filter -ExtraParameters $ExtraParameters -consistencyLevel:$consistencyLevel `
                 -Method $Method -Body $Body -apiVersion $apiVersion
         }
 
         # Now load functions that will use the mocked CallGraphAPI
-        . (Join-Path $script:RepoRoot "functions/UserAndGroupFunctions/GetGroupDirectAssignments.ps1")
-        . (Join-Path $script:RepoRoot "functions/UserAndGroupFunctions/GetGroupIndirectAssignments.ps1")
+        . (Join-Path $script:RepoRoot "functions/UserAndGroupFunctions/Get-GroupDirectAssignments.ps1")
+        . (Join-Path $script:RepoRoot "functions/UserAndGroupFunctions/Get-GroupIndirectAssignments.ps1")
         . (Join-Path $script:RepoRoot "functions/UserAndGroupFunctions/Get-GroupAssignments-Common.ps1")
         . (Join-Path $script:RepoRoot "functions/utilityFunctions/Get-CachedData.ps1")
 
@@ -53,7 +53,7 @@ Describe "Profile Assignment Integration" -Tags 'Integration', 'Profile', 'Assig
         Add-MockGroup -DisplayName "Test-Group-1" -Id "group-test-01"
 
         $script:token = New-MockAuthToken
-        $script:testGroup = @{ 
+        $script:testGroup = @{
             id          = "group-test-01"
             displayName = "Test-Group-1"
         }
@@ -67,7 +67,7 @@ Describe "Profile Assignment Integration" -Tags 'Integration', 'Profile', 'Assig
     BeforeEach {
         # Clear assignment state and cache before each test
         Clear-MockProfileAssignments
-        
+
         # Clear all caches to ensure tests are isolated
         if ($global:DirectoryObjectCache)
         {
@@ -93,7 +93,7 @@ Describe "Profile Assignment Integration" -Tags 'Integration', 'Profile', 'Assig
 
             # Act
             # The function under test requires the -IncludeBeta switch for Autopilot profiles
-            $result = GetGroupDirectAssignments -AccessToken $script:token -GroupName $script:testGroup -IncludeBeta
+            $result = Get-GroupDirectAssignments -AccessToken $script:token -GroupName $script:testGroup -IncludeBeta
 
             # Assert
             $result | Should -Not -BeNull
@@ -108,7 +108,7 @@ Describe "Profile Assignment Integration" -Tags 'Integration', 'Profile', 'Assig
             # Arrange: No assignments are added
 
             # Act
-            $result = GetGroupDirectAssignments -AccessToken $script:token -GroupName $script:testGroup -IncludeBeta
+            $result = Get-GroupDirectAssignments -AccessToken $script:token -GroupName $script:testGroup -IncludeBeta
 
             # Assert
             $result | Should -Not -BeNull
@@ -120,7 +120,7 @@ Describe "Profile Assignment Integration" -Tags 'Integration', 'Profile', 'Assig
             Add-MockProfileAssignment -ProfileId "profile-test-01" -TargetId "some-other-group"
 
             # Act
-            $result = GetGroupDirectAssignments -AccessToken $script:token -GroupName $script:testGroup -IncludeBeta
+            $result = Get-GroupDirectAssignments -AccessToken $script:token -GroupName $script:testGroup -IncludeBeta
 
             # Assert
             $result | Should -Not -BeNull
