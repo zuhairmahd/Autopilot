@@ -1,0 +1,29 @@
+{
+    "reportName": "AutopilotV1DeploymentStatus",
+    "localizationType": "ReplaceLocalizableValues",
+    "select": [
+        "DeviceName",
+        "DeviceSerialNumber",
+        "OSVersion",
+        "AutopilotProfileName",
+        "ESPPolicyName",
+        "UPN",
+        "DeviceRegisteredDateTime",
+        "EnrollmentDateTime",
+        "EnrollmentMethod",
+        "EnrollmentStatus",
+        "DeviceSetupStatus",
+        "UserSetupStatus",
+        "DeploymentStartDateTime",
+        "DeploymentEndDateTime",
+        "DeploymentState",
+        "EspDeviceSetupFailureDetails",
+        "EspUserSetupFailureDetails",
+        "FailureDetails",
+        "FailureReason",
+        "DeviceSetupDuration",
+        "AccountSetupDuration",
+        "DeploymentDuration",
+        "DeploymentTotalDuration"
+    ]
+}
