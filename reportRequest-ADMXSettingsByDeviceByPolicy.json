@@ -1,0 +1,20 @@
+{
+    "reportName": "ADMXSettingsByDeviceByPolicy",
+    "localizationType": "ReplaceLocalizableValues",
+    "select": [
+        "CreationSource",
+        "DeviceId",
+        "ErrorCode",
+        "ErrorType",
+        "PolicyId",
+        "PolicyName",
+        "PolicyVersion",
+        "SettingId",
+        "SettingInstanceId",
+        "SettingInstancePath",
+        "SettingName",
+        "SettingNameStringId",
+        "SettingStatus",
+        "UserId"
+    ]
+}
