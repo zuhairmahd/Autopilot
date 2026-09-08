@@ -962,6 +962,8 @@ $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $sc
 # "unmanaged" = $unmanagedDevices
 # }
 
+$global:token = $accessToken
+exit 0
 #How to use the new Get-Autopilot Report function
 $reportInfo = Get-Content -Path "$pwd\reportrequest.json" -Raw
 $report = Get-IntuneReport -accessToken $accessToken -reportInfo $reportInfo -uncompress -uncompressPath (Join-Path $env:USERPROFILE "Downloads")
