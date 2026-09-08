@@ -47,7 +47,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Verify PowerShell 7
         shell: pwsh
@@ -56,7 +56,7 @@ jobs:
           if ($PSVersionTable.PSVersion.Major -lt 7) { Write-Error "PowerShell 7+ is required."; exit 1 }
 
       - name: Cache Pester module
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~\Documents\PowerShell\Modules\Pester
           key: ${{ runner.os }}-pester-${{ hashFiles('**/Invoke-PesterTests.ps1') }}
@@ -132,10 +132,10 @@ jobs:
     needs: test
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Cache PowerShell modules
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~\Documents\PowerShell\Modules
           key: ${{ runner.os }}-pwsh-modules-${{ hashFiles('CreateRelease.ps1') }}
@@ -196,7 +196,7 @@ jobs:
       AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: true
           fetch-depth: 0
@@ -271,7 +271,7 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A $outputPath
-          git add -A main.exe 
+          git add -A main.exe
           git add -A lastrun.json
           git status
           git diff --cached --quiet

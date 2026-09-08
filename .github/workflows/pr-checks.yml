@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Verify PowerShell 7
         shell: pwsh
@@ -32,7 +32,7 @@ jobs:
           }
 
       - name: Cache Pester module
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~\Documents\PowerShell\Modules\Pester
           key: ${{ runner.os }}-pester-${{ hashFiles('**/Invoke-PesterTests.ps1') }}
@@ -74,7 +74,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Verify PowerShell 7
         shell: pwsh
@@ -86,7 +86,7 @@ jobs:
           }
 
       - name: Cache Pester module
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~\Documents\PowerShell\Modules\Pester
           key: ${{ runner.os }}-pester-${{ hashFiles('**/Invoke-PesterTests.ps1') }}
@@ -128,7 +128,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Verify PowerShell 7
         shell: pwsh
@@ -140,7 +140,7 @@ jobs:
           }
 
       - name: Cache Pester module
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~\Documents\PowerShell\Modules\Pester
           key: ${{ runner.os }}-pester-${{ hashFiles('**/Invoke-PesterTests.ps1') }}
@@ -182,7 +182,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Run PSScriptAnalyzer
         shell: pwsh
