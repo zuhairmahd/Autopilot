@@ -22,7 +22,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Verify PowerShell 7
         shell: pwsh
@@ -31,7 +31,7 @@ jobs:
           if ($PSVersionTable.PSVersion.Major -lt 7) { Write-Error "PowerShell 7+ is required."; exit 1 }
 
       - name: Cache Pester module
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~\Documents\PowerShell\Modules\Pester
           key: ${{ runner.os }}-pester-${{ hashFiles('**/Invoke-PesterTests.ps1') }}
@@ -68,10 +68,10 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Cache Pester module
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~\Documents\PowerShell\Modules\Pester
           key: ${{ runner.os }}-pester-${{ hashFiles('**/Invoke-PesterTests.ps1') }}
@@ -107,10 +107,10 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Cache Pester module
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~\Documents\PowerShell\Modules\Pester
           key: ${{ runner.os }}-pester-${{ hashFiles('**/Invoke-PesterTests.ps1') }}
@@ -149,10 +149,10 @@ jobs:
       BRANCH_NAME: ${{ github.ref_name }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Cache PowerShell modules
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~\Documents\PowerShell\Modules
           key: ${{ runner.os }}-pwsh-modules-${{ hashFiles('CreateRelease.ps1') }}
@@ -193,9 +193,9 @@ jobs:
           #copy lastrun.json to branch directory
           Copy-Item -Path .\lastrun.json -Destination "$branchDir\lastrun.json" -Force
           #copy the logs into the destination branch folder if it exists
-          if (Test-Path -Path .\logs\CreateRelease.log) { 
+          if (Test-Path -Path .\logs\CreateRelease.log) {
             if (-not (Test-Path -Path "$branchDir\logs")) { New-Item -Path "$branchDir\logs" -ItemType Directory }
-            Copy-Item -Path .\logs\* -Destination "$branchDir\logs" -Recurse -Force 
+            Copy-Item -Path .\logs\* -Destination "$branchDir\logs" -Recurse -Force
           }
           Write-Host "Build complete ($env:BRANCH_NAME using target: $env:TARGET_DESCRIPTION). Executable and lastrun.json are in the $env:BRANCH_NAME directory."
 
@@ -227,7 +227,7 @@ jobs:
       BRANCH_NAME: ${{ github.ref_name }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: true
           fetch-depth: 0
@@ -293,7 +293,7 @@ jobs:
         run: |
           $branchDir = ".\$env:BRANCH_NAME"
           #copy reset.cmd and reset.ps1 from the tools folder to the target folder.
-          if (Test-Path -Path .\tools\reset.cmd) { Copy-Item -Path .\tools\reset.cmd -Destination "$branchDir\reset.cmd" -Force }                   
+          if (Test-Path -Path .\tools\reset.cmd) { Copy-Item -Path .\tools\reset.cmd -Destination "$branchDir\reset.cmd" -Force }
           if (Test-Path -Path .\tools\reset.ps1) { Copy-Item -Path .\tools\reset.ps1 -Destination "$branchDir\reset.ps1" -Force }
           .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName $env:TARGET_NAME -Overwrite -CreateZipFileOnly
 

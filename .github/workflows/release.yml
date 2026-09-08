@@ -15,7 +15,7 @@ jobs:
     if: github.event_name == 'release' && github.event.action == 'published'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Verify PowerShell 7
         shell: pwsh
@@ -24,7 +24,7 @@ jobs:
           if ($PSVersionTable.PSVersion.Major -lt 7) { Write-Error "PowerShell 7+ is required."; exit 1 }
 
       - name: Cache Pester module
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~\Documents\PowerShell\Modules\Pester
           key: ${{ runner.os }}-pester-${{ hashFiles('**/Invoke-PesterTests.ps1') }}
@@ -60,10 +60,10 @@ jobs:
     if: github.event_name == 'release' && github.event.action == 'published'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Cache Pester module
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~\Documents\PowerShell\Modules\Pester
           key: ${{ runner.os }}-pester-${{ hashFiles('**/Invoke-PesterTests.ps1') }}
@@ -99,10 +99,10 @@ jobs:
     if: github.event_name == 'release' && github.event.action == 'published'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Cache Pester module
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~\Documents\PowerShell\Modules\Pester
           key: ${{ runner.os }}-pester-${{ hashFiles('**/Invoke-PesterTests.ps1') }}
@@ -138,10 +138,10 @@ jobs:
     if: github.event_name == 'release' && github.event.action == 'published'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Cache PowerShell modules
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~\Documents\PowerShell\Modules
           key: ${{ runner.os }}-pwsh-modules-${{ hashFiles('CreateRelease.ps1') }}
@@ -167,7 +167,7 @@ jobs:
           write-host "Build complete (release using target: production). Executable and lastrun.json are in the hd directory."
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: autopilot-build
           path: hd
@@ -192,7 +192,7 @@ jobs:
       AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: true
           fetch-depth: 0
