@@ -1,5 +1,4 @@
-function GetAppAssignmentTypes()
-{
+function GetAppAssignmentTypes() {
     <#
     .SYNOPSIS
     Retrieves and categorizes application assignments by type (required, available, unassigned).
@@ -39,70 +38,74 @@ function GetAppAssignmentTypes()
     param (
         [Parameter(Mandatory = $true)]
         [string]$AccessToken,
-        
         [Parameter(ParameterSetName = 'Export')]
         [switch]$Export,
         [Parameter(Mandatory = $true, ParameterSetName = 'Export')]
         [string]$outputPath,
         [Parameter(ParameterSetName = 'Export')]
         [ValidateSet('Append', 'Overwrite')]
-        [string]$fileMode = 'Overwrite'
+        [string]$fileMode = 'Overwrite',
+        [ValidateSet('Windows', 'macOS', 'iOS', 'Android')]
+        [string]$operatingSystem = 'Windows'
     )
-    $functionName = $MyInvocation.MyCommand.Name    
+    $functionName = $MyInvocation.MyCommand.Name
     #write a verbose log of received parameters
     Write-Verbose "[$functionName] Starting function with parameters: AccessToken, Export: $Export, outputPath: $outputPath, fileMode: $fileMode"
-Write-Log -logFile $logFile -Module $functionName -Message "Starting function with parameters: AccessToken, Export: $Export, outputPath: $outputPath, fileMode: $fileMode." -LogLevel "Verbose"
+    Write-Log -logFile $logFile -Module $functionName -Message "Starting function with parameters: AccessToken, Export: $Export, outputPath: $outputPath, fileMode: $fileMode." -LogLevel "Verbose"
     # Create a cache for group information to avoid repeated API calls
     $groupCache = @{}
     Write-Log -logFile $logFile -Module $functionName -Message "Initialized group cache." -LogLevel "Debug"
-    
+
     # Function to get group display name (uses cache when possible)
-    function GetGroupDisplayName
-    {
+    function GetGroupDisplayName {
         param (
             [string]$groupId
         )
-        $functionName = $MyInvocation.MyCommand.Name    
+        $functionName = $MyInvocation.MyCommand.Name
         Write-Verbose "[$functionName] Called with groupId: $groupId"
         Write-Log -logFile $logFile -Module $functionName -Message "Called GetGroupDisplayName with groupId: $groupId" -LogLevel "Debug"
         # Return from cache if available
-        if ($groupCache.ContainsKey($groupId))
-        {
+        if ($groupCache.ContainsKey($groupId)) {
             Write-Log -logFile $logFile -Module $functionName -Message "Using cached group info for ID: $groupId" -LogLevel "Debug"
             return $groupCache[$groupId]
         }
-        
+
         # Otherwise fetch from Graph API and add to cache
         $groupUri = "groups/$groupId"
         $extraparameters = "select=displayName"
         Write-Log -logFile $logFile -Module $functionName -Message "Fetching group info for ID: $groupId" -LogLevel "Debug"
         $groupResult = CallGraphApi -ResourcePath $groupUri -accessToken $AccessToken -apiVersion 'v1.0' -extraparameters $extraparameters
         Write-Log -logFile $logFile -Module $functionName -Message "Group result: $($groupResult | Out-String)" -LogLevel "Debug"
-        
-        if ($groupResult.displayName)
-        {
+
+        if ($groupResult.displayName) {
             Write-Log -logFile $logFile -Module $functionName -Message "Caching displayName: $($groupResult.displayName) for groupId: $groupId" -LogLevel "Debug"
             # Store in cache for future use
             $groupCache[$groupId] = $groupResult.displayName
             return $groupResult.displayName
         }
-        else
-        {
-Write-Log -logFile $logFile -Module $functionName -Message "No displayName found for groupId: $groupId, returning 'unassigned'" -LogLevel "Verbose"
-            return 'unassigned'
+        else {
+            # Return the groupId as fallback so the assignment is not silently lost
+            Write-Log -logFile $logFile -Module $functionName -Message "No displayName found for groupId: $groupId, returning raw ID as fallback" -LogLevel "Warning"
+            $groupCache[$groupId] = $groupId
+            return $groupId
         }
     }
-    
+
     # Step 1: Get all mobile apps with $expand parameter to include assignments in the same call
-    $managedAppUri = "deviceAppManagement/mobileApps"
-    $extraParameters = "expand=assignments"
-    Write-Verbose "[$functionName] Getting all apps with assignments in a single call: $($managedAppUri)"
-    Write-Log -logFile $logFile -Module $functionName -Message "Getting all apps with assignments in a single call: $managedAppUri" -LogLevel "Information"
-    
+    $params = @{
+        accessToken     = $AccessToken
+        apiVersion      = 'beta'
+        ResourcePath    = "deviceAppManagement/mobileApps"
+        extraParameters = "expand=assignments"
+    }
+    if ($operatingSystem -eq 'Windows') {
+        $params.filter = "(isof('microsoft.graph.windowsStoreApp') or isof('microsoft.graph.microsoftStoreForBusinessApp') or isof('microsoft.graph.officeSuiteApp') or isof('microsoft.graph.win32LobApp') or isof('microsoft.graph.windowsMicrosoftEdgeApp') or isof('microsoft.graph.windowsPhone81AppX') or isof('microsoft.graph.windowsPhone81StoreApp') or isof('microsoft.graph.windowsPhoneXAP') or isof('microsoft.graph.windowsAppX') or isof('microsoft.graph.windowsMobileMSI') or isof('microsoft.graph.windowsUniversalAppX') or isof('microsoft.graph.webApp') or isof('microsoft.graph.windowsWebApp') or isof('microsoft.graph.winGetApp'))&$orderby=displayName'"
+    }
+
     # Get all apps with their assignments in a single API call
-    $apps = CallGraphApi -ResourcePath $managedAppUri -accessToken $AccessToken -apiVersion 'v1.0' -extraParameters $extraParameters
-Write-Log -logFile $logFile -Module $functionName -Message "Found $($apps.value.count) apps in Intune." -LogLevel "Verbose"
-    
+    $apps = CallGraphApi @params
+    Write-Log -logFile $logFile -Module $functionName -Message "Found $($apps.value.count) apps in Intune." -LogLevel "Verbose"
+
     # Track results
     $assignmentResults = @()
     $requiredApps = @()
@@ -110,104 +113,124 @@ Write-Log -logFile $logFile -Module $functionName -Message "Found $($apps.value.
     $unassignedApps = @()
     Write-Verbose "[$functionName] Initialized result arrays."
     Write-Log -logFile $logFile -Module $functionName -Message "Initialized result arrays for assignments." -LogLevel "Debug"
-    
+
     # Step 2: Create a list of all unique groupIds to fetch in batch
     $allGroupIds = @{}
     Write-Log -logFile $logFile -Module $functionName -Message "Collecting all unique groupIds from app assignments." -LogLevel "Debug"
-    foreach ($app in $apps.value)
-    {
-        if ($app.assignments)
-        {
-            foreach ($assignment in $app.assignments)
-            {
-                if ($assignment.target.groupId)
-                {
-Write-Log -logFile $logFile -Module $functionName -Message "Found groupId: $($assignment.target.groupId) for app: $($app.displayName)" -LogLevel "Verbose"
+    foreach ($app in $apps.value) {
+        if ($app.assignments) {
+            foreach ($assignment in $app.assignments) {
+                if ($assignment.target.groupId) {
+                    Write-Log -logFile $logFile -Module $functionName -Message "Found groupId: $($assignment.target.groupId) for app: $($app.displayName)" -LogLevel "Verbose"
                     $allGroupIds[$assignment.target.groupId] = $true
                 }
             }
         }
     }
     Write-Log -logFile $logFile -Module $functionName -Message "Total unique groupIds collected: $($allGroupIds.Keys.Count)" -LogLevel "Debug"
-    
+
     # Step 3: Prefetch group info for all groups in batch (if supported by your GraphAPI implementation)
     Write-Log -logFile $logFile -Module $functionName -Message "Pre-fetching information for $($allGroupIds.Keys.Count) groups" -LogLevel "Debug"
-    foreach ($groupId in $allGroupIds.Keys)
-    {
+    foreach ($groupId in $allGroupIds.Keys) {
         Write-Log -logFile $logFile -Module $functionName -Message "Pre-fetching groupId: $groupId" -LogLevel "Debug"
         # Populate cache - calls the inner function that handles caching
         GetGroupDisplayName -groupId $groupId | Out-Null
     }
-    
+
     # Step 4: Process each app
-    foreach ($app in $apps.value)
-    {
-Write-Log -logFile $logFile -Module $functionName -Message "Processing app: $($app.displayName) (id: $($app.id))" -LogLevel "Verbose"
+    foreach ($app in $apps.value) {
+        Write-Log -logFile $logFile -Module $functionName -Message "Processing app: $($app.displayName) (id: $($app.id))" -LogLevel "Verbose"
         $assignedGroups = @()
-        
+
         # Process app assignments (if any)
         $hasAssignments = $false
-        if ($app.assignments -and $app.assignments.Count -gt 0)
-        {
+        if ($app.assignments -and $app.assignments.Count -gt 0) {
             $hasAssignments = $true
             Write-Log -logFile $logFile -Module $functionName -Message "App has $($app.assignments.Count) assignments." -LogLevel "Debug"
-            foreach ($assignment in $app.assignments)
-            {
-                if ($assignment.target.groupId)
-                {
-                    $groupName = GetGroupDisplayName -groupId $assignment.target.groupId
-                    Write-Log -logFile $logFile -Module $functionName -Message "Assignment groupId: $($assignment.target.groupId), groupName: $groupName" -LogLevel "Debug"
-                    $assignedGroups += $groupName
-                }
-                else
-                {
-                    Write-Log -logFile $logFile -Module $functionName -Message "Assignment has no groupId, marking as 'unassigned'" -LogLevel "Warning"
-                    $assignedGroups += 'unassigned'
+            foreach ($assignment in $app.assignments) {
+                $targetType = $assignment.target.'@odata.type'
+                switch ($targetType) {
+                    '#microsoft.graph.allLicensedUsersAssignmentTarget' {
+                        Write-Log -logFile $logFile -Module $functionName -Message "Assignment targets All Users (allLicensedUsersAssignmentTarget)" -LogLevel "Debug"
+                        $assignedGroups += 'All Users'
+                    }
+                    '#microsoft.graph.allDevicesAssignmentTarget' {
+                        Write-Log -logFile $logFile -Module $functionName -Message "Assignment targets All Devices (allDevicesAssignmentTarget)" -LogLevel "Debug"
+                        $assignedGroups += 'All Devices'
+                    }
+                    '#microsoft.graph.groupAssignmentTarget' {
+                        $groupName = GetGroupDisplayName -groupId $assignment.target.groupId
+                        Write-Log -logFile $logFile -Module $functionName -Message "Assignment groupId: $($assignment.target.groupId), groupName: $groupName" -LogLevel "Debug"
+                        $assignedGroups += $groupName
+                    }
+                    '#microsoft.graph.exclusionGroupAssignmentTarget' {
+                        $groupName = GetGroupDisplayName -groupId $assignment.target.groupId
+                        Write-Log -logFile $logFile -Module $functionName -Message "Exclusion groupId: $($assignment.target.groupId), groupName: $groupName" -LogLevel "Debug"
+                        $assignedGroups += "Excluded: $groupName"
+                    }
+                    default {
+                        # Unknown target type - use groupId if available
+                        if ($assignment.target.groupId) {
+                            $groupName = GetGroupDisplayName -groupId $assignment.target.groupId
+                            Write-Log -logFile $logFile -Module $functionName -Message "Unknown target type '$targetType', resolved groupId: $($assignment.target.groupId) to: $groupName" -LogLevel "Warning"
+                            $assignedGroups += $groupName
+                        }
+                        else {
+                            Write-Log -logFile $logFile -Module $functionName -Message "Unknown assignment target type with no groupId: '$targetType'" -LogLevel "Warning"
+                            $assignedGroups += "Unknown Target ($targetType)"
+                        }
+                    }
                 }
             }
         }
-        else
-        {
+        else {
             Write-Log -logFile $logFile -Module $functionName -Message "App has no assignments, marking as 'unassigned'" -LogLevel "Warning"
             $assignedGroups += 'unassigned'
         }
+        # Version property name differs by app type; resolve before constructing the object
+        $appVersion = switch ($app.'@odata.type') {
+            '#microsoft.graph.win32LobApp' { $app.displayVersion }
+            '#microsoft.graph.windowsMobileMSI' { $app.productVersion }
+            '#microsoft.graph.windowsUniversalAppX' { $app.identityVersion }
+            '#microsoft.graph.windowsAppX' { $app.identityVersion }
+            '#microsoft.graph.windowsPhone81AppX' { $app.identityVersion }
+            default { '' }
+        }
+
         # Create app object
         $appObject = [PSCustomObject]@{
-            id                     = $app.id
-            type                   = ($app."@odata.type" -replace '#Microsoft.Graph.', '')
-            displayName            = $app.displayName
-            AssignedGroups         = $assignedGroups -join '; '
-            assignedGroupCount     = $assignedGroups.Count
+            id                   = $app.id
+            type                 = ($app."@odata.type" -replace '#Microsoft.Graph.', '')
+            displayName          = $app.displayName
+            version              = if ($appVersion) { $appVersion } else { '' }
+            AssignedGroups       = $assignedGroups -join '; '
+            assignedGroupCount   = $assignedGroups.Count
             # assignmentResultObject property removed as it is unused
-            applicableDeviceType   = if ($app.applicableDeviceType.iPhoneAndIPod -and $app.applicableDeviceType.iPad) { 'iPad and iPhone' } elseif ($app.applicableDeviceType.iPad) { 'iPad' } elseif ($app.applicableDeviceType.iPhoneAndIPod) { 'iPhone' } else { "" }
+            applicableDeviceType = if ($app.applicableDeviceType.iPhoneAndIPod -and $app.applicableDeviceType.iPad) { 'iPad and iPhone' } elseif ($app.applicableDeviceType.iPad) { 'iPad' } elseif ($app.applicableDeviceType.iPhoneAndIPod) { 'iPhone' } else { "" }
         }
         Write-Log -logFile $logFile -Module $functionName -Message "App object created: $($appObject | Out-String)" -LogLevel "Debug"
-        
+
         # Categorize the app based on assignment intent
-        if (-not $hasAssignments)
-        {
+        if (-not $hasAssignments) {
             Write-Log -logFile $logFile -Module $functionName -Message "$($app.displayName) is unassigned." -LogLevel "Information"
             $unassignedApps += $appObject
         }
-        elseif ($app.assignments.intent -contains 'required')
-        {
+        elseif ($app.assignments.intent -contains 'required') {
             Write-Log -logFile $logFile -Module $functionName -Message "$($app.displayName) is a required app." -LogLevel "Information"
             $requiredApps += $appObject
         }
-        elseif ($app.assignments.intent -match 'available')
-        {
+        elseif ($app.assignments.intent -match 'available') {
             Write-Log -logFile $logFile -Module $functionName -Message "$($app.displayName) is an available app." -LogLevel "Information"
             $availableApps += $appObject
         }
-        else
-        {
+        else {
             Write-Log -logFile $logFile -Module $functionName -Message "$($app.displayName) has assignments but unclear intent." -LogLevel "Warning"
             $unassignedApps += $appObject
         }
-        
+
         $assignmentResults += $appObject
     }
-    
+
     # Create the return object
     $returnedApps = [PSCustomObject]@{
         RequiredApps   = $requiredApps
@@ -217,17 +240,16 @@ Write-Log -logFile $logFile -Module $functionName -Message "Processing app: $($a
     }
     Write-Verbose "[$functionName] Created return object."
     Write-Log -logFile $logFile -Module $functionName -Message "Created return object for app assignments." -LogLevel "Debug"
-    
+
     # Output stats
     Write-Host "Total number of apps: $($apps.value.count)" -ForegroundColor Green
     Write-Host "Total number of required apps: $($requiredApps.count)"
     Write-Host "Total number of available apps: $($availableApps.count)"
     Write-Host "Total number of unassigned apps: $($unassignedApps.count)"
     Write-Log -logFile $logFile -Module $functionName -Message "Output stats displayed." -LogLevel "Debug"
-    
+
     # Export if requested
-    if ($Export)
-    {
+    if ($Export) {
         Write-Log -logFile $logFile -Module $functionName -Message "Export requested." -LogLevel "Information"
         $date = (Get-Date -Format "yyyyMMdd-HHmmss")
         $exportSuccessful = $false
@@ -237,90 +259,84 @@ Write-Log -logFile $logFile -Module $functionName -Message "Processing app: $($a
 
         # Combine all apps for export and add a category column
         $allAppsForExport = @()
-        
+
         # Add required apps with category
-        foreach ($app in $requiredApps)
-        {
+        foreach ($app in $requiredApps) {
             $exportApp = [PSCustomObject]@{
                 Intent               = "Required"
                 id                   = $app.id
                 type                 = $app.type
                 displayName          = $app.displayName
+                version              = $app.version
                 applicableDeviceType = $app.applicableDeviceType
                 AssignedGroups       = $app.AssignedGroups
                 assignedGroupCount   = $app.assignedGroupCount
             }
             $allAppsForExport += $exportApp
         }
-        
+
         # Add available apps with category
-        foreach ($app in $availableApps)
-        {
+        foreach ($app in $availableApps) {
             $exportApp = [PSCustomObject]@{
                 Intent               = "Available"
                 id                   = $app.id
                 type                 = $app.type
                 displayName          = $app.displayName
+                version              = $app.version
                 applicableDeviceType = $app.applicableDeviceType
                 AssignedGroups       = $app.AssignedGroups
                 assignedGroupCount   = $app.assignedGroupCount
             }
             $allAppsForExport += $exportApp
         }
-        
+
         # Add unassigned apps with category
-        foreach ($app in $unassignedApps)
-        {
+        foreach ($app in $unassignedApps) {
             $exportApp = [PSCustomObject]@{
                 Intent               = "Unassigned"
                 id                   = $app.id
                 type                 = $app.type
                 displayName          = $app.displayName
+                version              = $app.version
                 applicableDeviceType = $app.applicableDeviceType
                 AssignedGroups       = $app.AssignedGroups
                 assignedGroupCount   = $app.assignedGroupCount
             }
             $allAppsForExport += $exportApp
         }
-        
+
         # Export all apps to CSV
-        if ($allAppsForExport.Count -gt 0)
-        {
+        if ($allAppsForExport.Count -gt 0) {
             Write-Log -logFile $logFile -Module $functionName -Message "Exporting $($allAppsForExport.Count) total apps to $csvPath" -LogLevel "Information"
-            if ($fileMode -eq 'Append' -and (Test-Path $csvPath))
-            {
+            if ($fileMode -eq 'Append' -and (Test-Path $csvPath)) {
                 Write-Log -logFile $logFile -Module $functionName -Message "Appending to existing CSV file." -LogLevel "Debug"
                 $allAppsForExport | Export-Csv -Path $csvPath -NoTypeInformation -Append
             }
-            else
-            {
-Write-Log -logFile $logFile -Module $functionName -Message "Overwriting existing CSV file." -LogLevel "Verbose"
+            else {
+                Write-Log -logFile $logFile -Module $functionName -Message "Overwriting existing CSV file." -LogLevel "Verbose"
                 $allAppsForExport | Export-Csv -Path $csvPath -NoTypeInformation
             }
             Write-Host "Exported $($allAppsForExport.Count) apps to $csvPath" -ForegroundColor Green
-            if (Test-Path $csvPath)
-            {
+            if (Test-Path $csvPath) {
                 Write-Verbose "[$functionName] CSV file created successfully."
                 Write-Log -logFile $logFile -Module $functionName -Message "CSV file created successfully at $csvPath." -LogLevel "Information"
                 $exportSuccessful = $true
             }
         }
-        else
-        {
+        else {
             Write-Log -logFile $logFile -Module $functionName -Message "No apps to export" -LogLevel "Warning"
             Write-Host "No apps found to export" -ForegroundColor Yellow
             $exportSuccessful = $false
         }
-        
+
         Write-Verbose "[$functionName] Export complete."
         Write-Log -logFile $logFile -Module $functionName -Message "Export complete to $csvPath" -LogLevel "Information"
     }
-    else
-    {
+    else {
         Write-Log -logFile $logFile -Module $functionName -Message "No export requested." -LogLevel "Debug"
     }
-    
+
     Write-Verbose "[$functionName] Returning result object."
-Write-Log -logFile $logFile -Module $functionName -Message "Returning result object from GetAppAssignmentTypes." -LogLevel "Information"
+    Write-Log -logFile $logFile -Module $functionName -Message "Returning result object from GetAppAssignmentTypes." -LogLevel "Information"
     return $exportSuccessful, $returnedApps
 }
