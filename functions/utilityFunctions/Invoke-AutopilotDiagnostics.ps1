@@ -22,10 +22,10 @@ function Invoke-AutopilotDiagnostics {
 
     $toolPath = Join-Path -Path $RootPath -ChildPath "tools\Get-AutopilotDiagnosticsCommunity.ps1"
     if (Test-Path -Path $toolPath) {
-        Write-Log -logFile $logFile -Module $functionName -Message "Found tool at path: $toolPath" -logLevel "INFO"
+        Write-Log -logFile $logFile -Module $functionName -Message "Found tool at path: $toolPath" -logLevel "INFORMATION"
         $returnObject.message = & $toolPath -File $fileName -Bearer $accessToken -online
         $returnObject.success = $true
-        Write-Log -logFile $logFile -Module $functionName -Message "Successfully invoked tool at path: $toolPath" -logLevel "INFO"
+        Write-Log -logFile $logFile -Module $functionName -Message "Successfully invoked tool at path: $toolPath" -logLevel "INFORMATION"
     }
     else {
         $returnObject.message = "Tool not found at path: $toolPath"
